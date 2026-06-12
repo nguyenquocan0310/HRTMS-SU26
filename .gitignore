@@ -14,3 +14,13 @@ backend/**/appsettings.Development.json
 # OS
 Thumbs.db
 .DS_Store
+
+appsettings.Development.json
+
+# Build output
+bin/
+obj/
+
+# VS files
+.vs/
+*.user
