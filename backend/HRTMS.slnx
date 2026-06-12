@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="HRTMS.API/HRTMS.API.csproj" />
+  <Project Path="HRTMS.Core/HRTMS.Core.csproj" />
+  <Project Path="HRTMS.Infrastructure/HRTMS.Infrastructure.csproj" />
+</Solution>

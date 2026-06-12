@@ -1,0 +1,6 @@
+@HRTMS.API_HostAddress = http://localhost:5222
+
+GET {{HRTMS.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
