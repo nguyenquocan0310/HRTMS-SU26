@@ -1,0 +1,16 @@
+# .NET — không commit thư mục build
+backend/**/bin/
+backend/**/obj/
+backend/**/.vs/
+
+# Node — không commit packages (nặng 300MB)
+frontend/node_modules/
+frontend/dist/
+
+# Thông tin nhạy cảm
+frontend/.env.local
+backend/**/appsettings.Development.json
+
+# OS
+Thumbs.db
+.DS_Store
