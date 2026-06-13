@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using HRTMS.Infrastructure.Entities;
+using HRTMS.Core.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace HRTMS.Infrastructure.Data;
