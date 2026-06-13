@@ -1,295 +1,232 @@
 # HRTMS-SU26 — Horse Racing Tournament Management System
 
-Dự án SWP391 — Hệ thống quản lý giải đua ngựa.  
-Backend: **.NET 8 Clean Architecture** · Frontend: **React 19 + TypeScript + Vite**
+SWP391 university project. Backend: .NET 8 Clean Architecture. Frontend: React 19 + TypeScript + Vite.
 
 ---
 
-## Mục lục
-
-1. [Cấu trúc repository](#1-cấu-trúc-repository)
-2. [Backend — Kiến trúc 3 tầng](#2-backend--kiến-trúc-3-tầng)
-3. [Frontend — Cấu trúc & yêu cầu](#3-frontend--cấu-trúc--yêu-cầu)
-4. [Hướng dẫn cài đặt & chạy](#4-hướng-dẫn-cài-đặt--chạy)
-5. [Quy trình làm việc với Git](#5-quy-trình-làm-việc-với-git)
-
----
-
-## 1. Cấu trúc repository
+## Repository Structure
 
 ```
 HRTMS-SU26/
-├── backend/          # .NET 8 Web API (Clean Architecture)
-├── frontend/         # React 19 + TypeScript + Vite
-├── database/         # SQL Server schema scripts
-│   └── hrtms_schema.sql
-├── docs/             # Tài liệu dự án
-│   ├── SRS.md                    # Software Requirements Specification
-│   ├── GIT_GUIDE.md              # Hướng dẫn Git workflow
-│   ├── api-contract-auth.md      # API contract module Auth
-│   ├── api-contract-jockey.md    # API contract module Jockey
-│   └── api-contract-tournament.md
-└── README.md
+  backend/
+    HRTMS.Core/                  Domain layer — no external dependencies
+      Entities/                  25 classes mapped 1:1 to DB tables (Database-First)
+      Interfaces/
+        Services/                Service contracts (IAuthService, ...)
+        Repositories/            Repository contracts (IUserRepository, ...)
+      DTOs/                      Request/response data shapes per module
+      Common/                    ApiResponse<T>, PagedResult<T>, JwtSettings
+      Enums/                     Shared enums
+    HRTMS.Infrastructure/        Implementation layer
+      Data/
+        HRTMSDbContext.cs        EF Core DbContext, Fluent API config for all tables
+      Services/                  Implements IService interfaces (AuthService, JwtService)
+      Repositories/              Implements IRepository interfaces
+      Configuration/             Optional Fluent API split files
+    HRTMS.API/                   Presentation layer
+      Controllers/               HTTP endpoints — call services, return ApiResponse
+      Extensions/                DI registration split by concern (DB, JWT, CORS, Swagger)
+      Middleware/
+        ExceptionMiddleware.cs   Global exception handler
+      Program.cs                 App entry point — calls extensions only
+      appsettings.json           Connection string, JwtSettings
+    HRTMS.slnx                   Solution file
+  frontend/
+    src/
+      api/                       Axios call functions per module (auth.ts, ...)
+      components/                Reusable UI components
+      pages/                     Screens organized by feature
+      store/                     Zustand state stores (authStore.ts)
+      types/
+        index.ts                 Shared TypeScript interfaces and types
+      utils/
+        axios.ts                 Axios instance — JWT interceptor, 401 redirect
+      App.tsx                    Router setup
+    index.html
+    package.json
+    vite.config.ts
+  database/
+    hrtms_schema.sql             SQL Server schema — run once to create DB, no Migrations
+  docs/
+    SRS.md                       Software Requirements Specification (source of truth)
+    GIT_GUIDE.md                 Git workflow guide
+    api-contract-*.md            API contracts per module
+  README.md
 ```
 
 ---
 
-## 2. Backend — Kiến trúc 3 tầng
+## Backend — Clean Architecture (3 Layers)
 
-### Tại sao dùng Clean Architecture?
-
-Clean Architecture (Onion Architecture) chia backend thành 3 tầng độc lập, giúp:
-
-- **Dễ test** — Core không phụ thuộc database hay framework, test logic thuần
-- **Dễ thay thế** — Đổi SQL Server → PostgreSQL chỉ sửa Infrastructure, không đụng Core
-- **Dễ phân công** — Mỗi người làm 1 tầng, ít conflict
-- **Tránh "Big Ball of Mud"** — Không nhét hết logic vào Controller
-
-### Sơ đồ phụ thuộc
+### Dependency Rule
 
 ```
-HRTMS.API  →  HRTMS.Infrastructure  →  HRTMS.Core
-  (ngoài)          (giữa)                (trong)
-
-Mũi tên = "biết đến / phụ thuộc vào"
-Core KHÔNG biết đến Infrastructure hay API
+HRTMS.API  ->  HRTMS.Infrastructure  ->  HRTMS.Core
 ```
 
-Quy tắc **bất biến**: **tầng trong không bao giờ import tầng ngoài**.
+Inner layers never import outer layers. Core has zero external dependencies.
 
 ---
 
-### 2.1 HRTMS.Core — Tầng lõi (không phụ thuộc gì)
+### HRTMS.Core
+
+Contains domain logic and contracts only. No database, no framework dependencies.
 
 ```
 HRTMS.Core/
-├── Entities/           # 25 class ánh xạ trực tiếp từ bảng SQL Server
-│   ├── User.cs
-│   ├── Horse.cs
-│   ├── Tournament.cs
-│   ├── Race.cs
-│   ├── RaceEntry.cs
-│   ├── Wallet.cs
-│   ├── VirtualPointsTransaction.cs
-│   ├── SpectatorProfile.cs
-│   ├── JockeyProfile.cs
-│   ├── OwnerProfile.cs
-│   ├── RefereeProfile.cs
-│   ├── DoctorProfile.cs
-│   └── ... (25 files tổng)
-│
-├── Interfaces/
-│   ├── Services/       # IAuthService, ITournamentService, ...
-│   └── Repositories/   # IUserRepository, IHorseRepository, ...
-│
-├── DTOs/
-│   └── Auth/           # LoginDto, RegisterDto, AuthResponseDto
-│
-├── Common/
-│   ├── ApiResponse.cs  # Wrapper chuẩn cho mọi response: { success, message, data }
-│   ├── PagedResult.cs  # Kết quả phân trang
-│   └── JwtSettings.cs  # Config class bind từ appsettings.json
-│
-└── Enums/              # Các enum dùng chung (nếu có)
+  Entities/          25 classes mapped 1:1 to SQL Server tables (Database-First)
+  Interfaces/
+    Services/        IAuthService, ITournamentService, ...
+    Repositories/    IUserRepository, IHorseRepository, ...
+  DTOs/
+    Auth/            LoginDto, RegisterDto, AuthResponseDto
+  Common/
+    ApiResponse.cs   Unified response wrapper: { success, message, data }
+    PagedResult.cs   Pagination result
+    JwtSettings.cs   Config class bound from appsettings.json
+  Enums/
 ```
 
-**Viết vào đây khi:** thêm entity mới, thêm DTO, định nghĩa interface service/repository mới.
+Write here when: adding entities, DTOs, or defining new service/repository interfaces.
 
 ---
 
-### 2.2 HRTMS.Infrastructure — Tầng triển khai (biết Core, không biết API)
+### HRTMS.Infrastructure
+
+Implements interfaces defined in Core. Knows Core, does not know API.
 
 ```
 HRTMS.Infrastructure/
-├── Data/
-│   └── HRTMSDbContext.cs   # EF Core DbContext, Fluent API config cho 25 bảng
-│                           # Database-First: KHÔNG có Migrations/
-│
-├── Services/               # Implement interface từ Core
-│   ├── AuthService.cs      # implements IAuthService
-│   └── JwtService.cs       # tạo/verify JWT token
-│
-├── Repositories/           # Implement IRepository (khi cần tách query phức tạp)
-│
-└── Configuration/          # Fluent API config riêng lẻ (nếu tách ra)
+  Data/
+    HRTMSDbContext.cs    EF Core DbContext with Fluent API config for all 25 tables
+  Services/
+    AuthService.cs       implements IAuthService
+    JwtService.cs        JWT token generation
+  Repositories/          implements IRepository interfaces
+  Configuration/         optional Fluent API split files
 ```
 
-**Viết vào đây khi:** implement logic nghiệp vụ, query database, gọi service ngoài (email, SMS...).
+Write here when: implementing business logic, querying the database, calling external services.
 
-> ⚠️ **Database-First**: Khi schema SQL thay đổi, chạy lại `Scaffold-DbContext` để cập nhật
-> `HRTMSDbContext` và Entities. **Không tạo Migrations.**
+Database-First: schema changes require re-running `Scaffold-DbContext`. Do not create Migrations.
 
 ---
 
-### 2.3 HRTMS.API — Tầng trình bày (biết cả Core lẫn Infrastructure)
+### HRTMS.API
+
+Entry point. Handles HTTP, DI registration, middleware. Knows both Core and Infrastructure.
 
 ```
 HRTMS.API/
-├── Controllers/            # Nhận HTTP request, gọi Service, trả response
-│   └── AuthController.cs
-│
-├── Extensions/             # Tách cấu hình DI ra khỏi Program.cs cho gọn
-│   ├── ApplicationServiceExtensions.cs   # Đăng ký Service, Repository
-│   ├── DatabaseServiceExtensions.cs      # Đăng ký DbContext + connection string
-│   ├── JwtAuthExtensions.cs              # Cấu hình JWT Bearer
-│   ├── CorsExtensions.cs                 # CORS policy cho frontend
-│   └── SwaggerExtensions.cs              # Swagger + Bearer auth UI
-│
-├── Middleware/
-│   └── ExceptionMiddleware.cs  # Bắt exception toàn cục, trả ApiResponse chuẩn
-│
-├── Program.cs              # Entry point — chỉ gọi các extension, không viết logic
-├── appsettings.json        # Connection string, JwtSettings
-└── appsettings.Development.json
+  Controllers/           Receive requests, call services, return responses
+  Extensions/
+    ApplicationServiceExtensions.cs   Register services and repositories
+    DatabaseServiceExtensions.cs      Register DbContext + connection string
+    JwtAuthExtensions.cs              JWT Bearer configuration
+    CorsExtensions.cs                 CORS policy for frontend origins
+    SwaggerExtensions.cs              Swagger + Bearer auth UI
+  Middleware/
+    ExceptionMiddleware.cs            Global exception handler -> ApiResponse
+  Program.cs             Calls extensions only, no logic
+  appsettings.json       ConnectionStrings, JwtSettings
 ```
 
-**Viết vào đây khi:** thêm Controller mới, thêm middleware, cấu hình pipeline.
+Write here when: adding controllers, middleware, or DI configuration.
 
 ---
 
-### 2.4 Cách làm việc trên cấu trúc 3 tầng
+### How to Add a New Feature
 
-Khi thêm một tính năng mới (ví dụ: **Quản lý Tournament**), thực hiện theo thứ tự:
+Follow this order strictly:
 
-#### Bước 1 — Core: Định nghĩa contract
-
-```csharp
-// HRTMS.Core/DTOs/Tournament/CreateTournamentDto.cs
-public class CreateTournamentDto { ... }
-
-// HRTMS.Core/Interfaces/Services/ITournamentService.cs
-public interface ITournamentService
-{
-    Task<ApiResponse<int>> CreateAsync(CreateTournamentDto dto);
-    Task<ApiResponse<PagedResult<TournamentDto>>> GetAllAsync(int page, int size);
-}
+**Step 1 — Core: define the contract**
+```
+HRTMS.Core/DTOs/Tournament/CreateTournamentDto.cs
+HRTMS.Core/Interfaces/Services/ITournamentService.cs
 ```
 
-#### Bước 2 — Infrastructure: Implement logic
-
-```csharp
-// HRTMS.Infrastructure/Services/TournamentService.cs
-public class TournamentService : ITournamentService
-{
-    private readonly HRTMSDbContext _context;
-    // ... query database, business logic
-}
+**Step 2 — Infrastructure: implement the logic**
+```
+HRTMS.Infrastructure/Services/TournamentService.cs
 ```
 
-#### Bước 3 — API: Đăng ký DI + tạo Controller
-
-```csharp
-// HRTMS.API/Extensions/ApplicationServiceExtensions.cs
-services.AddScoped<ITournamentService, TournamentService>();
-
-// HRTMS.API/Controllers/TournamentController.cs
-[ApiController, Route("api/tournaments")]
-public class TournamentController : ControllerBase
-{
-    private readonly ITournamentService _service;
-    // ... nhận request → gọi service → trả ApiResponse
-}
+**Step 3 — API: register DI + add controller**
 ```
-
-#### Quy tắc quan trọng
-
-| Được phép | Không được phép |
-|-----------|-----------------|
-| Controller gọi Interface (`IAuthService`) | Controller inject `HRTMSDbContext` trực tiếp |
-| Infrastructure dùng Entity từ Core | Core import namespace của Infrastructure |
-| API cấu hình DI trong Extensions | Viết SQL raw trong Controller |
-| Core chỉ chứa POCO + Interface | Infrastructure chứa DTO của API |
+HRTMS.API/Extensions/ApplicationServiceExtensions.cs   -> AddScoped<ITournamentService, TournamentService>()
+HRTMS.API/Controllers/TournamentController.cs
+```
 
 ---
 
-### 2.5 Response format chuẩn
+### Rules
 
-Mọi API đều trả về `ApiResponse<T>`:
+- Controllers must inject interfaces (IAuthService), never DbContext directly.
+- Core must never reference Infrastructure or API namespaces.
+- All API responses must use ApiResponse<T>.
+- Business logic belongs in Infrastructure Services, not Controllers.
+
+---
+
+### API Response Format
 
 ```json
-// Thành công
 { "success": true,  "message": "Success", "data": { ... } }
-
-// Thất bại
-{ "success": false, "message": "Email hoặc mật khẩu không đúng.", "data": null }
+{ "success": false, "message": "Error description.", "data": null }
 ```
 
 ---
 
-## 3. Frontend — Cấu trúc & yêu cầu
+## Frontend — Structure and Requirements
 
 ### Stack
 
-- **React 19** + **TypeScript** + **Vite**
-- **React Router v6** — routing
-- **Axios** — HTTP client (đã cấu hình interceptor JWT tự động)
-- **Zustand** — state management (auth store)
+React 19, TypeScript, Vite, React Router v6, Axios, Zustand
 
-### Cấu trúc thư mục
+### Directory Structure
 
 ```
 frontend/src/
-├── api/                # Hàm gọi API theo module
-│   └── auth.ts         # login(), register()
-│
-├── components/         # UI components tái sử dụng (Button, Input, Modal...)
-│
-├── pages/              # Màn hình theo tính năng
-│   └── auth/
-│       ├── LoginPage.tsx
-│       └── RegisterPage.tsx
-│
-├── store/              # Zustand stores
-│   └── authStore.ts    # token, user, setAuth(), logout()
-│
-├── types/              # TypeScript types/interfaces dùng chung
-│   └── index.ts
-│
-├── utils/
-│   └── axios.ts        # Axios instance với interceptor JWT + auto-redirect 401
-│
-├── App.tsx             # Router setup
-└── main.tsx            # Entry point
+  api/           API call functions per module (auth.ts, tournament.ts, ...)
+  components/    Reusable UI components
+  pages/         Screens organized by feature (auth/, tournament/, ...)
+  store/         Zustand stores (authStore.ts)
+  types/         Shared TypeScript types and interfaces (index.ts)
+  utils/
+    axios.ts     Axios instance with JWT interceptor and 401 auto-redirect
 ```
 
-### Quy ước khi thêm module mới (ví dụ: Tournament)
-
+When adding a new module (e.g. Tournament):
 ```
-src/api/tournament.ts           # các hàm gọi API tournament
-src/pages/tournament/           # các màn hình
-    TournamentListPage.tsx
-    TournamentDetailPage.tsx
-src/types/index.ts              # bổ sung Tournament, CreateTournamentRequest...
+src/api/tournament.ts
+src/pages/tournament/TournamentListPage.tsx
+src/pages/tournament/TournamentDetailPage.tsx
+src/types/index.ts              add Tournament, CreateTournamentRequest types
 ```
 
 ---
 
-### ⚠️ Các điểm FE cần đồng bộ với BE
+### FE Issues to Fix
 
-#### 1. Role names phải khớp với BE
-
-File `src/types/index.ts` hiện dùng `'HorseOwner'` — BE dùng `'Owner'`. Cần sửa:
+**1. Role names must match BE exactly**
 
 ```typescript
-// HIỆN TẠI (sai)
-export type Role = 'Admin' | 'HorseOwner' | 'Jockey' | 'RaceReferee' | 'Doctor' | 'Spectator'
+// Current (wrong)
+type Role = 'Admin' | 'HorseOwner' | 'Jockey' | 'RaceReferee' | 'Doctor' | 'Spectator'
 
-// ĐÚNG — khớp với BE
-export type Role = 'Admin' | 'Owner' | 'Jockey' | 'Race Referee' | 'Doctor' | 'Spectator'
+// Correct
+type Role = 'Admin' | 'Owner' | 'Jockey' | 'Race Referee' | 'Doctor' | 'Spectator'
 ```
 
-#### 2. LoginResponse không khớp với BE
+**2. LoginResponse must match BE ApiResponse wrapper**
 
-BE trả về `AuthResponseDto`:
+BE returns:
 ```json
 { "success": true, "message": "Success", "data": { "token": "...", "userId": 1, "role": "Spectator", "fullName": "..." } }
 ```
 
-FE hiện expect `{ token, user: User }` — cần cập nhật `types/index.ts`:
-
+Update `types/index.ts`:
 ```typescript
-// Sửa lại LoginResponse
-export interface LoginResponse {
+interface LoginResponse {
   success: boolean
   message: string
   data: {
@@ -301,98 +238,80 @@ export interface LoginResponse {
 }
 ```
 
-#### 3. RegisterRequest — bổ sung optional profile fields
+**3. RegisterRequest missing optional profile fields**
 
-BE yêu cầu thêm fields tùy theo `role`:
-
+BE requires additional fields depending on role:
 ```typescript
-export interface RegisterRequest {
+interface RegisterRequest {
   username: string
   fullName: string
   email: string
   password: string
   role: Role
-  // Owner
-  phoneNumber?: string
-  identityNumber?: string
-  // Jockey
-  licenseCertificate?: string
-  experienceYears?: number
-  selfDeclaredWeight?: number
-  // Race Referee
-  certificationLevel?: string
-  // Doctor
-  medicalLicenseNumber?: string
+  phoneNumber?: string         // Owner
+  identityNumber?: string      // Owner
+  licenseCertificate?: string  // Jockey
+  experienceYears?: number     // Jockey
+  selfDeclaredWeight?: number  // Jockey
+  certificationLevel?: string  // Race Referee
+  medicalLicenseNumber?: string // Doctor
 }
 ```
 
-#### 4. Biến môi trường
+**4. Environment variable**
 
-Tạo file `.env.local` (đã gitignore) với:
+Create `.env.local`:
 ```
 VITE_API_URL=http://localhost:5000/api
 ```
 
 ---
 
-## 4. Hướng dẫn cài đặt & chạy
+## Setup
 
 ### Backend
 
-**Yêu cầu:** .NET 8 SDK, SQL Server
+Requires: .NET 8 SDK, SQL Server
+
+1. Run `database/hrtms_schema.sql` against SQL Server to create the database.
+2. Update `backend/HRTMS.API/appsettings.json` — set `ConnectionStrings.DefaultConnection`.
+3. Run:
 
 ```bash
 cd backend
-
-# Cập nhật connection string trong HRTMS.API/appsettings.json
-# "DefaultConnection": "Server=...;Database=HRTMS;..."
-
-# Chạy API (port mặc định 5000)
 dotnet run --project HRTMS.API
 ```
 
-Swagger UI: `http://localhost:5000/swagger`
-
-> **Database-First**: Chạy `database/hrtms_schema.sql` để tạo schema trước, không dùng migrations.
+Swagger: `http://localhost:5000/swagger`
 
 ### Frontend
 
-**Yêu cầu:** Node.js 20+, pnpm
+Requires: Node.js 20+, pnpm
 
 ```bash
 cd frontend
 pnpm install
-pnpm dev       # http://localhost:5173
+pnpm dev
 ```
+
+Runs at `http://localhost:5173`
 
 ---
 
-## 5. Quy trình làm việc với Git
+## Git Workflow
 
 ```bash
-# Tạo branch mới từ main
-git checkout main
-git pull origin main
-git checkout -b feat/ten-tinh-nang
+git checkout main && git pull origin main
+git checkout -b feat/feature-name
 
-# Làm việc, commit thường xuyên
+# work, commit
 git add .
-git commit -m "feat: mô tả ngắn gọn"
+git commit -m "feat: description"
 
-# Push và tạo Pull Request
-git push origin feat/ten-tinh-nang
-# → Vào GitHub tạo PR: feat/ten-tinh-nang → main
-# → Chờ review → Merge
+git push origin feat/feature-name
+# open Pull Request on GitHub: feat/feature-name -> main
 ```
 
-**Cấu trúc commit message:**
+Commit prefix: `feat` `fix` `chore` `docs` `refactor`
 
-| Prefix | Dùng khi |
-|--------|----------|
-| `feat:` | thêm tính năng mới |
-| `fix:` | sửa bug |
-| `chore:` | cleanup, cấu hình, không ảnh hưởng logic |
-| `docs:` | cập nhật tài liệu |
-| `refactor:` | cải thiện code, không thêm/xóa tính năng |
-
-Chi tiết xem thêm: [`docs/GIT_GUIDE.md`](docs/GIT_GUIDE.md)
+See `docs/GIT_GUIDE.md` for details.
