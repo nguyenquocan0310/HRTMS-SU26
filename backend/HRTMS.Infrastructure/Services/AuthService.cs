@@ -11,32 +11,32 @@ public class AuthService : IAuthService
 {
     private readonly HRTMSDbContext _context;
     private readonly JwtService _jwtService;
+    private readonly IAuditLogService _auditLog;
 
     private static readonly string[] AllowedRoles =
         ["Spectator", "Owner", "Jockey", "Race Referee", "Doctor"];
     private const int MaxFailedAttempts = 5;
     private const int LockoutMinutes = 30;
 
-    public AuthService(HRTMSDbContext context, JwtService jwtService)
+    public AuthService(HRTMSDbContext context, JwtService jwtService,
+                       IAuditLogService auditLog)
     {
         _context = context;
         _jwtService = jwtService;
+        _auditLog = auditLog;
     }
 
-    public async Task<ApiResponse<AuthResponseDto>> LoginAsync(LoginDto dto)
+    public async Task<ApiResponse<AuthResponseDto>> LoginAsync(LoginDto dto, string? ipAddress)
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
 
-        // User not found — use generic message to prevent email enumeration
         if (user == null)
             return ApiResponse<AuthResponseDto>.Fail("Email hoặc mật khẩu không đúng.");
 
-        // Check lockout (BR-33 lockout logic)
         if (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTime.UtcNow)
             return ApiResponse<AuthResponseDto>.Fail(
                 $"Tài khoản đang bị khóa tạm thời. Vui lòng thử lại sau {user.LockoutEnd.Value:HH:mm dd/MM/yyyy} UTC.");
 
-        // Verify password
         if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
         {
             user.FailedLoginAttempts++;
@@ -50,18 +50,24 @@ public class AuthService : IAuthService
             return ApiResponse<AuthResponseDto>.Fail("Email hoặc mật khẩu không đúng.");
         }
 
-        // Check account status
         if (user.Status == "Pending")
             return ApiResponse<AuthResponseDto>.Fail("Tài khoản chưa được Admin phê duyệt.");
 
         if (user.Status == "Suspended")
             return ApiResponse<AuthResponseDto>.Fail("Tài khoản đã bị vô hiệu hóa.");
 
-        // Successful login — reset lockout counters
         user.FailedLoginAttempts = 0;
         user.LockoutEnd = null;
         user.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
+
+        await _auditLog.LogAsync(
+            actorId: user.UserId,
+            action: "Login",
+            entityName: "Users",
+            entityId: user.UserId.ToString(),
+            ipAddress: ipAddress
+        );
 
         var token = _jwtService.GenerateToken(user);
 
@@ -74,9 +80,8 @@ public class AuthService : IAuthService
         });
     }
 
-    public async Task<ApiResponse<int>> RegisterAsync(RegisterDto dto)
+    public async Task<ApiResponse<int>> RegisterAsync(RegisterDto dto, string? ipAddress)
     {
-        // Admin accounts are created separately — not via self-registration (SRS 1.2.3)
         if (dto.Role == "Admin")
             return ApiResponse<int>.Fail("Không thể tự đăng ký tài khoản Admin.");
 
@@ -86,7 +91,6 @@ public class AuthService : IAuthService
         if (await _context.Users.AnyAsync(u => u.Email == dto.Email || u.Username == dto.Username))
             return ApiResponse<int>.Fail("Email hoặc Username đã tồn tại.");
 
-        // Spectator and Owner → Active immediately; others → Pending until Admin approves (EC-37)
         string initialStatus = dto.Role is "Spectator" or "Owner" ? "Active" : "Pending";
 
         var now = DateTime.UtcNow;
@@ -99,7 +103,7 @@ public class AuthService : IAuthService
                 Username = dto.Username,
                 FullName = dto.FullName,
                 Email = dto.Email,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password, workFactor: 12),
                 Role = dto.Role,
                 Status = initialStatus,
                 FailedLoginAttempts = 0,
@@ -107,19 +111,18 @@ public class AuthService : IAuthService
                 UpdatedAt = now
             };
             _context.Users.Add(user);
-            await _context.SaveChangesAsync(); // get user.UserId
+            await _context.SaveChangesAsync();
 
             switch (dto.Role)
             {
                 case "Spectator":
-                    // EC-47: atomic SpectatorProfile + Wallet + SignUp Bonus transaction
                     var spectatorProfile = new SpectatorProfile
                     {
                         SpectatorId = user.UserId,
                         CreatedAt = now
                     };
                     _context.SpectatorProfiles.Add(spectatorProfile);
-                    await _context.SaveChangesAsync(); // get spectatorProfile.SpectatorId
+                    await _context.SaveChangesAsync();
 
                     var wallet = new Wallet
                     {
@@ -128,7 +131,7 @@ public class AuthService : IAuthService
                         UpdatedAt = now
                     };
                     _context.Wallets.Add(wallet);
-                    await _context.SaveChangesAsync(); // get wallet.WalletId
+                    await _context.SaveChangesAsync();
 
                     _context.VirtualPointsTransactions.Add(new VirtualPointsTransaction
                     {
@@ -139,7 +142,6 @@ public class AuthService : IAuthService
                         CreatedAt = now
                     });
 
-                    // Update wallet balance to reflect sign-up bonus
                     wallet.Balance = 1000;
                     wallet.UpdatedAt = now;
                     await _context.SaveChangesAsync();
@@ -158,7 +160,6 @@ public class AuthService : IAuthService
                     break;
 
                 case "Jockey":
-                    // EC-37: JockeyProfile created as Pending
                     _context.JockeyProfiles.Add(new JockeyProfile
                     {
                         JockeyId = user.UserId,
@@ -173,7 +174,6 @@ public class AuthService : IAuthService
                     break;
 
                 case "Race Referee":
-                    // EC-37: RefereeProfile created as Pending
                     _context.RefereeProfiles.Add(new RefereeProfile
                     {
                         RefereeId = user.UserId,
@@ -186,7 +186,6 @@ public class AuthService : IAuthService
                     break;
 
                 case "Doctor":
-                    // EC-37: DoctorProfile created as Pending
                     _context.DoctorProfiles.Add(new DoctorProfile
                     {
                         DoctorId = user.UserId,
@@ -200,6 +199,15 @@ public class AuthService : IAuthService
             }
 
             await transaction.CommitAsync();
+
+            await _auditLog.LogAsync(
+                actorId: user.UserId,
+                action: "Register",
+                entityName: "Users",
+                entityId: user.UserId.ToString(),
+                ipAddress: ipAddress
+            );
+
             return ApiResponse<int>.Ok(user.UserId, "Tạo tài khoản thành công.");
         }
         catch
