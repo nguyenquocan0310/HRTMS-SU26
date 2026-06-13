@@ -3,8 +3,9 @@ using HRTMS.Core.DTOs.Auth;
 
 namespace HRTMS.Core.Interfaces.Services;
 
+
 public interface IAuthService
 {
-    Task<ApiResponse<AuthResponseDto>> LoginAsync(LoginDto dto);
-    Task<ApiResponse<int>> RegisterAsync(RegisterDto dto);
+    Task<ApiResponse<AuthResponseDto>> LoginAsync(LoginDto dto, string? ipAddress);
+    Task<ApiResponse<int>> RegisterAsync(RegisterDto dto, string? ipAddress);
 }
