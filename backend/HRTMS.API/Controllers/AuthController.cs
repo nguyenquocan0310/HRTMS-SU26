@@ -18,14 +18,16 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterDto dto)
     {
-        var result = await _authService.RegisterAsync(dto);
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var result = await _authService.RegisterAsync(dto, ip);
         return result.Success ? Created("", result) : Conflict(result);
     }
 
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginDto dto)
     {
-        var result = await _authService.LoginAsync(dto);
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var result = await _authService.LoginAsync(dto, ip);
         return result.Success ? Ok(result) : Unauthorized(result);
     }
 }
