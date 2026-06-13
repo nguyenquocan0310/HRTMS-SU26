@@ -1,0 +1,305 @@
+/* LoginPage.css */
+
+/* Thiết lập màu sắc và font chữ global cho trang đăng nhập */
+:root {
+  --primary-color: #3e2723; /* Màu nâu đậm của nút Sign In */
+  --text-dark: #333;
+  --text-light: #aaa;
+  --bg-form: #fff;
+  --bg-input: #f5f5f5;
+  --border-color: #e0e0e0;
+}
+
+/* Container chính chia trang làm 2 cột */
+.login-page-container {
+  display: flex;
+  height: 100vh; /* Chiếm toàn bộ chiều cao màn hình */
+  font-family: Arial, sans-serif;
+  overflow: hidden; /* Ngăn cuộn trang */
+}
+
+/* Cột trái: Panel hình ảnh */
+.login-image-panel {
+  flex: 1; /* Chiếm 50% chiều rộng */
+  /* Thay 'src/assets/horse-bg.jpg' bằng đường dẫn thực tế đến ảnh của bạn */
+  background-image: url('../../assets/horse-bg.jpg'); 
+  background-size: cover;
+  background-position: center;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 80px 60px;
+  position: relative;
+}
+
+/* Lớp phủ mờ cho hình nền (để văn bản dễ đọc) */
+.login-image-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5); /* Lớp phủ đen mờ 50% */
+  z-index: 1;
+}
+
+.brand-header, .brand-stats {
+  position: relative;
+  z-index: 2; /* Nằm trên lớp phủ mờ */
+}
+
+.brand-header {
+  text-align: center;
+}
+
+.brand-logo-circle {
+  width: 80px;
+  height: 80px;
+  background-color: #e6c1a8; /* Màu vàng kem của logo */
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0 auto 20px;
+}
+
+.brand-icon {
+  font-size: 40px;
+}
+
+.brand-header h1 {
+  font-size: 36px;
+  margin-bottom: 15px;
+  font-weight: bold;
+}
+
+.brand-header p {
+  font-size: 16px;
+  line-height: 1.6;
+  max-width: 450px;
+  margin: 0 auto;
+}
+
+.brand-stats {
+  display: flex;
+  justify-content: space-around;
+  text-align: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+  padding-top: 40px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-number {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #ddd;
+}
+
+/* Cột phải: Panel Form */
+.login-form-panel {
+  flex: 1; /* Chiếm 50% chiều rộng */
+  background-color: var(--bg-form);
+  display: flex;
+  flex-direction: column;
+  padding: 60px 80px;
+}
+
+/* Tab Login/Register */
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 50px;
+}
+
+.tab {
+  padding: 15px 30px;
+  text-decoration: none;
+  color: var(--text-dark);
+  font-weight: bold;
+  font-size: 16px;
+  position: relative;
+}
+
+.tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background-color: var(--primary-color);
+}
+
+.tab:not(.active) {
+  color: var(--text-light);
+}
+
+/* Nội dung form */
+.form-content {
+  max-width: 400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.form-content h2 {
+  font-size: 32px;
+  margin-bottom: 10px;
+  font-weight: bold;
+}
+
+.form-subtitle {
+  color: var(--text-light);
+  margin-bottom: 30px;
+}
+
+/* Input groups có icon */
+.login-form .input-group {
+  display: flex;
+  align-items: center;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin-bottom: 20px;
+  padding: 0 15px;
+}
+
+.input-icon {
+  font-size: 18px;
+  color: var(--text-light);
+  margin-right: 15px;
+}
+
+.login-form input {
+  border: none;
+  background: none;
+  padding: 18px 0;
+  width: 100%;
+  font-size: 16px;
+  color: var(--text-dark);
+}
+
+.login-form input:focus {
+  outline: none;
+}
+
+.error-message {
+  color: red;
+  margin-top: -15px;
+  margin-bottom: 15px;
+  font-size: 14px;
+}
+
+/* Phần checkbox và quên mật khẩu */
+.form-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  font-size: 14px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  color: var(--text-dark);
+}
+
+.checkbox-label input {
+  width: auto;
+  padding: 0;
+  margin-right: 8px;
+}
+
+.forgot-password {
+  color: #c98b67; /* Màu cam nâu */
+  text-decoration: none;
+}
+
+/* Nút Sign In */
+.sign-in-button {
+  width: 100%;
+  padding: 18px;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.sign-in-button:hover {
+  background-color: #2b1d1a;
+}
+
+.sign-in-button:disabled {
+  background-color: var(--text-light);
+  cursor: not-allowed;
+}
+
+/* Phần Google Sign-In */
+.separator {
+  text-align: center;
+  border-bottom: 1px solid var(--border-color);
+  line-height: 0.1em;
+  margin: 40px 0;
+}
+
+.separator span {
+  background: var(--bg-form);
+  padding: 0 10px;
+  color: var(--text-light);
+  font-size: 14px;
+}
+
+.google-sign-in {
+  width: 100%;
+  padding: 15px;
+  background-color: #f8f9fa;
+  color: var(--text-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: normal;
+}
+
+.google-sign-in .google-icon {
+  margin-right: 10px;
+  font-weight: bold;
+}
+
+/* Các link bổ sung ở dưới cùng */
+.additional-links {
+  text-align: center;
+  margin-top: 50px;
+  font-size: 12px;
+  color: var(--text-light);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+}
+
+.additional-links a {
+  color: var(--text-light);
+  text-decoration: none;
+}
+
+.additional-links a:hover {
+  text-decoration: underline;
+}
