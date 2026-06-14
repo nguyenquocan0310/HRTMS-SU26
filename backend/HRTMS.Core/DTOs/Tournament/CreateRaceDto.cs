@@ -19,7 +19,7 @@ namespace HRTMS.Core.DTOs.Tournament
 
         public string? TrackTypeOverride { get; set;  }
         public int? RaceDistanceOverride { get; set; }
-        public int ConfirmationCuroffHours { get; set; } = 24;
+        public int ConfirmationCutoffHours { get; set; } = 24;
         public int ProtestDeadlineMinutes { get; set; } = 30; 
 
     }

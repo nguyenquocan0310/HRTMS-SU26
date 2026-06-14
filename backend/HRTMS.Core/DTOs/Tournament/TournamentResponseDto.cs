@@ -17,15 +17,15 @@ namespace HRTMS.Core.DTOs.Tournament
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
         public int MaxHorses { get; set; }
-        public string AllowBreed { get; set; } = string.Empty;
+        public string AllowedBreed { get; set; } = string.Empty;
         public string TrackType { get; set; } = string.Empty;
         public int RaceDistance { get; set; }
-        public string RaceCatgory { get; set; } = string.Empty;
+        public string RaceCategory { get; set; } = string.Empty;
         public int MinJockeyExperienceYears { get; set; }
         public decimal PurseAmount { get; set; }
         public decimal EntryFeeAmount { get; set; }
         public decimal PreRaceWeightThresholdKg { get; set; }
-        public decimal PostRaceWeightThresholdKg { get; set; }
+        public decimal PostRaceWeightDiffThresholdKg { get; set; }
         public string Status { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public List<RoundResponseDto> Rounds { get; set; } = new();

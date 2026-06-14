@@ -14,7 +14,7 @@ namespace HRTMS.Core.DTOs.Tournament
         [Required, MaxLength(100)]
         public string Name { get; set; } = string.Empty;
         [Range(1, 100)]
-        public int SenquenceOrder { get; set; }
+        public int SequenceOrder { get; set; }
         [Required]
         public DateTime ScheduledDate { get; set; }
     }

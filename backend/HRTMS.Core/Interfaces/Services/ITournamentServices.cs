@@ -14,13 +14,13 @@ namespace HRTMS.Core.Interfaces.Services
         Task<TournamentResponseDto> CreateTournamentAsync(CreateTournamentDto dto, int createByUserId);
         Task<TournamentResponseDto?> GetTournamentByIdAsync(int tournamentId);
         Task<List<TournamentResponseDto>> GetAllTournamentsAsync();
-        Task<TournamentResponseDto> UpdateTournamentAsync(int tournamentId, UpdateTournamentDto dto); 
+        Task<TournamentResponseDto> UpdateTournamentAsync(int tournamentId, UpdateTournamentDto dto);
 
         // STATE MACHINE
-        Task<TournamentResponseDto> ChangeStatusAsync(int tournamentId, int targetStatus);
+        Task<TournamentResponseDto> ChangeStatusAsync(int tournamentId, string targetStatus, int adminUserId);
 
         // CANCEL (TRN.10)
-        Task CancelTournamentsAsync(int tournamentId, int adminUserId);
+        Task CancelTournamentAsync(int tournamentId, int adminUserId);
 
         // PRIZE DISTRIBUTION (TRN.4)
         Task<List<PrizeDistributionResponseDto>> SetPrizeDistributionAsync(int tournamentId, SetPrizeDistributionDto dto);
