@@ -10,6 +10,7 @@ public static class ApplicationServiceExtensions
         services.AddScoped<JwtService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IAuditLogService, AuditLogService>(); 
+        services.AddScoped<ITournamentServices, TournamentSevice>();
         return services;
     }
 }
