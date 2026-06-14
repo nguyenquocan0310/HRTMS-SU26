@@ -9,7 +9,8 @@ public static class ApplicationServiceExtensions
     {
         services.AddScoped<JwtService>();
         services.AddScoped<IAuthService, AuthService>();
-        services.AddScoped<IAuditLogService, AuditLogService>(); 
+        services.AddScoped<IAuditLogService, AuditLogService>();
+        services.AddScoped<ITokenBlacklistService, TokenBlacklistService>();
         return services;
     }
 }
