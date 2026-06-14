@@ -23,7 +23,7 @@ namespace HRTMS.Core.Interfaces.Services
         Task CancelTournamentAsync(int tournamentId, int adminUserId);
 
         // PRIZE DISTRIBUTION (TRN.4)
-        Task<List<PrizeDistributionResponseDto>> SetPrizeDistributionAsync(int tournamentId, SetPrizeDistributionDto dto);
+        Task<List<PrizeDistributionResponseDto>> SetPrizeDistributionsAsync(int tournamentId, SetPrizeDistributionDto dto);
 
         // ROUND & RACE (TRN.6)
         Task<RoundResponseDto> CreateRoundAsync(int tournamentId, CreateRoundDto dto);
