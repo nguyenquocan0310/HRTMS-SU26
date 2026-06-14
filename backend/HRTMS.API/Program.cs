@@ -9,6 +9,11 @@ builder.Services.AddJwtAuth(builder.Configuration);
 builder.Services.AddCorsPolicy();
 builder.Services.AddSwaggerServices();
 builder.Services.AddControllers();
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration.GetConnectionString("Redis");
+    options.InstanceName = "HRTMS:";
+});
 
 var app = builder.Build();
 
