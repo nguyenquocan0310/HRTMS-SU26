@@ -17,14 +17,14 @@ namespace HRTMS.Core.DTOs.Tournament
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
         public int? MaxHorses { get; set; }
-        public string? AllowBreed { get; set; }
+        public string? AllowedBreed { get; set; }
         public string? TrackType { get; set; }
         public int? RaceDistance { get; set; }
-        public string? RaceCatgory { get; set; }
+        public string? RaceCategory { get; set; }
         public int? MinJockeyExperienceYears { get; set; }
         public decimal? PurseAmount { get; set; }
         public decimal? EntryFeeAmount { get; set; }
         public decimal? PreRaceWeightThresholdKg { get; set; }
-        public decimal? PostRaceWeightThresholdKg { get; set; }
+        public decimal? PostRaceWeightDiffThresholdKg { get; set; }
     }
 }

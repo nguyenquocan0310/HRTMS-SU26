@@ -24,13 +24,13 @@ namespace HRTMS.Core.DTOs.Tournament
 
         //TRN.2 - sigle-select, 4 gia tri hop le 
         [Required]
-        public string AllowBreed { get; set; } = string.Empty;
+        public string AllowedBreed { get; set; } = string.Empty;
         [Required]
         public string TrackType { get; set; } = string.Empty;
         [Range(100, 10_000, ErrorMessage = "RaceDistance must be between 100 and 10,000")]
         public int RaceDistance { get; set; }
         [Required]
-        public string RaceCatgory { get; set; } = string.Empty;
+        public string RaceCategory { get; set; } = string.Empty;
         [Range(0,50)]
         public int MinJockeyExperienceYears { get; set; }
 
@@ -42,6 +42,6 @@ namespace HRTMS.Core.DTOs.Tournament
         public decimal EntryFeeAmount { get; set; } = 0;
         // TRN.5 - nguong can nang
         public decimal PreRaceWeightThresholdKg { get; set; } = 2.0m; 
-        public decimal PostRaceWeightThresholdKg { get; set; } = 1.0m;
+        public decimal PostRaceWeightDiffThresholdKg { get; set; } = 1.0m;
     }
 }
