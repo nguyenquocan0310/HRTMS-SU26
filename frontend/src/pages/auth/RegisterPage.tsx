@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { register } from '../../api/auth'
 import type { Role } from '../../types'
+import './RegisterPage.css'
 
 const ROLES: Role[] = ['HorseOwner', 'Jockey', 'Spectator']
 
