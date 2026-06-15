@@ -1,5 +1,6 @@
-import axios, { AxiosInstance } from 'axios';
-import { Horse, RaceEntry, JockeyInvitation } from '../types/owner.types';
+import axios from 'axios';
+import type  { AxiosInstance } from 'axios';
+import type { Horse, RaceEntry, JockeyInvitation } from '../types/owner.types';
 
 const API_URL = import.meta.env.VITE_API_URL;
 

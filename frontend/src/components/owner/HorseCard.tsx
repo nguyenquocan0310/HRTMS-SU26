@@ -1,6 +1,7 @@
+
 import React from 'react';
-import { Horse } from '../../types/owner.types';
-import HorseStatusBadge from './HorseStatusBadge';
+import type { Horse } from '../../types/owner.types';
+import  HorseStatusBadge  from './HorseStatusBadge';
 
 interface HorseCardProps {
   horse: Horse;

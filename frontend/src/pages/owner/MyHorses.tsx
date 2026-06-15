@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Horse } from '../../types/owner.types';
+import type { Horse } from '../../types/owner.types';
 import HorseCard from '../../components/owner/HorseCard';
 import { getMyHorses } from '../../services/ownerService';
 
@@ -11,25 +11,42 @@ const MyHorses: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchHorses = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await getMyHorses();
-        setHorses(data);
-      } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : 'Không thể tải danh sách ngựa';
-        setError(errorMessage);
-        console.error('Error fetching horses:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchHorses = async () => {
+    try {
+      setLoading(true);
 
-    fetchHorses();
-  }, []);
+      // Dùng mock data tạm
+      const mockData: Horse[] = [
+        {
+          horseID: "H001", ownerID: "O001", breedCode: "THO",
+          name: "Thunder Storm", birthYear: 2019, gender: "Stallion",
+          color: "Bay", dopingTestResult: "Clean",
+          status: "Approved", createdAt: new Date()
+        },
+        {
+          horseID: "H002", ownerID: "O001", breedCode: "ARAB",
+          name: "Golden Arrow", birthYear: 2020, gender: "Filly",
+          color: "Chestnut", dopingTestResult: "Pending",
+          status: "Pending", createdAt: new Date()
+        },
+        {
+          horseID: "H003", ownerID: "O001", breedCode: "THO",
+          name: "Dark Knight", birthYear: 2018, gender: "Colt",
+          color: "Black", dopingTestResult: "Failed",
+          status: "Rejected", rejectionReason: "Doping test failed",
+          createdAt: new Date()
+        }
+      ];
 
+      setHorses(mockData);
+    } catch (err) {
+      setError('Không thể tải danh sách ngựa');
+    } finally {
+      setLoading(false);
+    }
+  };
+  fetchHorses();
+}, []);
   const handleViewDetail = (horseID: string) => {
     navigate(`/owner/horses/${horseID}`);
   };
@@ -101,7 +118,8 @@ const MyHorses: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {horses.map((horse) => (
+        {Array.isArray(horses) && horses.map((horse) => (
+
           <HorseCard
             key={horse.horseID}
             horse={horse}
