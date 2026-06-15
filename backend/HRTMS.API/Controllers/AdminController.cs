@@ -69,13 +69,23 @@ public class AdminController : ControllerBase
         if (profile == null)
             return NotFound(new { message = "Referee profile not found." });
 
-        if (profile.Status == "Approved")
-            return BadRequest(new { message = "Referee is already approved." });
+        var user = await _context.Users.FindAsync(profile.RefereeId);
+        if (user == null)
+            return NotFound(new { message = "User not found." });
 
-        var oldStatus = profile.Status;
-        profile.Status = "Approved";
+        if (profile.Status == "Active" && user.Status == "Active")
+            return BadRequest(new { message = "Referee is already active." });
+
+        var oldProfileStatus = profile.Status;
+        var oldUserStatus = user.Status;
+
+        profile.Status = "Active";
         profile.RejectionReason = null;
         profile.UpdatedAt = DateTime.UtcNow;
+
+        user.Status = "Active";
+        user.UpdatedAt = DateTime.UtcNow;
+
         await _context.SaveChangesAsync();
 
         await _auditLogService.LogAsync(
@@ -83,11 +93,11 @@ public class AdminController : ControllerBase
             action: "Approve_Referee",
             entityName: "RefereeProfile",
             entityId: profile.RefereeId.ToString(),
-            oldValue: oldStatus,
-            newValue: profile.Status,
+            oldValue: $"RefereeProfile.Status={oldProfileStatus}, User.Status={oldUserStatus}",
+            newValue: $"RefereeProfile.Status={profile.Status}, User.Status={user.Status}",
             ipAddress: ClientIp);
 
-        return Ok(new { message = "Referee approved successfully." });
+        return Ok(new { message = "Referee approved and activated successfully." });
     }
 
     [HttpPatch("doctors/{id}/approve")]
@@ -97,13 +107,23 @@ public class AdminController : ControllerBase
         if (profile == null)
             return NotFound(new { message = "Doctor profile not found." });
 
-        if (profile.Status == "Approved")
-            return BadRequest(new { message = "Doctor is already approved." });
+        var user = await _context.Users.FindAsync(profile.DoctorId);
+        if (user == null)
+            return NotFound(new { message = "User not found." });
 
-        var oldStatus = profile.Status;
-        profile.Status = "Approved";
+        if (profile.Status == "Active" && user.Status == "Active")
+            return BadRequest(new { message = "Doctor is already active." });
+
+        var oldProfileStatus = profile.Status;
+        var oldUserStatus = user.Status;
+
+        profile.Status = "Active";
         profile.RejectionReason = null;
         profile.UpdatedAt = DateTime.UtcNow;
+
+        user.Status = "Active";
+        user.UpdatedAt = DateTime.UtcNow;
+
         await _context.SaveChangesAsync();
 
         await _auditLogService.LogAsync(
@@ -111,10 +131,10 @@ public class AdminController : ControllerBase
             action: "Approve_Doctor",
             entityName: "DoctorProfile",
             entityId: profile.DoctorId.ToString(),
-            oldValue: oldStatus,
-            newValue: profile.Status,
+            oldValue: $"DoctorProfile.Status={oldProfileStatus}, User.Status={oldUserStatus}",
+            newValue: $"DoctorProfile.Status={profile.Status}, User.Status={user.Status}",
             ipAddress: ClientIp);
 
-        return Ok(new { message = "Doctor approved successfully." });
+        return Ok(new { message = "Doctor approved and activated successfully." });
     }
 }
