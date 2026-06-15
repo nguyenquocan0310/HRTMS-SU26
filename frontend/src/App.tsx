@@ -13,6 +13,12 @@ import RegisterHorse from './pages/owner/RegisterHorse'
 import HorseDetail from './pages/owner/HorseDetail'
 import RaceEntries from './pages/owner/RaceEntries'
 import JockeyInvite from './pages/owner/JockeyInvite'
+// Import jockey pages
+import JockeyLayout from './pages/jockey/JockeyLayout'
+import JockeyDashboard from './pages/jockey/JockeyDashboard'
+import InvitationList from './pages/jockey/InvitationList'
+import MyRaces from './pages/jockey/MyRaces'
+import RaceHistory from './pages/jockey/RaceHistory'
 
 // ── Placeholder các role khác ──
 const AdminDashboard     = () => <div>Admin Dashboard</div>
@@ -69,7 +75,16 @@ export default function App() {
           <Route path="horses/register" element={<RegisterHorse />} />
           <Route path="horses/:id" element={<HorseDetail />} />
         </Route>
-
+         <Route path="/jockey" element={
+  <ProtectedRoute allowedRoles={['Jockey']}>
+    <JockeyLayout />
+  </ProtectedRoute>
+}>
+  <Route index element={<JockeyDashboard />} />
+  <Route path="invitations" element={<InvitationList />} />
+  <Route path="races" element={<MyRaces />} />
+  <Route path="history" element={<RaceHistory />} />
+</Route>
         {/* Các role khác */}
         <Route path="/admin/*"     element={<ProtectedRoute allowedRoles={['Admin']}><AdminDashboard /></ProtectedRoute>} />
         <Route path="/jockey/*"    element={<ProtectedRoute allowedRoles={['Jockey']}><JockeyDashboard /></ProtectedRoute>} />
