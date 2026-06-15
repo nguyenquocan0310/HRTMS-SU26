@@ -1,11 +1,3 @@
-/**
- * Horse Racing Management System - Owner Types
- * This file contains TypeScript interfaces for managing horses, race entries, jockey invitations, and breeds.
- */
-
-/**
- * Represents a horse in the racing management system
- */
 export interface Horse {
   horseID: string;
   ownerID: string;
@@ -22,9 +14,6 @@ export interface Horse {
   createdAt: Date;
 }
 
-/**
- * Represents a race entry for a horse
- */
 export interface RaceEntry {
   entryID: string;
   raceID: string;
@@ -37,9 +26,6 @@ export interface RaceEntry {
   cancelReason?: string;
 }
 
-/**
- * Represents an invitation sent to a jockey for a race
- */
 export interface JockeyInvitation {
   invitationID: string;
   raceID: string;
@@ -51,9 +37,6 @@ export interface JockeyInvitation {
   respondedAt?: Date;
 }
 
-/**
- * Represents a horse breed
- */
 export interface Breed {
   breedCode: string;
   breedName: string;
