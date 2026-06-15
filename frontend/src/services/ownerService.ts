@@ -1,6 +1,11 @@
+<<<<<<< HEAD
 import axios from 'axios';
 import type  { AxiosInstance } from 'axios';
 import type { Horse, RaceEntry, JockeyInvitation } from '../types/owner.types';
+=======
+import axios, { AxiosInstance } from 'axios';
+import { Horse, RaceEntry, JockeyInvitation } from '../types/owner.types';
+>>>>>>> 301139b644c65205e8158bf86c9c5637696f221c
 
 const API_URL = import.meta.env.VITE_API_URL;
 
