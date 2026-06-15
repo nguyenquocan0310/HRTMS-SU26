@@ -27,6 +27,11 @@ app.UseMiddleware<ExceptionMiddleware>();
 app.UseCors("AllowFrontend");
 app.UseHttpsRedirection();
 app.UseAuthentication();
+
+// EC-29: phải đứng SAU UseAuthentication (cần đọc token)
+// và TRƯỚC UseAuthorization (để chặn trước khi vào controller)
+app.UseMiddleware<TokenBlacklistMiddleware>();
+
 app.UseAuthorization();
 app.MapControllers();
 app.Run();
