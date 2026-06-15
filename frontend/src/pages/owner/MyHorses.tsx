@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+<<<<<<< HEAD
 import type { Horse } from '../../types/owner.types';
+=======
+import { Horse } from '../../types/owner.types';
+>>>>>>> 301139b644c65205e8158bf86c9c5637696f221c
 import HorseCard from '../../components/owner/HorseCard';
 import { getMyHorses } from '../../services/ownerService';
 
@@ -11,6 +15,7 @@ const MyHorses: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+<<<<<<< HEAD
   const fetchHorses = async () => {
     try {
       setLoading(true);
@@ -47,6 +52,27 @@ const MyHorses: React.FC = () => {
   };
   fetchHorses();
 }, []);
+=======
+    const fetchHorses = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await getMyHorses();
+        setHorses(data);
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Không thể tải danh sách ngựa';
+        setError(errorMessage);
+        console.error('Error fetching horses:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchHorses();
+  }, []);
+
+>>>>>>> 301139b644c65205e8158bf86c9c5637696f221c
   const handleViewDetail = (horseID: string) => {
     navigate(`/owner/horses/${horseID}`);
   };
@@ -118,8 +144,12 @@ const MyHorses: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<<<<<<< HEAD
         {Array.isArray(horses) && horses.map((horse) => (
 
+=======
+        {horses.map((horse) => (
+>>>>>>> 301139b644c65205e8158bf86c9c5637696f221c
           <HorseCard
             key={horse.horseID}
             horse={horse}
