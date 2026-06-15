@@ -19,9 +19,9 @@ const HorseStatusBadge: React.FC<HorseStatusBadgeProps> = ({ status }) => {
   };
 
   return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStyle()}`}>
-      {status}
-    </span>
+    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusStyles(status)}`}>
+  {status}
+</span>
   );
 };
 
