@@ -335,7 +335,7 @@ namespace HRTMS.Infrastructure.Services
             }
         }
 
-        public async Task<List<PrizeDistributionResponseDto>> SetPrizeDistributionAsync(int tournamentId, SetPrizeDistributionDto dto)
+        public async Task<List<PrizeDistributionResponseDto>> SetPrizeDistributionsAsync(int tournamentId, SetPrizeDistributionDto dto)
         {
             //1. Validate du 5 position khong trung 
             var positions = dto.Distributions.Select(d => d.Position).OrderBy(p => p).ToList();
