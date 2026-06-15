@@ -212,12 +212,10 @@ public class JockeyService : IJockeyService
 
         return new PagedResult<AvailableJockeyDto>
         {
-            Data = data,
+            Items = data,
             Page = page,
             PageSize = pageSize,
-            Total = total,
-            TotalPages = (int)Math.Ceiling(
-                total / (double)pageSize)
+            TotalCount = total,
         };
     }
 
@@ -288,12 +286,10 @@ public class JockeyService : IJockeyService
 
         return new PagedResult<JockeyInvitationDto>
         {
-            Data = data,
+            Items = data,
             Page = page,
             PageSize = pageSize,
-            Total = total,
-            TotalPages = (int)Math.Ceiling(
-                total / (double)pageSize)
+            TotalCount = total,
         };
     }
 }

@@ -313,12 +313,10 @@ public class PairingService : IPairingService
 
         return new PagedResult<OwnerPairingDto>
         {
-            Data = data,
+            Items = data,
             Page = page,
             PageSize = pageSize,
-            Total = total,
-            TotalPages = (int)Math.Ceiling(
-                total / (double)pageSize)
+            TotalCount = total,
         };
     }
 }
