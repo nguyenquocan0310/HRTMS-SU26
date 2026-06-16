@@ -1,0 +1,42 @@
+.features {
+  padding: 4rem 2rem;
+  background: #fff9f2;
+}
+
+.features h2 {
+  margin: 0 0 2rem;
+  text-align: center;
+  font-size: 2.5rem;
+  color: #3f2a22;
+}
+
+.feature-grid {
+  display: grid;
+  gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .feature-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.feature-card {
+  padding: 1.75rem;
+  border-radius: 1.5rem;
+  background: #ffffff;
+  border: 1px solid rgba(105, 79, 60, 0.1);
+  box-shadow: 0 20px 40px rgba(79, 63, 50, 0.06);
+}
+
+.feature-card h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1.25rem;
+  color: #45382f;
+}
+
+.feature-card p {
+  margin: 0;
+  color: #6e5a50;
+  line-height: 1.75;
+}

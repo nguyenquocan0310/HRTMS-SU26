@@ -1,3 +1,5 @@
+import "./Statistics.css";
+
 const stats = [
   {
     number: 120,
@@ -19,7 +21,7 @@ const stats = [
 
 function Statistics() {
   return (
-    <section className="stats">
+    <section className="stats" id="solutions">
 
       {stats.map((item, index) => (
         <div className="stat-card" key={index}>
