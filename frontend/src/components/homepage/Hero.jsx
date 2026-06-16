@@ -7,10 +7,10 @@ function Hero() {
       <div className="hero-overlay" />
       <div className="hero-inner">
         <div className="hero-copy">
-          <span className="hero-eyebrow">Prism</span>
-          <h1>The new breed of equine management</h1>
+          <span className="hero-eyebrow">HRMS Racing</span>
+          <h1>The new breed of thoroughbred racing analytics</h1>
           <p>
-            Introducing Prism — the most intelligent, affordable and scalable horse and stable management system.
+            Track standout horses, monitor jockey performance and manage race entries with a system built for racing teams.
           </p>
           <div className="hero-actions">
             <Link to="/login" className="hero-button">Get started</Link>
