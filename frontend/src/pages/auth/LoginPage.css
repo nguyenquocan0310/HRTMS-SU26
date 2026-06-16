@@ -1,305 +1,358 @@
-/* LoginPage.css */
-
-/* Thiết lập màu sắc và font chữ global cho trang đăng nhập */
-:root {
-  --primary-color: #3e2723; /* Màu nâu đậm của nút Sign In */
-  --text-dark: #333;
-  --text-light: #aaa;
-  --bg-form: #fff;
-  --bg-input: #f5f5f5;
-  --border-color: #e0e0e0;
-}
-
-/* Container chính chia trang làm 2 cột */
 .login-page-container {
   display: flex;
-  height: 100vh; /* Chiếm toàn bộ chiều cao màn hình */
-  font-family: Arial, sans-serif;
-  overflow: hidden; /* Ngăn cuộn trang */
+  width: 100%;
+  height: 100vh;
 }
 
-/* Cột trái: Panel hình ảnh */
-.login-image-panel {
-  flex: 1; /* Chiếm 50% chiều rộng */
-  /* Thay 'src/assets/horse-bg.jpg' bằng đường dẫn thực tế đến ảnh của bạn */
-  background-image: url('../../assets/horse-bg.jpg'); 
-  background-size: cover;
-  background-position: center;
-  color: white;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 80px 60px;
+/* ===== LEFT PANEL ===== */
+.left-overlay {
+  flex: 1;
   position: relative;
-}
+  z-index: 2;
 
-/* Lớp phủ mờ cho hình nền (để văn bản dễ đọc) */
-.login-image-panel::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.5); /* Lớp phủ đen mờ 50% */
-  z-index: 1;
+
+  padding: 60px;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+
+  background-image: url('../../assets/horse.jpg');
+  background-size: cover;
+  background-position: center;
 }
 
-.brand-header, .brand-stats {
-  position: relative;
-  z-index: 2; /* Nằm trên lớp phủ mờ */
+.left-overlay::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+
+  background: linear-gradient(
+    rgba(40, 30, 20, 0.45),
+    rgba(40, 30, 20, 0.55)
+  );
+  backdrop-filter: blur(2px);
 }
 
-.brand-header {
+.hero-content {
   text-align: center;
+  max-width: 520px;
 }
 
 .brand-logo-circle {
   width: 80px;
   height: 80px;
-  background-color: #e6c1a8; /* Màu vàng kem của logo */
+
+  margin: 0 auto 25px;
+
   border-radius: 50%;
+
+  background: #e4b96d;
+
   display: flex;
   justify-content: center;
   align-items: center;
-  margin: 0 auto 20px;
+
+  font-size: 38px;
 }
 
-.brand-icon {
-  font-size: 40px;
+.hero-content h1 {
+  color: #fff;
+
+  font-size: 64px;
+  font-weight: 700;
+
+  margin-bottom: 25px;
 }
 
-.brand-header h1 {
-  font-size: 36px;
-  margin-bottom: 15px;
-  font-weight: bold;
-}
+.hero-content p {
+  color: #f0d7c5;
 
-.brand-header p {
-  font-size: 16px;
-  line-height: 1.6;
-  max-width: 450px;
-  margin: 0 auto;
+  font-size: 18px;
+  line-height: 1.7;
+
+  font-weight: 500;
 }
 
 .brand-stats {
+  position: absolute;
+
+  bottom: 70px;
+  left: 50%;
+
+  transform: translateX(-50%);
+
+  width: 70%;
+
   display: flex;
-  justify-content: space-around;
-  text-align: center;
-  border-top: 1px solid rgba(255, 255, 255, 0.3);
-  padding-top: 40px;
+  justify-content: space-between;
+
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+
+  padding-top: 30px;
 }
 
 .stat-item {
-  display: flex;
-  flex-direction: column;
+  text-align: center;
 }
 
 .stat-number {
-  font-size: 24px;
-  font-weight: bold;
+  display: block;
+
+  color: #f4d7aa;
+
+  font-size: 40px;
+  font-weight: 700;
 }
 
 .stat-label {
-  font-size: 14px;
-  color: #ddd;
+  color: rgba(255, 255, 255, 0.8);
+
+  font-size: 15px;
 }
 
-/* Cột phải: Panel Form */
+/* ===== RIGHT PANEL ===== */
 .login-form-panel {
-  flex: 1; /* Chiếm 50% chiều rộng */
-  background-color: var(--bg-form);
+  flex: 1;
+
   display: flex;
   flex-direction: column;
-  padding: 60px 80px;
+  justify-content: center;
+
+  padding: 80px;
+
+  background: #faf8f5;
+  overflow-y: auto;
 }
 
-/* Tab Login/Register */
 .tabs {
   display: flex;
-  border-bottom: 1px solid var(--border-color);
-  margin-bottom: 50px;
+  gap: 30px;
+
+  border-bottom: 1px solid #e3d6c9;
+  margin-bottom: 40px;
 }
 
 .tab {
-  padding: 15px 30px;
+  padding-bottom: 14px;
+
+  font-size: 18px;
+  font-weight: 600;
+  color: #b0a193;
   text-decoration: none;
-  color: var(--text-dark);
-  font-weight: bold;
-  font-size: 16px;
-  position: relative;
+
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+
+  transition: 0.3s;
 }
 
-.tab.active::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  width: 100%;
-  height: 3px;
-  background-color: var(--primary-color);
-}
-
-.tab:not(.active) {
-  color: var(--text-light);
-}
-
-/* Nội dung form */
-.form-content {
-  max-width: 400px;
-  margin: 0 auto;
-  width: 100%;
+.tab.active {
+  color: #4a1f08;
+  border-bottom-color: #4a1f08;
 }
 
 .form-content h2 {
-  font-size: 32px;
-  margin-bottom: 10px;
-  font-weight: bold;
+  font-size: 44px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: #2b1d12;
 }
 
 .form-subtitle {
-  color: var(--text-light);
-  margin-bottom: 30px;
-}
-
-/* Input groups có icon */
-.login-form .input-group {
-  display: flex;
-  align-items: center;
-  background-color: var(--bg-input);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  margin-bottom: 20px;
-  padding: 0 15px;
-}
-
-.input-icon {
-  font-size: 18px;
-  color: var(--text-light);
-  margin-right: 15px;
-}
-
-.login-form input {
-  border: none;
-  background: none;
-  padding: 18px 0;
-  width: 100%;
   font-size: 16px;
-  color: var(--text-dark);
+  color: #8a8a8a;
+  margin-bottom: 36px;
 }
 
-.login-form input:focus {
+.field-wrapper {
+  margin-bottom: 22px;
+}
+
+.field-wrapper label {
+  display: block;
+  margin-bottom: 8px;
+
+  font-weight: 600;
+  color: #5b4636;
+}
+
+.required {
+  color: red;
+  margin-left: 4px;
+}
+
+.field-wrapper input {
+  width: 100%;
+
+  height: 54px;
+
+  border: 1px solid #d9c7b7;
+  border-radius: 10px;
+
+  padding: 0 16px;
+
+  background: white;
+
+  font-size: 16px;
+
+  transition: all 0.3s;
+}
+
+.field-wrapper input:focus {
   outline: none;
+
+  border-color: #6d3a16;
+
+  box-shadow: 0 0 0 4px rgba(109, 58, 22, 0.1);
+}
+
+.field-wrapper input.input-error {
+  border-color: #d9534f;
+}
+
+.error-text {
+  color: #d9534f;
+  font-size: 13px;
+  margin-top: 6px;
 }
 
 .error-message {
-  color: red;
-  margin-top: -15px;
-  margin-bottom: 15px;
+  background: #fdecea;
+  color: #d9534f;
+
+  padding: 10px 14px;
+  border-radius: 8px;
+
   font-size: 14px;
+  margin-bottom: 16px;
 }
 
-/* Phần checkbox và quên mật khẩu */
 .form-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 30px;
+
+  margin-bottom: 28px;
+
   font-size: 14px;
 }
 
 .checkbox-label {
   display: flex;
   align-items: center;
-  color: var(--text-dark);
-}
+  gap: 8px;
 
-.checkbox-label input {
-  width: auto;
-  padding: 0;
-  margin-right: 8px;
+  color: #5b4636;
+  cursor: pointer;
 }
 
 .forgot-password {
-  color: #c98b67; /* Màu cam nâu */
+  color: #6d3a16;
   text-decoration: none;
+  font-weight: 600;
 }
 
-/* Nút Sign In */
+.forgot-password:hover {
+  text-decoration: underline;
+}
+
 .sign-in-button {
   width: 100%;
-  padding: 18px;
-  background-color: var(--primary-color);
-  color: white;
+  height: 56px;
+
+  border-radius: 10px;
   border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: bold;
+
+  background: #4a1f08;
+
+  color: white;
+
+  font-size: 18px;
+  font-weight: 600;
+
   cursor: pointer;
-  transition: background-color 0.3s;
+  transition: 0.3s;
 }
 
 .sign-in-button:hover {
-  background-color: #2b1d1a;
+  background: #2d1204;
 }
 
 .sign-in-button:disabled {
-  background-color: var(--text-light);
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
-/* Phần Google Sign-In */
 .separator {
+  display: flex;
+  align-items: center;
   text-align: center;
-  border-bottom: 1px solid var(--border-color);
-  line-height: 0.1em;
-  margin: 40px 0;
+
+  margin: 28px 0;
+
+  color: #b0a193;
+  font-size: 13px;
+}
+
+.separator::before,
+.separator::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #e3d6c9;
 }
 
 .separator span {
-  background: var(--bg-form);
-  padding: 0 10px;
-  color: var(--text-light);
-  font-size: 14px;
+  padding: 0 12px;
 }
 
 .google-sign-in {
   width: 100%;
-  padding: 15px;
-  background-color: #f8f9fa;
-  color: var(--text-dark);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-size: 14px;
+  height: 54px;
+
+  border: 1px solid #d9c7b7;
+  border-radius: 10px;
+
+  background: white;
+
+  font-size: 15px;
+  font-weight: 600;
+  color: #5b4636;
+
   cursor: pointer;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-weight: normal;
+  transition: 0.3s;
 }
 
-.google-sign-in .google-icon {
-  margin-right: 10px;
-  font-weight: bold;
+.google-sign-in:hover {
+  background: #f5efe8;
 }
 
-/* Các link bổ sung ở dưới cùng */
-.additional-links {
-  text-align: center;
-  margin-top: 50px;
-  font-size: 12px;
-  color: var(--text-light);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 15px;
-}
+/* ===== RESPONSIVE ===== */
+@media (max-width: 900px) {
+  .login-page-container {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+  }
 
-.additional-links a {
-  color: var(--text-light);
-  text-decoration: none;
-}
+  .left-overlay {
+    min-height: 320px;
+    padding: 40px 20px;
+  }
 
-.additional-links a:hover {
-  text-decoration: underline;
+  .brand-stats {
+    position: static;
+    transform: none;
+    width: 100%;
+    margin-top: 30px;
+  }
+
+  .login-form-panel {
+    padding: 40px 24px;
+  }
 }

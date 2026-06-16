@@ -1,110 +1,203 @@
-import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Formik, Form, Field, ErrorMessage } from 'formik'
+import * as Yup from 'yup'
+
 import { login } from '../../api/auth'
 import useAuthStore from '../../store/authStore'
 import { getRoleHomePath } from '../../App'
 import './LoginPage.css'
 
+const loginSchema = Yup.object({
+  email: Yup.string()
+    .email('Email không hợp lệ')
+    .required('Email là bắt buộc'),
+
+  password: Yup.string()
+    .required('Mật khẩu là bắt buộc')
+})
+
 export default function LoginPage() {
   const navigate = useNavigate()
   const setAuth = useAuthStore((s) => s.setAuth)
 
-  const [form, setForm] = useState({ email: '', password: '' })
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
-
-    try {
-      const res = await login(form)
-      setAuth(res.token, res.user)
-      navigate(getRoleHomePath(res.user.role), { replace: true })
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? 'Đăng nhập thất bại')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   return (
     <div className="login-page-container">
-      {/* CỘT TRÁI - PANEL HÌNH ẢNH */}
-      <div className="login-image-panel">
-        <div className="brand-header">
-          <div className="brand-logo-circle">
-            <span className="brand-icon">🐴</span> {/* Tạm dùng emoji, bạn có thể thay bằng icon logo */}
-          </div>
-          <h1>HRTMS</h1>
-          <p>Elevate your tournament management to elite standards. Precision, heritage, and performance in every stride.</p>
-        </div>
-        <div className="brand-stats">
-          <div className="stat-item"><span className="stat-number">500+</span><span className="stat-label">Events</span></div>
-          <div className="stat-item"><span className="stat-number">12k</span><span className="stat-label">Athletes</span></div>
-          <div className="stat-item"><span className="stat-number">Top 10</span><span className="stat-label">Ranked</span></div>
-        </div>
-      </div>
 
-      {/* CỘT PHẢI - PANEL FORM */}
+      {/* LEFT PANEL */}
+      <div className="left-overlay">
+
+  <div className="hero-content">
+
+    <div className="brand-logo-circle">
+      🐎
+    </div>
+
+    <h1>HRTMS</h1>
+
+    <p>
+      Elevate your tournament management to elite
+      standards. Precision, heritage, and performance
+      in every stride.
+    </p>
+
+  </div>
+
+  <div className="brand-stats">
+
+    <div className="stat-item">
+      <span className="stat-number">500+</span>
+      <span className="stat-label">Events</span>
+    </div>
+
+    <div className="stat-item">
+      <span className="stat-number">12k</span>
+      <span className="stat-label">Athletes</span>
+    </div>
+
+    <div className="stat-item">
+      <span className="stat-number">Top 10</span>
+      <span className="stat-label">Ranked</span>
+    </div>
+
+  </div>
+
+</div>
+
+      {/* RIGHT PANEL */}
       <div className="login-form-panel">
         <div className="tabs">
-          <Link to="/login" className="tab active">Login</Link>
-          <Link to="/register" className="tab">Register</Link>
+          <Link to="/login" className="tab active">
+            Login
+          </Link>
+
+          <Link to="/register" className="tab">
+            Register
+          </Link>
         </div>
 
         <div className="form-content">
           <h2>Welcome Back</h2>
-          <p className="form-subtitle">Access your elite racing dashboard.</p>
 
-          <form onSubmit={handleSubmit} className="login-form">
-            <div className="input-group">
-              <span className="input-icon">📧</span>
-              <input
-                type="email"
-                placeholder="Email Address"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                required
-              />
-            </div>
-            <div className="input-group">
-              <span className="input-icon">🔒</span>
-              <input
-                type="password"
-                placeholder="Password"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                required
-              />
-            </div>
+          <p className="form-subtitle">
+            Sign in to access your racing dashboard.
+          </p>
 
-            {error && <p className="error-message">{error}</p>}
+          <Formik
+            initialValues={{
+              email: '',
+              password: ''
+            }}
+            validationSchema={loginSchema}
+            onSubmit={async (values, { setSubmitting, setStatus }) => {
+              try {
+                const res = await login(values)
 
-            <div className="form-footer">
-              <label className="checkbox-label">
-                <input type="checkbox" /> Remember device
-              </label>
-              <a href="#" className="forgot-password">Forgot credentials?</a>
-            </div>
+                setAuth(res.token, res.user)
 
-            <button type="submit" className="sign-in-button" disabled={loading}>
-              {loading ? 'Đang đăng nhập...' : 'Sign In →'}
-            </button>
-          </form>
+                navigate(
+                  getRoleHomePath(res.user.role),
+                  { replace: true }
+                )
+              } catch (err: any) {
+                setStatus(
+                  err.response?.data?.message ??
+                    'Đăng nhập thất bại'
+                )
+              } finally {
+                setSubmitting(false)
+              }
+            }}
+          >
+            {({ errors, touched, isSubmitting, status }) => (
+              <Form className="login-form">
 
-          <div className="separator"><span>Secure Entry</span></div>
+                {/* EMAIL */}
+                <div className="field-wrapper">
+                  <label>
+                    Email Address
+                    <span className="required">*</span>
+                  </label>
+
+                  <Field
+                    name="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    className={
+                      touched.email && errors.email
+                        ? 'input-error'
+                        : ''
+                    }
+                  />
+
+                  <ErrorMessage
+                    name="email"
+                    component="div"
+                    className="error-text"
+                  />
+                </div>
+
+                {/* PASSWORD */}
+                <div className="field-wrapper">
+                  <label>
+                    Password
+                    <span className="required">*</span>
+                  </label>
+
+                  <Field
+                    name="password"
+                    type="password"
+                    placeholder="Enter your password"
+                    className={
+                      touched.password && errors.password
+                        ? 'input-error'
+                        : ''
+                    }
+                  />
+
+                  <ErrorMessage
+                    name="password"
+                    component="div"
+                    className="error-text"
+                  />
+                </div>
+
+                {status && (
+                  <div className="error-message">
+                    {status}
+                  </div>
+                )}
+
+                <div className="form-footer">
+                  <label className="checkbox-label">
+                    <input type="checkbox" />
+                    Remember device
+                  </label>
+
+                  <a href="#" className="forgot-password">
+                    Forgot password?
+                  </a>
+                </div>
+
+                <button
+                  type="submit"
+                  className="sign-in-button"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting
+                    ? 'Signing In...'
+                    : 'Sign In →'}
+                </button>
+              </Form>
+            )}
+          </Formik>
+
+          <div className="separator">
+            <span>Secure Access</span>
+          </div>
 
           <button className="google-sign-in">
-            <span className="google-icon">G</span> Authorized SSO Login
+            Authorized SSO Login
           </button>
-
-          <div className="additional-links">
-            <a href="#">Help Center</a>
-            <span>|</span>
-            <a href="#">Security Protocol</a>
-          </div>
         </div>
       </div>
     </div>
