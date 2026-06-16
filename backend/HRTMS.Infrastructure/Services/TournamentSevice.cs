@@ -1,46 +1,40 @@
-﻿using HRTMS.Core.DTOs.Tournament;
+using HRTMS.Core.DTOs.Tournament;
 using HRTMS.Core.Entities;
 using HRTMS.Core.Interfaces.Services;
 using HRTMS.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace HRTMS.Infrastructure.Services
 {
     public class TournamentSevice : ITournamentServices
     {
-        private readonly HRTMSDbContext _context; // 0. readonly là gì, tại sao phải khai báo _context
+        private readonly HRTMSDbContext _context;
         private readonly IAuditLogService _auditLog;
 
         private static readonly string[] ValidBreeds =
-            ["Thoroughbred", "Arabian", "Quarter Horse", "Mixed"]; // 1. giải thích tại sao lại code cứng giống ngựa vào đây, nếu cần có thêm giống ngựa mới thì dev sẽ vào thay đổi có đúng không?
-        private static readonly string[] ValidTrackType = // 2. Type Track là gì? Tại sao lại tiếp tục code cứng?
+            ["Thoroughbred", "Arabian", "Quarter Horse", "Mixed"];
+        private static readonly string[] ValidTrackType =
             ["Turf", "Dirt", "Synthetic"];
-        private static readonly string[] ValidCategories = // 3.  Category là gì?
+        private static readonly string[] ValidCategories =
             ["Open", "Classic", "Maiden"];
-        private static readonly Dictionary<string, string> ValidTransitions = new() // 4.  Dictionary là kiểu dữ liệu gì?
+        private static readonly Dictionary<string, string> ValidTransitions = new()
         {
             ["Draft"]               = "Open Registration",
             ["Open Registration"]   = "Closed Registration",
             ["Closed Registration"] = "Pre-Race",
             ["Pre-Race"]            = "In-Progress",
-            ["In-Progress"]         = "Completed",  // 5.  Có bao nhiêu chuyển pha, Pha nào qua pha nào, chuyển khi nào?
+            ["In-Progress"]         = "Completed",
         };
-        public TournamentSevice(HRTMSDbContext context, IAuditLogService auditLog) // 6.  Cái này là constructor có đúng không?
+
+        public TournamentSevice(HRTMSDbContext context, IAuditLogService auditLog)
         {
             _context = context;
             _auditLog = auditLog;
         }
-        
 
 
         // PRIVATE HELPER
-        private static TournamentResponseDto MapToResponseDto(Tournament t) => new() // 7. tại sao phải có helper kiểu MapToResponse này
+        private static TournamentResponseDto MapToResponseDto(Tournament t) => new()
         {
             TournamentId = t.TournamentId,
             Name = t.Name,
@@ -63,34 +57,33 @@ namespace HRTMS.Infrastructure.Services
             {
                 RoundId = r.RoundId,
                 Name = r.Name,
-                SequenceOrder = r.SequenceOrder, 
-                ScheduledDate = r.ScheduledDate, 
+                SequenceOrder = r.SequenceOrder,
+                ScheduledDate = r.ScheduledDate,
                 Status = r.Status,
                 Races = r.Races.Select(race => new RaceResponseDto
                 {
-                    RaceId = race.RaceId, 
+                    RaceId = race.RaceId,
                     RoundId = race.RoundId,
                     RaceNumber = race.RaceNumber,
-                    ScheduledTime = race.ScheduledTime, 
+                    ScheduledTime = race.ScheduledTime,
                     PurseAmount = race.PurseAmount,
-                    TrackTypeOverride = race.TrackTypeOverride, 
+                    TrackTypeOverride = race.TrackTypeOverride,
                     RaceDistanceOverride = race.RaceDistanceOverride,
                     Status = race.Status,
-                    ConfirmationCutoffHours = race.ConfirmationCutoffHours, 
+                    ConfirmationCutoffHours = race.ConfirmationCutoffHours,
                     ProtestDeadlineMinutes = race.ProtestDeadlineMinutes,
                 }).ToList(),
-            }
-            ).ToList(),
+            }).ToList(),
             PrizeDistributions = t.PrizeDistributions
                 .OrderBy(p => p.Position)
                 .Select(p => new PrizeDistributionResponseDto
                 {
-                    Position = p.Position, 
+                    Position = p.Position,
                     Percentage = p.Percentage
                 }).ToList()
-        }; // 8. giải thích toàn bộ helper này
-        //9. Giải thích chi tiết tác dụng của từng class trong DTOs/Tournament
-        public async Task<TournamentResponseDto> CreateTournamentAsync(CreateTournamentDto dto, int createdByUserId) // 10. Task là gì
+        };
+
+        public async Task<TournamentResponseDto> CreateTournamentAsync(CreateTournamentDto dto, int createdByUserId)
         {
             // 1. Validate enum values
             if (!ValidBreeds.Contains(dto.AllowedBreed))
@@ -128,7 +121,7 @@ namespace HRTMS.Infrastructure.Services
             };
 
             _context.Tournaments.Add(tournament);
-            await _context.SaveChangesAsync(); // 11. await là gì
+            await _context.SaveChangesAsync();
 
             // 4. Ghi AuditLog
             await _auditLog.LogAsync(
@@ -139,7 +132,7 @@ namespace HRTMS.Infrastructure.Services
                 newValue: tournament.Name
             );
 
-            return MapToResponseDto(tournament); //12. tại sao phải return maptoresponse
+            return MapToResponseDto(tournament);
         }
 
         public async Task<TournamentResponseDto?> GetTournamentByIdAsync(int tournamentId)
@@ -148,7 +141,7 @@ namespace HRTMS.Infrastructure.Services
                 .Include(t => t.Rounds)
                     .ThenInclude(r => r.Races)
                 .Include(t => t.PrizeDistributions)
-                .FirstOrDefaultAsync(t => t.TournamentId == tournamentId); // 13. Giải thích  LINQ này
+                .FirstOrDefaultAsync(t => t.TournamentId == tournamentId);
 
             return tournament == null ? null : MapToResponseDto(tournament);
         }
@@ -160,23 +153,31 @@ namespace HRTMS.Infrastructure.Services
                     .ThenInclude(r => r.Races)
                 .Include(t => t.PrizeDistributions)
                 .OrderByDescending(t => t.CreatedAt)
-                .ToListAsync(); // 14 Giải thích LINQ này
+                .ToListAsync();
 
             return tournaments.Select(MapToResponseDto).ToList();
         }
 
-        public async Task<TournamentResponseDto> UpdateTournamentAsync(int tournamentId, UpdateTournamentDto dto) 
+        public async Task<TournamentResponseDto> UpdateTournamentAsync(int tournamentId, UpdateTournamentDto dto)
         {
             var tournament = await _context.Tournaments
                 .Include(t => t.Rounds).ThenInclude(r => r.Races)
                 .Include(t => t.PrizeDistributions)
                 .FirstOrDefaultAsync(t => t.TournamentId == tournamentId)
-                ?? throw new KeyNotFoundException($"Không tìm thấy Tournament #{tournamentId}"); // 15. Giải thích LINQ này
+                ?? throw new KeyNotFoundException($"Không tìm thấy Tournament #{tournamentId}");
 
             // TRN.9 — chỉ cho sửa khi còn ở Draft hoặc Open Registration
             if (tournament.Status != "Draft" && tournament.Status != "Open Registration")
                 throw new InvalidOperationException(
-                    $"Không thể sửa giải ở trạng thái '{tournament.Status}'"); 
+                    $"Không thể sửa giải ở trạng thái '{tournament.Status}'");
+
+            // Bug 9 fix — validate enum khi update
+            if (dto.AllowedBreed != null && !ValidBreeds.Contains(dto.AllowedBreed))
+                throw new ArgumentException($"AllowedBreed Invalid: {dto.AllowedBreed}");
+            if (dto.TrackType != null && !ValidTrackType.Contains(dto.TrackType))
+                throw new ArgumentException($"TrackType Invalid: {dto.TrackType}");
+            if (dto.RaceCategory != null && !ValidCategories.Contains(dto.RaceCategory))
+                throw new ArgumentException($"RaceCategory Invalid: {dto.RaceCategory}");
 
             // Chỉ update field nào được gửi lên (nullable pattern)
             if (dto.Name != null) tournament.Name = dto.Name;
@@ -203,35 +204,39 @@ namespace HRTMS.Infrastructure.Services
         public async Task<TournamentResponseDto> ChangeStatusAsync(int tournamentId, string targetStatus, int adminUserId)
         {
             var tournament = await _context.Tournaments
-                .Include( t => t.Rounds).ThenInclude(r => r.Races)
-                .Include( t => t.PrizeDistributions)
+                .Include(t => t.Rounds).ThenInclude(r => r.Races)
+                .Include(t => t.PrizeDistributions)
                 .FirstOrDefaultAsync(t => t.TournamentId == tournamentId)
-                ?? throw new KeyNotFoundException($"Không tìm thấy Tournament #{tournamentId}"); // 16. Giải thích LINQ này
-            // Guard: chi cho phep transition hop le
-            if (!ValidTransitions.TryGetValue(tournament.Status, out var allowedNext)||allowedNext != targetStatus) // 17. Giải thích TryGetValue; out var 
+                ?? throw new KeyNotFoundException($"Không tìm thấy Tournament #{tournamentId}");
+
+            // Guard: chỉ cho phép transition hợp lệ
+            if (!ValidTransitions.TryGetValue(tournament.Status, out var allowedNext) || allowedNext != targetStatus)
             {
-                throw new InvalidOperationException($"Khong the chuyen tu '{tournament.Status}' sang '{targetStatus}"); 
+                // Bug 5 fix — thêm dấu ' đóng sau {targetStatus}
+                throw new InvalidOperationException($"Không thể chuyển từ '{tournament.Status}' sang '{targetStatus}'");
             }
-            // Guard dac biet: chuyen sang Open Registration phai co PrieDistributions
-            if(targetStatus == "Open Registration" && tournament.PrizeDistributions.Count<5)
+
+            // Guard đặc biệt: chuyển sang Open Registration phải có PrizeDistributions
+            if (targetStatus == "Open Registration" && tournament.PrizeDistributions.Count < 5)
             {
-                throw new InvalidOperationException($"Phai cau hinh du 5 ty le PrizeDistributions truoc khi dang ky ");
+                throw new InvalidOperationException("Phải cấu hình đủ 5 tỷ lệ PrizeDistributions trước khi đăng ký");
             }
 
             var oldStatus = tournament.Status;
             tournament.Status = targetStatus;
-            tournament.UpdatedAt = DateTime.UtcNow; 
+            tournament.UpdatedAt = DateTime.UtcNow;
 
-            await _context.SaveChangesAsync(); // 18. await là gì, có tác dụng gì trong này 
+            await _context.SaveChangesAsync();
             await _auditLog.LogAsync(
                 actorId: adminUserId,
-                action : "Change_Tournament_Status", 
-                entityName: "Tournament", 
-                entityId: tournamentId.ToString(), 
-                oldValue: oldStatus, 
+                action: "Change_Tournament_Status",
+                entityName: "Tournament",
+                entityId: tournamentId.ToString(),
+                oldValue: oldStatus,
                 newValue: targetStatus
-                );
-            return MapToResponseDto( tournament );
+            );
+
+            return MapToResponseDto(tournament);
         }
 
         public async Task CancelTournamentAsync(int tournamentId, int adminUserId)
@@ -243,17 +248,19 @@ namespace HRTMS.Infrastructure.Services
                 .Include(t => t.Rounds).ThenInclude(r => r.Races)
                     .ThenInclude(race => race.Predictions)
                 .FirstOrDefaultAsync(t => t.TournamentId == tournamentId)
-                ?? throw new KeyNotFoundException($"Không tìm thấy Tournament #{tournamentId}"); // 19. Giải thích LINQ này
+                ?? throw new KeyNotFoundException($"Không tìm thấy Tournament #{tournamentId}");
 
             if (tournament.Status == "Completed")
                 throw new InvalidOperationException("Không thể hủy giải đã hoàn thành");
 
-            // ── BẮT ĐẦU TRANSACTION ──────────────────────────────────
-            using var transaction = await _context.Database.BeginTransactionAsync(); // 20. Bắt đầu transaction trong database hay trong hệ thống 
+            using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                var now = DateTime.UtcNow; // 21. Tại sao phải có thời gian 
-                var affectedUserIds = new HashSet<int>(); // 22. HashSet để làm gì 
+                var now = DateTime.UtcNow;
+                var affectedUserIds = new HashSet<int>();
+
+                // Bug 4 fix — capture old status trước khi thay đổi
+                var oldStatus = tournament.Status;
 
                 // 1. Hủy giải
                 tournament.Status = "Cancelled";
@@ -269,32 +276,40 @@ namespace HRTMS.Infrastructure.Services
                         // 3. Hủy tất cả RaceEntry
                         foreach (var entry in race.RaceEntries)
                         {
+                            // Bug 1 fix — dùng EntryFeeStatus cho check phí, Status cho trạng thái tham gia
+                            if (entry.EntryFeeStatus == "Paid")
+                                entry.EntryFeeStatus = "Refund Pending";
 
-                            // TRN.10 — EC-32: entry đã Paid → chuyển sang Refund Pending
-                            if (entry.Status == "Paid")
-                                entry.Status = "Refund Pending";
-                            else
-                                entry.Status = "Cancelled";
-
-                            entry.UpdatedAt = now; 
+                            entry.Status = "Cancelled";
+                            entry.UpdatedAt = now;
                         }
 
                         // 4. Hoàn điểm ảo cho Predictions đang Pending
                         foreach (var prediction in race.Predictions.Where(p => p.Status == "Pending"))
                         {
+                            // Bug 2 fix — Include Wallet để tránh null reference
                             var spectator = await _context.SpectatorProfiles
-                                .FirstOrDefaultAsync(s => s.SpectatorId == prediction.SpectatorId); // 23. Giải thích LINQ này
+                                .Include(s => s.Wallet)
+                                .FirstOrDefaultAsync(s => s.SpectatorId == prediction.SpectatorId);
 
-
-                            if (spectator?.Wallet != null) // 24. Giải thích dòng này
+                            if (spectator?.Wallet != null)
                             {
-                                spectator.Wallet.Balance += prediction.PointsPlaced;  // hoàn điểm vào Wallet
-                                spectator.Wallet.UpdatedAt = now; // 25. Giai đoạn này có liên quan gì đến vptransaction không
+                                spectator.Wallet.Balance += prediction.PointsPlaced;
+                                spectator.Wallet.UpdatedAt = now;
+
+                                // Bug 3 fix — tạo ledger entry để giữ bất biến Balance = SUM(VPT)
+                                _context.VirtualPointsTransactions.Add(new VirtualPointsTransaction
+                                {
+                                    WalletId = spectator.Wallet.WalletId,
+                                    Amount = prediction.PointsPlaced,
+                                    Type = "Prediction Refund",
+                                    ReferenceId = prediction.PredictionId.ToString(),
+                                    CreatedAt = now,
+                                });
                             }
 
                             prediction.Status = "Refunded";
-
-                            affectedUserIds.Add(prediction.SpectatorId); // 26. Tại sao phải có dòng này
+                            affectedUserIds.Add(prediction.SpectatorId);
                         }
                     }
 
@@ -317,12 +332,13 @@ namespace HRTMS.Infrastructure.Services
                 await _context.SaveChangesAsync();
 
                 // 6. Ghi AuditLog
+                // Bug 4 fix — dùng oldStatus thật thay vì hardcode "Active"
                 await _auditLog.LogAsync(
                     actorId: adminUserId,
                     action: "Cancel_Tournament",
                     entityName: "Tournament",
                     entityId: tournamentId.ToString(),
-                    oldValue: "Active",
+                    oldValue: oldStatus,
                     newValue: "Cancelled"
                 );
 
@@ -331,22 +347,29 @@ namespace HRTMS.Infrastructure.Services
             catch
             {
                 await transaction.RollbackAsync();
-                throw; // re-throw để Controller bắt và trả 500
+                throw;
             }
         }
 
         public async Task<List<PrizeDistributionResponseDto>> SetPrizeDistributionsAsync(int tournamentId, SetPrizeDistributionDto dto)
         {
-            //1. Validate du 5 position khong trung 
+            // Bug 6 fix — kiểm tra tournament tồn tại trước khi upsert
+            var exists = await _context.Tournaments.AnyAsync(t => t.TournamentId == tournamentId);
+            if (!exists)
+                throw new KeyNotFoundException($"Không tìm thấy Tournament #{tournamentId}");
+
+            // 1. Validate đủ 5 position không trùng
             var positions = dto.Distributions.Select(d => d.Position).OrderBy(p => p).ToList();
-            if (positions.Count != 5 || !positions.SequenceEqual([1, 2, 3, 4, 5])) // 27. Giải thích syntax này, cái này phải lambda không 
-                throw new ArgumentException($"Phai nhap dung 5 vi tri tu 1 den 5, khong trung");
-            //2. Validate tong = 100% - dung decimal de tranh floating point error
+            if (positions.Count != 5 || !positions.SequenceEqual([1, 2, 3, 4, 5]))
+                throw new ArgumentException("Phải nhập đúng 5 vị trí từ 1 đến 5, không trùng");
+
+            // 2. Validate tổng = 100% — dùng decimal để tránh floating point error
             var total = dto.Distributions.Sum(d => d.Percentage);
-            if (Math.Round(total, 2) != 100m) 
-                throw new ArgumentException($"Tong ty le phai = 100%, hien tai = {total}%");
-            //3. Upsert - xoa cu, insert moi trong cung transaction
-            var existing = await _context.PrizeDistributions // 28. Tại sao phải có await
+            if (Math.Round(total, 2) != 100m)
+                throw new ArgumentException($"Tổng tỷ lệ phải = 100%, hiện tại = {total}%");
+
+            // 3. Upsert — xóa cũ, insert mới trong cùng transaction
+            var existing = await _context.PrizeDistributions
                 .Where(p => p.TournamentId == tournamentId)
                 .ToListAsync();
             _context.PrizeDistributions.RemoveRange(existing);
@@ -369,18 +392,24 @@ namespace HRTMS.Infrastructure.Services
                 {
                     Position = p.Position,
                     Percentage = p.Percentage
-                }).ToList(); // 29. Giải thích LINQ này
+                }).ToList();
         }
 
         public async Task<RoundResponseDto> CreateRoundAsync(int tournamentId, CreateRoundDto dto)
         {
-            var tournament = await _context.Tournaments.FindAsync(tournamentId) // 30. Async có nghĩa là gì
+            var tournament = await _context.Tournaments.FindAsync(tournamentId)
                 ?? throw new KeyNotFoundException($"Không tìm thấy Tournament #{tournamentId}");
 
             // TRN.7 — validate date nằm trong cửa sổ giải
             if (dto.ScheduledDate < tournament.StartDate || dto.ScheduledDate > tournament.EndDate)
                 throw new ArgumentException(
                     $"ScheduledDate phải nằm trong [{tournament.StartDate:d}, {tournament.EndDate:d}]");
+
+            // Bug 7 fix — kiểm tra trùng SequenceOrder trong cùng tournament
+            var isDuplicateOrder = await _context.Rounds
+                .AnyAsync(r => r.TournamentId == tournamentId && r.SequenceOrder == dto.SequenceOrder);
+            if (isDuplicateOrder)
+                throw new ArgumentException($"SequenceOrder {dto.SequenceOrder} đã tồn tại trong Tournament #{tournamentId}");
 
             var round = new Round
             {
@@ -412,7 +441,7 @@ namespace HRTMS.Infrastructure.Services
             var round = await _context.Rounds
                 .Include(r => r.Tournament)
                 .FirstOrDefaultAsync(r => r.RoundId == roundId)
-                ?? throw new KeyNotFoundException($"Không tìm thấy Round #{roundId}"); // 31. Giải thích LINQ này
+                ?? throw new KeyNotFoundException($"Không tìm thấy Round #{roundId}");
 
             var tournament = round.Tournament;
 
@@ -424,10 +453,16 @@ namespace HRTMS.Infrastructure.Services
                 throw new ArgumentException(
                     $"ScheduledTime phải nằm trong cửa sổ giải [{tournament.StartDate:d}, {tournament.EndDate:d}]");
 
+            // Bug 8 fix — kiểm tra trùng RaceNumber trong cùng round
+            var isDuplicateRaceNumber = await _context.Races
+                .AnyAsync(r => r.RoundId == roundId && r.RaceNumber == dto.RaceNumber);
+            if (isDuplicateRaceNumber)
+                throw new ArgumentException($"RaceNumber {dto.RaceNumber} đã tồn tại trong Round #{roundId}");
+
             // TRN.7 — validate tổng PurseAmount không vượt giải
             var existingPurseTotal = await _context.Races
                 .Where(r => r.Round.TournamentId == tournament.TournamentId)
-                .SumAsync(r => r.PurseAmount); // 32. Giải thích LINQ này
+                .SumAsync(r => r.PurseAmount);
 
             if (existingPurseTotal + dto.PurseAmount > tournament.PurseAmount)
                 throw new ArgumentException(

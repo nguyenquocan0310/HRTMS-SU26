@@ -55,7 +55,7 @@ namespace HRTMS.API.Controllers
         }
 
         // GET/api/tournament/{id}
-        [HttpGet]
+        [HttpGet("{id}")]
         [AllowAnonymous]
         public async Task<ActionResult<ApiResponse<TournamentResponseDto>>> GetById(int id)
         {
@@ -77,7 +77,7 @@ namespace HRTMS.API.Controllers
             }
             catch(KeyNotFoundException ex)
             {
-                return NotFound(ApiResponse<TournamentResponseDto>.Fail($"ex.Message")); 
+                return NotFound(ApiResponse<TournamentResponseDto>.Fail(ex.Message)); 
             }
             catch(InvalidOperationException ex)
             {
