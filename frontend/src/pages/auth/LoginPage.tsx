@@ -4,7 +4,7 @@ import * as Yup from 'yup'
 
 import { login } from '../../api/auth'
 import useAuthStore from '../../store/authStore'
-import { getRoleHomePath } from '../../App'
+import { getRoleHomePath } from '../../utils/roleHelper'
 import './LoginPage.css'
 
 const loginSchema = Yup.object({
