@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Horse } from '../../types/owner.types';
+import type { Horse } from '../../types/owner.types';
 import HorseCard from '../../components/owner/HorseCard';
 import { getMyHorses } from '../../services/ownerService';
 
