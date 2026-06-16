@@ -1,3 +1,4 @@
+
 import React from 'react';
 import type { Horse } from '../../types/owner.types';
 import HorseStatusBadge from './HorseStatusBadge';
