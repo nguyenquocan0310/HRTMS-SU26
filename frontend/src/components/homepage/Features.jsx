@@ -1,3 +1,5 @@
+import "./Features.css";
+
 const features = [
   {
     title: "Horse Management",
@@ -33,7 +35,7 @@ const features = [
 
 function Features() {
   return (
-    <section className="features">
+    <section className="features" id="features">
 
       <h2>System Features</h2>
 
