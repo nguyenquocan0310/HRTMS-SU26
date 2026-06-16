@@ -2,34 +2,34 @@ import "./Features.css";
 
 const features = [
   {
-    title: "Horse Management",
+    title: "Race Entry Management",
     description:
-      "Manage horse profiles, breeds and race history."
+      "Schedule races, assign entries and manage starting gates with precision."
   },
   {
-    title: "Jockey Management",
+    title: "Horse Performance",
     description:
-      "Track jockey performance and assignments."
+      "Track speed, stamina and race form for each thoroughbred."
   },
   {
-    title: "Race Scheduling",
+    title: "Jockey Analytics",
     description:
-      "Create and manage racing events."
+      "Analyze rider strengths, win rates and course specialty performance."
   },
   {
-    title: "Owner Management",
+    title: "Trainer Insights",
     description:
-      "Manage horse ownership information."
+      "Monitor training progress, conditioning and competition readiness."
   },
   {
-    title: "Performance Tracking",
+    title: "Race Results",
     description:
-      "Analyze rankings and race results."
+      "View results, payouts and historical performance in one dashboard."
   },
   {
-    title: "Medical Records",
+    title: "Stable Notes",
     description:
-      "Monitor horse health and vaccinations."
+      "Capture horse health updates, gear changes and race-day strategies."
   }
 ];
 

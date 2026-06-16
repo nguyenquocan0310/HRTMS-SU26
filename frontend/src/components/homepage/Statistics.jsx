@@ -21,7 +21,7 @@ const stats = [
 
 function Statistics() {
   return (
-    <section className="stats" id="solutions">
+    <section className="stats" id="statistics">
 
       {stats.map((item, index) => (
         <div className="stat-card" key={index}>

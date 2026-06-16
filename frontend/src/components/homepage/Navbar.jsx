@@ -4,16 +4,18 @@ import './Navbar.css'
 function Navbar() {
   return (
     <header className="navbar">
-      <div className="navbar__brand">
-        <div className="navbar__logo">P</div>
-        <span className="navbar__title">Prism</span>
-      </div>
+      <Link to="/" className="navbar__brand">
+        <div className="navbar__logo">H</div>
+        <div>
+          <span className="navbar__title">HRMS</span>
+          <span className="navbar__subtitle">Racing</span>
+        </div>
+      </Link>
 
       <nav className="navbar__links">
-        <a href="#solutions" className="navbar__link">Solutions</a>
-        <a href="#features" className="navbar__link">Features</a>
-        <a href="#pricing" className="navbar__link">Pricing</a>
-        <a href="#resources" className="navbar__link">Resources</a>
+        <Link to="/#features" className="navbar__link">Features</Link>
+        <Link to="/#statistics" className="navbar__link">Statistics</Link>
+        <Link to="/#news" className="navbar__link">News</Link>
       </nav>
 
       <div className="navbar__actions">
