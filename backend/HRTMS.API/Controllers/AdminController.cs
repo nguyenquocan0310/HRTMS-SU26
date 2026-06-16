@@ -3,6 +3,8 @@ using HRTMS.Core.Interfaces.Services;
 using HRTMS.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Linq;
 
 namespace HRTMS.API.Controllers;
 
@@ -136,5 +138,130 @@ public class AdminController : ControllerBase
             ipAddress: ClientIp);
 
         return Ok(new { message = "Doctor approved and activated successfully." });
+    }
+    [HttpGet("users")]
+    public async Task<IActionResult> GetUsers(
+        [FromQuery] string? role,
+        [FromQuery] string? status)
+    {
+        var query = _context.Users.AsQueryable();
+
+        if (!string.IsNullOrEmpty(role))
+            query = query.Where(u => u.Role == role);
+
+        if (!string.IsNullOrEmpty(status))
+            query = query.Where(u => u.Status == status);
+
+        var users = await query
+            .OrderByDescending(u => u.CreatedAt)
+            .Select(u => new
+            {
+                u.UserId,
+                u.Username,
+                u.FullName,
+                u.Email,
+                u.Role,
+                u.Status,
+                u.CreatedAt
+            })
+            .ToListAsync();
+
+        return Ok(new { success = true, data = users });
+    }
+
+    [HttpGet("users/{id}")]
+    public async Task<IActionResult> GetUserById(int id)
+    {
+        var user = await _context.Users
+            .Where(u => u.UserId == id)
+            .Select(u => new
+            {
+                u.UserId,
+                u.Username,
+                u.FullName,
+                u.Email,
+                u.Role,
+                u.Status,
+                u.FailedLoginAttempts,
+                u.LockoutEnd,
+                u.CreatedAt,
+                u.UpdatedAt
+            })
+            .FirstOrDefaultAsync();
+
+        if (user == null)
+            return NotFound(new { message = "User not found." });
+
+        return Ok(new { success = true, data = user });
+    }
+
+    [HttpGet("pending-approvals")]
+    public async Task<IActionResult> GetPendingApprovals()
+    {
+        var referees = await _context.RefereeProfiles
+            .Where(r => r.Status == "Pending")
+            .Join(_context.Users,
+                r => r.RefereeId,
+                u => u.UserId,
+                (r, u) => new
+                {
+                    u.UserId,
+                    u.Username,
+                    u.FullName,
+                    u.Email,
+                    Role = "Referee",
+                    ProfileStatus = r.Status,
+                    r.CertificationLevel,
+                    r.CreatedAt
+                })
+            .ToListAsync();
+
+        var doctors = await _context.DoctorProfiles
+            .Where(d => d.Status == "Pending")
+            .Join(_context.Users,
+                d => d.DoctorId,
+                u => u.UserId,
+                (d, u) => new
+                {
+                    u.UserId,
+                    u.Username,
+                    u.FullName,
+                    u.Email,
+                    Role = "Doctor",
+                    ProfileStatus = d.Status,
+                    CertificationLevel = d.MedicalLicenseNumber,
+                    d.CreatedAt
+                })
+            .ToListAsync();
+
+        var jockeys = await _context.JockeyProfiles
+            .Where(j => j.Status == "Pending")
+            .Join(_context.Users,
+                j => j.JockeyId,
+                u => u.UserId,
+                (j, u) => new
+                {
+                    u.UserId,
+                    u.Username,
+                    u.FullName,
+                    u.Email,
+                    Role = "Jockey",
+                    ProfileStatus = j.Status,
+                    CertificationLevel = j.LicenseCertificate,
+                    j.CreatedAt
+                })
+            .ToListAsync();
+
+        return Ok(new
+        {
+            success = true,
+            data = new
+            {
+                referees,
+                doctors,
+                jockeys,
+                totalPending = referees.Count + doctors.Count + jockeys.Count
+            }
+        });
     }
 }
