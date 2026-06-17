@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { JockeyRaceEntry } from '../../types/jockey.types';
 import RaceStatusBadge from '../../components/jockey/RaceStatusBadge';
 
-// Mock data
+// Dữ liệu mẫu
 const mockRaceEntries: JockeyRaceEntry[] = [
   {
     entryID: 'entry-001',
@@ -44,14 +44,14 @@ export default function MyRaces() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate loading
+    // Mô phỏng tải dữ liệu
     setTimeout(() => {
       setRaces(mockRaceEntries);
       setLoading(false);
     }, 500);
   }, []);
 
-  // Loading state
+  // Trạng thái đang tải
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -63,7 +63,7 @@ export default function MyRaces() {
     );
   }
 
-  // Empty state
+  // Trạng thái rỗng
   if (races.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -80,11 +80,11 @@ export default function MyRaces() {
     );
   }
 
-  // List state
+  // Danh sách cuộc đua
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
+        {/* Tiêu đề */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
             Cuộc đua của tôi
@@ -94,11 +94,11 @@ export default function MyRaces() {
           </p>
         </div>
 
-        {/* Table */}
+        {/* Bảng danh sách */}
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              {/* Table Header */}
+              {/* Tiêu đề bảng */}
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
@@ -120,7 +120,7 @@ export default function MyRaces() {
                     Tiền thưởng
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
-                    Công xuất phát
+                    Số cổng xuất phát
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
                     Trạng thái
@@ -128,7 +128,7 @@ export default function MyRaces() {
                 </tr>
               </thead>
 
-              {/* Table Body */}
+              {/* Nội dung bảng */}
               <tbody className="divide-y divide-gray-200">
                 {races.map((race, index) => (
                   <tr key={race.entryID} className="hover:bg-gray-50 transition-colors">
@@ -162,7 +162,7 @@ export default function MyRaces() {
                       {race.purse.toLocaleString('vi-VN')} ₫
                     </td>
 
-                    {/* Công xuất phát */}
+                    {/* Số cổng xuất phát */}
                     <td className="px-6 py-4 text-sm text-gray-800">
                       {race.gateNumber ? (
                         <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-full font-medium">

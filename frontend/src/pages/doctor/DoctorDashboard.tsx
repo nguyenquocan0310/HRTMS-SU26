@@ -1,0 +1,317 @@
+import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+
+interface CoiFormState {
+  fullName: string
+  relationship: string
+  raceRole: string
+}
+
+interface ScheduleItem {
+  id: string
+  raceRun: string
+  checkTime: string
+  checkType: 'Weigh-In' | 'Vet Check' | 'Weigh-Out'
+  subject: string
+  status: 'Đã hoàn thành' | 'Đang chờ' | 'Chưa bắt đầu'
+}
+
+export default function DoctorDashboard() {
+  const navigate = useNavigate()
+  
+  // Trạng thái hiển thị banner cảnh báo
+  const [showBanner, setShowBanner] = useState(true)
+
+  // Trạng thái Form COI
+  const [coiForm, setCoiForm] = useState<CoiFormState>({
+    fullName: '',
+    relationship: 'Không có',
+    raceRole: ''
+  })
+  const [coiSubmitted, setCoiSubmitted] = useState(false)
+  const [coiError, setCoiError] = useState('')
+
+  // Dữ liệu Mock cho lịch phân công hôm nay
+  const scheduleData: ScheduleItem[] = [
+    {
+      id: 'S1',
+      raceRun: 'Lượt 1 - Chung kết Nam',
+      checkTime: '08:30',
+      checkType: 'Weigh-In',
+      subject: 'Nguyễn Văn Hùng (Kỵ sĩ)',
+      status: 'Đã hoàn thành'
+    },
+    {
+      id: 'S2',
+      raceRun: 'Lượt 2 - Vòng loại A',
+      checkTime: '10:15',
+      checkType: 'Vet Check',
+      subject: 'Kim Long - Mã số #V102 (Ngựa)',
+      status: 'Đang chờ'
+    },
+    {
+      id: 'S3',
+      raceRun: 'Lượt 3 - Vòng loại B',
+      checkTime: '14:00',
+      checkType: 'Weigh-Out',
+      subject: 'Lê Hoàng Nam (Kỵ sĩ)',
+      status: 'Chưa bắt đầu'
+    }
+  ]
+
+  const handleCoiSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!coiForm.fullName.trim() || !coiForm.raceRole.trim()) {
+      setCoiError('Vui lòng điền đầy đủ Họ tên và Vai trò giải đua.')
+      return
+    }
+    setCoiError('')
+    setCoiSubmitted(true)
+  }
+
+  const resetCoiForm = () => {
+    setCoiForm({ fullName: '', relationship: 'Không có', raceRole: '' })
+    setCoiSubmitted(false)
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Tiêu đề trang */}
+      <div className="flex justify-between items-center pb-4 border-b border-gray-200">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Bảng điều khiển</h1>
+          <p className="text-sm text-gray-500 mt-1">Thông tin tổng quan và phân công công việc hôm nay</p>
+        </div>
+        <div className="text-sm text-gray-500 bg-white border border-gray-200 px-3 py-1.5 rounded-lg shadow-sm">
+          📅 Hôm nay: {new Date().toLocaleDateString('vi-VN')}
+        </div>
+      </div>
+
+      {/* Banner cảnh báo màu vàng ở trên cùng */}
+      {showBanner && (
+        <div className="bg-yellow-50 text-yellow-800 border border-yellow-200 rounded-lg p-4 flex justify-between items-start shadow-sm transition-all duration-150">
+          <div className="flex gap-3">
+            <span className="text-xl mt-0.5">⚠️</span>
+            <div>
+              <p className="font-semibold text-sm">Yêu cầu xét duyệt tài khoản</p>
+              <p className="text-xs text-yellow-700 mt-1">
+                Hồ sơ của bạn đang chờ Admin xét duyệt. Bạn chưa thể thao tác.
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={() => setShowBanner(false)}
+            className="text-yellow-600 hover:text-yellow-900 text-lg leading-none p-1 rounded hover:bg-yellow-100/50 transition-colors"
+            aria-label="Đóng cảnh báo"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Hệ thống 4 thẻ chỉ số (Stats Cards) */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Thẻ 1: Phiên khám hôm nay */}
+        <div className="bg-white border border-emerald-100 rounded-xl p-5 flex items-center justify-between shadow-sm transition-all duration-200 hover:shadow-md">
+          <div>
+            <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Phiên khám hôm nay</p>
+            <p className="text-3xl font-bold text-gray-900 mt-2">8</p>
+          </div>
+          <div className="w-12 h-12 bg-emerald-50 text-emerald-600 flex items-center justify-center rounded-xl text-2xl font-semibold shadow-inner">
+            🏥
+          </div>
+        </div>
+
+        {/* Thẻ 2: Chờ kiểm tra - Clickable */}
+        <button
+          onClick={() => navigate('/doctor/paddock')}
+          className="bg-white border border-yellow-100 rounded-xl p-5 flex items-center justify-between shadow-sm transition-all duration-200 hover:shadow-md hover:border-yellow-200 text-left focus:outline-none focus:ring-2 focus:ring-yellow-200"
+        >
+          <div>
+            <p className="text-xs font-semibold text-yellow-600 uppercase tracking-wider">Chờ kiểm tra</p>
+            <p className="text-3xl font-bold text-gray-900 mt-2">3</p>
+          </div>
+          <div className="w-12 h-12 bg-yellow-50 text-yellow-600 flex items-center justify-center rounded-xl text-2xl font-semibold shadow-inner">
+            ⏳
+          </div>
+        </button>
+
+        {/* Thẻ 3: Đã thông qua */}
+        <div className="bg-white border border-green-100 rounded-xl p-5 flex items-center justify-between shadow-sm transition-all duration-200 hover:shadow-md">
+          <div>
+            <p className="text-xs font-semibold text-green-600 uppercase tracking-wider">Đã thông qua</p>
+            <p className="text-3xl font-bold text-gray-900 mt-2">5</p>
+          </div>
+          <div className="w-12 h-12 bg-green-50 text-green-600 flex items-center justify-center rounded-xl text-2xl font-semibold shadow-inner">
+            ✅
+          </div>
+        </div>
+
+        {/* Thẻ 4: Không đạt điều kiện */}
+        <div className="bg-white border border-red-100 rounded-xl p-5 flex items-center justify-between shadow-sm transition-all duration-200 hover:shadow-md">
+          <div>
+            <p className="text-xs font-semibold text-red-600 uppercase tracking-wider">Không đạt điều kiện</p>
+            <p className="text-3xl font-bold text-gray-900 mt-2">0</p>
+          </div>
+          <div className="w-12 h-12 bg-red-50 text-red-600 flex items-center justify-center rounded-xl text-2xl font-semibold shadow-inner">
+            ❌
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Khu vực "Khai báo xung đột lợi ích (COI)" */}
+        <div className="lg:col-span-1 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col justify-between">
+          <div className="p-6">
+            <h2 className="text-base font-bold text-gray-900 flex items-center gap-2 border-b border-gray-100 pb-3">
+              🛡️ Khai báo xung đột lợi ích (COI)
+            </h2>
+            <p className="text-xs text-gray-500 mt-2">
+              Khai báo trung thực các mối quan hệ gia đình hoặc lợi ích liên quan đến các vận động viên hoặc trọng tài trong giải đua.
+            </p>
+
+            {coiSubmitted ? (
+              <div className="mt-6 p-4 bg-emerald-50 border border-emerald-100 rounded-lg text-emerald-800 text-sm space-y-3">
+                <div className="flex gap-2 font-semibold">
+                  <span>✓</span>
+                  <span>Khai báo thành công</span>
+                </div>
+                <p className="text-xs text-emerald-700">
+                  Hệ thống đã ghi nhận cam kết không có xung đột lợi ích của bác sĩ cho giải đấu hôm nay.
+                </p>
+                <div className="border-t border-emerald-100 pt-2 text-xs space-y-1 text-emerald-600">
+                  <div><strong>Họ tên:</strong> {coiForm.fullName}</div>
+                  <div><strong>Mối quan hệ:</strong> {coiForm.relationship}</div>
+                  <div><strong>Vai trò giải đua:</strong> {coiForm.raceRole}</div>
+                </div>
+                <button
+                  onClick={resetCoiForm}
+                  className="mt-2 w-full bg-white text-emerald-700 hover:bg-emerald-100/50 border border-emerald-200 py-1.5 px-3 rounded-md text-xs font-medium transition-colors"
+                >
+                  Tạo khai báo mới
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleCoiSubmit} className="mt-5 space-y-4">
+                {coiError && (
+                  <p className="text-xs text-red-600 bg-red-50 p-2 border border-red-100 rounded">
+                    {coiError}
+                  </p>
+                )}
+                
+                <div>
+                  <label htmlFor="fullName" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                    Họ và tên
+                  </label>
+                  <input
+                    id="fullName"
+                    type="text"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors"
+                    placeholder="Nhập đầy đủ họ tên bác sĩ"
+                    value={coiForm.fullName}
+                    onChange={(e) => setCoiForm({ ...coiForm, fullName: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="relationship" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                    Quan hệ thân nhân
+                  </label>
+                  <select
+                    id="relationship"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors"
+                    value={coiForm.relationship}
+                    onChange={(e) => setCoiForm({ ...coiForm, relationship: e.target.value })}
+                  >
+                    <option value="Không có">Không có xung đột</option>
+                    <option value="Thân nhân là Chủ ngựa">Thân nhân là Chủ ngựa</option>
+                    <option value="Thân nhân là Trọng tài">Thân nhân là Trọng tài</option>
+                    <option value="Mối liên hệ thương mại khác">Mối liên hệ thương mại khác</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="raceRole" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                    Vai trò giải đua
+                  </label>
+                  <input
+                    id="raceRole"
+                    type="text"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors"
+                    placeholder="VD: Giám sát y tế khu vực Paddock"
+                    value={coiForm.raceRole}
+                    onChange={(e) => setCoiForm({ ...coiForm, raceRole: e.target.value })}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-4 rounded-lg text-sm font-semibold transition-all shadow-sm shadow-emerald-600/10 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-500/20 mt-2"
+                >
+                  Xác nhận không có xung đột
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+
+        {/* Khu vực "Lịch phân công hôm nay" */}
+        <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl shadow-sm p-6 flex flex-col justify-between">
+          <div>
+            <h2 className="text-base font-bold text-gray-900 flex items-center gap-2 border-b border-gray-100 pb-3">
+              📅 Lịch phân công hôm nay
+            </h2>
+            <div className="overflow-x-auto mt-4">
+              <table className="w-full text-left text-sm text-gray-700">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    <th className="py-3 px-4">Lượt đua</th>
+                    <th className="py-3 px-4">Giờ khám</th>
+                    <th className="py-3 px-4">Loại kiểm tra</th>
+                    <th className="py-3 px-4">Đối tượng kiểm tra</th>
+                    <th className="py-3 px-4 text-right">Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {scheduleData.map((item) => (
+                    <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="py-3.5 px-4 font-medium text-gray-900 text-xs">{item.raceRun}</td>
+                      <td className="py-3.5 px-4 font-mono text-xs">{item.checkTime}</td>
+                      <td className="py-3.5 px-4">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
+                          {item.checkType}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-xs font-medium text-gray-600">{item.subject}</td>
+                      <td className="py-3.5 px-4 text-right">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                            item.status === 'Đã hoàn thành'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                              : item.status === 'Đang chờ'
+                              ? 'bg-yellow-50 text-yellow-700 border border-yellow-100'
+                              : 'bg-gray-50 text-gray-500 border border-gray-100'
+                          }`}
+                        >
+                          {item.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="mt-6 pt-4 border-t border-gray-100 flex justify-end">
+            <button
+              onClick={() => navigate('/doctor/paddock')}
+              className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 hover:underline flex items-center gap-1 focus:outline-none"
+            >
+              Xem chi tiết bàn điều khiển Paddock ➔
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
