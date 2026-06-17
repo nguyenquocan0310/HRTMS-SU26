@@ -33,11 +33,10 @@ export default function RegisterPage() {
   })
 
   const ROLES = [
-  'Admin',
-  'HorseOwner',
-  'Jockey',
-  'Referee',
-  'Spectator'
+    'HorseOwner',
+    'Jockey',
+    'Referee',
+    'Spectator'
   ]
 
   return (
