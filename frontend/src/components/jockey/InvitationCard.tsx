@@ -40,10 +40,10 @@ const InvitationCard: React.FC<InvitationCardProps> = ({
 
   return (
     <div className="border border-gray-200 rounded-lg shadow-sm p-4 bg-white hover:shadow-md transition-shadow">
-      {/* Horse Name */}
+      {/* Tên ngựa */}
       <h3 className="font-bold text-lg mb-3">{invitation.horseName}</h3>
 
-      {/* Details */}
+      {/* Thông tin chi tiết */}
       <div className="text-sm text-gray-700 mb-4 space-y-2">
         <p>
           <span className="font-medium">Chủ ngựa:</span> {invitation.ownerName}
@@ -56,11 +56,11 @@ const InvitationCard: React.FC<InvitationCardProps> = ({
           {new Date(invitation.raceScheduledTime).toLocaleString('vi-VN')}
         </p>
         <p>
-          <span className="font-medium">ID Cuộc đua:</span> {invitation.raceID}
+          <span className="font-medium">Mã cuộc đua:</span> {invitation.raceID}
         </p>
       </div>
 
-      {/* Status Badge */}
+      {/* Badge trạng thái */}
       <div className="mb-4">
         <span
           className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(
@@ -71,7 +71,7 @@ const InvitationCard: React.FC<InvitationCardProps> = ({
         </span>
       </div>
 
-      {/* Action Buttons - Show only if Pending */}
+      {/* Nút hành động — chỉ hiển thị khi Chờ phản hồi */}
       {invitation.status === 'Pending' && (
         <div className="flex gap-3">
           <button
@@ -89,14 +89,14 @@ const InvitationCard: React.FC<InvitationCardProps> = ({
         </div>
       )}
 
-      {/* Readonly Status - Show for Accept/Decline */}
+      {/* Hiển thị thời gian phản hồi cho Accept/Decline */}
       {(invitation.status === 'Accept' || invitation.status === 'Decline') && (
         <div className="text-sm text-gray-600">
           <p>
             <span className="font-medium">Phản hồi lúc:</span>{' '}
             {invitation.respondedAt
               ? new Date(invitation.respondedAt).toLocaleString('vi-VN')
-              : 'N/A'}
+              : 'Chưa có'}
           </p>
         </div>
       )}
