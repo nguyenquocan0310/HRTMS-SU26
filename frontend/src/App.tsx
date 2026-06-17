@@ -14,9 +14,12 @@ import RegisterHorse from './pages/owner/RegisterHorse'
 import HorseDetail from './pages/owner/HorseDetail'
 import RaceEntries from './pages/owner/RaceEntries'
 import JockeyInvite from './pages/owner/JockeyInvite'
+import ScheduleConfirm from './pages/owner/ScheduleConfirm'
+import Protest from './pages/shared/Protest'
+import ProfileDeclaration from './pages/jockey/ProfileDeclaration'
+
 // Import jockey pages
 import JockeyLayout from './pages/jockey/JockeyLayout'
-import JockeyDashboard from './pages/jockey/JockeyDashboard'
 import InvitationList from './pages/jockey/InvitationList'
 import MyRaces from './pages/jockey/MyRaces'
 import RaceHistory from './pages/jockey/RaceHistory'
@@ -35,7 +38,7 @@ interface ProtectedRouteProps {
 }
 
 function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
-  // TẠM THỜI bypass auth khi dev
+  // TẠM THỜI bypass auth khi dev để làm giao diện nhanh
   if (import.meta.env.DEV) return <>{children}</>
 
   const { isAuthenticated, user } = useAuthStore()
@@ -66,7 +69,7 @@ export default function App() {
         <Route path="/login"    element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 
-        {/* Owner routes — có nested routes */}
+        {/* ── Cấu trúc Route của CHỦ NGỰA (Owner) ── */}
         <Route path="/owner" element={
           <ProtectedRoute allowedRoles={['HorseOwner']}>
             <OwnerLayout />
@@ -76,20 +79,28 @@ export default function App() {
           <Route path="horses" element={<MyHorses />} />
           <Route path="horses/register" element={<RegisterHorse />} />
           <Route path="horses/:id" element={<HorseDetail />} />
+          {/* ✨ ĐÃ BỔ SUNG 2 ROUTE THIẾU CỦA OWNER VÀO ĐÂY: */}
+          <Route path="schedule-confirm" element={<ScheduleConfirm />} />
+          <Route path="protest" element={<Protest userRole="HorseOwner" />} />
         </Route>
-         <Route path="/jockey" element={
-  <ProtectedRoute allowedRoles={['Jockey']}>
-    <JockeyLayout />
-  </ProtectedRoute>
-}>
-  <Route index element={<JockeyDashboard />} />
-  <Route path="invitations" element={<InvitationList />} />
-  <Route path="races" element={<MyRaces />} />
-  <Route path="history" element={<RaceHistory />} />
-</Route>
-        {/* Các role khác */}
+
+        {/* ── Cấu trúc Route của KỴ SĨ (Jockey) ── */}
+        <Route path="/jockey" element={
+          <ProtectedRoute allowedRoles={['Jockey']}>
+            <JockeyLayout />
+          </ProtectedRoute>
+        }>
+          <Route index element={<JockeyDashboard />} />
+          <Route path="invitations" element={<InvitationList />} />
+          <Route path="races" element={<MyRaces />} />
+          <Route path="history" element={<RaceHistory />} />
+          {/* ✨ ĐÃ BỔ SUNG 2 ROUTE THIẾU CỦA JOCKEY VÀO ĐÂY: */}
+          <Route path="profile-declaration" element={<ProfileDeclaration />} />
+          <Route path="protest" element={<Protest userRole="Jockey" />} />
+        </Route>
+
+        {/* Các role hệ thống khác */}
         <Route path="/admin/*"     element={<ProtectedRoute allowedRoles={['Admin']}><AdminDashboard /></ProtectedRoute>} />
-        <Route path="/jockey/*"    element={<ProtectedRoute allowedRoles={['Jockey']}><JockeyDashboard /></ProtectedRoute>} />
         <Route path="/referee/*"   element={<ProtectedRoute allowedRoles={['RaceReferee']}><RefereeDashboard /></ProtectedRoute>} />
         <Route path="/doctor/*"    element={<ProtectedRoute allowedRoles={['Doctor']}><DoctorDashboard /></ProtectedRoute>} />
         <Route path="/spectator/*" element={<ProtectedRoute allowedRoles={['Spectator']}><SpectatorDashboard /></ProtectedRoute>} />
