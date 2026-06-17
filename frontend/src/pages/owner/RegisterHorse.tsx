@@ -23,6 +23,13 @@ const initialFormData: FormData = {
   dopingTestResult: 'Pending',
 };
 
+const genderOptions: { value: 'Stallion' | 'Colt' | 'Mare' | 'Filly'; label: string }[] = [
+  { value: 'Stallion', label: 'Ngựa đực (trưởng thành)' },
+  { value: 'Colt', label: 'Ngựa đực (non)' },
+  { value: 'Mare', label: 'Ngựa cái (trưởng thành)' },
+  { value: 'Filly', label: 'Ngựa cái (non)' },
+];
+
 export default function RegisterHorse() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<FormData>(initialFormData);
@@ -30,7 +37,6 @@ export default function RegisterHorse() {
   const [error, setError] = useState<string | null>(null);
 
   const breedOptions = ['THO', 'ARAB', 'QUAR', 'APPA'];
-  const genderOptions = ['Stallion', 'Colt', 'Mare', 'Filly'] as const;
 
   const validateForm = (): boolean => {
     if (!formData.name.trim()) {
@@ -95,7 +101,7 @@ export default function RegisterHorse() {
       const errorMessage =
         err instanceof Error ? err.message : 'Lỗi khi đăng ký ngựa';
       setError(errorMessage);
-      console.error('Error registering horse:', err);
+      console.error('Lỗi đăng ký ngựa:', err);
     } finally {
       setLoading(false);
     }
@@ -104,7 +110,7 @@ export default function RegisterHorse() {
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-4xl mx-auto">
-        {/* Back Button */}
+        {/* Nút quay lại */}
         <button
           onClick={() => navigate('/owner/horses')}
           className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium mb-6 transition-colors"
@@ -112,20 +118,20 @@ export default function RegisterHorse() {
           ← Quay lại danh sách
         </button>
 
-        {/* Form Container */}
+        {/* Khung form */}
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-6">
             Đăng ký ngựa mới
           </h1>
 
-          {/* Error Alert */}
+          {/* Thông báo lỗi */}
           {error && (
             <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
               <p className="text-red-800 font-medium">{error}</p>
             </div>
           )}
 
-          {/* Form */}
+          {/* Form đăng ký */}
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
               {/* Tên ngựa */}
@@ -146,7 +152,7 @@ export default function RegisterHorse() {
               {/* Mã giống ngựa */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Mã giống ngựa <span className="text-red-600">*</span>
+                  Giống ngựa <span className="text-red-600">*</span>
                 </label>
                 <select
                   name="breedCode"
@@ -154,7 +160,7 @@ export default function RegisterHorse() {
                   onChange={handleInputChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                 >
-                  <option value="">Chọn mã giống</option>
+                  <option value="">Chọn giống ngựa</option>
                   {breedOptions.map((breed) => (
                     <option key={breed} value={breed}>
                       {breed}
@@ -190,9 +196,9 @@ export default function RegisterHorse() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                 >
                   <option value="">Chọn giới tính</option>
-                  {genderOptions.map((gen) => (
-                    <option key={gen} value={gen}>
-                      {gen}
+                  {genderOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
                     </option>
                   ))}
                 </select>
@@ -228,9 +234,8 @@ export default function RegisterHorse() {
                 />
               </div>
             </div>
-                      
-            {/* Action Buttons */}
-            
+
+            {/* Nút hành động */}
             <div className="flex justify-end gap-4">
               <button
                 type="button"
@@ -247,8 +252,7 @@ export default function RegisterHorse() {
                 {loading && (
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                 )}
-                Xác nhận Đăng ký
-                
+                {loading ? 'Đang xử lý...' : 'Xác nhận Đăng ký'}
               </button>
             </div>
           </form>
