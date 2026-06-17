@@ -11,8 +11,6 @@ import OwnerDashboard from './pages/owner/OwnerDashboard'
 import OwnerLayout from './pages/owner/OwnerLayout'
 import RegisterHorse from './pages/owner/RegisterHorse'
 import HorseDetail from './pages/owner/HorseDetail'
-import RaceEntries from './pages/owner/RaceEntries'
-import JockeyInvite from './pages/owner/JockeyInvite'
 // Import jockey pages
 import JockeyLayout from './pages/jockey/JockeyLayout'
 import JockeyDashboard from './pages/jockey/JockeyDashboard'
@@ -22,7 +20,6 @@ import RaceHistory from './pages/jockey/RaceHistory'
 
 // ── Placeholder các role khác ──
 const AdminDashboard     = () => <div>Admin Dashboard</div>
-const JockeyDashboard    = () => <div>Jockey Dashboard</div>
 const RefereeDashboard   = () => <div>Race Referee Dashboard</div>
 const DoctorDashboard    = () => <div>Doctor Dashboard</div>
 const SpectatorDashboard = () => <div>Spectator Dashboard</div>
@@ -87,7 +84,6 @@ export default function App() {
 </Route>
         {/* Các role khác */}
         <Route path="/admin/*"     element={<ProtectedRoute allowedRoles={['Admin']}><AdminDashboard /></ProtectedRoute>} />
-        <Route path="/jockey/*"    element={<ProtectedRoute allowedRoles={['Jockey']}><JockeyDashboard /></ProtectedRoute>} />
         <Route path="/referee/*"   element={<ProtectedRoute allowedRoles={['RaceReferee']}><RefereeDashboard /></ProtectedRoute>} />
         <Route path="/doctor/*"    element={<ProtectedRoute allowedRoles={['Doctor']}><DoctorDashboard /></ProtectedRoute>} />
         <Route path="/spectator/*" element={<ProtectedRoute allowedRoles={['Spectator']}><SpectatorDashboard /></ProtectedRoute>} />
