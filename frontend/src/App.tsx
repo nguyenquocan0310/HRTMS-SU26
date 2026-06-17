@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import useAuthStore from './store/authStore'
 import type { Role } from './types'
 
+import Home from './pages/Home'
 import LoginPage from './pages/auth/LoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
 
@@ -49,6 +50,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* Public */}
+        <Route path="/"         element={<Home />} />
         <Route path="/login"    element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 
