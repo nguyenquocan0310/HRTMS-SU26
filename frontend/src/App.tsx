@@ -6,6 +6,7 @@ import Home from './pages/Home/Home.js'
 import LoginPage from './pages/auth/LoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
 
+
 // ── Import các trang Owner ──
 import MyHorses from './pages/owner/MyHorses'
 import OwnerDashboard from './pages/owner/OwnerDashboard'
@@ -24,11 +25,15 @@ import InvitationList from './pages/jockey/InvitationList'
 import MyRaces from './pages/jockey/MyRaces'
 import RaceHistory from './pages/jockey/RaceHistory'
 
+// ── Import các trang Doctor ──
+import DoctorLayout from './pages/doctor/DoctorLayout'
+import DoctorDashboard from './pages/doctor/DoctorDashboard'
+import PaddockConsole from './pages/doctor/PaddockConsole'
+
 // ── Placeholder các role khác ──
 const AdminDashboard     = () => <div>Admin Dashboard</div>
 const JockeyDashboard    = () => <div>Jockey Dashboard</div>
 const RefereeDashboard   = () => <div>Race Referee Dashboard</div>
-const DoctorDashboard    = () => <div>Doctor Dashboard</div>
 const SpectatorDashboard = () => <div>Spectator Dashboard</div>
 
 // ── Protected Route ──
@@ -102,7 +107,17 @@ export default function App() {
         {/* Các role hệ thống khác */}
         <Route path="/admin/*"     element={<ProtectedRoute allowedRoles={['Admin']}><AdminDashboard /></ProtectedRoute>} />
         <Route path="/referee/*"   element={<ProtectedRoute allowedRoles={['RaceReferee']}><RefereeDashboard /></ProtectedRoute>} />
-        <Route path="/doctor/*"    element={<ProtectedRoute allowedRoles={['Doctor']}><DoctorDashboard /></ProtectedRoute>} />
+        
+        {/* ── Cấu trúc Route của BÁC SĨ (Doctor) ── */}
+        <Route path="/doctor" element={
+          <ProtectedRoute allowedRoles={['Doctor']}>
+            <DoctorLayout />
+          </ProtectedRoute>
+        }>
+          <Route index element={<DoctorDashboard />} />
+          <Route path="paddock" element={<PaddockConsole />} />
+        </Route>
+
         <Route path="/spectator/*" element={<ProtectedRoute allowedRoles={['Spectator']}><SpectatorDashboard /></ProtectedRoute>} />
 
         <Route path="/unauthorized" element={<div>403 — Không có quyền truy cập</div>} />
