@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import useAuthStore from './store/authStore'
 import type { Role } from './types'
-import Home from './pages/Home/Home.js'
+import Home from './pages/Home/Home'
 
 import LoginPage from './pages/auth/LoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
@@ -23,7 +23,6 @@ import RaceHistory from './pages/jockey/RaceHistory'
 
 // ── Placeholder các role khác ──
 const AdminDashboard     = () => <div>Admin Dashboard</div>
-const JockeyDashboard    = () => <div>Jockey Dashboard</div>
 const RefereeDashboard   = () => <div>Race Referee Dashboard</div>
 const DoctorDashboard    = () => <div>Doctor Dashboard</div>
 const SpectatorDashboard = () => <div>Spectator Dashboard</div>
@@ -89,7 +88,6 @@ export default function App() {
 </Route>
         {/* Các role khác */}
         <Route path="/admin/*"     element={<ProtectedRoute allowedRoles={['Admin']}><AdminDashboard /></ProtectedRoute>} />
-        <Route path="/jockey/*"    element={<ProtectedRoute allowedRoles={['Jockey']}><JockeyDashboard /></ProtectedRoute>} />
         <Route path="/referee/*"   element={<ProtectedRoute allowedRoles={['RaceReferee']}><RefereeDashboard /></ProtectedRoute>} />
         <Route path="/doctor/*"    element={<ProtectedRoute allowedRoles={['Doctor']}><DoctorDashboard /></ProtectedRoute>} />
         <Route path="/spectator/*" element={<ProtectedRoute allowedRoles={['Spectator']}><SpectatorDashboard /></ProtectedRoute>} />
