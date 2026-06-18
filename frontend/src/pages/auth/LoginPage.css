@@ -20,7 +20,7 @@
   justify-content: center;
   align-items: center;
 
-  background-image: url('../../assets/horse.jpg');
+  background-image: url('../../assets/horse2.jpg');
   background-size: cover;
   background-position: center;
 }
@@ -123,10 +123,15 @@
   flex-direction: column;
   justify-content: center;
 
-  padding: 80px;
+  padding: 50px 40px;
 
   background: #faf8f5;
   overflow-y: auto;
+}
+
+.form-content {
+  width: 100%;
+  max-width: 460px;
 }
 
 .tabs {
@@ -154,6 +159,13 @@
 .tab.active {
   color: #4a1f08;
   border-bottom-color: #4a1f08;
+}
+
+.auth-tabs-bottom {
+  border-top: 1px solid #e3d6c9;
+  margin-top: 32px;
+  padding-top: 24px;
+  justify-content: center;
 }
 
 .form-content h2 {
