@@ -1,7 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import useAuthStore from './store/authStore'
 import type { Role } from './types'
-import Home from './pages/Home'
+import Home from './pages/Home/Home.js'
+
 import LoginPage from './pages/auth/LoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
 
@@ -41,7 +42,7 @@ import PredictionPage from './pages/spectator/PredictionPage'
 import WalletTransactions from './pages/spectator/WalletTransactions'
 import MyPredictions from './pages/spectator/MyPredictions'
 
-// ── Placeholder các role khác ──
+// ── Placeholder Admin ──
 const AdminDashboard = () => <div>Admin Dashboard</div>
 
 // ── Protected Route ──
@@ -51,7 +52,6 @@ interface ProtectedRouteProps {
 }
 
 function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
-  // TẠM THỜI bypass auth khi dev để làm giao diện nhanh
   if (import.meta.env.DEV) return <>{children}</>
 
   const { isAuthenticated, user } = useAuthStore()
@@ -82,7 +82,7 @@ export default function App() {
         <Route path="/login"    element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 
-        {/* ── Cấu trúc Route của CHỦ NGỰA (Owner) ── */}
+        {/* Owner routes */}
         <Route path="/owner" element={
           <ProtectedRoute allowedRoles={['HorseOwner']}>
             <OwnerLayout />
