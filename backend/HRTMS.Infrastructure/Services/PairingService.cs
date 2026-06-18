@@ -130,6 +130,7 @@ public class PairingService : IPairingService
             await _context.Database.BeginTransactionAsync();
 
         var pairing = await _context.Pairings
+            .Include(p => p.Horse)
             .FirstOrDefaultAsync(p => p.PairingId == pairingId);
 
         if (pairing == null)
@@ -145,6 +146,10 @@ public class PairingService : IPairingService
         if (pairing.Status != "Pending")
         {
             throw new InvalidOperationException("INVALID_STATUS");
+        }
+        if (pairing.Horse.AdminApprovalStatus != "Approved")
+        {
+            throw new InvalidOperationException("HORSE_NOT_APPROVED");
         }
 
         var hasAcceptedPairingForHorse = await _context.Pairings
@@ -177,6 +182,8 @@ public class PairingService : IPairingService
                 "Another jockey has already accepted this horse invitation.";
             otherPairing.UpdatedAt = DateTime.UtcNow;
         }
+
+
 
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
