@@ -18,10 +18,23 @@ const HorseStatusBadge: React.FC<HorseStatusBadgeProps> = ({ status }) => {
     }
   };
 
+  const getStatusLabel = (status: HorseStatusBadgeProps['status']): string => {
+    switch (status) {
+      case 'Pending':
+        return 'Chờ duyệt';
+      case 'Approved':
+        return 'Đã duyệt';
+      case 'Rejected':
+        return 'Từ chối';
+      default:
+        return status;
+    }
+  };
+
   return (
     <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusStyles(status)}`}>
-  {status}
-</span>
+      {getStatusLabel(status)}
+    </span>
   );
 };
 

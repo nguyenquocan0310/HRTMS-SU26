@@ -70,6 +70,36 @@ export default function RaceEntries() {
     }
   };
 
+  const getStatusLabel = (status: RaceEntry['status']): string => {
+    switch (status) {
+      case 'PendingConf':
+        return 'Chờ xác nhận';
+      case 'Confirmed':
+        return 'Đã xác nhận';
+      case 'Cancelled':
+        return 'Đã hủy';
+      case 'Disqualified':
+        return 'Bị loại';
+      default:
+        return status;
+    }
+  };
+
+  const getFeeStatusLabel = (status: RaceEntry['entryFeeStatus']): string => {
+    switch (status) {
+      case 'Paid':
+        return 'Đã thanh toán';
+      case 'Unpaid':
+        return 'Chưa thanh toán';
+      case 'Refund Pending':
+        return 'Chờ hoàn tiền';
+      case 'Refunded':
+        return 'Đã hoàn tiền';
+      default:
+        return status;
+    }
+  };
+
   const handleConfirmEntry = (entryID: string) => {
     // Mock confirmation
     setEntries((prev) =>
@@ -196,13 +226,13 @@ export default function RaceEntries() {
                           entry.status
                         )}`}
                       >
-                        {entry.status === 'PendingConf' ? 'Chờ xác nhận' : entry.status}
+                        {getStatusLabel(entry.status)}
                       </span>
                     </td>
 
                     {/* Fee Status */}
                     <td className={`px-6 py-4 text-sm font-medium ${getFeeStatusColor(entry.entryFeeStatus)}`}>
-                      {entry.entryFeeStatus}
+                      {getFeeStatusLabel(entry.entryFeeStatus)}
                     </td>
 
                     {/* Registered Date */}

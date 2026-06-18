@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import type { Horse } from '../../types/owner.types';
 import HorseStatusBadge from '../../components/owner/HorseStatusBadge';
 
-// Mock data
+// Dữ liệu mẫu
 const mockHorses: Horse[] = [
   {
     horseID: 'H001',
@@ -48,12 +48,27 @@ const mockHorses: Horse[] = [
   },
 ];
 
+const getGenderLabel = (gender: Horse['gender']): string => {
+  switch (gender) {
+    case 'Stallion':
+      return 'Ngựa đực (trưởng thành)';
+    case 'Colt':
+      return 'Ngựa đực (non)';
+    case 'Mare':
+      return 'Ngựa cái (trưởng thành)';
+    case 'Filly':
+      return 'Ngựa cái (non)';
+    default:
+      return gender;
+  }
+};
+
 export default function HorseDetail() {
   const { id } = useParams<{ horseID: string }>();
   const navigate = useNavigate();
 
-  // Find horse from mock data
-const horse = mockHorses.find((h) => h.horseID === id);
+  // Tìm ngựa từ dữ liệu mẫu
+  const horse = mockHorses.find((h) => h.horseID === id);
   if (!horse) {
     return (
       <div className="min-h-screen bg-gray-50 py-12 px-4 flex items-center justify-center">
@@ -87,10 +102,23 @@ const horse = mockHorses.find((h) => h.horseID === id);
     }
   };
 
+  const getDopingLabel = (result: Horse['dopingTestResult']): string => {
+    switch (result) {
+      case 'Clean':
+        return 'Âm tính';
+      case 'Pending':
+        return 'Chờ duyệt';
+      case 'Failed':
+        return 'Dương tính';
+      default:
+        return result;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-4xl mx-auto">
-        {/* Back Button */}
+        {/* Nút quay lại */}
         <button
           onClick={() => navigate('/owner/horses')}
           className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium mb-6 transition-colors"
@@ -98,9 +126,9 @@ const horse = mockHorses.find((h) => h.horseID === id);
           ← Quay lại
         </button>
 
-        {/* Detail Container */}
+        {/* Khung thông tin chi tiết */}
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-8">
-          {/* Header */}
+          {/* Tiêu đề */}
           <div className="mb-8">
             <h1 className="text-4xl font-bold text-gray-800 mb-4">
               {horse.name}
@@ -111,7 +139,7 @@ const horse = mockHorses.find((h) => h.horseID === id);
             </div>
           </div>
 
-          {/* Rejection Reason Alert */}
+          {/* Thông báo lý do từ chối */}
           {horse.status === 'Rejected' && horse.rejectionReason && (
             <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
               <h3 className="text-red-800 font-semibold mb-2">Lý do từ chối</h3>
@@ -119,31 +147,31 @@ const horse = mockHorses.find((h) => h.horseID === id);
             </div>
           )}
 
-          {/* Horse Information Grid */}
+          {/* Bảng thông tin ngựa */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            {/* Breed Code */}
+            {/* Mã giống */}
             <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-sm text-gray-600 font-medium mb-1">Mã giống</p>
+              <p className="text-sm text-gray-600 font-medium mb-1">Giống ngựa</p>
               <p className="text-lg font-semibold text-gray-800">
                 {horse.breedCode}
               </p>
             </div>
 
-            {/* Gender */}
+            {/* Giới tính */}
             <div className="bg-gray-50 rounded-lg p-4">
               <p className="text-sm text-gray-600 font-medium mb-1">Giới tính</p>
               <p className="text-lg font-semibold text-gray-800">
-                {horse.gender}
+                {getGenderLabel(horse.gender)}
               </p>
             </div>
 
-            {/* Age */}
+            {/* Tuổi */}
             <div className="bg-gray-50 rounded-lg p-4">
               <p className="text-sm text-gray-600 font-medium mb-1">Tuổi</p>
               <p className="text-lg font-semibold text-gray-800">{age} tuổi</p>
             </div>
 
-            {/* Birth Year */}
+            {/* Năm sinh */}
             <div className="bg-gray-50 rounded-lg p-4">
               <p className="text-sm text-gray-600 font-medium mb-1">Năm sinh</p>
               <p className="text-lg font-semibold text-gray-800">
@@ -151,7 +179,7 @@ const horse = mockHorses.find((h) => h.horseID === id);
               </p>
             </div>
 
-            {/* Color */}
+            {/* Màu sắc */}
             <div className="bg-gray-50 rounded-lg p-4">
               <p className="text-sm text-gray-600 font-medium mb-1">Màu sắc</p>
               <p className="text-lg font-semibold text-gray-800">
@@ -159,21 +187,21 @@ const horse = mockHorses.find((h) => h.horseID === id);
               </p>
             </div>
 
-            {/* Doping Test Result */}
+            {/* Kết quả kiểm tra doping */}
             <div className="bg-gray-50 rounded-lg p-4">
               <p className="text-sm text-gray-600 font-medium mb-1">
-                Kết quả xét nghiệm doping
+                Kiểm tra doping
               </p>
               <p
                 className={`text-lg font-semibold ${getDopingTextColor(
                   horse.dopingTestResult
                 )}`}
               >
-                {horse.dopingTestResult}
+                {getDopingLabel(horse.dopingTestResult)}
               </p>
             </div>
 
-            {/* Vaccination Record */}
+            {/* Hồ sơ tiêm chủng */}
             {horse.vaccinationRecordRef && (
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-sm text-gray-600 font-medium mb-1">
@@ -185,7 +213,7 @@ const horse = mockHorses.find((h) => h.horseID === id);
               </div>
             )}
 
-            {/* Doping Test Date */}
+            {/* Ngày xét nghiệm */}
             {horse.dopingTestDate && (
               <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-sm text-gray-600 font-medium mb-1">
@@ -197,7 +225,7 @@ const horse = mockHorses.find((h) => h.horseID === id);
               </div>
             )}
 
-            {/* Created At */}
+            {/* Ngày đăng ký */}
             <div className="bg-gray-50 rounded-lg p-4">
               <p className="text-sm text-gray-600 font-medium mb-1">
                 Ngày đăng ký
@@ -208,7 +236,7 @@ const horse = mockHorses.find((h) => h.horseID === id);
             </div>
           </div>
 
-          {/* Action Buttons */}
+          {/* Nút hành động */}
           <div className="flex gap-4 justify-end">
             <button
               onClick={() => navigate('/owner/horses')}
@@ -217,7 +245,7 @@ const horse = mockHorses.find((h) => h.horseID === id);
               Quay lại
             </button>
             <button
-              onClick={() => navigate(`/owner/horses/edit/${horseID}`)}
+              onClick={() => navigate(`/owner/horses/edit/${horse.horseID}`)}
               className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
             >
               Cập nhật thông tin

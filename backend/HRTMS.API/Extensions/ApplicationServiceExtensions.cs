@@ -14,6 +14,7 @@ public static class ApplicationServiceExtensions
         services.AddScoped<ITokenBlacklistService, TokenBlacklistService>();
         services.AddScoped<IJockeyService, JockeyService>();
         services.AddScoped<IPairingService, PairingService>();
+        services.AddScoped<IResultService, ResultService>();
         return services;
     }
 }
