@@ -45,13 +45,12 @@ export default function RegisterPage() {
       </div>
 
       <div className="login-form-panel">
-        <div className="tabs">
-          <Link to="/login" className="tab">Login</Link>
-          <Link to="/register" className="tab active">Register</Link>
-        </div>
-
         <div className="form-content">
           <h2>Create Account</h2>
+          <div className="tabs auth-tabs-under-title">
+            <Link to="/login" className="tab">Login</Link>
+            <Link to="/register" className="tab active">Register</Link>
+          </div>
           <form onSubmit={formik.handleSubmit} className="login-form">
             
             {/* Ví dụ mẫu cho 1 trường (làm tương tự cho các trường còn lại) */}
