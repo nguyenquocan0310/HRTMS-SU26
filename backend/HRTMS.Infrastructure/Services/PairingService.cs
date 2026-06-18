@@ -17,8 +17,8 @@ public class PairingService : IPairingService
     }
 
     public async Task<PairingResponseDto> CreateAsync(
-        int ownerId,
-        CreatePairingDto dto)
+    int ownerId,
+    CreatePairingDto dto)
     {
         // Lay thong tin ngua theo HorseId
         var horse = await _context.Horses
@@ -37,7 +37,7 @@ public class PairingService : IPairingService
                 "HORSE_NOT_OWNED");
         }
 
-        // Chi ngua da duoc Admin phe duyet moi duoc ghep cap
+        // Chi ngua da duoc Admin phe duyet moi duoc gui loi moi ghep cap
         if (horse.AdminApprovalStatus != "Approved")
         {
             throw new InvalidOperationException(
@@ -63,7 +63,36 @@ public class PairingService : IPairingService
                 "JOCKEY_NOT_ACTIVE");
         }
 
-        // Chan tao Pairing trung khi da co Pending hoac Accepted
+        // Kiem tra horse da co cap chinh thuc chua
+        // Neu horse da co pairing Accepted thi owner khong duoc gui them loi moi cho horse nay
+        var horseAlreadyHasAcceptedPairing = await _context.Pairings
+            .AnyAsync(p =>
+                p.HorseId == dto.HorseId &&
+                p.Status == "Accepted");
+
+        if (horseAlreadyHasAcceptedPairing)
+        {
+            throw new InvalidOperationException(
+                "HORSE_ALREADY_HAS_ACCEPTED_JOCKEY");
+        }
+
+        // Kiem tra jockey da co cap chinh thuc chua
+        // Neu jockey da co pairing Accepted thi jockey khong duoc nhan them loi moi moi
+        var jockeyAlreadyHasAcceptedPairing = await _context.Pairings
+            .AnyAsync(p =>
+                p.JockeyId == dto.JockeyId &&
+                p.Status == "Accepted");
+
+        if (jockeyAlreadyHasAcceptedPairing)
+        {
+            throw new InvalidOperationException(
+                "JOCKEY_ALREADY_HAS_ACCEPTED_HORSE");
+        }
+
+        // Kiem tra trung loi moi cho cung cap horse-jockey
+        // Cho phep horse co nhieu pending voi jockey khac
+        // Cho phep jockey co nhieu pending voi horse khac
+        // Nhung khong cho tao trung cung mot cap horse-jockey
         var pairingExists = await _context.Pairings
             .AnyAsync(p =>
                 p.HorseId == dto.HorseId &&
@@ -107,7 +136,7 @@ public class PairingService : IPairingService
 
         await _context.SaveChangesAsync();
 
-        // Sau khi luu se co PairingId tu database
+        // Sau khi luu pairing moi co PairingId tu database
         notification.RelatedEntityId = pairing.PairingId;
 
         await _context.SaveChangesAsync();

@@ -165,46 +165,56 @@ public class JockeyService : IJockeyService
             int page,
             int pageSize)
     {
-        // Chuan hoa gia tri phan trang
-        page = page < 1 ? 1 : page;
-        pageSize = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
+        if (page <= 0)
+        {
+            page = 1;
+        }
 
-        // Kiem tra Tournament co ton tai hay khong
+        if (pageSize <= 0)
+        {
+            pageSize = 20;
+        }
+
         var tournament = await _context.Tournaments
-            .AsNoTracking()
-            .FirstOrDefaultAsync(t =>
-                t.TournamentId == tournamentId);
+            .FirstOrDefaultAsync(t => t.TournamentId == tournamentId);
 
         if (tournament == null)
         {
-            throw new KeyNotFoundException(
-                "TOURNAMENT_NOT_FOUND");
+            throw new KeyNotFoundException("TOURNAMENT_NOT_FOUND");
         }
 
-        // Chi lay Jockey Active, du kinh nghiem va chua co loi moi Pending tu Owner nay
+        // Lay danh sach HorseId cua Owner dang dang nhap
+        var ownerHorseIds = await _context.Horses
+            .Where(h => h.OwnerId == ownerId)
+            .Select(h => h.HorseId)
+            .ToListAsync();
+
+        // Lay danh sach Jockey da co pending invite tu Owner nay
+        var pendingJockeyIds = await _context.Pairings
+            .Where(p =>
+                ownerHorseIds.Contains(p.HorseId) &&
+                p.Status == "Pending")
+            .Select(p => p.JockeyId)
+            .ToListAsync();
+
         var query = _context.JockeyProfiles
-            .AsNoTracking()
+            .Include(j => j.Jockey)
             .Where(j =>
                 j.Status == "Active" &&
-                j.ExperienceYears >=
-                    tournament.MinJockeyExperienceYears &&
-                !_context.Pairings.Any(p =>
-                    p.JockeyId == j.JockeyId &&
-                    p.Horse.OwnerId == ownerId &&
-                    p.Status == "Pending"));
+                j.ExperienceYears >= tournament.MinJockeyExperienceYears &&
+                !pendingJockeyIds.Contains(j.JockeyId));
 
         var total = await query.CountAsync();
 
         var data = await query
-            .OrderBy(j => j.Jockey.FullName)
+            .OrderByDescending(j => j.ExperienceYears)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(j => new AvailableJockeyDto
             {
                 JockeyId = j.JockeyId,
                 FullName = j.Jockey.FullName,
-                LicenseCertificate =
-                    j.LicenseCertificate,
+                LicenseCertificate = j.LicenseCertificate,
                 ExperienceYears = j.ExperienceYears,
                 HealthStatus = j.HealthStatus
             })
@@ -213,9 +223,9 @@ public class JockeyService : IJockeyService
         return new PagedResult<AvailableJockeyDto>
         {
             Items = data,
-            Page = page,
-            PageSize = pageSize,
             TotalCount = total,
+            Page = page,
+            PageSize = pageSize
         };
     }
 
