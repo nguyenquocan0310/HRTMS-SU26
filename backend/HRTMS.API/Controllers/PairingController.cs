@@ -150,12 +150,12 @@ public class PairingController : ControllerBase
                 });
         }
         catch (InvalidOperationException ex)
-            when (ex.Message == "INVALID_STATUS")
+            when (ex.Message == "HORSE_ALREADY_ACCEPTED")
         {
             return Conflict(new
             {
-                error = "INVALID_STATUS",
-                message = "Only pending pairings can be accepted."
+                error = "HORSE_ALREADY_ACCEPTED",
+                message = "This horse already has an accepted jockey."
             });
         }
     }

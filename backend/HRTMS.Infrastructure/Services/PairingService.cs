@@ -123,52 +123,63 @@ public class PairingService : IPairingService
     }
 
     public async Task<PairingActionResponseDto> AcceptAsync(
-        int jockeyId,
-        int pairingId)
+    int jockeyId,
+    int pairingId)
     {
-        // Lay Pairing kem thong tin ngua
+        await using var transaction =
+            await _context.Database.BeginTransactionAsync();
+
         var pairing = await _context.Pairings
-            .Include(p => p.Horse)
-            .FirstOrDefaultAsync(p =>
-                p.PairingId == pairingId);
+            .FirstOrDefaultAsync(p => p.PairingId == pairingId);
 
         if (pairing == null)
         {
-            throw new KeyNotFoundException(
-                "PAIRING_NOT_FOUND");
+            throw new KeyNotFoundException("PAIRING_NOT_FOUND");
         }
 
-        // Chi dung Jockey trong Pairing moi duoc chap nhan
         if (pairing.JockeyId != jockeyId)
         {
-            throw new UnauthorizedAccessException(
-                "FORBIDDEN");
+            throw new UnauthorizedAccessException("FORBIDDEN");
         }
 
-        // Chi Pairing Pending moi duoc chap nhan
         if (pairing.Status != "Pending")
         {
-            throw new InvalidOperationException(
-                "INVALID_STATUS");
+            throw new InvalidOperationException("INVALID_STATUS");
         }
 
+        var hasAcceptedPairingForHorse = await _context.Pairings
+            .AnyAsync(p =>
+                p.HorseId == pairing.HorseId &&
+                p.PairingId != pairing.PairingId &&
+                p.Status == "Accepted");
+
+        if (hasAcceptedPairingForHorse)
+        {
+            throw new InvalidOperationException("HORSE_ALREADY_ACCEPTED");
+        }
+
+        // Chap nhan loi moi hien tai
         pairing.Status = "Accepted";
         pairing.UpdatedAt = DateTime.UtcNow;
 
-        // Gui thong bao cho Owner
-        _context.Notifications.Add(new Notification
+        // Tu dong tu choi cac loi moi pending khac cua cung con ngua
+        var otherPendingPairings = await _context.Pairings
+            .Where(p =>
+                p.HorseId == pairing.HorseId &&
+                p.PairingId != pairing.PairingId &&
+                p.Status == "Pending")
+            .ToListAsync();
+
+        foreach (var otherPairing in otherPendingPairings)
         {
-            RecipientId = pairing.Horse.OwnerId,
-            Title = "Pairing invitation accepted",
-            Message =
-                $"The jockey accepted the pairing invitation for horse {pairing.Horse.Name}.",
-            Type = "In-app",
-            RelatedEntityType = "Pairing",
-            RelatedEntityId = pairing.PairingId,
-            SentAt = DateTime.UtcNow
-        });
+            otherPairing.Status = "Declined";
+            otherPairing.ResponseReason =
+                "Another jockey has already accepted this horse invitation.";
+            otherPairing.UpdatedAt = DateTime.UtcNow;
+        }
 
         await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
 
         return new PairingActionResponseDto
         {
