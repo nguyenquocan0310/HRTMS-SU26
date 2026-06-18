@@ -14,7 +14,7 @@ public class AuthService : IAuthService
     private readonly IAuditLogService _auditLog;
 
     private static readonly string[] AllowedRoles =
-        ["Spectator", "Owner", "Jockey", "Race Referee", "Doctor"];
+        ["Spectator", "Owner", "Jockey", "Referee", "Doctor"];
     private const int MaxFailedAttempts = 5;
     private const int LockoutMinutes = 30;
 
@@ -173,7 +173,7 @@ public class AuthService : IAuthService
                     await _context.SaveChangesAsync();
                     break;
 
-                case "Race Referee":
+                case "Referee":
                     _context.RefereeProfiles.Add(new RefereeProfile
                     {
                         RefereeId = user.UserId,
