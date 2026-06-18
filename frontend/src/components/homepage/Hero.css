@@ -1,0 +1,102 @@
+.hero {
+  position: relative;
+  min-height: 100vh;
+  padding-top: 5rem;
+  display: flex;
+  align-items: center;
+  background-image: url("../../assets/horse1.jpg");
+  background-size: cover;
+  background-position: center;
+}
+
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(10, 10, 10, 0.63), rgba(10, 10, 10, 0.9));
+}
+
+.hero-inner {
+  position: relative;
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+.hero-copy {
+  max-width: 620px;
+  color: white;
+}
+
+.hero-eyebrow {
+  display: inline-block;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #c4b5fd;
+}
+
+.hero h1 {
+  font-size: clamp(3rem, 5vw, 5.5rem);
+  line-height: 0.96;
+  margin: 0;
+}
+
+.hero p {
+  margin: 1.5rem 0 2rem;
+  max-width: 620px;
+  font-size: 1.1rem;
+  line-height: 1.85;
+  color: rgba(255, 255, 255, 0.93);
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.hero-button,
+.hero-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0.95rem 2rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.hero-button {
+  background: linear-gradient(135deg, #7c3aed, #8b5cf6);
+  color: white;
+}
+
+.hero-button:hover {
+  opacity: 0.95;
+}
+
+.hero-link {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.hero-link:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+@media (max-width: 768px) {
+  .hero {
+    padding-top: 6rem;
+  }
+
+  .hero h1 {
+    font-size: clamp(2.5rem, 8vw, 3.6rem);
+  }
+
+  .hero p {
+    font-size: 1rem;
+  }
+}

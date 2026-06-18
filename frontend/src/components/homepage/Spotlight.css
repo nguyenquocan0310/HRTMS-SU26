@@ -1,0 +1,91 @@
+.spotlight {
+  padding: 4rem 2rem;
+  background: #f4f1ef;
+}
+
+.spotlight-header {
+  max-width: 760px;
+  margin: 0 auto 2.5rem;
+  text-align: center;
+}
+
+.spotlight-header span {
+  display: inline-block;
+  color: #8b5cf6;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.spotlight-header h2 {
+  margin: 0;
+  font-size: clamp(2rem, 2.7vw, 3rem);
+  color: #221f1f;
+}
+
+.spotlight-header p {
+  margin-top: 1rem;
+  color: #5f5650;
+  line-height: 1.8;
+}
+
+.spotlight-grid {
+  display: grid;
+  gap: 1.75rem;
+}
+
+@media (min-width: 900px) {
+  .spotlight-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.spotlight-card {
+  padding: 2rem;
+  background: white;
+  border-radius: 1.5rem;
+  box-shadow: 0 24px 60px rgba(26, 24, 22, 0.06);
+  border: 1px solid rgba(153, 133, 116, 0.16);
+}
+
+.spotlight-card h3 {
+  margin: 0 0 0.75rem;
+  color: #3d3025;
+}
+
+.spotlight-card-description {
+  margin: 0 0 1.5rem;
+  color: #6b5f57;
+}
+
+.spotlight-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-top: 1px solid rgba(164, 149, 134, 0.18);
+}
+
+.spotlight-item:first-child {
+  border-top: none;
+}
+
+.spotlight-item strong {
+  display: block;
+  font-size: 1.05rem;
+  color: #1f1b18;
+}
+
+.spotlight-item p {
+  margin: 0.4rem 0 0;
+  color: #6a5f57;
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
+
+.spotlight-item span {
+  white-space: nowrap;
+  font-weight: 700;
+  color: #7c3aed;
+}
