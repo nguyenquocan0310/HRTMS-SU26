@@ -158,6 +158,15 @@ public class PairingController : ControllerBase
                 message = "This horse already has an accepted jockey."
             });
         }
+        catch (InvalidOperationException ex)
+            when (ex.Message == "HORSE_NOT_APPROVED")
+        {
+            return UnprocessableEntity(new
+            {
+                error = "HORSE_NOT_APPROVED",
+                message = "Horse is still waiting for admin approval."
+            });
+        }
     }
 
     [HttpPatch("pairings/{id:int}/decline")]
