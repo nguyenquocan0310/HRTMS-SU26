@@ -24,18 +24,18 @@ import ProfileDeclaration from './pages/jockey/ProfileDeclaration'
 // ── Import các trang shared ──
 import Protest from './pages/shared/Protest'
 
-{/* ── DOCTOR ── */}
+// ── Import các trang Doctor ──
 import DoctorLayout from './pages/doctor/DoctorLayout'
 import DoctorDashboard from './pages/doctor/DoctorDashboard'
 import PaddockConsole from './pages/doctor/PaddockConsole'
 
-{/* ── REFEREE ── */}
+// ── Import các trang Referee ──
 import RefereeLayout from './pages/referee/RefereeLayout'
 import RefereeDashboard from './pages/referee/RefereeDashboard'
 import RaceOfficiating from './pages/referee/RaceOfficiating'
 import ProtestHandling from './pages/referee/ProtestHandling'
 
-{/* ── SPECTATOR ── */}
+// ── Import các trang Spectator ──
 import SpectatorLayout from './pages/spectator/SpectatorLayout'
 import SpectatorHome from './pages/spectator/SpectatorHome'
 import PredictionPage from './pages/spectator/PredictionPage'
@@ -78,7 +78,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* Public */}
-        <Route path="/"         element={<Home />} /> 
+        <Route path="/"         element={<Home />} />
         <Route path="/login"    element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 
@@ -96,7 +96,7 @@ export default function App() {
           <Route path="protest" element={<Protest userRole="HorseOwner" />} />
         </Route>
 
-        {/* Jockey routes */}
+        {/* ── Cấu trúc Route của KỴ SĨ (Jockey) ── */}
         <Route path="/jockey" element={
           <ProtectedRoute allowedRoles={['Jockey']}>
             <JockeyLayout />
@@ -110,7 +110,7 @@ export default function App() {
           <Route path="protest" element={<Protest userRole="Jockey" />} />
         </Route>
 
-        {/* Doctor routes */}
+        {/* ── Cấu trúc Route của BÁC SĨ (Doctor) ── */}
         <Route path="/doctor" element={
           <ProtectedRoute allowedRoles={['Doctor']}>
             <DoctorLayout />
@@ -120,7 +120,7 @@ export default function App() {
           <Route path="paddock" element={<PaddockConsole />} />
         </Route>
 
-        {/* Referee routes */}
+        {/* ── Cấu trúc Route của TRỌNG TÀI (Referee) ── */}
         <Route path="/referee" element={
           <ProtectedRoute allowedRoles={['RaceReferee']}>
             <RefereeLayout />
@@ -131,7 +131,7 @@ export default function App() {
           <Route path="protest" element={<ProtestHandling />} />
         </Route>
 
-        {/* Spectator routes */}
+        {/* ── Cấu trúc Route của KHÁN GIẢ (Spectator) ── */}
         <Route path="/spectator" element={
           <ProtectedRoute allowedRoles={['Spectator']}>
             <SpectatorLayout />
@@ -144,7 +144,7 @@ export default function App() {
         </Route>
 
         {/* Admin */}
-        <Route path="/admin/*"     element={<ProtectedRoute allowedRoles={['Admin']}><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/admin/*" element={<ProtectedRoute allowedRoles={['Admin']}><AdminDashboard /></ProtectedRoute>} />
 
         <Route path="/unauthorized" element={<div>403 — Không có quyền truy cập</div>} />
         <Route path="*" element={<Navigate to="/" replace />} />
