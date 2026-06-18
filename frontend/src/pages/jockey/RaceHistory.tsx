@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { JockeyRaceResult } from '../../types/jockey.types';
 
-// Mock data
+// Dữ liệu mẫu
 const mockRaceResults: JockeyRaceResult[] = [
   {
     resultID: 'result-001',
@@ -54,14 +54,14 @@ export default function RaceHistory() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate loading
+    // Mô phỏng tải dữ liệu
     setTimeout(() => {
       setResults(mockRaceResults);
       setLoading(false);
     }, 500);
   }, []);
 
-  // Calculate summary stats
+  // Tính toán thống kê tổng hợp
   const totalRaces = results.length;
   const winCount = results.filter((r) => r.finishPosition === 1).length;
   const totalPrize = results.reduce((sum, r) => sum + r.prizeAmount, 0);
@@ -107,7 +107,7 @@ export default function RaceHistory() {
     }
   };
 
-  // Loading state
+  // Trạng thái đang tải
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -119,7 +119,7 @@ export default function RaceHistory() {
     );
   }
 
-  // Empty state
+  // Trạng thái rỗng
   if (results.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -136,11 +136,11 @@ export default function RaceHistory() {
     );
   }
 
-  // List state
+  // Danh sách lịch sử
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
+        {/* Tiêu đề */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
             Lịch sử thi đấu
@@ -150,9 +150,9 @@ export default function RaceHistory() {
           </p>
         </div>
 
-        {/* Summary Stats */}
+        {/* Thẻ thống kê tổng hợp */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          {/* Total Races */}
+          {/* Tổng số trận */}
           <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
             <p className="text-gray-600 text-sm font-medium mb-2">
               Tổng số trận
@@ -160,7 +160,7 @@ export default function RaceHistory() {
             <p className="text-4xl font-bold text-blue-600">{totalRaces}</p>
           </div>
 
-          {/* Win Count */}
+          {/* Số lần thắng */}
           <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
             <p className="text-gray-600 text-sm font-medium mb-2">
               Số lần thắng
@@ -168,17 +168,17 @@ export default function RaceHistory() {
             <p className="text-4xl font-bold text-yellow-600">{winCount}</p>
           </div>
 
-          {/* Total Prize */}
+          {/* Tổng tiền thưởng */}
           <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
             <p className="text-gray-600 text-sm font-medium mb-2">
               Tổng tiền thưởng
             </p>
             <p className="text-2xl font-bold text-green-600">
-              {(totalPrize / 1000000).toFixed(0)}M
+              {(totalPrize / 1000000).toFixed(0)}M ₫
             </p>
           </div>
 
-          {/* Win Rate */}
+          {/* Tỉ lệ thắng */}
           <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
             <p className="text-gray-600 text-sm font-medium mb-2">
               Tỉ lệ thắng
@@ -187,11 +187,11 @@ export default function RaceHistory() {
           </div>
         </div>
 
-        {/* Table */}
+        {/* Bảng lịch sử */}
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              {/* Table Header */}
+              {/* Tiêu đề bảng */}
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
@@ -201,7 +201,7 @@ export default function RaceHistory() {
                     Tên ngựa
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
-                    Hạng về
+                    Thứ hạng về đích
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
                     Thời gian (s)
@@ -218,7 +218,7 @@ export default function RaceHistory() {
                 </tr>
               </thead>
 
-              {/* Table Body */}
+              {/* Nội dung bảng */}
               <tbody className="divide-y divide-gray-200">
                 {results.map((result) => (
                   <tr key={result.resultID} className="hover:bg-gray-50 transition-colors">
@@ -232,7 +232,7 @@ export default function RaceHistory() {
                       {result.horseName}
                     </td>
 
-                    {/* Hạng về */}
+                    {/* Hạng về đích */}
                     <td className="px-6 py-4">
                       <span
                         className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm ${getPositionBadgeColor(
@@ -271,7 +271,7 @@ export default function RaceHistory() {
                     <td className="px-6 py-4 text-sm">
                       {result.isDisqualified ? (
                         <span className="inline-block px-3 py-1 bg-red-100 text-red-800 rounded-full font-medium text-xs">
-                          Bị loại (DQ)
+                          Bị loại (Vi phạm)
                         </span>
                       ) : (
                         <span className="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full font-medium text-xs">
