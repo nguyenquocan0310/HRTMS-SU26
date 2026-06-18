@@ -47,7 +47,7 @@ public class PairingController : ControllerBase
                 result);
         }
         catch (KeyNotFoundException ex)
-            when (ex.Message == "HORSE_NOT_FOUND")
+    when (ex.Message == "HORSE_NOT_FOUND")
         {
             return NotFound(new
             {
@@ -76,15 +76,6 @@ public class PairingController : ControllerBase
                 });
         }
         catch (InvalidOperationException ex)
-            when (ex.Message == "PAIRING_ALREADY_EXISTS")
-        {
-            return Conflict(new
-            {
-                error = "PAIRING_ALREADY_EXISTS",
-                message = "A pending or accepted pairing already exists."
-            });
-        }
-        catch (InvalidOperationException ex)
             when (ex.Message == "JOCKEY_NOT_ACTIVE")
         {
             return UnprocessableEntity(new
@@ -100,6 +91,36 @@ public class PairingController : ControllerBase
             {
                 error = "HORSE_NOT_APPROVED",
                 message = "The horse has not been approved."
+            });
+        }
+        catch (InvalidOperationException ex)
+            when (ex.Message == "HORSE_ALREADY_HAS_ACCEPTED_JOCKEY")
+        {
+            // Horse da co jockey accepted nen khong the tao loi moi moi
+            return Conflict(new
+            {
+                error = "HORSE_ALREADY_HAS_ACCEPTED_JOCKEY",
+                message = "This horse already has an accepted jockey."
+            });
+        }
+        catch (InvalidOperationException ex)
+            when (ex.Message == "JOCKEY_ALREADY_HAS_ACCEPTED_HORSE")
+        {
+            // Jockey da co horse accepted nen khong the nhan them loi moi moi
+            return Conflict(new
+            {
+                error = "JOCKEY_ALREADY_HAS_ACCEPTED_HORSE",
+                message = "This jockey already has an accepted horse."
+            });
+        }
+        catch (InvalidOperationException ex)
+            when (ex.Message == "PAIRING_ALREADY_EXISTS")
+        {
+            // Cap horse-jockey nay da co pending hoac accepted nen khong tao trung
+            return Conflict(new
+            {
+                error = "PAIRING_ALREADY_EXISTS",
+                message = "A pending or accepted pairing already exists for this horse and jockey."
             });
         }
     }
