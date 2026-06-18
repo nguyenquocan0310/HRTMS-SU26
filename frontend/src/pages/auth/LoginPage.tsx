@@ -4,7 +4,7 @@ import * as Yup from 'yup'
 
 import { login } from '../../api/auth'
 import useAuthStore from '../../store/authStore'
-import { getRoleHomePath } from '../../App'
+import { getRoleHomePath } from '../../utils/roleHelper'
 import './LoginPage.css'
 
 const loginSchema = Yup.object({
@@ -65,16 +65,6 @@ export default function LoginPage() {
 
       {/* RIGHT PANEL */}
       <div className="login-form-panel">
-        <div className="tabs">
-          <Link to="/login" className="tab active">
-            Login
-          </Link>
-
-          <Link to="/register" className="tab">
-            Register
-          </Link>
-        </div>
-
         <div className="form-content">
           <h2>Welcome Back</h2>
 
@@ -195,9 +185,14 @@ export default function LoginPage() {
             <span>Secure Access</span>
           </div>
 
-          <button className="google-sign-in">
-            Authorized SSO Login
-          </button>
+          <div className="tabs auth-tabs-bottom">
+            <Link to="/login" className="tab active">
+              Login
+            </Link>
+            <Link to="/register" className="tab">
+              Register
+            </Link>
+          </div>
         </div>
       </div>
     </div>

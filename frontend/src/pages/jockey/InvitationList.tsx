@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { RaceInvitation } from '../../types/jockey.types';
 import InvitationCard from '../../components/jockey/InvitationCard';
 
-// Mock data
+// Dữ liệu mẫu
 const mockInvitations: RaceInvitation[] = [
   {
     invitationID: 'inv-001',
@@ -50,7 +50,7 @@ export default function InvitationList() {
   const [declineConfirmID, setDeclineConfirmID] = useState<string | null>(null);
 
   useEffect(() => {
-    // Simulate loading
+    // Mô phỏng tải dữ liệu
     setTimeout(() => {
       setInvitations(mockInvitations);
       setLoading(false);
@@ -108,7 +108,7 @@ export default function InvitationList() {
 
   const filteredInvitations = getFilteredInvitations();
 
-  // Loading state
+  // Trạng thái đang tải
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -120,7 +120,7 @@ export default function InvitationList() {
     );
   }
 
-  // Empty state
+  // Trạng thái rỗng
   if (invitations.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -140,7 +140,7 @@ export default function InvitationList() {
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
+        {/* Tiêu đề */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
             Lời mời tham gia
@@ -150,7 +150,7 @@ export default function InvitationList() {
           </p>
         </div>
 
-        {/* Filter Tabs */}
+        {/* Tab lọc */}
         <div className="mb-8 flex gap-4 border-b border-gray-200">
           <button
             onClick={() => setActiveTab('all')}
@@ -197,7 +197,7 @@ export default function InvitationList() {
           </button>
         </div>
 
-        {/* Empty filtered state */}
+        {/* Trạng thái rỗng sau lọc */}
         {filteredInvitations.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-gray-600 text-lg">
@@ -205,7 +205,7 @@ export default function InvitationList() {
             </p>
           </div>
         ) : (
-          /* Invitations Grid */
+          /* Lưới lời mời */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredInvitations.map((invitation) => (
               <InvitationCard
