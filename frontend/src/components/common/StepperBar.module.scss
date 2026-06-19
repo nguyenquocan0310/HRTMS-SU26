@@ -1,0 +1,104 @@
+.stepper {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  padding: 2rem 1rem 1rem;
+  background: transparent;
+}
+
+.stepWrapper {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  max-width: 160px;
+}
+
+.connector {
+  flex: 1;
+  height: 2px;
+  background: #3a3a3a;
+  margin-bottom: 1.8rem;
+  transition: background 0.3s;
+
+  &.connectorActive {
+    background: #B5121B;
+  }
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: default;
+  min-width: 70px;
+}
+
+.circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+  transition: all 0.3s;
+}
+
+.label {
+  font-size: 0.7rem;
+  text-align: center;
+  transition: all 0.3s;
+  padding-bottom: 4px;
+}
+
+// ─── Trạng thái ──────────────────────────────────────────────────────────────
+
+.active {
+  .circle {
+    background: #B5121B;
+    color: #fff;
+    box-shadow: 0 0 12px rgba(181, 18, 27, 0.5);
+  }
+  .label {
+    color: #F3C8C3;
+    font-weight: 600;
+    border-bottom: 2px solid #D8B45A;
+  }
+}
+
+.completed {
+  .circle {
+    background: #6b1217;
+    color: #F3C8C3;
+    border: 1px solid #B5121B;
+  }
+  .label {
+    color: #888;
+  }
+}
+
+.upcoming {
+  .circle {
+    background: transparent;
+    color: #555;
+    border: 2px solid #3a3a3a;
+  }
+  .label {
+    color: #555;
+  }
+}
+
+.skipped {
+  .circle {
+    background: transparent;
+    color: #333;
+    border: 2px dashed #333;
+  }
+  .label {
+    color: #333;
+    text-decoration: line-through;
+  }
+}
