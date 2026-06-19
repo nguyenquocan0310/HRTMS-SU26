@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import useAuthStore from './store/authStore'
 import type { Role } from './types'
 import LandingPage from './pages/landing/LandingPage'
+import LoginPage from './pages/auth/LoginPage'
 
 
 
@@ -50,6 +51,7 @@ export default function App() {
       <Routes>
         {/* Public */}
         <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
 
         {/* Protected — theo role */}
         <Route path="/admin/*"    element={<ProtectedRoute allowedRoles={['Admin']}><AdminDashboard /></ProtectedRoute>} />
