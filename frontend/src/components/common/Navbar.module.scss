@@ -1,0 +1,106 @@
+/* ─── Color tokens ──────────────────────────────────────── */
+$bg-dark: #0b0b0d;
+$accent-red: #b5121b;
+$accent-pink: #f3c8c3;
+$text-main: #e8e8ea;
+$text-muted: #8a8a8f;
+$border-subtle: rgba(255, 255, 255, 0.08);
+
+/* ─── Navbar ────────────────────────────────────────────── */
+.navbar {
+  height: 64px;
+  background: rgba($bg-dark, 0.92);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-bottom: 1px solid $border-subtle;
+  z-index: 1050;
+}
+
+/* ─── Logo ──────────────────────────────────────────────── */
+.logo {
+  font-family: 'Inter', sans-serif;
+  font-weight: 800;
+  font-size: 1.35rem;
+  letter-spacing: 2px;
+  background: linear-gradient(135deg, $accent-red 0%, #e85d3a 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-decoration: none;
+  transition: opacity 0.2s;
+
+  &:hover {
+    opacity: 0.85;
+  }
+}
+
+/* ─── Nav links ─────────────────────────────────────────── */
+.navList {
+  gap: 0.25rem;
+}
+
+.navLink {
+  display: inline-block;
+  padding: 0.4rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: $text-muted;
+  text-decoration: none;
+  border-radius: 6px;
+  transition: color 0.2s, background 0.2s;
+
+  &:hover {
+    color: $text-main;
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  &.active {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* ─── Login button ──────────────────────────────────────── */
+.loginBtn {
+  display: inline-block;
+  padding: 0.38rem 1.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  color: $text-main;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  text-decoration: none;
+  transition: all 0.25s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.45);
+    color: #fff;
+  }
+}
+
+/* ─── Icon buttons ──────────────────────────────────────── */
+.iconGroup {
+  border-left: 1px solid $border-subtle;
+  padding-left: 1rem;
+}
+
+.iconBtn {
+  background: none;
+  border: none;
+  color: $text-muted;
+  font-size: 1.05rem;
+  padding: 0.3rem;
+  cursor: pointer;
+  transition: color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    color: $text-main;
+  }
+}

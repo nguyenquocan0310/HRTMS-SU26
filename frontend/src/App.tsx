@@ -1,9 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import useAuthStore from './store/authStore'
 import type { Role } from './types'
+import LandingPage from './pages/landing/LandingPage'
 
-import LoginPage from './pages/auth/LoginPage'
-import RegisterPage from './pages/auth/RegisterPage'
+
 
 // ─── Placeholder pages — FE leader thay bằng component thật ──────────────────
 const AdminDashboard    = () => <div>Admin Dashboard</div>
@@ -49,8 +49,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* Public */}
-        <Route path="/login"    element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/" element={<LandingPage />} />
 
         {/* Protected — theo role */}
         <Route path="/admin/*"    element={<ProtectedRoute allowedRoles={['Admin']}><AdminDashboard /></ProtectedRoute>} />
@@ -62,7 +61,7 @@ export default function App() {
 
         {/* Fallback */}
         <Route path="/unauthorized" element={<div>403 — Không có quyền truy cập</div>} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   )
