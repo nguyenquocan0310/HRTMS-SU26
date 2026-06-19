@@ -1,0 +1,107 @@
+.container {
+  padding: 1.5rem 0;
+}
+
+.title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 0.4rem;
+}
+
+.subtitle {
+  color: #888;
+  font-size: 0.85rem;
+  margin-bottom: 2rem;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 480px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.label {
+  font-size: 0.85rem;
+  color: #ccc;
+  font-weight: 500;
+}
+
+.input {
+  background: #15151A;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  color: #fff;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+
+  option {
+    background: #15151A;
+    color: #fff;
+  }
+
+  &::placeholder {
+    color: #555;
+  }
+
+  &:focus {
+    border-color: #B5121B;
+    box-shadow: 0 0 0 3px rgba(181, 18, 27, 0.15);
+  }
+}
+
+.coiBox {
+  background: #1a1a20;
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.coiTitle {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #F3C8C3;
+  margin: 0;
+}
+
+.coiDesc {
+  font-size: 0.8rem;
+  color: #666;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.textarea {
+  background: #15151A;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  color: #fff;
+  font-size: 0.9rem;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.2s;
+  font-family: inherit;
+
+  &::placeholder {
+    color: #555;
+  }
+
+  &:focus {
+    border-color: #B5121B;
+    box-shadow: 0 0 0 3px rgba(181, 18, 27, 0.15);
+  }
+}
