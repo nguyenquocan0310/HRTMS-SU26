@@ -1,0 +1,71 @@
+.container {
+  padding: 0.5rem 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.fieldFull {
+  grid-column: 1 / -1;
+}
+
+.label {
+  font-size: 0.8rem;
+  color: #ccc;
+  font-weight: 500;
+}
+
+.input {
+  background: #15151A;
+  border: 1px solid #2a2a30;
+  border-radius: 8px;
+  padding: 0.65rem 0.85rem;
+  color: #fff;
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+
+  option {
+    background: #15151A;
+    color: #fff;
+  }
+
+  &::placeholder {
+    color: #555;
+  }
+
+  &:focus {
+    border-color: #B5121B;
+    box-shadow: 0 0 0 3px rgba(181, 18, 27, 0.15);
+  }
+}
+
+.inputError {
+  border-color: #e74c3c !important;
+}
+
+.errorText {
+  font-size: 0.75rem;
+  color: #ff6b6b;
+}
+
+.hintText {
+  font-size: 0.75rem;
+  color: #D8B45A;
+}
+
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

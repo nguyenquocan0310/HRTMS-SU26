@@ -1,0 +1,193 @@
+import type { TournamentBasicInfo, AllowedBreed, TrackType, RaceCategory } from '../TournamentBuilder';
+import styles from './TabBasicInfo.module.scss';
+
+interface Props {
+  data: TournamentBasicInfo;
+  onChange: (data: TournamentBasicInfo) => void;
+}
+
+const TabBasicInfo = ({ data, onChange }: Props) => {
+  const update = <K extends keyof TournamentBasicInfo>(field: K, value: TournamentBasicInfo[K]) => {
+    onChange({ ...data, [field]: value });
+  };
+
+  const isDateRangeInvalid = data.startDate !== '' && data.endDate !== '' && data.endDate < data.startDate;
+
+  return (
+    <div className={styles.container}>
+      <div className={styles.grid}>
+        {/* ─── Name ───────────────────────────────────────────── */}
+        <div className={`${styles.field} ${styles.fieldFull}`}>
+          <label className={styles.label}>Tên giải đấu</label>
+          <input
+            type="text"
+            className={styles.input}
+            placeholder="Ví dụ: Royal Stakes — Ascot Cup 2026"
+            value={data.name}
+            onChange={(e) => update('name', e.target.value)}
+          />
+        </div>
+
+        {/* ─── Dates ──────────────────────────────────────────── */}
+        <div className={styles.field}>
+          <label className={styles.label}>Ngày bắt đầu</label>
+          <input
+            type="date"
+            className={styles.input}
+            value={data.startDate}
+            onChange={(e) => update('startDate', e.target.value)}
+          />
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label}>Ngày kết thúc</label>
+          <input
+            type="date"
+            className={`${styles.input} ${isDateRangeInvalid ? styles.inputError : ''}`}
+            value={data.endDate}
+            onChange={(e) => update('endDate', e.target.value)}
+          />
+          {isDateRangeInvalid && (
+            <span className={styles.errorText}>Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.</span>
+          )}
+        </div>
+
+        {/* ─── Allowed Breed ──────────────────────────────────── */}
+        <div className={styles.field}>
+          <label className={styles.label}>Allowed Breed (bắt buộc)</label>
+          <select
+            className={styles.input}
+            value={data.allowedBreed}
+            onChange={(e) => update('allowedBreed', e.target.value as AllowedBreed)}
+          >
+            <option value="">-- Chọn giống ngựa --</option>
+            <option value="Thoroughbred">Thoroughbred</option>
+            <option value="Arabian">Arabian</option>
+            <option value="Quarter Horse">Quarter Horse</option>
+            <option value="Mixed">Mixed</option>
+          </select>
+        </div>
+
+        {/* ─── Track Type ─────────────────────────────────────── */}
+        <div className={styles.field}>
+          <label className={styles.label}>Track Type</label>
+          <select
+            className={styles.input}
+            value={data.trackType}
+            onChange={(e) => update('trackType', e.target.value as TrackType)}
+          >
+            <option value="">-- Chọn loại đường đua --</option>
+            <option value="Turf">Turf</option>
+            <option value="Dirt">Dirt</option>
+            <option value="Synthetic">Synthetic</option>
+          </select>
+        </div>
+
+        {/* ─── Race Distance ──────────────────────────────────── */}
+        <div className={styles.field}>
+          <label className={styles.label}>Race Distance (mét)</label>
+          <input
+            type="number"
+            className={styles.input}
+            placeholder="Ví dụ: 1600"
+            value={data.raceDistance}
+            onChange={(e) => update('raceDistance', e.target.value ? Number(e.target.value) : '')}
+          />
+        </div>
+
+        {/* ─── Race Category ──────────────────────────────────── */}
+        <div className={styles.field}>
+          <label className={styles.label}>Race Category</label>
+          <select
+            className={styles.input}
+            value={data.raceCategory}
+            onChange={(e) => update('raceCategory', e.target.value as RaceCategory)}
+          >
+            <option value="">-- Chọn hạng đua --</option>
+            <option value="Open">Open</option>
+            <option value="Classic">Classic</option>
+            <option value="Maiden">Maiden</option>
+          </select>
+        </div>
+
+        {/* ─── Max Horses ─────────────────────────────────────── */}
+        <div className={styles.field}>
+          <label className={styles.label}>Max Horses</label>
+          <input
+            type="number"
+            className={styles.input}
+            placeholder="Ví dụ: 20"
+            value={data.maxHorses}
+            onChange={(e) => update('maxHorses', e.target.value ? Number(e.target.value) : '')}
+          />
+        </div>
+
+        {/* ─── Min Jockey Experience ──────────────────────────── */}
+        <div className={styles.field}>
+          <label className={styles.label}>Min Jockey Experience (năm)</label>
+          <input
+            type="number"
+            className={styles.input}
+            placeholder="Ví dụ: 2"
+            value={data.minJockeyExperienceYears}
+            onChange={(e) => update('minJockeyExperienceYears', e.target.value ? Number(e.target.value) : '')}
+          />
+        </div>
+
+        {/* ─── Purse Amount ───────────────────────────────────── */}
+        <div className={styles.field}>
+          <label className={styles.label}>Purse Amount (quỹ thưởng toàn giải)</label>
+          <input
+            type="number"
+            className={styles.input}
+            placeholder="VNĐ"
+            value={data.purseAmount}
+            onChange={(e) => update('purseAmount', e.target.value ? Number(e.target.value) : '')}
+          />
+        </div>
+
+        {/* ─── Entry Fee ───────────────────────────────────────── */}
+        <div className={styles.field}>
+          <label className={styles.label}>Entry Fee Amount</label>
+          <input
+            type="number"
+            className={styles.input}
+            placeholder="0 = miễn phí"
+            value={data.entryFeeAmount}
+            onChange={(e) => update('entryFeeAmount', Number(e.target.value) || 0)}
+          />
+          {data.entryFeeAmount === 0 && (
+            <span className={styles.hintText}>
+              Nếu = 0, hệ thống tự bỏ qua luồng xác nhận phí.
+            </span>
+          )}
+        </div>
+
+        {/* ─── Weight thresholds ──────────────────────────────── */}
+        <div className={styles.field}>
+          <label className={styles.label}>Pre-Race Weight Threshold (kg)</label>
+          <input
+            type="number"
+            step="0.1"
+            className={styles.input}
+            value={data.preRaceWeightThresholdKg}
+            onChange={(e) => update('preRaceWeightThresholdKg', Number(e.target.value) || 0)}
+          />
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label}>Post-Race Weight Diff Threshold (kg)</label>
+          <input
+            type="number"
+            step="0.1"
+            className={styles.input}
+            value={data.postRaceWeightDiffThresholdKg}
+            onChange={(e) => update('postRaceWeightDiffThresholdKg', Number(e.target.value) || 0)}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default TabBasicInfo;

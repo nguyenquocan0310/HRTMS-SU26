@@ -43,3 +43,17 @@
   color: #ff6b6b;
   border: 1px solid rgba(181, 18, 27, 0.5);
 }
+
+// ─── Draft — xám nhạt ─────────────────────────────────────────────────────
+.statusDraft {
+  background: rgba(150, 150, 150, 0.1);
+  color: #aaa;
+  border: 1px solid rgba(150, 150, 150, 0.25);
+}
+
+// ─── Completed — xanh dương ───────────────────────────────────────────────
+.statusCompleted {
+  background: rgba(52, 152, 219, 0.15);
+  color: #3498db;
+  border: 1px solid rgba(52, 152, 219, 0.35);
+}

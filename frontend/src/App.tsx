@@ -8,7 +8,7 @@ import AdminLayout from './layouts/AdminLayout'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import ApprovalCenter from './pages/admin/ApprovalCenter'
 import UserManagement from './pages/admin/UserManagement'
-
+import TournamentBuilder from './components/admin/TournamentBuilder'
 
 // ── Import các trang Owner ──
 import MyHorses from './pages/owner/MyHorses'
@@ -156,6 +156,7 @@ export default function App() {
   <Route index element={<AdminDashboard />} />
   <Route path="approval-center" element={<ApprovalCenter />} />
   <Route path="users" element={<UserManagement />} />
+  <Route path="tournament-builder" element={<TournamentBuilder />} />
 </Route>
 
         <Route path="/unauthorized" element={<div>403 — Không có quyền truy cập</div>} />
