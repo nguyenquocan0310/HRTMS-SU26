@@ -1,12 +1,25 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿namespace HRTMS.Core.DTOs.Referee;
 
-namespace HRTMS.Core.DTOs.Referee
+public class RefereeAssignmentDto
 {
-    internal class RefereeAssignmentDto
-    {
-    }
+    
+    public int RaceId { get; set; }
+
+   
+    public int RefereeId { get; set; }
+
+    
+    public string RefereeName { get; set; } = null!;
+
+    
+    public string RefereeEmail { get; set; } = null!;
+
+    
+    public string CertificationLevel { get; set; } = null!;
+
+    
+    public string Role { get; set; } = null!;
+
+   
+    public DateTime AssignedAt { get; set; }
 }
