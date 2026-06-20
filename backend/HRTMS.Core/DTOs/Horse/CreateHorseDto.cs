@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using HRTMS.Core.Common;
 
 namespace HRTMS.Core.DTOs.Horse
 {
