@@ -169,6 +169,45 @@ public class AdminController : ControllerBase
         return Ok(new { success = true, data = users });
     }
 
+    [HttpPatch("jockeys/{id}/approve")]
+    public async Task<IActionResult> ApproveJockey(int id)
+    {
+        var profile = await _context.JockeyProfiles.FindAsync(id);
+        if (profile == null)
+            return NotFound(new { message = "Jockey profile not found." });
+
+        var user = await _context.Users.FindAsync(profile.JockeyId);
+        if (user == null)
+            return NotFound(new { message = "User not found." });
+
+        if (profile.Status == "Active" && user.Status == "Active")
+            return BadRequest(new { message = "Jockey is already active." });
+
+        var oldProfileStatus = profile.Status;
+        var oldUserStatus = user.Status;
+
+        profile.Status = "Active";
+        profile.RejectionReason = null;
+        profile.UpdatedAt = DateTime.UtcNow;
+
+        user.Status = "Active";
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        await _auditLogService.LogAsync(
+            actorId: CurrentAdminId,
+            action: "Approve_Jockey",
+            entityName: "JockeyProfile",
+            entityId: profile.JockeyId.ToString(),
+            oldValue: $"JockeyProfile.Status={oldProfileStatus}, User.Status={oldUserStatus}",
+            newValue: $"JockeyProfile.Status={profile.Status}, User.Status={user.Status}",
+            ipAddress: ClientIp);
+
+        return Ok(new { message = "Jockey approved and activated successfully." });
+    }
+
+
     [HttpGet("users/{id}")]
     public async Task<IActionResult> GetUserById(int id)
     {
