@@ -387,5 +387,49 @@ public class AdminController : ControllerBase
         if (!result.Success) return BadRequest(result);
         return Ok(result);
     }
+    [HttpGet("audit-logs")]
+    public async Task<IActionResult> GetAuditLogs(
+    [FromQuery] string? action,
+    [FromQuery] string? entityName,
+    [FromQuery] int? actorId,
+    [FromQuery] DateTime? from,
+    [FromQuery] DateTime? to,
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 20)
+    {
+        var query = _context.AuditLogs.AsQueryable();
+
+        if (!string.IsNullOrEmpty(action))
+            query = query.Where(a => a.Action == action);
+        if (!string.IsNullOrEmpty(entityName))
+            query = query.Where(a => a.EntityName == entityName);
+        if (actorId.HasValue)
+            query = query.Where(a => a.ActorId == actorId.Value);
+        if (from.HasValue)
+            query = query.Where(a => a.CreatedAt >= from.Value);
+        if (to.HasValue)
+            query = query.Where(a => a.CreatedAt <= to.Value);
+
+        var total = await query.CountAsync();
+        var logs = await query
+            .OrderByDescending(a => a.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(a => new
+            {
+                a.AuditLogId,
+                a.ActorId,
+                a.Action,
+                a.EntityName,
+                a.EntityId,
+                a.OldValue,
+                a.NewValue,
+                a.IpAddress,
+                a.CreatedAt
+            })
+            .ToListAsync();
+
+        return Ok(new { success = true, total, page, pageSize, data = logs });
+    }
 
 }
