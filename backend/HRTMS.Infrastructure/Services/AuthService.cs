@@ -15,6 +15,7 @@ public class AuthService : IAuthService
     private readonly JwtService _jwtService;
     private readonly IAuditLogService _auditLog;
     private readonly IFamilyDeclarationValidator _frdValidator;
+    private readonly ITokenBlacklistService _tokenBlacklistService;
 
     private static readonly string[] AllowedRoles =
         ["Spectator", "Owner", "Jockey", "Referee", "Doctor"];
@@ -32,17 +33,18 @@ public class AuthService : IAuthService
     private const int LockoutMinutes = 30;
 
     public AuthService(
-       HRTMSDbContext context,
-       JwtService jwtService,
-       IAuditLogService auditLog,
-       IFamilyDeclarationValidator frdValidator)
+    HRTMSDbContext context,
+    JwtService jwtService,
+    IAuditLogService auditLog,
+    IFamilyDeclarationValidator frdValidator,
+    ITokenBlacklistService tokenBlacklistService)
     {
         _context = context;
         _jwtService = jwtService;
         _auditLog = auditLog;
         _frdValidator = frdValidator;
+        _tokenBlacklistService = tokenBlacklistService;
     }
-
     // =========================================================
     // LOGIN — không đổi logic, giữ nguyên
     // =========================================================
@@ -155,11 +157,10 @@ public class AuthService : IAuthService
                         CreatedAt = now
                     };
                     _context.SpectatorProfiles.Add(spectatorProfile);
-
                     var wallet = new Wallet
                     {
                         SpectatorId = user.UserId,
-                        Balance = 1000,  // set luôn 1000 — khớp với VPT dưới đây
+                        Balance = 0, 
                         UpdatedAt = now
                     };
                     _context.Wallets.Add(wallet);
@@ -269,6 +270,20 @@ public class AuthService : IAuthService
             throw;
         }
     }
+    public async Task<ApiResponse<bool>> LogoutAsync(int userId, string? ipAddress)
+    {
+        await _tokenBlacklistService.BlacklistUserAsync(userId);
+
+        await _auditLog.LogAsync(
+            actorId: userId,
+            action: "Logout",
+            entityName: "Users",
+            entityId: userId.ToString(),
+            ipAddress: ipAddress
+        );
+
+        return ApiResponse<bool>.Ok(true, "Đăng xuất thành công.");
     }
+}
 
     

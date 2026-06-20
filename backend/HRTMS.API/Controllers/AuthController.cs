@@ -22,7 +22,13 @@ public class AuthController : ControllerBase
     {
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
         var result = await _authService.RegisterAsync(dto, ip);
-        return result.Success ? Created("", result) : Conflict(result);
+        if (!result.Success)
+        {
+            // trùng email/username → 409, lỗi validation → 400
+            var isConflict = result.Message?.Contains("tồn tại") == true;
+            return isConflict ? Conflict(result) : BadRequest(result);
+        }
+        return Created("", result);
     }
 
     [HttpPost("login")]
@@ -32,6 +38,17 @@ public class AuthController : ControllerBase
         var result = await _authService.LoginAsync(dto, ip);
         return result.Success ? Ok(result) : Unauthorized(result);
     }
+
+    [HttpPost("logout")]
+    [Authorize]
+    public async Task<IActionResult> Logout()
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var result = await _authService.LogoutAsync(userId, ip);
+        return Ok(result);
+    }
+
     [HttpGet("me")]
     [Authorize]
     public IActionResult Me()
