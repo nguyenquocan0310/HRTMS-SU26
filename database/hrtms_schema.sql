@@ -271,6 +271,7 @@ CREATE TABLE Horses (
     [Status]              VARCHAR(20)                     NOT NULL    DEFAULT 'Declared',
     AdminApprovalStatus   VARCHAR(20)                     NOT NULL    DEFAULT 'Pending',
     RejectionReason       NVARCHAR(500)                   NULL,
+    LegalConsentAccepted  BIT                             NOT NULL    DEFAULT 0,   -- [EC-22] cam kết pháp lý
     CreatedAt             DATETIME2                       NOT NULL,
     UpdatedAt             DATETIME2                       NOT NULL    DEFAULT GETUTCDATE(),
 
