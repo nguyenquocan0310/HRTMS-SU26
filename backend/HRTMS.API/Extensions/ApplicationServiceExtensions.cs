@@ -18,6 +18,7 @@ public static class ApplicationServiceExtensions
         services.AddScoped<IPairingService, PairingService>();
         services.AddScoped<IResultService, ResultService>();
         services.AddScoped<IHorseService, HorseService>();
+        services.AddScoped<INotificationService, NotificationService>();
         return services;
     }
 }
