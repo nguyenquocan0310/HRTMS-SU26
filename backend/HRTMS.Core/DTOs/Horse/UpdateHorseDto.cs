@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using HRTMS.Core.Common;
 
 namespace HRTMS.Core.DTOs.Horse
 {
@@ -15,6 +11,7 @@ namespace HRTMS.Core.DTOs.Horse
         [Range(1900, 9999)]
         public int? BirthYear { get; set; }
 
+        [AllowedValues("Male", "Female", "Gelding")]
         public string? Gender { get; set; }
 
         [MaxLength(50)]
@@ -29,7 +26,7 @@ namespace HRTMS.Core.DTOs.Horse
         [MaxLength(255)]
         public string? IdentifyingMarks { get; set; }
 
-        [MaxLength(30)]
+        [AllowedValues("Thoroughbred", "Arabian", "Quarter Horse", "Mixed")]
         public string? Breed { get; set; }
 
         [MaxLength(100)]
@@ -37,6 +34,7 @@ namespace HRTMS.Core.DTOs.Horse
 
         public DateOnly? DopingTestDate { get; set; }
 
+        [AllowedValues("Clean", "Pending", "Failed")]
         public string? DopingTestResult { get; set; }
     }
 }
