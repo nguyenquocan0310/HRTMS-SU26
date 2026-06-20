@@ -1,0 +1,386 @@
+/* ─── Design tokens (synced with LandingPage) ──────────── */
+$bg-dark: #0b0b0d;
+$bg-card: #111114;
+$accent-red: #b5121b;
+$accent-red-light: #d4292e;
+$accent-pink: #f3c8c3;
+$accent-gold: #d4a73a;
+$text-main: #e8e8ea;
+$text-muted: #6e6e74;
+$text-dim: #4a4a50;
+$border-subtle: rgba(255, 255, 255, 0.07);
+$border-hover: rgba(255, 255, 255, 0.14);
+$radius-sm: 6px;
+$radius-md: 10px;
+$radius-lg: 16px;
+
+/* ═══════════════════════════════════════════════════════════
+   PAGE WRAPPER — full bleed, dark bg + faint horse silhouette
+   ═══════════════════════════════════════════════════════════ */
+.loginPage {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  background: $bg-dark;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: $text-main;
+  overflow: hidden;
+}
+
+.bgOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse at 30% 60%, rgba($accent-red, 0.04) 0%, transparent 60%),
+    radial-gradient(ellipse at 70% 40%, rgba(100, 60, 180, 0.03) 0%, transparent 55%),
+    url('https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=1920&q=60') center / cover no-repeat;
+  opacity: 0.08;
+  filter: blur(2px) saturate(0.4);
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LOGIN CARD
+   ═══════════════════════════════════════════════════════════ */
+.card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 420px;
+  background: rgba($bg-card, 0.65);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid $border-subtle;
+  border-radius: $radius-lg;
+  padding: 2.5rem 2.2rem 2rem;
+}
+
+/* ─── Logo block ────────────────────────────────────────── */
+.logoBlock {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.logoIcon {
+  width: 52px;
+  height: 52px;
+  border-radius: $radius-md;
+  background: linear-gradient(135deg, $accent-red, $accent-red-light);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: #fff;
+  margin-bottom: 0.9rem;
+  box-shadow: 0 6px 24px rgba($accent-red, 0.3);
+}
+
+.logoText {
+  display: block;
+  font-weight: 800;
+  font-size: 1.5rem;
+  letter-spacing: 3px;
+  background: linear-gradient(135deg, $accent-pink, #fff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0.35rem;
+}
+
+.tagline {
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 3.5px;
+  text-transform: uppercase;
+  color: $text-dim;
+}
+
+/* ─── Form fields ───────────────────────────────────────── */
+.fieldGroup {
+  margin-bottom: 1.25rem;
+}
+
+.labelRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.45rem;
+}
+
+.label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: $text-muted;
+}
+
+.forgotLink {
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.8px;
+  color: $accent-pink;
+  text-decoration: none;
+  transition: color 0.2s;
+
+  &:hover {
+    color: #fff;
+  }
+}
+
+.inputWrap {
+  position: relative;
+}
+
+.inputIcon {
+  position: absolute;
+  left: 0.9rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.95rem;
+  color: $text-dim;
+  pointer-events: none;
+  transition: color 0.2s;
+}
+
+.input {
+  width: 100%;
+  padding: 0.7rem 0.9rem 0.7rem 2.6rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid $border-subtle;
+  border-radius: $radius-sm;
+  color: $text-main;
+  font-size: 0.88rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.25s, background 0.25s;
+
+  &::placeholder {
+    color: $text-dim;
+    font-size: 0.84rem;
+  }
+
+  &:focus {
+    border-color: rgba($accent-red, 0.5);
+    background: rgba(255, 255, 255, 0.06);
+
+    & ~ .inputIcon,
+    + .inputIcon {
+      color: $accent-pink;
+    }
+  }
+}
+
+/* Make sibling icon highlight on focus — via parent selector */
+.inputWrap:focus-within .inputIcon {
+  color: $accent-pink;
+}
+
+.togglePassword {
+  position: absolute;
+  right: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: $text-dim;
+  font-size: 0.92rem;
+  cursor: pointer;
+  padding: 0.2rem;
+  display: flex;
+  transition: color 0.2s;
+
+  &:hover {
+    color: $text-muted;
+  }
+}
+
+/* ─── Checkbox ──────────────────────────────────────────── */
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 1.6rem;
+  cursor: pointer;
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid $border-hover;
+  background: rgba(255, 255, 255, 0.03);
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s, border-color 0.2s;
+  flex-shrink: 0;
+
+  &:checked {
+    background: $accent-red;
+    border-color: $accent-red;
+  }
+
+  &:checked::after {
+    content: '✓';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    color: #fff;
+    font-weight: 700;
+  }
+}
+
+.checkLabel {
+  font-size: 0.8rem;
+  color: $text-muted;
+  user-select: none;
+}
+
+/* ─── Submit button ─────────────────────────────────────── */
+.submitBtn {
+  width: 100%;
+  padding: 0.78rem;
+  background: linear-gradient(135deg, $accent-red 0%, #d42a20 50%, #e85d3a 100%);
+  color: #fff;
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  border: none;
+  border-radius: $radius-sm;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: box-shadow 0.3s, transform 0.2s, opacity 0.2s;
+  box-shadow: 0 4px 22px rgba($accent-red, 0.3);
+  font-family: inherit;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 30px rgba($accent-red, 0.4);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+/* ─── Divider + encryption notice ───────────────────────── */
+.divider {
+  margin: 1.6rem 0 1.2rem;
+  border: none;
+  border-top: 1px solid $border-subtle;
+}
+
+.securityNotice {
+  text-align: center;
+  font-size: 0.7rem;
+  color: $text-dim;
+  line-height: 1.6;
+
+  .gold {
+    color: $accent-gold;
+    font-weight: 600;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   OUTSIDE CARD — bottom info
+   ═══════════════════════════════════════════════════════════ */
+.bottomMeta {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 420px;
+  margin-top: 1.5rem;
+}
+
+.metaRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.7rem;
+  color: $text-dim;
+  margin-bottom: 0.85rem;
+}
+
+.statusLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: $text-dim;
+  text-decoration: none;
+  transition: color 0.2s;
+
+  &:hover {
+    color: $text-muted;
+  }
+}
+
+.version {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.5px;
+  color: $text-dim;
+}
+
+.registerRow {
+  text-align: center;
+  font-size: 0.82rem;
+  color: $text-dim;
+}
+
+.registerLink {
+  color: $text-muted;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.2s;
+
+  &:hover {
+    color: $accent-pink;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ERROR
+   ═══════════════════════════════════════════════════════════ */
+.errorMsg {
+  background: rgba($accent-red, 0.1);
+  border: 1px solid rgba($accent-red, 0.2);
+  border-radius: $radius-sm;
+  padding: 0.55rem 0.8rem;
+  margin-bottom: 1.2rem;
+  font-size: 0.8rem;
+  color: $accent-red-light;
+  text-align: center;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+  .card {
+    padding: 2rem 1.4rem 1.6rem;
+    border-radius: $radius-md;
+  }
+
+  .logoText {
+    font-size: 1.3rem;
+  }
+}
