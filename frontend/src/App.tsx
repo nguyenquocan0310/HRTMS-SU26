@@ -4,8 +4,11 @@ import type { Role } from './types'
 import LandingPage from './pages/landing/LandingPage'
 import LoginPage from './pages/auth/LoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
-
-
+import AdminLayout from './layouts/AdminLayout'
+import AdminDashboard from './pages/admin/AdminDashboard'
+import ApprovalCenter from './pages/admin/ApprovalCenter'
+import UserManagement from './pages/admin/UserManagement'
+import TournamentBuilder from './components/admin/TournamentBuilder'
 
 // ── Import các trang Owner ──
 import MyHorses from './pages/owner/MyHorses'
@@ -44,7 +47,6 @@ import WalletTransactions from './pages/spectator/WalletTransactions'
 import MyPredictions from './pages/spectator/MyPredictions'
 
 // ── Placeholder Admin ──
-const AdminDashboard = () => <div>Admin Dashboard</div>
 
 // ── Protected Route ──
 interface ProtectedRouteProps {
@@ -145,7 +147,17 @@ export default function App() {
         </Route>
 
         {/* Admin */}
-        <Route path="/admin/*" element={<ProtectedRoute allowedRoles={['Admin']}><AdminDashboard /></ProtectedRoute>} />
+        {/* ── Cấu trúc Route của ADMIN ── */}
+<Route path="/admin" element={
+  <ProtectedRoute allowedRoles={['Admin']}>
+    <AdminLayout />
+  </ProtectedRoute>
+}>
+  <Route index element={<AdminDashboard />} />
+  <Route path="approval-center" element={<ApprovalCenter />} />
+  <Route path="users" element={<UserManagement />} />
+  <Route path="tournament-builder" element={<TournamentBuilder />} />
+</Route>
 
         <Route path="/unauthorized" element={<div>403 — Không có quyền truy cập</div>} />
         <Route path="*" element={<Navigate to="/" replace />} />

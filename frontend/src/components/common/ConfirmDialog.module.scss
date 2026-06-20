@@ -1,0 +1,120 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 2000;
+  animation: fadeIn 0.2s ease;
+}
+
+.dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #18181d;
+  border: 1px solid #2a2a30;
+  border-radius: 16px;
+  padding: 1.75rem;
+  width: 380px;
+  max-width: 90vw;
+  z-index: 2001;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.5rem;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+  animation: popIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.95); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+.iconWrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(216, 180, 90, 0.15);
+  color: #D8B45A;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
+.iconDanger {
+  background: rgba(231, 76, 60, 0.15);
+  color: #e74c3c;
+}
+
+.title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+
+.message {
+  font-size: 0.85rem;
+  color: #999;
+  margin: 0 0 0.5rem;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.cancelBtn {
+  flex: 1;
+  background: transparent;
+  border: 1px solid #2a2a30;
+  color: #ccc;
+  padding: 0.6rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: #555;
+  }
+}
+
+.confirmBtn {
+  flex: 1;
+  background: linear-gradient(135deg, #B5121B, #8b0d13);
+  border: none;
+  color: #fff;
+  padding: 0.6rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(181, 18, 27, 0.35);
+  }
+}
+
+.confirmBtnDanger {
+  background: #e74c3c;
+
+  &:hover {
+    background: #c0392b;
+    box-shadow: 0 8px 20px rgba(231, 76, 60, 0.35);
+  }
+}
