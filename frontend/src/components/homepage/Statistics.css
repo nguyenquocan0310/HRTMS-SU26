@@ -1,0 +1,33 @@
+.stats {
+  padding: 4rem 2rem;
+  display: grid;
+  gap: 1.25rem;
+  background: #f3efe9;
+}
+
+@media (min-width: 768px) {
+  .stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.stat-card {
+  padding: 2rem;
+  border-radius: 1.25rem;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 18px 40px rgba(46, 35, 28, 0.08);
+  border: 1px solid rgba(88, 67, 53, 0.12);
+  text-align: center;
+}
+
+.stat-card h2 {
+  margin: 0 0 0.75rem;
+  font-size: 2.75rem;
+  color: #3d2c24;
+}
+
+.stat-card p {
+  margin: 0;
+  color: #6b554a;
+  font-size: 1rem;
+}
