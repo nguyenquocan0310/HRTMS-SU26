@@ -1,7 +1,9 @@
-﻿using HRTMS.Core.DTOs.Horse;
+﻿using HRTMS.Core.Common;
+using HRTMS.Core.DTOs.Horse;
 using HRTMS.Core.Entities;
 using HRTMS.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
@@ -29,6 +31,8 @@ namespace HRTMS.API.Controllers
 
         [HttpPost]
         [Authorize(Roles = "Owner")]
+        [ProducesResponseType(typeof(ApiResponse<HorseResponseDto>), StatusCodes.Status201Created)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> CreateHorse([FromBody] CreateHorseDto dto)
         {
             var result = await _horseService.CreateHorseAsync(CurrentUserId, dto);
@@ -38,6 +42,7 @@ namespace HRTMS.API.Controllers
 
         [HttpGet("my")]
         [Authorize(Roles = "Owner")]
+        [ProducesResponseType(typeof(ApiResponse<List<HorseResponseDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetMyHorses(
             [FromQuery] string? adminApprovalStatus,
             [FromQuery] int page = 1,
@@ -49,6 +54,8 @@ namespace HRTMS.API.Controllers
 
         [HttpGet("{id:int}")]
         [Authorize(Roles = "Owner")]
+        [ProducesResponseType(typeof(ApiResponse<HorseResponseDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetHorseById(int id)
         {
             var result = await _horseService.GetHorseByIdAsync(CurrentUserId, id);
@@ -58,6 +65,9 @@ namespace HRTMS.API.Controllers
 
         [HttpPut("{id:int}")]
         [Authorize(Roles = "Owner")]
+        [ProducesResponseType(typeof(ApiResponse<HorseResponseDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> UpdateHorse(int id, [FromBody] UpdateHorseDto dto)
         {
             var result = await _horseService.UpdateHorseAsync(CurrentUserId, id, dto);

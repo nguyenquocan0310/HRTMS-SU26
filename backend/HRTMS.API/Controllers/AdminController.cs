@@ -1,4 +1,7 @@
-﻿using HRTMS.Core.DTOs.Horse;
+﻿using HRTMS.Core.Common;
+using HRTMS.Core.DTOs.Horse;
+using HRTMS.Core.DTOs.Horse;
+using HRTMS.Core.Interfaces.Services;
 using HRTMS.Core.Interfaces.Services;
 using HRTMS.Infrastructure.Data;
 using HRTMS.Infrastructure.Services;
@@ -7,8 +10,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
 using System.Security.Claims;
-using HRTMS.Core.DTOs.Horse;
-using HRTMS.Core.Interfaces.Services;
 
 namespace HRTMS.API.Controllers;
 
@@ -313,6 +314,7 @@ public class AdminController : ControllerBase
     // ── MODULE C: Horse Approval ──────────────────────────────────────────────
 
     [HttpGet("horses/pending")]
+    [ProducesResponseType(typeof(ApiResponse<List<HorseResponseDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPendingHorses(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
@@ -322,6 +324,8 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("horses/{id:int}")]
+    [ProducesResponseType(typeof(ApiResponse<HorseResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetHorseAdmin(int id)
     {
         var result = await _horseService.GetHorseByIdAdminAsync(id);
@@ -330,6 +334,8 @@ public class AdminController : ControllerBase
     }
 
     [HttpPatch("horses/{id:int}/approve")]
+    [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ApproveHorse(int id)
     {
         var result = await _horseService.ApproveHorseAsync(CurrentAdminId, id);
@@ -338,6 +344,8 @@ public class AdminController : ControllerBase
     }
 
     [HttpPatch("horses/{id:int}/reject")]
+    [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> RejectHorse(int id, [FromBody] AdminRejectHorseDto dto)
     {
         var result = await _horseService.RejectHorseAsync(CurrentAdminId, id, dto);

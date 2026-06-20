@@ -1,8 +1,9 @@
-﻿using System.Security.Claims;
+﻿using HRTMS.Core.Common;
 using HRTMS.Core.DTOs.Horse;
 using HRTMS.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace HRTMS.API.Controllers;
 
@@ -23,6 +24,8 @@ public class RaceEntryController : ControllerBase
 
     [HttpPost]
     [Authorize(Roles = "Owner")]
+    [ProducesResponseType(typeof(ApiResponse<RaceEntryResponseDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateRaceEntry([FromBody] CreateRaceEntryDto dto)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
@@ -33,6 +36,7 @@ public class RaceEntryController : ControllerBase
 
     [HttpGet("my")]
     [Authorize(Roles = "Owner")]
+    [ProducesResponseType(typeof(ApiResponse<List<RaceEntryResponseDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMyRaceEntries(
         [FromQuery] string? status,
         [FromQuery] string? entryFeeStatus,
