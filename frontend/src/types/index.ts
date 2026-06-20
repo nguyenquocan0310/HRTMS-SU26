@@ -41,3 +41,6 @@ export interface ApiError {
   errorCode: string
   message: string
 }
+
+export * from './jockey.types'
+export * from './owner.types'
