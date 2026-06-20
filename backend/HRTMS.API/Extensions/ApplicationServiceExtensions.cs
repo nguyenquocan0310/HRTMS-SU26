@@ -9,6 +9,8 @@ public static class ApplicationServiceExtensions
     {
         services.AddScoped<JwtService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IFamilyDeclarationValidator, FamilyDeclarationValidator>();
+        services.AddScoped<IFamilyDeclarationService, FamilyDeclarationService>();
         services.AddScoped<IAuditLogService, AuditLogService>();
         services.AddScoped<ITournamentServices, TournamentSevice>();
         services.AddScoped<ITokenBlacklistService, TokenBlacklistService>();
