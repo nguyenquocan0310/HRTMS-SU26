@@ -344,4 +344,40 @@ public class AdminController : ControllerBase
         if (!result.Success) return BadRequest(result);
         return Ok(result);
     }
+    // ── MODULE C: Race Entry Admin ────────────────────────────────────────────
+
+    [HttpGet("entries/pending-fee")]
+    public async Task<IActionResult> GetPendingFeeEntries(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        var result = await _horseService.GetPendingFeeEntriesAsync(page, pageSize);
+        return Ok(result);
+    }
+
+    [HttpPatch("entries/{id:int}/fee-status")]
+    public async Task<IActionResult> ConfirmEntryFee(int id)
+    {
+        var result = await _horseService.ConfirmEntryFeeAsync(CurrentAdminId, id);
+        if (!result.Success) return BadRequest(result);
+        return Ok(result);
+    }
+
+    [HttpPatch("entries/{id:int}/approve")]
+    public async Task<IActionResult> ApproveRaceEntry(int id)
+    {
+        var result = await _horseService.ApproveRaceEntryAsync(CurrentAdminId, id);
+        if (!result.Success) return BadRequest(result);
+        return Ok(result);
+    }
+
+    [HttpPatch("entries/{id:int}/reject")]
+    public async Task<IActionResult> RejectRaceEntry(int id, [FromBody] AdminRejectHorseDto dto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+        var result = await _horseService.RejectRaceEntryAsync(CurrentAdminId, id, dto.Reason);
+        if (!result.Success) return BadRequest(result);
+        return Ok(result);
+    }
+
 }
