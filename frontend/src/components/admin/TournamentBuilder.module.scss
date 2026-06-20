@@ -1,0 +1,280 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+// ─── List view header ─────────────────────────────────────────────────────
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.heading {
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: #fff;
+  margin: 0;
+}
+
+.createBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: linear-gradient(135deg, #B5121B, #8b0d13);
+  border: none;
+  color: #fff;
+  padding: 0.65rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 22px rgba(181, 18, 27, 0.35);
+  }
+}
+
+.tournamentName {
+  font-weight: 600;
+  color: #fff;
+}
+
+.editBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: transparent;
+  border: 1px solid #2a2a30;
+  color: #ccc;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+
+  &:hover {
+    border-color: #B5121B;
+    color: #F3C8C3;
+  }
+}
+
+// ─── Wizard header ────────────────────────────────────────────────────────
+
+.wizardHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.backLink {
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s;
+
+  &:hover {
+    color: #F3C8C3;
+  }
+}
+
+// ─── Tab stepper ──────────────────────────────────────────────────────────
+
+.tabStepper {
+  display: flex;
+  align-items: flex-start;
+  background: #15151A;
+  border: 1px solid #232328;
+  border-radius: 14px;
+  padding: 1.25rem 1.5rem;
+  overflow-x: auto;
+}
+
+.tabStepWrapper {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 140px;
+}
+
+.tabConnector {
+  flex: 1;
+  height: 2px;
+  background: #2a2a30;
+  margin: 0 0.5rem;
+  margin-bottom: 1.6rem;
+}
+
+.tabStep {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  min-width: 90px;
+}
+
+.tabStepCircle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: transparent;
+  border: 2px solid #2a2a30;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  transition: all 0.25s;
+}
+
+.tabStepLabel {
+  font-size: 0.74rem;
+  color: #777;
+  text-align: center;
+  white-space: nowrap;
+  transition: color 0.25s;
+}
+
+.tabStepActive {
+  .tabStepCircle {
+    background: #B5121B;
+    border-color: #B5121B;
+    color: #fff;
+    box-shadow: 0 0 12px rgba(181, 18, 27, 0.5);
+  }
+
+  .tabStepLabel {
+    color: #F3C8C3;
+    font-weight: 600;
+  }
+}
+
+// ─── Tab content ──────────────────────────────────────────────────────────
+
+.tabContent {
+  background: #15151A;
+  border: 1px solid #232328;
+  border-radius: 14px;
+  padding: 1.5rem;
+}
+
+// ─── Action bar ───────────────────────────────────────────────────────────
+
+.actionBar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #131316;
+  border: 1px solid #232328;
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.actionBarRight {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.cancelTournamentBtn {
+  background: transparent;
+  border: 1px solid #2a2a30;
+  color: #e74c3c;
+  padding: 0.6rem 1.1rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: #e74c3c;
+    background: rgba(231, 76, 60, 0.08);
+  }
+}
+
+.saveDraftBtn {
+  background: transparent;
+  border: 1px solid #2a2a30;
+  color: #ccc;
+  padding: 0.6rem 1.1rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: #555;
+  }
+}
+
+.publishBtn {
+  background: #2ecc71;
+  border: none;
+  color: #0a1f12;
+  padding: 0.6rem 1.3rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover:not(:disabled) {
+    background: #27ae60;
+    transform: translateY(-2px);
+  }
+
+  &:disabled {
+    background: #2a2a30;
+    color: #666;
+    cursor: not-allowed;
+  }
+}
+
+// ─── Responsive ───────────────────────────────────────────────────────────
+
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .actionBar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .actionBarRight {
+    width: 100%;
+  }
+
+  .saveDraftBtn,
+  .publishBtn {
+    flex: 1;
+  }
+
+  .tabStepLabel {
+    display: none;
+  }
+}

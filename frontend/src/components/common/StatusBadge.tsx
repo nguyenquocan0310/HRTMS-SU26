@@ -8,7 +8,12 @@ export type StatusType =
   | 'Rejected'
   | 'AutoRejected'
   | 'Withdrawn'
-  | 'Disqualified';
+  | 'Disqualified'
+  | 'Draft'
+  | 'OpenRegistration'
+  | 'Closed'
+  | 'Completed'
+  | 'Cancelled';
 
 interface StatusBadgeProps {
   status: StatusType;
@@ -17,10 +22,13 @@ interface StatusBadgeProps {
 
 // ─── Convention màu chuẩn (chưa có bảng màu chính thức từ SRS 3.1.3) ────────
 // Pending      → vàng/cam (chờ xử lý)
-// Approved/Active → xanh lá (đã xác nhận, hợp lệ)
-// Rejected     → đỏ (bị từ chối bởi Admin)
+// Approved/Active/OpenRegistration → xanh lá (đã xác nhận, hợp lệ, đang mở)
+// Rejected/Suspended → đỏ (bị từ chối/khóa bởi Admin)
 // AutoRejected → xám (hệ thống tự loại, không phải quyết định Admin)
-// Withdrawn / Disqualified → đỏ đậm (cảnh báo nghiêm trọng — khớp tile URGENT ở Dashboard)
+// Withdrawn / Disqualified / Cancelled → đỏ đậm (cảnh báo nghiêm trọng, bất khả hồi)
+// Draft        → xám nhạt (chưa publish)
+// Closed       → xám (đã đóng, không còn nhận đăng ký)
+// Completed    → xanh dương (đã hoàn tất bình thường)
 const STATUS_CONFIG: Record<StatusType, { label: string; className: string }> = {
   Pending: { label: 'Pending', className: 'statusPending' },
   Approved: { label: 'Approved', className: 'statusApproved' },
@@ -30,6 +38,11 @@ const STATUS_CONFIG: Record<StatusType, { label: string; className: string }> = 
   AutoRejected: { label: 'Auto-Rejected', className: 'statusAutoRejected' },
   Withdrawn: { label: 'Withdrawn', className: 'statusUrgent' },
   Disqualified: { label: 'Disqualified', className: 'statusUrgent' },
+  Draft: { label: 'Draft', className: 'statusDraft' },
+  OpenRegistration: { label: 'Open Registration', className: 'statusApproved' },
+  Closed: { label: 'Closed', className: 'statusAutoRejected' },
+  Completed: { label: 'Completed', className: 'statusCompleted' },
+  Cancelled: { label: 'Cancelled', className: 'statusUrgent' },
 };
 
 const StatusBadge = ({ status, label }: StatusBadgeProps) => {

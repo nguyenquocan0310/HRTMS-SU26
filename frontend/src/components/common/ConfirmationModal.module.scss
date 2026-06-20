@@ -1,0 +1,150 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 2500;
+  animation: fadeIn 0.2s ease;
+}
+
+.modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #18181d;
+  border: 1px solid #B5121B;
+  border-radius: 16px;
+  padding: 1.85rem;
+  width: 420px;
+  max-width: 92vw;
+  z-index: 2501;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.5rem;
+  box-shadow: 0 24px 64px rgba(181, 18, 27, 0.25);
+  animation: popIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.95); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+.iconWrap {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(231, 76, 60, 0.15);
+  color: #e74c3c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
+.title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+
+.message {
+  font-size: 0.85rem;
+  color: #999;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.typeConfirmBlock {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  text-align: left;
+}
+
+.typeConfirmLabel {
+  font-size: 0.8rem;
+  color: #ccc;
+
+  strong {
+    color: #ff6b6b;
+  }
+}
+
+.typeConfirmInput {
+  background: #0d0d10;
+  border: 1px solid #2a2a30;
+  border-radius: 8px;
+  padding: 0.6rem 0.85rem;
+  color: #fff;
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color 0.2s;
+
+  &::placeholder {
+    color: #444;
+  }
+
+  &:focus {
+    border-color: #B5121B;
+    box-shadow: 0 0 0 3px rgba(181, 18, 27, 0.15);
+  }
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+  margin-top: 0.75rem;
+}
+
+.cancelBtn {
+  flex: 1;
+  background: transparent;
+  border: 1px solid #2a2a30;
+  color: #ccc;
+  padding: 0.65rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: #555;
+  }
+}
+
+.confirmBtn {
+  flex: 1;
+  background: #e74c3c;
+  border: none;
+  color: #fff;
+  padding: 0.65rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover:not(:disabled) {
+    background: #c0392b;
+    transform: translateY(-2px);
+  }
+
+  &:disabled {
+    background: #2a2a30;
+    color: #666;
+    cursor: not-allowed;
+  }
+}
