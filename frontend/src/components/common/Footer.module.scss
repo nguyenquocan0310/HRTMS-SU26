@@ -1,0 +1,155 @@
+/* ─── Color tokens ──────────────────────────────────────── */
+$bg-dark: #0b0b0d;
+$bg-card: #111114;
+$accent-red: #b5121b;
+$text-main: #e8e8ea;
+$text-muted: #6a6a70;
+$border-subtle: rgba(255, 255, 255, 0.06);
+
+/* ─── Footer ────────────────────────────────────────────── */
+.footer {
+  background: $bg-card;
+  border-top: 1px solid $border-subtle;
+  padding: 4rem 0 0;
+  color: $text-muted;
+  font-size: 0.88rem;
+}
+
+/* ─── Brand column ──────────────────────────────────────── */
+.logo {
+  display: inline-block;
+  font-family: 'Inter', sans-serif;
+  font-weight: 800;
+  font-size: 1.4rem;
+  letter-spacing: 2px;
+  background: linear-gradient(135deg, $accent-red, #e85d3a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-decoration: none;
+  margin-bottom: 1rem;
+}
+
+.tagline {
+  color: $text-muted;
+  line-height: 1.65;
+  font-size: 0.84rem;
+  margin-bottom: 1.4rem;
+}
+
+.socialRow {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.socialIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid $border-subtle;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: $text-muted;
+  font-size: 0.9rem;
+  transition: all 0.25s;
+  text-decoration: none;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: $text-main;
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+}
+
+/* ─── Link columns ──────────────────────────────────────── */
+.heading {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 1.8px;
+  color: $text-muted;
+  margin-bottom: 1.3rem;
+  text-transform: uppercase;
+}
+
+.linkList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  li {
+    margin-bottom: 0.75rem;
+  }
+
+  a {
+    color: $text-muted;
+    text-decoration: none;
+    transition: color 0.2s;
+    font-size: 0.88rem;
+
+    &:hover {
+      color: $text-main;
+    }
+  }
+}
+
+/* ─── Connect column ────────────────────────────────────── */
+.contactList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.85rem;
+    color: $text-muted;
+    font-size: 0.88rem;
+  }
+
+  a {
+    color: $text-muted;
+    text-decoration: none;
+    transition: color 0.2s;
+
+    &:hover {
+      color: $text-main;
+    }
+  }
+}
+
+.contactIcon {
+  font-size: 0.92rem;
+  color: $text-muted;
+  flex-shrink: 0;
+}
+
+/* ─── Bottom bar ────────────────────────────────────────── */
+.bottomBar {
+  margin-top: 3rem;
+  padding: 1.5rem 0;
+  border-top: 1px solid $border-subtle;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.bottomLinks {
+  display: flex;
+  gap: 1.5rem;
+
+  a {
+    color: rgba(255, 255, 255, 0.25);
+    text-decoration: none;
+    transition: color 0.2s;
+
+    &:hover {
+      color: $text-muted;
+    }
+  }
+}

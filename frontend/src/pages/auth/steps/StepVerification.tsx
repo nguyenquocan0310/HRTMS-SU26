@@ -1,0 +1,238 @@
+import { RegRole } from '../../../types/role.types';
+import { type RegisterFormData } from '../../../types/auth.types';
+import styles from './StepVerification.module.scss';
+
+interface Props {
+  role: RegRole | null;
+  formData: RegisterFormData;
+  onChange: (partial: Partial<RegisterFormData>) => void;
+}
+
+const StepVerification = ({ role, formData, onChange }: Props) => {
+
+  // ─── Owner ────────────────────────────────────────────────────────────────
+  if (role === RegRole.Owner) {
+    return (
+      <div className={styles.container}>
+        <h2 className={styles.title}>Owner Verification</h2>
+        <p className={styles.subtitle}>Provide your identity details for verification.</p>
+        <div className={styles.form}>
+          <div className={styles.field}>
+            <label className={styles.label}>Phone Number</label>
+            <input
+              type="text"
+              className={styles.input}
+              placeholder="Enter your phone number"
+              value={formData.ownerVerification.phoneNumber}
+              onChange={(e) =>
+                onChange({
+                  ownerVerification: {
+                    ...formData.ownerVerification,
+                    phoneNumber: e.target.value,
+                  },
+                })
+              }
+            />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Identity Number</label>
+            <input
+              type="text"
+              className={styles.input}
+              placeholder="Enter your identity number"
+              value={formData.ownerVerification.identityNumber}
+              onChange={(e) =>
+                onChange({
+                  ownerVerification: {
+                    ...formData.ownerVerification,
+                    identityNumber: e.target.value,
+                  },
+                })
+              }
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Jockey ───────────────────────────────────────────────────────────────
+  if (role === RegRole.Jockey) {
+    return (
+      <div className={styles.container}>
+        <h2 className={styles.title}>Jockey Verification</h2>
+        <p className={styles.subtitle}>Provide your license and physical details.</p>
+        <div className={styles.form}>
+          <div className={styles.field}>
+            <label className={styles.label}>License Certificate</label>
+            <input
+              type="text"
+              className={styles.input}
+              placeholder="Enter license certificate number"
+              value={formData.jockeyVerification.licenseCertificate}
+              onChange={(e) =>
+                onChange({
+                  jockeyVerification: {
+                    ...formData.jockeyVerification,
+                    licenseCertificate: e.target.value,
+                  },
+                })
+              }
+            />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Experience Years</label>
+            <input
+              type="number"
+              className={styles.input}
+              placeholder="Years of experience"
+              value={formData.jockeyVerification.experienceYears}
+              onChange={(e) =>
+                onChange({
+                  jockeyVerification: {
+                    ...formData.jockeyVerification,
+                    experienceYears: e.target.value ? Number(e.target.value) : '',
+                  },
+                })
+              }
+            />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Self Declared Weight (kg)</label>
+            <input
+              type="number"
+              className={styles.input}
+              placeholder="Your weight in kg"
+              value={formData.jockeyVerification.selfDeclaredWeight}
+              onChange={(e) =>
+                onChange({
+                  jockeyVerification: {
+                    ...formData.jockeyVerification,
+                    selfDeclaredWeight: e.target.value ? Number(e.target.value) : '',
+                  },
+                })
+              }
+            />
+          </div>
+
+          {/* Family / Conflict of Interest Declaration */}
+          <div className={styles.coiBox}>
+            <h4 className={styles.coiTitle}>
+              Family / Conflict of Interest Declaration
+            </h4>
+            <p className={styles.coiDesc}>
+              Declare any family relationships with other participants to prevent
+              conflicts of interest during races.
+            </p>
+            <textarea
+              className={styles.textarea}
+              placeholder="Describe any family relationships or conflicts of interest (or write 'None')"
+              rows={4}
+              value={formData.jockeyVerification.familyDeclaration}
+              onChange={(e) =>
+                onChange({
+                  jockeyVerification: {
+                    ...formData.jockeyVerification,
+                    familyDeclaration: e.target.value,
+                  },
+                })
+              }
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Referee ──────────────────────────────────────────────────────────────
+  if (role === RegRole.Referee) {
+    return (
+      <div className={styles.container}>
+        <h2 className={styles.title}>Referee Verification</h2>
+        <p className={styles.subtitle}>Provide your certification level and declarations.</p>
+        <div className={styles.form}>
+          <div className={styles.field}>
+            <label className={styles.label}>Certification Level</label>
+            <select
+              className={styles.input}
+              value={formData.refereeVerification.certificationLevel}
+              onChange={(e) =>
+                onChange({
+                  refereeVerification: {
+                    ...formData.refereeVerification,
+                    certificationLevel: e.target.value as 'Level1' | 'Level2' | 'Level3',
+                  },
+                })
+              }
+            >
+              <option value="">-- Select Level --</option>
+              <option value="Level1">Cấp 1</option>
+              <option value="Level2">Cấp 2</option>
+              <option value="Level3">Cấp 3</option>
+            </select>
+          </div>
+
+          {/* Family / Conflict of Interest Declaration */}
+          <div className={styles.coiBox}>
+            <h4 className={styles.coiTitle}>
+              Family / Conflict of Interest Declaration
+            </h4>
+            <p className={styles.coiDesc}>
+              Declare any family relationships with participants to ensure
+              tournament integrity.
+            </p>
+            <textarea
+              className={styles.textarea}
+              placeholder="Describe any family relationships or conflicts of interest (or write 'None')"
+              rows={4}
+              value={formData.refereeVerification.familyDeclaration}
+              onChange={(e) =>
+                onChange({
+                  refereeVerification: {
+                    ...formData.refereeVerification,
+                    familyDeclaration: e.target.value,
+                  },
+                })
+              }
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Doctor ───────────────────────────────────────────────────────────────
+  if (role === RegRole.Doctor) {
+    // Doctor sẽ khai báo gia đình (COI) sau, tại Doctor Dashboard UI-S30, không phải lúc Register
+    return (
+      <div className={styles.container}>
+        <h2 className={styles.title}>Doctor Verification</h2>
+        <p className={styles.subtitle}>Provide your medical license number.</p>
+        <div className={styles.form}>
+          <div className={styles.field}>
+            <label className={styles.label}>Medical License Number</label>
+            <input
+              type="text"
+              className={styles.input}
+              placeholder="Enter your medical license number"
+              value={formData.doctorVerification.medicalLicenseNumber}
+              onChange={(e) =>
+                onChange({
+                  doctorVerification: {
+                    ...formData.doctorVerification,
+                    medicalLicenseNumber: e.target.value,
+                  },
+                })
+              }
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Spectator — không bao giờ render vì RegisterPage skip bước này
+  return null;
+};
+
+export default StepVerification;

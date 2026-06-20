@@ -1,200 +1,164 @@
-import { Link, useNavigate } from 'react-router-dom'
-import { Formik, Form, Field, ErrorMessage } from 'formik'
-import * as Yup from 'yup'
+import { useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  FiUser,
+  FiLock,
+  FiArrowRight,
+  FiHelpCircle,
+  FiEye,
+  FiEyeOff,
+} from 'react-icons/fi';
+import { GiHorseHead } from 'react-icons/gi';
 
-import { login } from '../../api/auth'
-import useAuthStore from '../../store/authStore'
-import { getRoleHomePath } from '../../utils/roleHelper'
-import './LoginPage.css'
-
-const loginSchema = Yup.object({
-  email: Yup.string()
-    .email('Email không hợp lệ')
-    .required('Email là bắt buộc'),
-
-  password: Yup.string()
-    .required('Mật khẩu là bắt buộc')
-})
+import styles from './LoginPage.module.scss';
 
 export default function LoginPage() {
-  const navigate = useNavigate()
-  const setAuth = useAuthStore((s) => s.setAuth)
+  /* ─── Local state ──────────────────────────────────────── */
+  const [credential, setCredential] = useState('');
+  const [password, setPassword] = useState('');
+  const [rememberSession, setRememberSession] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
 
+  const isFormValid = credential.trim() !== '' && password.trim() !== '';
+
+  /* ─── Submit handler ───────────────────────────────────── */
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError('');
+
+    if (!credential.trim() || !password.trim()) {
+      setError('Please fill in all fields.');
+      return;
+    }
+
+    // TODO: gọi API đăng nhập khi có Swagger từ BE — xem Điều 6
+    // Dự kiến: POST /api/auth/login  body: { email: credential, password }
+    // Nếu rememberSession === true → lưu token vào localStorage thay vì sessionStorage
+    console.log('[LoginPage] submit', { credential, password, rememberSession });
+  };
+
+  /* ─── Render ───────────────────────────────────────────── */
   return (
-    <div className="login-page-container">
+    <div className={styles.loginPage}>
+      {/* Faint horse silhouette background */}
+      <div className={styles.bgOverlay} />
 
-      {/* LEFT PANEL */}
-      <div className="left-overlay">
+      {/* ═══ CARD ════════════════════════════════════════════ */}
+      <div className={styles.card}>
+        {/* Logo */}
+        <div className={styles.logoBlock}>
+          <div className={styles.logoIcon}>
+            <GiHorseHead />
+          </div>
+          <span className={styles.logoText}>HRTMS</span>
+          <span className={styles.tagline}>MYSTIC THOROUGHBRED</span>
+        </div>
 
-  <div className="hero-content">
+        {/* Error */}
+        {error && <div className={styles.errorMsg}>{error}</div>}
 
-    <div className="brand-logo-circle">
-      🐎
-    </div>
+        {/* Form */}
+        <form onSubmit={handleSubmit} noValidate>
+          {/* Username / Email */}
+          <div className={styles.fieldGroup}>
+            <div className={styles.labelRow}>
+              <label className={styles.label} htmlFor="login-credential">
+                USERNAME / EMAIL
+              </label>
+            </div>
+            <div className={styles.inputWrap}>
+              <input
+                id="login-credential"
+                className={styles.input}
+                type="text"
+                placeholder="Enter your credentials"
+                autoComplete="username"
+                value={credential}
+                onChange={(e) => setCredential(e.target.value)}
+              />
+              <FiUser className={styles.inputIcon} />
+            </div>
+          </div>
 
-    <h1>HRTMS</h1>
+          {/* Password */}
+          <div className={styles.fieldGroup}>
+            <div className={styles.labelRow}>
+              <label className={styles.label} htmlFor="login-password">
+                PASSWORD
+              </label>
+              <Link to="#" className={styles.forgotLink}>
+                FORGOT PASSWORD?
+              </Link>
+            </div>
+            <div className={styles.inputWrap}>
+              <input
+                id="login-password"
+                className={styles.input}
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <FiLock className={styles.inputIcon} />
+              <button
+                type="button"
+                className={styles.togglePassword}
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <FiEyeOff /> : <FiEye />}
+              </button>
+            </div>
+          </div>
 
-    <p>
-      Elevate your tournament management to elite
-      standards. Precision, heritage, and performance
-      in every stride.
-    </p>
+          {/* Remember session */}
+          <label className={styles.checkRow}>
+            <input
+              type="checkbox"
+              className={styles.checkbox}
+              checked={rememberSession}
+              onChange={(e) => setRememberSession(e.target.checked)}
+            />
+            <span className={styles.checkLabel}>Remember this session</span>
+          </label>
 
-  </div>
-
-  <div className="brand-stats">
-
-    <div className="stat-item">
-      <span className="stat-number">500+</span>
-      <span className="stat-label">Events</span>
-    </div>
-
-    <div className="stat-item">
-      <span className="stat-number">12k</span>
-      <span className="stat-label">Athletes</span>
-    </div>
-
-    <div className="stat-item">
-      <span className="stat-number">Top 10</span>
-      <span className="stat-label">Ranked</span>
-    </div>
-
-  </div>
-
-</div>
-
-      {/* RIGHT PANEL */}
-      <div className="login-form-panel">
-        <div className="form-content">
-          <h2>Welcome Back</h2>
-
-          <p className="form-subtitle">
-            Sign in to access your racing dashboard.
-          </p>
-
-          <Formik
-            initialValues={{
-              email: '',
-              password: ''
-            }}
-            validationSchema={loginSchema}
-            onSubmit={async (values, { setSubmitting, setStatus }) => {
-              try {
-                const res = await login(values)
-
-                setAuth(res.token, res.user)
-
-                navigate(
-                  getRoleHomePath(res.user.role),
-                  { replace: true }
-                )
-              } catch (err: any) {
-                setStatus(
-                  err.response?.data?.message ??
-                    'Đăng nhập thất bại'
-                )
-              } finally {
-                setSubmitting(false)
-              }
-            }}
+          {/* Submit */}
+          <button
+            type="submit"
+            className={styles.submitBtn}
+            disabled={!isFormValid}
           >
-            {({ errors, touched, isSubmitting, status }) => (
-              <Form className="login-form">
+            Login to Dashboard <FiArrowRight size={16} />
+          </button>
+        </form>
 
-                {/* EMAIL */}
-                <div className="field-wrapper">
-                  <label>
-                    Email Address
-                    <span className="required">*</span>
-                  </label>
+        {/* Divider + security notice */}
+        <hr className={styles.divider} />
+        <div className={styles.securityNotice}>
+          Authorized Personnel Only.
+          <br />
+          Encryption Level: <span className={styles.gold}>256-BIT AES</span>
+        </div>
+      </div>
 
-                  <Field
-                    name="email"
-                    type="email"
-                    placeholder="Enter your email"
-                    className={
-                      touched.email && errors.email
-                        ? 'input-error'
-                        : ''
-                    }
-                  />
-
-                  <ErrorMessage
-                    name="email"
-                    component="div"
-                    className="error-text"
-                  />
-                </div>
-
-                {/* PASSWORD */}
-                <div className="field-wrapper">
-                  <label>
-                    Password
-                    <span className="required">*</span>
-                  </label>
-
-                  <Field
-                    name="password"
-                    type="password"
-                    placeholder="Enter your password"
-                    className={
-                      touched.password && errors.password
-                        ? 'input-error'
-                        : ''
-                    }
-                  />
-
-                  <ErrorMessage
-                    name="password"
-                    component="div"
-                    className="error-text"
-                  />
-                </div>
-
-                {status && (
-                  <div className="error-message">
-                    {status}
-                  </div>
-                )}
-
-                <div className="form-footer">
-                  <label className="checkbox-label">
-                    <input type="checkbox" />
-                    Remember device
-                  </label>
-
-                  <a href="#" className="forgot-password">
-                    Forgot password?
-                  </a>
-                </div>
-
-                <button
-                  type="submit"
-                  className="sign-in-button"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting
-                    ? 'Signing In...'
-                    : 'Sign In →'}
-                </button>
-              </Form>
-            )}
-          </Formik>
-
-          <div className="separator">
-            <span>Secure Access</span>
-          </div>
-
-          <div className="tabs auth-tabs-bottom">
-            <Link to="/login" className="tab active">
-              Login
-            </Link>
-            <Link to="/register" className="tab">
-              Register
-            </Link>
-          </div>
+      {/* ═══ BELOW CARD ══════════════════════════════════════ */}
+      <div className={styles.bottomMeta}>
+        <div className={styles.metaRow}>
+          <a href="#" className={styles.statusLink}>
+            <FiHelpCircle size={13} />
+            System Status
+          </a>
+          <span className={styles.version}>v2.4.0-STABLE</span>
+        </div>
+        <div className={styles.registerRow}>
+          New to HRTMS?{' '}
+          <Link to="/register" className={styles.registerLink}>
+            Register Account
+          </Link>
         </div>
       </div>
     </div>
-  )
+  );
 }

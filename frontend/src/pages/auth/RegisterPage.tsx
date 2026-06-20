@@ -1,176 +1,133 @@
-import { Link, useNavigate } from 'react-router-dom'
-import { useFormik } from 'formik' // Import Formik
-import * as Yup from 'yup'         // Import Yup
-import { register } from '../../api/auth'
-import type { Role } from '../../types'
-import './RegisterPage.css'
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { RegRole } from '../../types/role.types';
+import { type RegisterFormData, initialFormData } from '../../types/auth.types';
+import StepperBar from '../../components/common/StepperBar';
+import StepRoleSelection from './steps/StepRoleSelection';
+import StepIdentity from './steps/StepIdentity';
+import StepCredentials from './steps/StepCredentials';
+import StepVerification from './steps/StepVerification';
+import StepReview from './steps/StepReview';
+import StepFinalize from './steps/StepFinalize';
+import styles from './RegisterPage.module.scss';
 
-const RegisterSchema = Yup.object().shape({
-  fullName: Yup.string().required('Họ và tên là bắt buộc'),
-  username: Yup.string().required('Tên đăng nhập là bắt buộc'),
-  email: Yup.string().email('Email không hợp lệ').required('Email là bắt buộc'),
-  password: Yup.string().min(6, 'Mật khẩu phải có ít nhất 6 ký tự').required('Mật khẩu là bắt buộc'),
-  confirmPassword: Yup.string().oneOf([Yup.ref('password')], 'Mật khẩu xác nhận không khớp').required('Vui lòng xác nhận mật khẩu'),
-  role: Yup.string().required('Vui lòng chọn vai trò'),
-});
+const RegisterPage = () => {
+  const navigate = useNavigate();
+  const [currentStep, setCurrentStep] = useState<number>(1);
+  const [formData, setFormData] = useState<RegisterFormData>(initialFormData);
 
-export default function RegisterPage() {
-  const navigate = useNavigate()
+  const updateFormData = (partial: Partial<RegisterFormData>) => {
+    setFormData(prev => ({ ...prev, ...partial }));
+  };
 
-  const formik = useFormik({
-    initialValues: { username: '', fullName: '', email: '', password: '', confirmPassword: '', role: 'Spectator' as Role },
-    validationSchema: RegisterSchema,
-    onSubmit: async (values, { setFieldError, setSubmitting }) => {
-      try {
-        await register(values)
-        navigate('/login')
-      } catch (err: any) {
-        setFieldError('email', err.response?.data?.message ?? 'Đăng ký thất bại')
-      } finally {
-        setSubmitting(false)
-      }
-    },
-  })
+  const nextStep = () => {
+    // Spectator skip bước 4
+    if (currentStep === 3 && formData.role === RegRole.Spectator) {
+      setCurrentStep(5);
+      return;
+    }
+    setCurrentStep(prev => Math.min(prev + 1, 6));
+  };
 
-  const ROLES = [
-    'HorseOwner',
-    'Jockey',
-    'Referee',
-    'Spectator'
-  ]
+  const prevStep = () => {
+    // Spectator skip bước 4 khi back
+    if (currentStep === 5 && formData.role === RegRole.Spectator) {
+      setCurrentStep(3);
+      return;
+    }
+    setCurrentStep(prev => Math.max(prev - 1, 1));
+  };
+
+  const goToStep = (step: number) => setCurrentStep(step);
+
+  const renderStep = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <StepRoleSelection
+            selected={formData.role}
+            onSelect={(role) => updateFormData({ role })}
+          />
+        );
+      case 2:
+        return (
+          <StepIdentity
+            data={formData.identity}
+            onChange={(identity) => updateFormData({ identity })}
+          />
+        );
+      case 3:
+        return (
+          <StepCredentials
+            data={formData.credentials}
+            onChange={(credentials) => updateFormData({ credentials })}
+          />
+        );
+      case 4:
+        return (
+          <StepVerification
+            role={formData.role}
+            formData={formData}
+            onChange={updateFormData}
+          />
+        );
+      case 5:
+        return (
+          <StepReview
+            formData={formData}
+            onGoToStep={goToStep}
+          />
+        );
+      case 6:
+        return (
+          <StepFinalize
+            role={formData.role}
+          />
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
-    <div className="login-page-container">
-      <div className="login-image-panel">        
+    <div className={styles.page}>
+      {/* Header */}
+      <div className={styles.header}>
+        <h1 className={styles.logo}>HRTMS</h1>
+        <p className={styles.subtitle}>TOURNAMENT REGISTRATION PORTAL</p>
       </div>
 
-      <div className="login-form-panel">
-        <div className="form-content">
-          <h2>Create Account</h2>
-          <div className="tabs auth-tabs-under-title">
-            <Link to="/login" className="tab">Login</Link>
-            <Link to="/register" className="tab active">Register</Link>
-          </div>
-          <form onSubmit={formik.handleSubmit} className="login-form">
-            
-            {/* Ví dụ mẫu cho 1 trường (làm tương tự cho các trường còn lại) */}
-            <div className="input-group">
-              <label>Full Name <span className="required">*</span></label>
+      {/* Stepper */}
+      <StepperBar currentStep={currentStep} role={formData.role} />
 
-              <input
-                type="text"
-                name="fullName"
-                placeholder="Enter full name"
-                value={formik.values.fullName}
-                onChange={formik.handleChange}
-                onBlur={formik.handleBlur}
-                className={formik.touched.fullName && formik.errors.fullName ? 'input-error' : ''}
-              />
+      {/* Nội dung bước */}
+      <div className={styles.content}>
+        {renderStep()}
+      </div>
 
-              {formik.touched.fullName && formik.errors.fullName && (
-                <p className="error-text">{formik.errors.fullName}</p>
-              )}
-            </div>
+      {/* Footer điều hướng */}
+      <div className={styles.footer}>
+        <button
+          className={styles.backBtn}
+          onClick={currentStep === 1 ? () => navigate('/login') : prevStep}
+        >
+          {currentStep === 1 ? '← Back to Login' : '← Back'}
+        </button>
 
-            <div className="input-group">
-              <label>Email<span className="required">*</span></label>
-              <input
-                type="email"
-                name="email"
-                placeholder="Enter email"
-                value={formik.values.email}
-                onChange={formik.handleChange}
-                onBlur={formik.handleBlur}
-                className={formik.touched.email && formik.errors.email ? 'input-error' : ''}
-              />
-              {formik.touched.email && formik.errors.email && (
-                <p className="error-text">{formik.errors.email}</p>
-              )}
-            </div>
+        {currentStep < 6 && (
+          <button className={styles.nextBtn} onClick={nextStep}>
+            Next Step →
+          </button>
+        )}
+      </div>
 
-            <div className="input-group">
-              <label>Username<span className="required">*</span></label>
-              <input
-                type="text"
-                name="username"
-                placeholder="Enter username"
-                value={formik.values.username}
-                onChange={formik.handleChange}
-                onBlur={formik.handleBlur}
-                className={formik.touched.username && formik.errors.username ? 'input-error' : ''}
-              />
-              {formik.touched.username && formik.errors.username && (
-                <p className="error-text">{formik.errors.username}</p>
-              )}
-            </div>
-
-            <div className="input-group">
-              <label>Password<span className="required">*</span></label>
-              <input
-                type="password"
-                name="password"
-                placeholder="Enter password"
-                value={formik.values.password}
-                onChange={formik.handleChange}
-                onBlur={formik.handleBlur}
-                className={formik.touched.password && formik.errors.password ? 'input-error' : ''}
-              />
-              {formik.touched.password && formik.errors.password && (
-                <p className="error-text">{formik.errors.password}</p>
-              )}
-            </div>  
-
-            <div className="input-group">
-              <label>Confirm Password<span className="required">*</span></label>
-              <input
-                type="password"
-                name="confirmPassword"
-                placeholder="Confirm password"
-                value={formik.values.confirmPassword}
-                onChange={formik.handleChange}
-                onBlur={formik.handleBlur}
-                className={formik.touched.confirmPassword && formik.errors.confirmPassword ? 'input-error' : ''}
-              />
-              {formik.touched.confirmPassword && formik.errors.confirmPassword && (
-                <p className="error-text">{formik.errors.confirmPassword}</p>
-              )}
-            </div>              
-
-            <div className="input-group">
-              <label>Role<span className="required">*</span></label>
-  <select
-    name="role"
-    value={formik.values.role}
-    onChange={formik.handleChange}
-    onBlur={formik.handleBlur}
-    className={
-      formik.touched.role &&
-      formik.errors.role
-        ? 'input-error'
-        : ''
-    }
-  >
-    {ROLES.map((role) => (
-      <option
-        key={role}
-        value={role}
-      >
-        {role}
-      </option>
-    ))}
-  </select>
-              {formik.touched.role && formik.errors.role && (
-                <p className="error-text">{formik.errors.role}</p>
-              )}
-            </div>                                              
-
-
-            <button type="submit" className="sign-in-button" disabled={formik.isSubmitting}>
-              {formik.isSubmitting ? 'Processing...' : 'Create Account →'}
-            </button>
-          </form>
-        </div>
+      {/* Bottom bar */}
+      <div className={styles.bottomBar}>
+        <span>🛡 System Integrity Verified</span>
+        <span>© 2024 Horse Race Tournament Management System</span>
       </div>
     </div>
-  )
-}
+  );
+};
+
+export default RegisterPage;
