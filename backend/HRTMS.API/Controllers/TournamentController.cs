@@ -1,8 +1,11 @@
 ﻿using HRTMS.Core.Common;
 using HRTMS.Core.DTOs.Tournament;
 using HRTMS.Core.Interfaces.Services;
+using HRTMS.Infrastructure.Data;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,10 +22,12 @@ namespace HRTMS.API.Controllers
     public class TournamentController : ControllerBase
     {
         private readonly ITournamentServices _tournamentService;
+        private readonly HRTMSDbContext _context;
 
-        public TournamentController(ITournamentServices tournamentServices)
+        public TournamentController(ITournamentServices tournamentServices, HRTMSDbContext context)
         {
             _tournamentService = tournamentServices;
+            _context = context;
         }
 
         // Lay UserId tu JWT claim, khong nhan tu request body
@@ -178,6 +183,40 @@ namespace HRTMS.API.Controllers
             {
                 return BadRequest(ApiResponse<RaceResponseDto>.Fail(ex.Message));
             }
+        }
+        [HttpGet("/api/races/{raceId:int}/entries")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetRaceEntries(int raceId)
+        {
+            var race = await _context.Races
+                .Include(r => r.Round).ThenInclude(r => r.Tournament)
+                .FirstOrDefaultAsync(r => r.RaceId == raceId);
+
+            if (race == null)
+                return NotFound(new { success = false, message = "RACE_NOT_FOUND" });
+
+            // Chỉ public sau khi đã draw post position, Admin thấy luôn
+            bool isAdmin = User.IsInRole("Admin");
+            if (!race.IsPostPositionDrawn && !isAdmin)
+                return Ok(new { success = true, message = "Kết quả bốc thăm chưa được công bố.", data = Array.Empty<object>() });
+
+            var entries = await _context.RaceEntries
+                .Include(e => e.Pairing).ThenInclude(p => p.Horse)
+                .Include(e => e.Pairing).ThenInclude(p => p.Jockey).ThenInclude(j => j.Jockey)
+                .Where(e => e.RaceId == raceId && e.Status != "Cancelled" && e.Status != "Disqualified")
+                .OrderBy(e => e.PostPosition)
+                .Select(e => new
+                {
+                    e.RaceEntryId,
+                    e.PostPosition,
+                    e.Status,
+                    e.EntryFeeStatus,
+                    Horse = new { e.Pairing.Horse.HorseId, e.Pairing.Horse.Name, e.Pairing.Horse.Breed },
+                    Jockey = new { e.Pairing.Jockey.JockeyId, e.Pairing.Jockey.Jockey.FullName }
+                })
+                .ToListAsync();
+
+            return Ok(new { success = true, data = entries });
         }
     }
 
