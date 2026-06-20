@@ -4,6 +4,7 @@ import type { Role } from './types'
 import LandingPage from './pages/landing/LandingPage'
 import LoginPage from './pages/auth/LoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
+import AdminLayout from './layouts/AdminLayout'
 
 
 
@@ -44,7 +45,6 @@ import WalletTransactions from './pages/spectator/WalletTransactions'
 import MyPredictions from './pages/spectator/MyPredictions'
 
 // ── Placeholder Admin ──
-const AdminDashboard = () => <div>Admin Dashboard</div>
 
 // ── Protected Route ──
 interface ProtectedRouteProps {
@@ -145,7 +145,17 @@ export default function App() {
         </Route>
 
         {/* Admin */}
-        <Route path="/admin/*" element={<ProtectedRoute allowedRoles={['Admin']}><AdminDashboard /></ProtectedRoute>} />
+        {/* ── Cấu trúc Route của ADMIN ── */}
+<Route path="/admin" element={
+  <ProtectedRoute allowedRoles={['Admin']}>
+    <AdminLayout />
+  </ProtectedRoute>
+}>
+  <Route index element={<div>Admin Dashboard (placeholder — chờ FE làm UI-S08)</div>} />
+  {/* Các route con khác sẽ thêm dần khi làm xong từng trang:
+      tournaments, assignments, declare-official, approvals, users,
+      entry-fees, payouts, prediction-config, audit-log, reports, settings */}
+</Route>
 
         <Route path="/unauthorized" element={<div>403 — Không có quyền truy cập</div>} />
         <Route path="*" element={<Navigate to="/" replace />} />
