@@ -5,7 +5,7 @@ import LandingPage from './pages/landing/LandingPage'
 import LoginPage from './pages/auth/LoginPage'
 import RegisterPage from './pages/auth/RegisterPage'
 import AdminLayout from './layouts/AdminLayout'
-
+import AdminDashboard from './pages/admin/AdminDashboard'
 
 
 // ── Import các trang Owner ──
@@ -151,10 +151,7 @@ export default function App() {
     <AdminLayout />
   </ProtectedRoute>
 }>
-  <Route index element={<div>Admin Dashboard (placeholder — chờ FE làm UI-S08)</div>} />
-  {/* Các route con khác sẽ thêm dần khi làm xong từng trang:
-      tournaments, assignments, declare-official, approvals, users,
-      entry-fees, payouts, prediction-config, audit-log, reports, settings */}
+  <Route index element={<AdminDashboard />} />
 </Route>
 
         <Route path="/unauthorized" element={<div>403 — Không có quyền truy cập</div>} />
