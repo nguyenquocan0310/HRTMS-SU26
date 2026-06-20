@@ -1,10 +1,15 @@
-﻿using System.Security.Claims;
+﻿using HRTMS.Core.Common;
+using HRTMS.Core.DTOs.Horse;
+using HRTMS.Core.DTOs.Horse;
+using HRTMS.Core.Interfaces.Services;
 using HRTMS.Core.Interfaces.Services;
 using HRTMS.Infrastructure.Data;
+using HRTMS.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
+using System.Security.Claims;
 
 namespace HRTMS.API.Controllers;
 
@@ -16,15 +21,18 @@ public class AdminController : ControllerBase
     private readonly HRTMSDbContext _context;
     private readonly IAuditLogService _auditLogService;
     private readonly ITokenBlacklistService _tokenBlacklistService;
+    private readonly IHorseService _horseService;
 
     public AdminController(
         HRTMSDbContext context,
         IAuditLogService auditLogService,
-        ITokenBlacklistService tokenBlacklistService)
+        ITokenBlacklistService tokenBlacklistService,
+        IHorseService horseService)
     {
         _context = context;
         _auditLogService = auditLogService;
         _tokenBlacklistService = tokenBlacklistService;
+        _horseService = horseService;
     }
 
     private int CurrentAdminId =>
@@ -303,4 +311,81 @@ public class AdminController : ControllerBase
             }
         });
     }
+    // ── MODULE C: Horse Approval ──────────────────────────────────────────────
+
+    [HttpGet("horses/pending")]
+    [ProducesResponseType(typeof(ApiResponse<List<HorseResponseDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPendingHorses(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        var result = await _horseService.GetPendingHorsesAsync(page, pageSize);
+        return Ok(result);
+    }
+
+    [HttpGet("horses/{id:int}")]
+    [ProducesResponseType(typeof(ApiResponse<HorseResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetHorseAdmin(int id)
+    {
+        var result = await _horseService.GetHorseByIdAdminAsync(id);
+        if (!result.Success) return NotFound(result);
+        return Ok(result);
+    }
+
+    [HttpPatch("horses/{id:int}/approve")]
+    [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ApproveHorse(int id)
+    {
+        var result = await _horseService.ApproveHorseAsync(CurrentAdminId, id);
+        if (!result.Success) return BadRequest(result);
+        return Ok(result);
+    }
+
+    [HttpPatch("horses/{id:int}/reject")]
+    [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> RejectHorse(int id, [FromBody] AdminRejectHorseDto dto)
+    {
+        var result = await _horseService.RejectHorseAsync(CurrentAdminId, id, dto);
+        if (!result.Success) return BadRequest(result);
+        return Ok(result);
+    }
+    // ── MODULE C: Race Entry Admin ────────────────────────────────────────────
+
+    [HttpGet("entries/pending-fee")]
+    public async Task<IActionResult> GetPendingFeeEntries(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        var result = await _horseService.GetPendingFeeEntriesAsync(page, pageSize);
+        return Ok(result);
+    }
+
+    [HttpPatch("entries/{id:int}/fee-status")]
+    public async Task<IActionResult> ConfirmEntryFee(int id)
+    {
+        var result = await _horseService.ConfirmEntryFeeAsync(CurrentAdminId, id);
+        if (!result.Success) return BadRequest(result);
+        return Ok(result);
+    }
+
+    [HttpPatch("entries/{id:int}/approve")]
+    public async Task<IActionResult> ApproveRaceEntry(int id)
+    {
+        var result = await _horseService.ApproveRaceEntryAsync(CurrentAdminId, id);
+        if (!result.Success) return BadRequest(result);
+        return Ok(result);
+    }
+
+    [HttpPatch("entries/{id:int}/reject")]
+    public async Task<IActionResult> RejectRaceEntry(int id, [FromBody] AdminRejectHorseDto dto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+        var result = await _horseService.RejectRaceEntryAsync(CurrentAdminId, id, dto.Reason);
+        if (!result.Success) return BadRequest(result);
+        return Ok(result);
+    }
+
 }
