@@ -189,6 +189,7 @@ public partial class HRTMSDbContext : DbContext
             entity.Property(e => e.Name).HasMaxLength(100);
             entity.Property(e => e.Pedigree).HasMaxLength(255);
             entity.Property(e => e.RejectionReason).HasMaxLength(500);
+            entity.Property(e => e.LegalConsentAccepted).HasDefaultValue(false);
             entity.Property(e => e.Status)
                 .HasMaxLength(20)
                 .IsUnicode(false)
