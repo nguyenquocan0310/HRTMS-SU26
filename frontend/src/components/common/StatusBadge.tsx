@@ -4,6 +4,7 @@ export type StatusType =
   | 'Pending'
   | 'Approved'
   | 'Active'
+  | 'Suspended'
   | 'Rejected'
   | 'AutoRejected'
   | 'Withdrawn'
@@ -24,6 +25,7 @@ const STATUS_CONFIG: Record<StatusType, { label: string; className: string }> = 
   Pending: { label: 'Pending', className: 'statusPending' },
   Approved: { label: 'Approved', className: 'statusApproved' },
   Active: { label: 'Active', className: 'statusApproved' },
+  Suspended: { label: 'Suspended', className: 'statusRejected' },
   Rejected: { label: 'Rejected', className: 'statusRejected' },
   AutoRejected: { label: 'Auto-Rejected', className: 'statusAutoRejected' },
   Withdrawn: { label: 'Withdrawn', className: 'statusUrgent' },
