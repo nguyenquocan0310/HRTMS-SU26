@@ -21,5 +21,15 @@ namespace HRTMS.Core.Interfaces.Services
         Task<ApiResponse<HorseResponseDto>> GetHorseByIdAdminAsync(int horseId);
         Task<ApiResponse<string>> ApproveHorseAsync(int adminId, int horseId);
         Task<ApiResponse<string>> RejectHorseAsync(int adminId, int horseId, AdminRejectHorseDto dto);
+        // RaceEntry
+        Task<ApiResponse<RaceEntryResponseDto>> CreateRaceEntryAsync(int ownerId, CreateRaceEntryDto dto);
+        Task<ApiResponse<List<RaceEntryResponseDto>>> GetMyRaceEntriesAsync(int ownerId, string? status, string? feeStatus, int page, int pageSize);
+
+        // Admin - RaceEntry
+        Task<ApiResponse<List<RaceEntryResponseDto>>> GetPendingFeeEntriesAsync(int page, int pageSize);
+        Task<ApiResponse<string>> ConfirmEntryFeeAsync(int adminId, int raceEntryId);
+        Task<ApiResponse<string>> ApproveRaceEntryAsync(int adminId, int raceEntryId);
+        Task<ApiResponse<string>> RejectRaceEntryAsync(int adminId, int raceEntryId, string reason);
+
     }
 }

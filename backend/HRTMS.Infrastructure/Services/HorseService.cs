@@ -326,4 +326,219 @@ public class HorseService : IHorseService
         CreatedAt = h.CreatedAt,
         UpdatedAt = h.UpdatedAt
     };
+    // ── RACE ENTRY ────────────────────────────────────────────────────────────
+
+    public async Task<ApiResponse<RaceEntryResponseDto>> CreateRaceEntryAsync(int ownerId, CreateRaceEntryDto dto)
+    {
+        var pairing = await _context.Pairings
+            .Include(p => p.Horse)
+            .Include(p => p.Jockey).ThenInclude(j => j.Jockey)
+            .FirstOrDefaultAsync(p => p.PairingId == dto.PairingId);
+
+        if (pairing == null)
+            return ApiResponse<RaceEntryResponseDto>.Fail("PAIRING_NOT_FOUND");
+        if (pairing.Horse.OwnerId != ownerId)
+            return ApiResponse<RaceEntryResponseDto>.Fail("PAIRING_NOT_OWNED");
+        if (pairing.Status != "Accepted")
+            return ApiResponse<RaceEntryResponseDto>.Fail("PAIRING_NOT_ACCEPTED");
+        if (pairing.Horse.AdminApprovalStatus != "Approved")
+            return ApiResponse<RaceEntryResponseDto>.Fail("HORSE_NOT_APPROVED");
+
+        var race = await _context.Races
+            .Include(r => r.Round).ThenInclude(r => r.Tournament)
+            .FirstOrDefaultAsync(r => r.RaceId == dto.RaceId);
+
+        if (race == null)
+            return ApiResponse<RaceEntryResponseDto>.Fail("RACE_NOT_FOUND");
+
+        var tournament = race.Round.Tournament;
+
+        int currentEntries = await _context.RaceEntries
+            .CountAsync(e => e.RaceId == dto.RaceId
+                          && e.Status != "Cancelled"
+                          && e.Status != "Disqualified");
+        if (currentEntries >= tournament.MaxHorses)
+            return ApiResponse<RaceEntryResponseDto>.Fail("RACE_FULL");
+
+        bool horseInRace = await _context.RaceEntries
+            .Include(e => e.Pairing)
+            .AnyAsync(e => e.RaceId == dto.RaceId
+                        && e.Pairing.HorseId == pairing.HorseId
+                        && e.Status != "Cancelled"
+                        && e.Status != "Disqualified");
+        if (horseInRace)
+            return ApiResponse<RaceEntryResponseDto>.Fail("DUPLICATE_HORSE_IN_RACE");
+
+        bool jockeyInRace = await _context.RaceEntries
+            .Include(e => e.Pairing)
+            .AnyAsync(e => e.RaceId == dto.RaceId
+                        && e.Pairing.JockeyId == pairing.JockeyId
+                        && e.Status != "Cancelled"
+                        && e.Status != "Disqualified");
+        if (jockeyInRace)
+            return ApiResponse<RaceEntryResponseDto>.Fail("DUPLICATE_JOCKEY_IN_RACE");
+
+        string feeStatus = tournament.EntryFeeAmount == 0 ? "Paid" : "Unpaid";
+
+        var entry = new RaceEntry
+        {
+            RaceId = dto.RaceId,
+            PairingId = dto.PairingId,
+            Status = "Pending",
+            EntryFeeStatus = feeStatus,
+            IsWithdrawn = false,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.RaceEntries.Add(entry);
+        await _context.SaveChangesAsync();
+
+        return ApiResponse<RaceEntryResponseDto>.Ok(
+            await MapToRaceEntryDtoAsync(entry.RaceEntryId, tournament.EntryFeeAmount),
+            "Đăng ký tham gia cuộc đua thành công.");
+    }
+
+    public async Task<ApiResponse<List<RaceEntryResponseDto>>> GetMyRaceEntriesAsync(
+        int ownerId, string? status, string? feeStatus, int page, int pageSize)
+    {
+        var query = _context.RaceEntries
+            .Include(e => e.Pairing).ThenInclude(p => p.Horse)
+            .Include(e => e.Pairing).ThenInclude(p => p.Jockey).ThenInclude(j => j.Jockey)
+            .Include(e => e.Race).ThenInclude(r => r.Round).ThenInclude(r => r.Tournament)
+            .Where(e => e.Pairing.Horse.OwnerId == ownerId);
+
+        if (!string.IsNullOrEmpty(status))
+            query = query.Where(e => e.Status == status);
+        if (!string.IsNullOrEmpty(feeStatus))
+            query = query.Where(e => e.EntryFeeStatus == feeStatus);
+
+        var entries = await query
+            .OrderByDescending(e => e.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        var result = entries.Select(e => MapToRaceEntryDto(e)).ToList();
+        return ApiResponse<List<RaceEntryResponseDto>>.Ok(result);
+    }
+
+    public async Task<ApiResponse<List<RaceEntryResponseDto>>> GetPendingFeeEntriesAsync(int page, int pageSize)
+    {
+        var entries = await _context.RaceEntries
+            .Include(e => e.Pairing).ThenInclude(p => p.Horse)
+            .Include(e => e.Pairing).ThenInclude(p => p.Jockey).ThenInclude(j => j.Jockey)
+            .Include(e => e.Race).ThenInclude(r => r.Round).ThenInclude(r => r.Tournament)
+            .Where(e => e.EntryFeeStatus == "Unpaid")
+            .OrderByDescending(e => e.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return ApiResponse<List<RaceEntryResponseDto>>.Ok(entries.Select(MapToRaceEntryDto).ToList());
+    }
+
+    public async Task<ApiResponse<string>> ConfirmEntryFeeAsync(int adminId, int raceEntryId)
+    {
+        var entry = await _context.RaceEntries.FindAsync(raceEntryId);
+        if (entry == null) return ApiResponse<string>.Fail("RACE_ENTRY_NOT_FOUND");
+        if (entry.EntryFeeStatus == "Paid") return ApiResponse<string>.Fail("FEE_ALREADY_CONFIRMED");
+
+        entry.EntryFeeStatus = "Paid";
+        entry.EntryFeeConfirmedBy = adminId;
+        entry.EntryFeeConfirmedAt = DateTime.UtcNow;
+        entry.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        await _auditLog.LogAsync(adminId, "Confirm_Entry_Fee", "RaceEntry",
+            raceEntryId.ToString(), "Unpaid", "Paid", null);
+
+        return ApiResponse<string>.Ok("Lệ phí đã được xác nhận.");
+    }
+
+    public async Task<ApiResponse<string>> ApproveRaceEntryAsync(int adminId, int raceEntryId)
+    {
+        var entry = await _context.RaceEntries
+            .Include(e => e.Pairing).ThenInclude(p => p.Horse)
+            .Include(e => e.Race).ThenInclude(r => r.Round).ThenInclude(r => r.Tournament)
+            .FirstOrDefaultAsync(e => e.RaceEntryId == raceEntryId);
+
+        if (entry == null) return ApiResponse<string>.Fail("RACE_ENTRY_NOT_FOUND");
+        if (entry.EntryFeeStatus != "Paid") return ApiResponse<string>.Fail("ENTRY_FEE_NOT_PAID");
+        if (entry.Pairing.Horse.AdminApprovalStatus != "Approved")
+            return ApiResponse<string>.Fail("HORSE_NOT_APPROVED");
+        if (entry.Status == "Confirmed") return ApiResponse<string>.Fail("ENTRY_ALREADY_CONFIRMED");
+
+        // Breed check — có Tournament context tại đây
+        string allowedBreed = entry.Race.Round.Tournament.AllowedBreed;
+        if (entry.Pairing.Horse.Breed != allowedBreed)
+            return ApiResponse<string>.Fail($"AUTO_REJECTED_BREED: yêu cầu '{allowedBreed}', ngựa có '{entry.Pairing.Horse.Breed}'.");
+
+        entry.Status = "Confirmed";
+        entry.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        await _auditLog.LogAsync(adminId, "Approve_RaceEntry", "RaceEntry",
+            raceEntryId.ToString(), "Pending", "Confirmed", null);
+
+        return ApiResponse<string>.Ok("Đăng ký tham gia cuộc đua đã được xác nhận.");
+    }
+
+    public async Task<ApiResponse<string>> RejectRaceEntryAsync(int adminId, int raceEntryId, string reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason) || reason.Trim().Length < 10)
+            return ApiResponse<string>.Fail("Lý do từ chối phải có ít nhất 10 ký tự.");
+
+        var entry = await _context.RaceEntries.FindAsync(raceEntryId);
+        if (entry == null) return ApiResponse<string>.Fail("RACE_ENTRY_NOT_FOUND");
+        if (entry.Status == "Rejected") return ApiResponse<string>.Fail("ALREADY_REJECTED");
+
+        string oldStatus = entry.Status;
+        entry.Status = "Rejected";
+        entry.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        await _auditLog.LogAsync(adminId, "Reject_RaceEntry", "RaceEntry",
+            raceEntryId.ToString(), oldStatus, $"Rejected: {reason}", null);
+
+        return ApiResponse<string>.Ok("Đã từ chối đăng ký.");
+    }
+
+    // Helpers
+    private static RaceEntryResponseDto MapToRaceEntryDto(RaceEntry e) => new()
+    {
+        RaceEntryId = e.RaceEntryId,
+        Status = e.Status,
+        EntryFeeStatus = e.EntryFeeStatus,
+        EntryFeeAmount = e.Race.Round.Tournament.EntryFeeAmount,
+        CreatedAt = e.CreatedAt,
+        Race = new RaceEntryRaceDto
+        {
+            RaceId = e.Race.RaceId,
+            RaceNumber = e.Race.RaceNumber,
+            ScheduledTime = e.Race.ScheduledTime,
+            TournamentName = e.Race.Round.Tournament.Name
+        },
+        Horse = new RaceEntryHorseDto
+        {
+            HorseId = e.Pairing.Horse.HorseId,
+            Name = e.Pairing.Horse.Name
+        },
+        Jockey = new RaceEntryJockeyDto
+        {
+            JockeyId = e.Pairing.Jockey.JockeyId,
+            FullName = e.Pairing.Jockey.Jockey.FullName
+        }
+    };
+
+    private async Task<RaceEntryResponseDto> MapToRaceEntryDtoAsync(int raceEntryId, decimal feeAmount)
+    {
+        var e = await _context.RaceEntries
+            .Include(e => e.Pairing).ThenInclude(p => p.Horse)
+            .Include(e => e.Pairing).ThenInclude(p => p.Jockey).ThenInclude(j => j.Jockey)
+            .Include(e => e.Race).ThenInclude(r => r.Round).ThenInclude(r => r.Tournament)
+            .FirstAsync(e => e.RaceEntryId == raceEntryId);
+        return MapToRaceEntryDto(e);
+    }
+
 }

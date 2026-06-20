@@ -12,6 +12,9 @@ using System.Threading.Tasks;
 
 namespace HRTMS.API.Controllers
 {
+
+    [ApiController]
+    [Route("api/horses")]
     public class HorseController : ControllerBase
     {
         private readonly IHorseService _horseService;
