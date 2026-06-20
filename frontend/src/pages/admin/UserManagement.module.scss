@@ -1,0 +1,225 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+// ─── Header ───────────────────────────────────────────────────────────────
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.heading {
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: #fff;
+  margin: 0;
+}
+
+.filters {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.searchWrap {
+  position: relative;
+  flex: 1;
+  min-width: 220px;
+  max-width: 360px;
+  display: flex;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  color: #666;
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  background: #15151A;
+  border: 1px solid #2a2a30;
+  border-radius: 8px;
+  padding: 0.55rem 0.75rem 0.55rem 2.2rem;
+  color: #fff;
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.2s;
+
+  &::placeholder {
+    color: #555;
+  }
+
+  &:focus {
+    border-color: #B5121B;
+    box-shadow: 0 0 0 3px rgba(181, 18, 27, 0.15);
+  }
+}
+
+.filterSelect {
+  background: #15151A;
+  border: 1px solid #2a2a30;
+  border-radius: 8px;
+  padding: 0.55rem 0.85rem;
+  color: #ccc;
+  font-size: 0.85rem;
+  outline: none;
+  cursor: pointer;
+  min-width: 150px;
+  transition: border-color 0.2s;
+
+  option {
+    background: #15151A;
+    color: #fff;
+  }
+
+  &:focus {
+    border-color: #B5121B;
+  }
+}
+
+// ─── Table cells ──────────────────────────────────────────────────────────
+
+.usernameCell {
+  font-weight: 600;
+  color: #fff;
+}
+
+.emailCell {
+  color: #999;
+  font-size: 0.82rem;
+}
+
+.roleBadge {
+  display: inline-block;
+  padding: 0.22rem 0.65rem;
+  border-radius: 6px;
+  background: #1d1d23;
+  border: 1px solid #2a2a30;
+  color: #ccc;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.actionCell {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.suspendBtn {
+  background: transparent;
+  border: 1px solid #e74c3c;
+  color: #e74c3c;
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+
+  &:hover {
+    background: rgba(231, 76, 60, 0.1);
+  }
+}
+
+.activateBtn {
+  background: transparent;
+  border: 1px solid #2ecc71;
+  color: #2ecc71;
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+
+  &:hover {
+    background: rgba(46, 204, 113, 0.1);
+  }
+}
+
+.detailBtn {
+  background: transparent;
+  border: 1px solid #2a2a30;
+  color: #ccc;
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+
+  &:hover {
+    border-color: #B5121B;
+    color: #F3C8C3;
+  }
+}
+
+// ─── Pagination ───────────────────────────────────────────────────────────
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.pageInfo {
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.pageBtns {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.pageBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: #15151A;
+  border: 1px solid #2a2a30;
+  color: #ccc;
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover:not(:disabled) {
+    border-color: #B5121B;
+    color: #F3C8C3;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+// ─── Responsive ───────────────────────────────────────────────────────────
+
+@media (max-width: 768px) {
+  .filters {
+    flex-direction: column;
+  }
+
+  .searchWrap,
+  .filterSelect {
+    max-width: 100%;
+    width: 100%;
+  }
+}

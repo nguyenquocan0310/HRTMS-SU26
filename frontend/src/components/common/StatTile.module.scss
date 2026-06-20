@@ -1,0 +1,85 @@
+.tileLink {
+  text-decoration: none;
+  display: block;
+}
+
+.tile {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: #15151A;
+  border: 1px solid #232328;
+  border-radius: 14px;
+  padding: 1.25rem 1.5rem;
+  transition: all 0.25s ease;
+  cursor: default;
+}
+
+.tileLink .tile {
+  cursor: pointer;
+
+  &:hover {
+    border-color: #B5121B;
+    transform: translateY(-3px);
+    box-shadow: 0 10px 28px rgba(181, 18, 27, 0.18);
+  }
+}
+
+.iconWrap {
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  border-radius: 12px;
+  background: rgba(181, 18, 27, 0.12);
+  color: #F3C8C3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+}
+
+.textWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.value {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.1;
+}
+
+.label {
+  font-size: 0.78rem;
+  color: #888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+// ─── Urgent variant ───────────────────────────────────────────────────────
+
+.urgent {
+  background: linear-gradient(135deg, #2a0d10, #1a0709);
+  border-color: #B5121B;
+
+  .iconWrap {
+    background: rgba(181, 18, 27, 0.3);
+    color: #ff6b6b;
+  }
+
+  .value {
+    color: #ff8585;
+  }
+
+  .label {
+    color: #d89999;
+  }
+}
+
+.tileLink .urgent:hover {
+  box-shadow: 0 10px 28px rgba(181, 18, 27, 0.35);
+}

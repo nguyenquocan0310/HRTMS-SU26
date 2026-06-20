@@ -1,0 +1,150 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 0.5rem 0;
+}
+
+.raceSelectWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-width: 420px;
+}
+
+.raceSelectLabel {
+  font-size: 0.8rem;
+  color: #ccc;
+  font-weight: 500;
+}
+
+.raceSelect {
+  background: #15151A;
+  border: 1px solid #2a2a30;
+  border-radius: 8px;
+  padding: 0.65rem 0.85rem;
+  color: #fff;
+  font-size: 0.88rem;
+  outline: none;
+  cursor: pointer;
+
+  option {
+    background: #15151A;
+  }
+
+  &:focus {
+    border-color: #B5121B;
+  }
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.drawnBadge {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(46, 204, 113, 0.12);
+  color: #2ecc71;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+}
+
+.notDrawnBadge {
+  background: rgba(216, 180, 90, 0.12);
+  color: #D8B45A;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+}
+
+.randomizeBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: linear-gradient(135deg, #B5121B, #8b0d13);
+  border: none;
+  color: #fff;
+  padding: 0.6rem 1.1rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(181, 18, 27, 0.35);
+  }
+
+  &:disabled {
+    background: #2a2a30;
+    color: #666;
+    cursor: not-allowed;
+  }
+}
+
+.entriesTable {
+  background: #15151A;
+  border: 1px solid #232328;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.entriesHeader {
+  display: grid;
+  grid-template-columns: 1fr 140px;
+  padding: 0.75rem 1.1rem;
+  background: #1a1a1f;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #888;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.entryRow {
+  display: grid;
+  grid-template-columns: 1fr 140px;
+  padding: 0.8rem 1.1rem;
+  border-bottom: 1px solid #1e1e22;
+  align-items: center;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.horseName {
+  font-size: 0.85rem;
+  color: #fff;
+  font-weight: 600;
+}
+
+.postPosition {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.postPositionAssigned {
+  color: #D8B45A;
+  font-weight: 700;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 2.5rem 1.5rem;
+  color: #666;
+  font-size: 0.85rem;
+  background: #15151A;
+  border: 1px solid #232328;
+  border-radius: 12px;
+}
