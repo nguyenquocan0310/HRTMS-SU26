@@ -1,0 +1,45 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.7rem;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+// ─── Pending — vàng/cam ───────────────────────────────────────────────────
+.statusPending {
+  background: rgba(216, 180, 90, 0.15);
+  color: #D8B45A;
+  border: 1px solid rgba(216, 180, 90, 0.35);
+}
+
+// ─── Approved / Active — xanh lá ──────────────────────────────────────────
+.statusApproved {
+  background: rgba(46, 204, 113, 0.15);
+  color: #2ecc71;
+  border: 1px solid rgba(46, 204, 113, 0.35);
+}
+
+// ─── Rejected — đỏ ────────────────────────────────────────────────────────
+.statusRejected {
+  background: rgba(231, 76, 60, 0.15);
+  color: #e74c3c;
+  border: 1px solid rgba(231, 76, 60, 0.35);
+}
+
+// ─── Auto-Rejected — xám (hệ thống tự loại, không phải Admin quyết định) ──
+.statusAutoRejected {
+  background: rgba(150, 150, 150, 0.12);
+  color: #999;
+  border: 1px solid rgba(150, 150, 150, 0.3);
+}
+
+// ─── Withdrawn / Disqualified — đỏ đậm cảnh báo nghiêm trọng ─────────────
+.statusUrgent {
+  background: rgba(181, 18, 27, 0.25);
+  color: #ff6b6b;
+  border: 1px solid rgba(181, 18, 27, 0.5);
+}
