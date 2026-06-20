@@ -32,6 +32,11 @@ public class HorseService : IHorseService
         if (!dto.LegalConsentAccepted)
             return ApiResponse<HorseResponseDto>.Fail("Bạn phải đồng ý cam kết pháp lý trước khi gửi hồ sơ.");
 
+        // FK check: OwnerProfile phải tồn tại
+        var ownerExists = await _context.OwnerProfiles.AnyAsync(o => o.OwnerId == ownerId);
+        if (!ownerExists)
+            return ApiResponse<HorseResponseDto>.Fail("Không tìm thấy hồ sơ chủ ngựa. Vui lòng hoàn thiện hồ sơ trước.");
+
         // Validate BirthYear không ở tương lai
         if (dto.BirthYear > DateTime.UtcNow.Year)
             return ApiResponse<HorseResponseDto>.Fail("Năm sinh không được ở tương lai.");
