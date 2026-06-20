@@ -37,6 +37,8 @@ public partial class Horse
 
     public string? RejectionReason { get; set; }
 
+    public bool LegalConsentAccepted { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
