@@ -82,6 +82,7 @@ const RegisterPage = () => {
         return (
           <StepFinalize
             role={formData.role}
+            formData={formData}
           />
         );
       default:
