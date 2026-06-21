@@ -20,7 +20,7 @@ public class SchedulingController : ControllerBase
     }
 
     // SCH.1 — Admin phan bo Pairing vao Race.
-    [HttpPost("races/{raceId:int}/entries")]
+    [HttpPost("admin/races/{raceId:int}/entries")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Allocate(int raceId, [FromBody] AllocateEntryDto dto)
     {
@@ -30,7 +30,8 @@ public class SchedulingController : ControllerBase
         try
         {
             var result = await _service.AllocateAsync(adminId, raceId, dto);
-            return CreatedAtAction(nameof(GetSchedule), new { raceId }, result);
+            // Lich cong khai xem qua GET /api/races/{raceId}/entries (TournamentController - Module B).
+            return Created($"/api/races/{raceId}/entries", result);
         }
         catch (KeyNotFoundException ex) when (ex.Message == "RACE_NOT_FOUND")
         {
