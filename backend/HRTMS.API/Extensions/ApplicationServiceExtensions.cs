@@ -22,7 +22,7 @@ public static class ApplicationServiceExtensions
         services.AddScoped<IRaceEntryService, RaceEntryService>();
         services.AddScoped<IRefereeAssignmentService, RefereeAssignmentService>();
         services.AddScoped<IPursePayoutService, PursePayoutService>();
-
+        services.AddScoped<IProfileService, ProfileService>();
         services.AddScoped<IPredictionService, PredictionService>();
         services.AddScoped<IReconciliationService, ReconciliationService>();
         return services;
