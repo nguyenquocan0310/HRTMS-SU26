@@ -76,7 +76,7 @@ public class SchedulingController : ControllerBase
     }
 
     // SCH.2 — Admin boc tham vi tri xuat phat (nguyen tu).
-    [HttpPost("races/{raceId:int}/draw")]
+    [HttpPost("admin/races/{raceId:int}/draw")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Draw(int raceId)
     {
