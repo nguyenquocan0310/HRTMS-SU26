@@ -92,4 +92,19 @@ public partial class RaceEntry
 
     // Navigation den Doctor da kiem tra suc khoe
     public virtual DoctorProfile? ClinicalCheckedByDoctor { get; set; }
+    // Ket qua kiem tra tinh doc lap cua Jockey voi Owner doi thu
+    // Gia tri: Passed hoac Failed
+    public string? IndependenceCheckStatus { get; set; }
+
+    // Referee thuc hien kiem tra
+    public int? IndependenceCheckedByRefereeId { get; set; }
+
+    // Thoi gian kiem tra
+    public DateTime? IndependenceCheckedAt { get; set; }
+
+    // Ly do vi pham neu Failed
+    public string? IndependenceViolationReason { get; set; }
+
+    // Navigation den Referee da kiem tra
+    public virtual RefereeProfile? IndependenceCheckedByReferee { get; set; }
 }
