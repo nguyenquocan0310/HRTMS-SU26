@@ -24,6 +24,7 @@ public static class ApplicationServiceExtensions
         services.AddScoped<IPursePayoutService, PursePayoutService>();
 
         services.AddScoped<IPredictionService, PredictionService>();
+        services.AddScoped<IReconciliationService, ReconciliationService>();
         return services;
     }
 }
