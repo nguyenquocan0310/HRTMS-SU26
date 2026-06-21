@@ -8,10 +8,13 @@ namespace HRTMS.Infrastructure.Services;
 public class IndependenceCheckService : IIndependenceCheckService
 {
     private readonly HRTMSDbContext _context;
-
-    public IndependenceCheckService(HRTMSDbContext context)
+    private readonly IEmergencyDisqualificationService _emergencyDisqualificationService;
+    public IndependenceCheckService(
+        HRTMSDbContext context,
+        IEmergencyDisqualificationService emergencyDisqualificationService)
     {
         _context = context;
+        _emergencyDisqualificationService = emergencyDisqualificationService;
     }
 
     public async Task<IndependenceCheckResultDto> CheckJockeyIndependenceAsync(
@@ -138,7 +141,7 @@ public class IndependenceCheckService : IIndependenceCheckService
             // MED.6: Vi pham se kich hoat Emergency DQ
             // Ban hien tai xu ly DQ toi thieu: cap nhat RaceEntry thanh Disqualified
             // Phan ACID refund + notification + audit se lam o MED.7
-            raceEntry.Status = "Disqualified";
+            
         }
         else
         {
@@ -147,6 +150,16 @@ public class IndependenceCheckService : IIndependenceCheckService
         }
 
         await _context.SaveChangesAsync();
+
+        if (isFailed)
+        {
+            await _emergencyDisqualificationService.DisqualifyAsync(
+                refereeId,
+                raceEntry.RaceEntryId,
+                raceEntry.IndependenceViolationReason
+                    ?? "Jockey has direct family relationship with an opposing owner.",
+                "MED.6_INDEPENDENCE_CHECK");
+        }
 
         return new IndependenceCheckResultDto
         {

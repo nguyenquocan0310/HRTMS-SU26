@@ -8,10 +8,14 @@ namespace HRTMS.Infrastructure.Services;
 public class MedicalCheckService : IMedicalCheckService
 {
     private readonly HRTMSDbContext _context;
+    private readonly IEmergencyDisqualificationService _emergencyDisqualificationService;
 
-    public MedicalCheckService(HRTMSDbContext context)
+    public MedicalCheckService(
+        HRTMSDbContext context,
+        IEmergencyDisqualificationService emergencyDisqualificationService)
     {
         _context = context;
+        _emergencyDisqualificationService = emergencyDisqualificationService;
     }
 
     public async Task<PreRaceWeightResultDto> RecordPreRaceWeightAsync(
@@ -187,12 +191,16 @@ public class MedicalCheckService : IMedicalCheckService
         // MED.4: Mismatch se kich hoat Emergency DQ
         // Ban hien tai xu ly DQ toi thieu: cap nhat RaceEntry thanh Disqualified
         // Phan ACID refund + 3 notification + audit se lam o MED.7
+        await _context.SaveChangesAsync();
+
         if (isMismatch)
         {
-            raceEntry.Status = "Disqualified";
+            await _emergencyDisqualificationService.DisqualifyAsync(
+                doctorId,
+                raceEntry.RaceEntryId,
+                "Horse identity mismatch at paddock.",
+                "MED.4_HORSE_IDENTITY_CHECK");
         }
-
-        await _context.SaveChangesAsync();
 
         return new HorseIdentityResultDto
         {
@@ -299,9 +307,15 @@ public class MedicalCheckService : IMedicalCheckService
         // MED.5: Unfit se kich hoat Emergency DQ
         // Ban hien tai xu ly DQ toi thieu: cap nhat RaceEntry thanh Disqualified
         // Phan ACID refund + notification + audit se lam o MED.7
+        await _context.SaveChangesAsync();
+
         if (isUnfit)
         {
-            raceEntry.Status = "Disqualified";
+            await _emergencyDisqualificationService.DisqualifyAsync(
+                doctorId,
+                raceEntry.RaceEntryId,
+                raceEntry.UnfitReason ?? "Horse is unfit for racing.",
+                "MED.5_CLINICAL_CHECK");
         }
 
         await _context.SaveChangesAsync();
