@@ -1,19 +1,56 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RegRole } from '../../../types/role.types';
+import type { RegisterFormData } from '../../../types/auth.types';
+import type { Role } from '../../../types';
+import * as authService from '../../../services/authService';
 import styles from './StepFinalize.module.scss';
 
 interface Props {
   role: RegRole | null;
+  formData: RegisterFormData;
 }
 
-const StepFinalize = ({ role }: Props) => {
+// RegRole (enum dùng cho UI luồng Register) khớp giá trị với Role (type dùng
+// cho authService/User toàn hệ thống) — map tường minh để tránh nhầm lẫn.
+const mapRegRoleToRole = (role: RegRole): Role => role as unknown as Role;
+
+const StepFinalize = ({ role, formData }: Props) => {
   const navigate = useNavigate();
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [resultMessage, setResultMessage] = useState('');
 
-  const handleSubmit = () => {
-    // TODO: Gọi API thật ở đây (Điều 6)
-    setSubmitted(true);
+  const handleSubmit = async () => {
+    if (!role) return;
+
+    setIsSubmitting(true);
+    setErrorMsg('');
+
+    try {
+      // Gom verification data theo role để gửi kèm (BE thật sẽ dùng các field này)
+      let verificationData: Record<string, unknown> = {};
+      if (role === RegRole.Owner) verificationData = formData.ownerVerification;
+      if (role === RegRole.Jockey) verificationData = formData.jockeyVerification;
+      if (role === RegRole.Referee) verificationData = formData.refereeVerification;
+      if (role === RegRole.Doctor) verificationData = formData.doctorVerification;
+
+      const result = await authService.register({
+        role: mapRegRoleToRole(role),
+        username: formData.identity.username,
+        email: formData.identity.email,
+        password: formData.credentials.password,
+        verificationData,
+      });
+
+      setResultMessage(result.message);
+      setSubmitted(true);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Đăng ký thất bại. Vui lòng thử lại.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // ─── Sau khi submit ───────────────────────────────────────────────────────
@@ -28,20 +65,12 @@ const StepFinalize = ({ role }: Props) => {
           {isSpectator ? (
             <>
               <h2 className={styles.successTitle}>Đăng ký thành công!</h2>
-              <p className={styles.successMsg}>
-                Tài khoản đã được tạo. Bạn đã nhận{' '}
-                <span className={styles.highlight}>1000 điểm</span> vào Wallet.
-                Hãy đăng nhập ngay.
-              </p>
+              <p className={styles.successMsg}>{resultMessage}</p>
             </>
           ) : (
             <>
               <h2 className={styles.successTitle}>Hồ sơ đã được gửi!</h2>
-              <p className={styles.successMsg}>
-                Hồ sơ của bạn đã được gửi và đang chờ{' '}
-                <span className={styles.highlight}>Admin xác nhận</span>.
-                Bạn sẽ nhận được thông báo qua email.
-              </p>
+              <p className={styles.successMsg}>{resultMessage}</p>
             </>
           )}
 
@@ -72,8 +101,14 @@ const StepFinalize = ({ role }: Props) => {
         </p>
       </div>
 
-      <button className={styles.submitBtn} onClick={handleSubmit}>
-        Hoàn tất đăng ký
+      {errorMsg && <div className={styles.errorMsg}>{errorMsg}</div>}
+
+      <button
+        className={styles.submitBtn}
+        onClick={handleSubmit}
+        disabled={isSubmitting}
+      >
+        {isSubmitting ? 'Đang xử lý...' : 'Hoàn tất đăng ký'}
       </button>
     </div>
   );
