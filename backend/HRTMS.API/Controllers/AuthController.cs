@@ -11,10 +11,12 @@ namespace HRTMS.API.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IProfileService _profileService;
 
-    public AuthController(IAuthService authService)
+    public AuthController(IAuthService authService, IProfileService profileService)
     {
         _authService = authService;
+        _profileService = profileService;
     }
 
     [HttpPost("register")]
@@ -24,7 +26,6 @@ public class AuthController : ControllerBase
         var result = await _authService.RegisterAsync(dto, ip);
         if (!result.Success)
         {
-            // trùng email/username → 409, lỗi validation → 400
             var isConflict = result.Message?.Contains("tồn tại") == true;
             return isConflict ? Conflict(result) : BadRequest(result);
         }
@@ -57,5 +58,14 @@ public class AuthController : ControllerBase
         var username = User.FindFirstValue(ClaimTypes.Name);
         var role = User.FindFirstValue(ClaimTypes.Role);
         return Ok(new { userId, username, role });
+    }
+
+    [HttpGet("profile")]
+    [Authorize]
+    public async Task<IActionResult> GetProfile()
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var result = await _profileService.GetProfileAsync(userId);
+        return result.Success ? Ok(result) : NotFound(result);
     }
 }
