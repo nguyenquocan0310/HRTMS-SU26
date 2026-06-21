@@ -497,6 +497,17 @@ public partial class HRTMSDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(d => d.ClinicalCheckedByDoctorId)
                 .HasConstraintName("FK_RaceEntries_ClinicalDoctor");
+            entity.Property(e => e.IndependenceCheckStatus)
+                .HasMaxLength(20)
+                .IsUnicode(false);
+
+            entity.Property(e => e.IndependenceViolationReason)
+                .HasMaxLength(500);
+
+            entity.HasOne(d => d.IndependenceCheckedByReferee)
+                .WithMany()
+                .HasForeignKey(d => d.IndependenceCheckedByRefereeId)
+                .HasConstraintName("FK_RaceEntries_IndependenceReferee");
         });
 
         modelBuilder.Entity<RaceReport>(entity =>
