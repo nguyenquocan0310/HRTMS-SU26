@@ -502,5 +502,79 @@ namespace HRTMS.Infrastructure.Services
                 ProtestDeadlineMinutes = race.ProtestDeadlineMinutes,
             };
         }
+
+        // SCH.9/EC-48 — cap nhat cau hinh Race, dong bang truong nhay cam sau cam ket.
+        public async Task<RaceResponseDto> UpdateRaceAsync(int raceId, UpdateRaceDto dto)
+        {
+            var race = await _context.Races
+                .Include(r => r.Round).ThenInclude(rd => rd.Tournament)
+                .FirstOrDefaultAsync(r => r.RaceId == raceId)
+                ?? throw new KeyNotFoundException($"Không tìm thấy Race #{raceId}");
+
+            var tournament = race.Round.Tournament;
+
+            // EC-48 — dong bang khi da boc tham HOAC da co Prediction.
+            var hasPrediction = await _context.Predictions.AnyAsync(p => p.RaceId == raceId);
+            var isFrozen = race.IsPostPositionDrawn || hasPrediction;
+
+            // Cac truong nhay cam khong duoc sua khi da dong bang.
+            var sensitiveChanged =
+                race.ScheduledTime != dto.ScheduledTime ||
+                race.RaceDistanceOverride != dto.RaceDistanceOverride ||
+                race.TrackTypeOverride != dto.TrackTypeOverride;
+
+            if (isFrozen && sensitiveChanged)
+                throw new InvalidOperationException("RACE_CONFIG_FROZEN");
+
+            // EC-35 — validate cua so thoi gian (chi khi ScheduledTime thay doi).
+            if (race.ScheduledTime != dto.ScheduledTime)
+            {
+                if (dto.ScheduledTime <= DateTime.UtcNow)
+                    throw new ArgumentException("ScheduledTime phải ở tương lai");
+
+                if (dto.ScheduledTime < tournament.StartDate || dto.ScheduledTime > tournament.EndDate)
+                    throw new ArgumentException(
+                        $"ScheduledTime phải nằm trong cửa sổ giải [{tournament.StartDate:d}, {tournament.EndDate:d}]");
+
+                if (dto.ScheduledTime < race.Round.ScheduledDate)
+                    throw new ArgumentException("ScheduledTime không được sớm hơn ngày của Round");
+            }
+
+            // TRN.7 — tong PurseAmount khong vuot quy giai (tru chinh race nay).
+            if (race.PurseAmount != dto.PurseAmount)
+            {
+                var otherPurseTotal = await _context.Races
+                    .Where(r => r.Round.TournamentId == tournament.TournamentId && r.RaceId != raceId)
+                    .SumAsync(r => r.PurseAmount);
+
+                if (otherPurseTotal + dto.PurseAmount > tournament.PurseAmount)
+                    throw new ArgumentException(
+                        $"Tổng quỹ Race ({otherPurseTotal + dto.PurseAmount}) vượt quỹ giải ({tournament.PurseAmount})");
+            }
+
+            race.ScheduledTime = dto.ScheduledTime;
+            race.PurseAmount = dto.PurseAmount;
+            race.TrackTypeOverride = dto.TrackTypeOverride;
+            race.RaceDistanceOverride = dto.RaceDistanceOverride;
+            race.ConfirmationCutoffHours = dto.ConfirmationCutoffHours;
+            race.ProtestDeadlineMinutes = dto.ProtestDeadlineMinutes;
+            race.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            return new RaceResponseDto
+            {
+                RaceId = race.RaceId,
+                RoundId = race.RoundId,
+                RaceNumber = race.RaceNumber,
+                ScheduledTime = race.ScheduledTime,
+                PurseAmount = race.PurseAmount,
+                TrackTypeOverride = race.TrackTypeOverride,
+                RaceDistanceOverride = race.RaceDistanceOverride,
+                Status = race.Status,
+                ConfirmationCutoffHours = race.ConfirmationCutoffHours,
+                ProtestDeadlineMinutes = race.ProtestDeadlineMinutes,
+            };
+        }
     }
 }
