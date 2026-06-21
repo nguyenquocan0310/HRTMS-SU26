@@ -98,6 +98,16 @@ public class RefereeAssignmentController : ControllerBase
                 message = "This referee has a conflict of interest with an owner in this race."
             });
         }
+        catch (InvalidOperationException ex)
+            when (ex.Message == "REFEREE_DOUBLE_BOOKED")
+        {
+            // Referee da duoc phan cong vao Race khac cung gio
+            return Conflict(new
+            {
+                error = "REFEREE_DOUBLE_BOOKED",
+                message = "This referee is already assigned to another race at the same time."
+            });
+        }
     }
 
     [HttpGet]
