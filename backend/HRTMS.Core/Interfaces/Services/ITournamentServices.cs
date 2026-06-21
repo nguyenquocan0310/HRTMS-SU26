@@ -27,6 +27,9 @@ namespace HRTMS.Core.Interfaces.Services
 
         // ROUND & RACE (TRN.6)
         Task<RoundResponseDto> CreateRoundAsync(int tournamentId, CreateRoundDto dto);
-        Task<RaceResponseDto> CreateRaceAsync(int roundId, CreateRaceDto dto); 
+        Task<RaceResponseDto> CreateRaceAsync(int roundId, CreateRaceDto dto);
+
+        // SCH.9/EC-48 — cap nhat Race; dong bang truong nhay cam sau boc tham / co Prediction
+        Task<RaceResponseDto> UpdateRaceAsync(int raceId, UpdateRaceDto dto);
     }
 }

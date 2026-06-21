@@ -184,6 +184,7 @@ namespace HRTMS.API.Controllers
                 return BadRequest(ApiResponse<RaceResponseDto>.Fail(ex.Message));
             }
         }
+
         [HttpGet("/api/races/{raceId:int}/entries")]
         [AllowAnonymous]
         public async Task<IActionResult> GetRaceEntries(int raceId)
@@ -217,6 +218,31 @@ namespace HRTMS.API.Controllers
                 .ToListAsync();
 
             return Ok(new { success = true, data = entries });
+        }
+
+        // SCH.9/EC-48 — cap nhat cau hinh Race; dong bang truong nhay cam sau boc tham / co Prediction.
+        [HttpPut("/api/races/{raceId:int}")]
+        public async Task<ActionResult<ApiResponse<RaceResponseDto>>> UpdateRace(
+            int raceId, [FromBody] UpdateRaceDto dto)
+        {
+            try
+            {
+                var result = await _tournamentService.UpdateRaceAsync(raceId, dto);
+                return Ok(ApiResponse<RaceResponseDto>.Ok(result, "Cập nhật cuộc đua thành công"));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ApiResponse<RaceResponseDto>.Fail(ex.Message));
+            }
+            catch (InvalidOperationException ex) when (ex.Message == "RACE_CONFIG_FROZEN")
+            {
+                return Conflict(ApiResponse<RaceResponseDto>.Fail(
+                    "Cấu hình cuộc đua đã bị khóa sau khi bốc thăm hoặc đã có dự đoán (EC-48)."));
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ApiResponse<RaceResponseDto>.Fail(ex.Message));
+            }
         }
     }
 
