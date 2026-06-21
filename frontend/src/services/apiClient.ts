@@ -1,24 +1,23 @@
 // ─── Cấu hình gọi API trung tâm ─────────────────────────────────────────────
-// Khi có Swagger từ BE, chỉ cần điền đúng BASE_URL bên dưới.
-// Mọi service thật (không phải mock) sẽ import từ đây.
+// Mọi service thật (không phải mock) import từ đây.
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000/api';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5222/api';
 
 export interface ApiErrorResponse {
-  errorCode: string;
+  success: boolean;
   message: string;
+  data: null;
 }
 
 /**
  * Wrapper fetch dùng chung — tự động gắn token, parse JSON, ném lỗi rõ ràng.
- * TODO: khi có Swagger thật, kiểm tra lại path, headers (Authorization Bearer...)
- * cho khớp đúng chuẩn BE quy định.
+ * Token được authStore lưu dưới key 'token' (xem store/authStore.ts).
  */
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = sessionStorage.getItem('hrtms_token') ?? localStorage.getItem('hrtms_token');
+  const token = sessionStorage.getItem('token') ?? localStorage.getItem('token');
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
