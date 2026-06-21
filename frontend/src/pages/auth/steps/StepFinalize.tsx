@@ -37,12 +37,13 @@ const StepFinalize = ({ role, formData }: Props) => {
       if (role === RegRole.Doctor) verificationData = formData.doctorVerification;
 
       const result = await authService.register({
-        role: mapRegRoleToRole(role),
-        username: formData.identity.username,
-        email: formData.identity.email,
-        password: formData.credentials.password,
-        verificationData,
-      });
+  role: mapRegRoleToRole(role),
+  username: formData.identity.username,
+  fullName: formData.identity.fullName,
+  email: formData.identity.email,
+  password: formData.credentials.password,
+  verificationData,
+});
 
       setResultMessage(result.message);
       setSubmitted(true);
