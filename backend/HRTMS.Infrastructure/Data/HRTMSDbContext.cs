@@ -489,6 +489,14 @@ public partial class HRTMSDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(d => d.HorseIdentityCheckedByDoctorId)
                 .HasConstraintName("FK_RaceEntries_HorseIdentityDoctor");
+            entity.Property(e => e.ClinicalStatus)
+                .HasMaxLength(20)
+                .IsUnicode(false);
+
+            entity.HasOne(d => d.ClinicalCheckedByDoctor)
+                .WithMany()
+                .HasForeignKey(d => d.ClinicalCheckedByDoctorId)
+                .HasConstraintName("FK_RaceEntries_ClinicalDoctor");
         });
 
         modelBuilder.Entity<RaceReport>(entity =>

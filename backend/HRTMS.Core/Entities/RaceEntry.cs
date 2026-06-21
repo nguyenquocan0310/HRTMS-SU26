@@ -80,4 +80,16 @@ public partial class RaceEntry
 
     // Navigation den Doctor da xac minh danh tinh ngua
     public virtual DoctorProfile? HorseIdentityCheckedByDoctor { get; set; }
+    // Ket qua kiem tra suc khoe ngua
+    // Gia tri: Fit hoac Unfit
+    public string? ClinicalStatus { get; set; }
+
+    // Doctor thuc hien kiem tra suc khoe
+    public int? ClinicalCheckedByDoctorId { get; set; }
+
+    // Thoi gian kiem tra suc khoe
+    public DateTime? ClinicalCheckedAt { get; set; }
+
+    // Navigation den Doctor da kiem tra suc khoe
+    public virtual DoctorProfile? ClinicalCheckedByDoctor { get; set; }
 }
