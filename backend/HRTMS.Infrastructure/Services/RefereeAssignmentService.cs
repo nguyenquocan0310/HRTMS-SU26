@@ -74,6 +74,41 @@ public class RefereeAssignmentService : IRefereeAssignmentService
                 throw new InvalidOperationException("LEAD_REFEREE_ALREADY_EXISTS");
             }
         }
+        // Kiem tra COI cua Referee voi Owner co ngua trong Race
+        // Referee khong duoc la Spouse, Parent, Child cua bat ky Owner nao trong Race
+        var ownerIdsInRace = await (
+            from raceEntry in _context.RaceEntries
+            join pairing in _context.Pairings
+                on raceEntry.PairingId equals pairing.PairingId
+            join horse in _context.Horses
+                on pairing.HorseId equals horse.HorseId
+            where raceEntry.RaceId == raceId
+                  && raceEntry.Status != "Cancelled"
+            select horse.OwnerId
+        )
+                .Distinct()
+                .ToListAsync();
+
+        var directFamilyRelations = new[]
+        {
+                "Spouse",
+                "Parent",
+                "Child",
+                "Sibling"
+};
+
+        var hasConflictOfInterest = await _context.FamilyRelationshipDeclarations
+            .AnyAsync(f =>
+                f.DeclarantUserId == dto.RefereeId &&
+                f.RelatedUserId.HasValue &&
+                ownerIdsInRace.Contains(f.RelatedUserId.Value) &&
+                directFamilyRelations.Contains(f.RelationType));
+
+        if (hasConflictOfInterest)
+        {
+            throw new InvalidOperationException(
+                "REFEREE_CONFLICT_OF_INTEREST");
+        }
 
         var now = DateTime.UtcNow;
 

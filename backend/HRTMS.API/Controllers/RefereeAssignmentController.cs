@@ -88,6 +88,16 @@ public class RefereeAssignmentController : ControllerBase
                 message = "This race already has a lead referee."
             });
         }
+        catch (InvalidOperationException ex)
+            when (ex.Message == "REFEREE_CONFLICT_OF_INTEREST")
+        {
+            // Referee co quan he gia dinh truc he voi Owner trong Race
+            return Conflict(new
+            {
+                error = "REFEREE_CONFLICT_OF_INTEREST",
+                message = "This referee has a conflict of interest with an owner in this race."
+            });
+        }
     }
 
     [HttpGet]
