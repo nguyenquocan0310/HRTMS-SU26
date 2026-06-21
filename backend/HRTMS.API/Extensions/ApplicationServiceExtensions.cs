@@ -22,6 +22,7 @@ public static class ApplicationServiceExtensions
         services.AddScoped<IRaceEntryService, RaceEntryService>();
         services.AddScoped<IPursePayoutService, PursePayoutService>();
 
+        services.AddScoped<IPredictionService, PredictionService>();
         return services;
     }
 }
