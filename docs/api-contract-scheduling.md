@@ -3,7 +3,9 @@
 Controller: `SchedulingController` · Base: `/api`
 Auth: JWT Bearer. Role lấy từ claim, ActorId lấy từ `NameIdentifier`.
 
-> Lưu ý: `RaceEntryController` (`/api/race-entries`) là module ĐĂNG KÝ entry + entry fee của Owner — KHÔNG thuộc Module E. Module E nằm ở `SchedulingController`.
+> **Mô hình RaceEntry (quyết định thiết kế):** `RaceEntry` **chỉ do Admin tạo** qua SCH.1. Owner chỉ khai báo ngựa (Module C) + mời Jockey (Module D); KHÔNG còn `POST /api/race-entries` cho Owner. `RaceEntryController` chỉ còn `GET /api/race-entries/my` để Owner xem entry của mình.
+>
+> **Hệ quả:** vòng đời Entry Fee (`Unpaid → Paid → approve`) diễn ra ở **Pha 3** (sau khi Admin allocate mới có RaceEntry). Các endpoint fee/approve ở `AdminController` (`/api/admin/entries/...`) giữ nguyên.
 
 ---
 
@@ -27,6 +29,8 @@ Errors: `404 RACE_NOT_FOUND` · `404 PAIRING_NOT_FOUND` · `409 RACE_ALREADY_DRA
 `422 INVALID_RACE_STATE` · `422 PAIRING_NOT_CONFIRMED` · `422 HORSE_NOT_APPROVED` ·
 `409 MAX_HORSES_REACHED` (EC-46) · `409 DUPLICATE_IN_RACE` (EC-40) ·
 `409 DOUBLE_BOOKED` (EC-15) · `422 INVALID_SCHEDULE` (EC-35).
+
+> `entryFeeStatus` được set tự động khi tạo: `Paid` nếu `Tournament.EntryFeeAmount == 0`, ngược lại `Unpaid`.
 
 ## 2. Bốc thăm vị trí xuất phát — SCH.2
 `POST /api/admin/races/{raceId}/draw` · Role: **Admin**
