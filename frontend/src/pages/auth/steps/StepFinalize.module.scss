@@ -108,3 +108,12 @@
     box-shadow: 0 6px 20px rgba(181, 18, 27, 0.4);
   }
 }
+
+.errorMsg {
+  background: rgba(231, 76, 60, 0.12);
+  border: 1px solid rgba(231, 76, 60, 0.35);
+  color: #ff6b6b;
+  font-size: 0.85rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+}

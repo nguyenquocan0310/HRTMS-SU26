@@ -229,7 +229,7 @@ public class HorseService : IHorseService
             RecipientId = horse.OwnerId,
             Title = "Hồ sơ ngựa được phê duyệt",
             Message = $"Hồ sơ ngựa '{horse.Name}' đã được Admin phê duyệt.",
-            Type = "HorseApproved",
+            Type = "In-app",
             IsRead = false,
             RelatedEntityType = "Horse",
             RelatedEntityId = horseId,
@@ -273,7 +273,7 @@ public class HorseService : IHorseService
             RecipientId = horse.OwnerId,
             Title = "Hồ sơ ngựa bị từ chối",
             Message = $"Hồ sơ ngựa '{horse.Name}' bị từ chối. Lý do: {dto.Reason}",
-            Type = "HorseRejected",
+            Type = "In-app",
             IsRead = false,
             RelatedEntityType = "Horse",
             RelatedEntityId = horseId,
@@ -332,77 +332,8 @@ public class HorseService : IHorseService
         UpdatedAt = h.UpdatedAt
     };
     // ── RACE ENTRY ────────────────────────────────────────────────────────────
-
-    public async Task<ApiResponse<RaceEntryResponseDto>> CreateRaceEntryAsync(int ownerId, CreateRaceEntryDto dto)
-    {
-        var pairing = await _context.Pairings
-            .Include(p => p.Horse)
-            .Include(p => p.Jockey).ThenInclude(j => j.Jockey)
-            .FirstOrDefaultAsync(p => p.PairingId == dto.PairingId);
-
-        if (pairing == null)
-            return ApiResponse<RaceEntryResponseDto>.Fail("PAIRING_NOT_FOUND");
-        if (pairing.Horse.OwnerId != ownerId)
-            return ApiResponse<RaceEntryResponseDto>.Fail("PAIRING_NOT_OWNED");
-        if (pairing.Status != "Accepted")
-            return ApiResponse<RaceEntryResponseDto>.Fail("PAIRING_NOT_ACCEPTED");
-        if (pairing.Horse.AdminApprovalStatus != "Approved")
-            return ApiResponse<RaceEntryResponseDto>.Fail("HORSE_NOT_APPROVED");
-
-        var race = await _context.Races
-            .Include(r => r.Round).ThenInclude(r => r.Tournament)
-            .FirstOrDefaultAsync(r => r.RaceId == dto.RaceId);
-
-        if (race == null)
-            return ApiResponse<RaceEntryResponseDto>.Fail("RACE_NOT_FOUND");
-
-        var tournament = race.Round.Tournament;
-
-        int currentEntries = await _context.RaceEntries
-            .CountAsync(e => e.RaceId == dto.RaceId
-                          && e.Status != "Cancelled"
-                          && e.Status != "Disqualified");
-        if (currentEntries >= tournament.MaxHorses)
-            return ApiResponse<RaceEntryResponseDto>.Fail("RACE_FULL");
-
-        bool horseInRace = await _context.RaceEntries
-            .Include(e => e.Pairing)
-            .AnyAsync(e => e.RaceId == dto.RaceId
-                        && e.Pairing.HorseId == pairing.HorseId
-                        && e.Status != "Cancelled"
-                        && e.Status != "Disqualified");
-        if (horseInRace)
-            return ApiResponse<RaceEntryResponseDto>.Fail("DUPLICATE_HORSE_IN_RACE");
-
-        bool jockeyInRace = await _context.RaceEntries
-            .Include(e => e.Pairing)
-            .AnyAsync(e => e.RaceId == dto.RaceId
-                        && e.Pairing.JockeyId == pairing.JockeyId
-                        && e.Status != "Cancelled"
-                        && e.Status != "Disqualified");
-        if (jockeyInRace)
-            return ApiResponse<RaceEntryResponseDto>.Fail("DUPLICATE_JOCKEY_IN_RACE");
-
-        string feeStatus = tournament.EntryFeeAmount == 0 ? "Paid" : "Unpaid";
-
-        var entry = new RaceEntry
-        {
-            RaceId = dto.RaceId,
-            PairingId = dto.PairingId,
-            Status = "Pending",
-            EntryFeeStatus = feeStatus,
-            IsWithdrawn = false,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
-
-        _context.RaceEntries.Add(entry);
-        await _context.SaveChangesAsync();
-
-        return ApiResponse<RaceEntryResponseDto>.Ok(
-            await MapToRaceEntryDtoAsync(entry.RaceEntryId, tournament.EntryFeeAmount),
-            "Đăng ký tham gia cuộc đua thành công.");
-    }
+    // RaceEntry chi do Admin tao qua Module E (SCH.1 - POST /api/admin/races/{raceId}/entries).
+    // HorseService chi con phuc vu Owner xem danh sach entry cua minh.
 
     public async Task<ApiResponse<List<RaceEntryResponseDto>>> GetMyRaceEntriesAsync(
         int ownerId, string? status, string? feeStatus, int page, int pageSize)

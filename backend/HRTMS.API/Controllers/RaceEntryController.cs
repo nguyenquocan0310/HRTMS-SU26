@@ -22,17 +22,9 @@ public class RaceEntryController : ControllerBase
     private int CurrentUserId =>
         int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-    [HttpPost]
-    [Authorize(Roles = "Owner")]
-    [ProducesResponseType(typeof(ApiResponse<RaceEntryResponseDto>), StatusCodes.Status201Created)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> CreateRaceEntry([FromBody] CreateRaceEntryDto dto)
-    {
-        if (!ModelState.IsValid) return BadRequest(ModelState);
-        var result = await _horseService.CreateRaceEntryAsync(CurrentUserId, dto);
-        if (!result.Success) return BadRequest(result);
-        return CreatedAtAction(nameof(GetMyRaceEntries), null, result);
-    }
+    // RaceEntry chi do Admin tao qua SCH.1 (POST /api/admin/races/{raceId}/entries).
+    // Owner chi khai bao ngua + moi jockey; khong tu tao RaceEntry.
+    // Endpoint nay chi de Owner xem cac entry cua minh.
 
     [HttpGet("my")]
     [Authorize(Roles = "Owner")]

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   FiUser,
   FiLock,
@@ -10,20 +10,27 @@ import {
 } from 'react-icons/fi';
 import { GiHorseHead } from 'react-icons/gi';
 
+import * as authService from '../../services/authService';
+import useAuthStore from '../../store/authStore';
+import { getRoleHomePath } from '../../App';
 import styles from './LoginPage.module.scss';
 
 export default function LoginPage() {
   /* ─── Local state ──────────────────────────────────────── */
+  const navigate = useNavigate();
+  const setAuth = useAuthStore((state) => state.setAuth);
+
   const [credential, setCredential] = useState('');
   const [password, setPassword] = useState('');
   const [rememberSession, setRememberSession] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isFormValid = credential.trim() !== '' && password.trim() !== '';
 
   /* ─── Submit handler ───────────────────────────────────── */
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
 
@@ -32,10 +39,16 @@ export default function LoginPage() {
       return;
     }
 
-    // TODO: gọi API đăng nhập khi có Swagger từ BE — xem Điều 6
-    // Dự kiến: POST /api/auth/login  body: { email: credential, password }
-    // Nếu rememberSession === true → lưu token vào localStorage thay vì sessionStorage
-    console.log('[LoginPage] submit', { credential, password, rememberSession });
+    setIsSubmitting(true);
+    try {
+      const result = await authService.login({ credential, password });
+      setAuth(result.token, result.user);
+      navigate(getRoleHomePath(result.user.role), { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Đăng nhập thất bại.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   /* ─── Render ───────────────────────────────────────────── */
@@ -128,9 +141,9 @@ export default function LoginPage() {
           <button
             type="submit"
             className={styles.submitBtn}
-            disabled={!isFormValid}
+            disabled={!isFormValid || isSubmitting}
           >
-            Login to Dashboard <FiArrowRight size={16} />
+            {isSubmitting ? 'Đang đăng nhập...' : 'Login to Dashboard'} <FiArrowRight size={16} />
           </button>
         </form>
 
