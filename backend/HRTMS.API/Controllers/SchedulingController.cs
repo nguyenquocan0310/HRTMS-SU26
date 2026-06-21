@@ -57,6 +57,11 @@ public class SchedulingController : ControllerBase
         {
             return UnprocessableEntity(Err("HORSE_NOT_APPROVED", "The horse has not been approved."));
         }
+        catch (InvalidOperationException ex) when (ex.Message == "JOCKEY_EXPERIENCE_TOO_LOW")
+        {
+            return UnprocessableEntity(Err("JOCKEY_EXPERIENCE_TOO_LOW",
+                "The jockey does not meet the tournament's minimum experience requirement."));
+        }
         catch (InvalidOperationException ex) when (ex.Message == "MAX_HORSES_REACHED")
         {
             return Conflict(Err("MAX_HORSES_REACHED", "The race already reached the maximum number of horses."));
