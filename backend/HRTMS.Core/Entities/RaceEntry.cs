@@ -68,4 +68,16 @@ public partial class RaceEntry
     public virtual ICollection<Violation> ViolationPlaceBehindEntries { get; set; } = new List<Violation>();
 
     public virtual ICollection<Violation> ViolationRaceEntries { get; set; } = new List<Violation>();
+    // Ket qua xac minh danh tinh ngua tai Paddock
+    // Gia tri: Matched hoac Mismatch
+    public string? HorseIdentityStatus { get; set; }
+
+    // Doctor thuc hien xac minh danh tinh ngua
+    public int? HorseIdentityCheckedByDoctorId { get; set; }
+
+    // Thoi gian xac minh danh tinh ngua
+    public DateTime? HorseIdentityCheckedAt { get; set; }
+
+    // Navigation den Doctor da xac minh danh tinh ngua
+    public virtual DoctorProfile? HorseIdentityCheckedByDoctor { get; set; }
 }

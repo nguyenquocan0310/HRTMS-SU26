@@ -105,4 +105,90 @@ public class MedicalCheckController : ControllerBase
             });
         }
     }
+    [HttpPatch("{raceEntryId:int}/horse-identity")]
+    public async Task<IActionResult> RecordHorseIdentity(
+    int raceEntryId,
+    [FromBody] RecordHorseIdentityDto dto)
+    {
+        var doctorIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (!int.TryParse(doctorIdClaim, out var doctorId))
+        {
+            return Unauthorized(new
+            {
+                error = "INVALID_TOKEN",
+                message = "Invalid doctor token."
+            });
+        }
+
+        try
+        {
+            // Doctor xac minh danh tinh ngua tai Paddock
+            var result = await _medicalCheckService.RecordHorseIdentityAsync(
+                doctorId,
+                raceEntryId,
+                dto);
+
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+            when (ex.Message == "DOCTOR_NOT_FOUND")
+        {
+            return NotFound(new
+            {
+                error = "DOCTOR_NOT_FOUND",
+                message = "Doctor was not found."
+            });
+        }
+        catch (KeyNotFoundException ex)
+            when (ex.Message == "RACE_ENTRY_NOT_FOUND")
+        {
+            return NotFound(new
+            {
+                error = "RACE_ENTRY_NOT_FOUND",
+                message = "Race entry was not found."
+            });
+        }
+        catch (InvalidOperationException ex)
+            when (ex.Message == "USER_NOT_DOCTOR")
+        {
+            return UnprocessableEntity(new
+            {
+                error = "USER_NOT_DOCTOR",
+                message = "The current user is not a doctor."
+            });
+        }
+        catch (InvalidOperationException ex)
+            when (ex.Message == "DOCTOR_NOT_ACTIVE")
+        {
+            return UnprocessableEntity(new
+            {
+                error = "DOCTOR_NOT_ACTIVE",
+                message = "The doctor is not active."
+            });
+        }
+        catch (InvalidOperationException ex)
+            when (ex.Message == "DOCTOR_NOT_ASSIGNED_TO_RACE")
+        {
+            return Forbid();
+        }
+        catch (InvalidOperationException ex)
+            when (ex.Message == "RACE_ENTRY_NOT_ELIGIBLE")
+        {
+            return Conflict(new
+            {
+                error = "RACE_ENTRY_NOT_ELIGIBLE",
+                message = "Race entry is cancelled, withdrawn, or disqualified."
+            });
+        }
+        catch (InvalidOperationException ex)
+            when (ex.Message == "RACE_NOT_UPCOMING")
+        {
+            return Conflict(new
+            {
+                error = "RACE_NOT_UPCOMING",
+                message = "Horse identity can only be checked before the race starts."
+            });
+        }
+    }
 }
