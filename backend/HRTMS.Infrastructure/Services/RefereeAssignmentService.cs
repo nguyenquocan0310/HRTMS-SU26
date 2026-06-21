@@ -20,10 +20,11 @@ public class RefereeAssignmentService : IRefereeAssignmentService
         AssignRefereeDto dto)
     {
         // Kiem tra Race co ton tai hay khong
-        var raceExists = await _context.Races
-            .AnyAsync(r => r.RaceId == raceId);
+        // Lay Race de kiem tra ton tai va thoi gian thi dau
+        var race = await _context.Races
+            .FirstOrDefaultAsync(r => r.RaceId == raceId);
 
-        if (!raceExists)
+        if (race == null)
         {
             throw new KeyNotFoundException("RACE_NOT_FOUND");
         }
@@ -60,6 +61,19 @@ public class RefereeAssignmentService : IRefereeAssignmentService
         {
             throw new InvalidOperationException("REFEREE_ALREADY_ASSIGNED");
         }
+        // Kiem tra Referee co bi trung lich voi Race khac cung gio khong
+        var refereeHasRaceAtSameTime = await _context.RefereeAssignments
+            .Include(a => a.Race)
+            .AnyAsync(a =>
+                a.RefereeId == dto.RefereeId &&
+                a.RaceId != raceId &&
+                a.Race.ScheduledTime == race.ScheduledTime &&
+                a.Race.Status != "Cancelled");
+
+        if (refereeHasRaceAtSameTime)
+        {
+            throw new InvalidOperationException("REFEREE_DOUBLE_BOOKED");
+        }
 
         // Moi Race chi duoc co mot Lead Referee
         if (dto.Role == "Lead Referee")
@@ -75,7 +89,7 @@ public class RefereeAssignmentService : IRefereeAssignmentService
             }
         }
         // Kiem tra COI cua Referee voi Owner co ngua trong Race
-        // Referee khong duoc la Spouse, Parent, Child cua bat ky Owner nao trong Race
+        // Referee khong duoc la Spouse, Parent, Child, Sibling cua bat ky Owner nao trong Race
         var ownerIdsInRace = await (
             from raceEntry in _context.RaceEntries
             join pairing in _context.Pairings
@@ -98,11 +112,20 @@ public class RefereeAssignmentService : IRefereeAssignmentService
 };
 
         var hasConflictOfInterest = await _context.FamilyRelationshipDeclarations
-            .AnyAsync(f =>
-                f.DeclarantUserId == dto.RefereeId &&
+                .AnyAsync(f =>
                 f.RelatedUserId.HasValue &&
-                ownerIdsInRace.Contains(f.RelatedUserId.Value) &&
-                directFamilyRelations.Contains(f.RelationType));
+                directFamilyRelations.Contains(f.RelationType) &&
+                (
+            (
+                f.DeclarantUserId == dto.RefereeId &&
+                ownerIdsInRace.Contains(f.RelatedUserId.Value)
+            )
+            ||
+            (
+                ownerIdsInRace.Contains(f.DeclarantUserId) &&
+                f.RelatedUserId.Value == dto.RefereeId
+            )
+        ));
 
         if (hasConflictOfInterest)
         {
