@@ -8,7 +8,7 @@ Auth: JWT Bearer. Role lấy từ claim, ActorId lấy từ `NameIdentifier`.
 ---
 
 ## 1. Phân bổ Pairing vào Race — SCH.1
-`POST /api/races/{raceId}/entries` · Role: **Admin**
+`POST /api/admin/races/{raceId}/entries` · Role: **Admin**
 
 Body:
 ```json
@@ -29,7 +29,7 @@ Errors: `404 RACE_NOT_FOUND` · `404 PAIRING_NOT_FOUND` · `409 RACE_ALREADY_DRA
 `409 DOUBLE_BOOKED` (EC-15) · `422 INVALID_SCHEDULE` (EC-35).
 
 ## 2. Bốc thăm vị trí xuất phát — SCH.2
-`POST /api/races/{raceId}/draw` · Role: **Admin**
+`POST /api/admin/races/{raceId}/draw` · Role: **Admin**
 
 `200 OK` → `PostPositionDrawResultDto`:
 ```json
@@ -44,10 +44,9 @@ Errors: `404 RACE_NOT_FOUND` · `409 ALREADY_DRAWN` · `422 NO_ELIGIBLE_ENTRIES`
 Bốc thăm nguyên tử trong 1 transaction; `UNIQUE(RaceId, PostPosition)` chống trùng cổng (BR-37/EC-06).
 
 ## 3. Lịch thi đấu công khai — SCH.3
-`GET /api/races/{raceId}/schedule` · **AllowAnonymous**
-
-`200 OK` → `RaceScheduleDto` (gồm `confirmationCutoffTime`, danh sách `entries` đã bỏ Cancelled, sắp theo postPosition).
-Errors: `404 RACE_NOT_FOUND`.
+`GET /api/races/{raceId}/entries` · **AllowAnonymous** — ĐÃ CÓ ở `TournamentController.GetRaceEntries` (Module B)
+(chỉ public sau khi `IsPostPositionDrawn=true`; Admin thấy luôn). SchedulingController không tạo lại.
+Service `IRaceEntryService.GetRaceScheduleAsync` (trả `RaceScheduleDto` có `confirmationCutoffTime`) vẫn để sẵn nếu cần dùng nơi khác.
 
 ## 4. Xác nhận tham gia — SCH.4
 `PATCH /api/race-entries/{id}/confirm` · Role: **Owner**
@@ -56,12 +55,8 @@ Errors: `404 RACE_NOT_FOUND`.
 Errors: `404 ENTRY_NOT_FOUND` · `403 FORBIDDEN` · `409 INVALID_STATUS` · `422 CONFIRMATION_CLOSED` (quá cut-off).
 
 ## 5. Rút lui — SCH.5
-`PATCH /api/race-entries/{id}/withdraw` · Role: **Owner**
+`DELETE /api/race-entries/{id}` · Role: **Owner** · lý do (tùy chọn) qua query: `?reason=Ngựa chấn thương`
 
-Body:
-```json
-{ "reason": "Ngựa chấn thương" }
-```
 `200 OK` → `WithdrawResultDto`:
 ```json
 { "raceEntryId": 45, "status": "Cancelled", "refundedPredictions": 3, "alreadyWithdrawn": false, "message": "..." }
