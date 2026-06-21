@@ -209,4 +209,117 @@ public class MedicalCheckService : IMedicalCheckService
                 : "Horse identity matched successfully."
         };
     }
+    public async Task<ClinicalCheckResultDto> RecordClinicalCheckAsync(
+    int doctorId,
+    int raceEntryId,
+    RecordClinicalCheckDto dto)
+    {
+        // Kiem tra Doctor co ton tai va dang Active hay khong
+        var doctor = await _context.DoctorProfiles
+            .Include(d => d.Doctor)
+            .FirstOrDefaultAsync(d => d.DoctorId == doctorId);
+
+        if (doctor == null)
+        {
+            throw new KeyNotFoundException("DOCTOR_NOT_FOUND");
+        }
+
+        if (doctor.Doctor.Role != "Doctor")
+        {
+            throw new InvalidOperationException("USER_NOT_DOCTOR");
+        }
+
+        if (doctor.Status != "Active")
+        {
+            throw new InvalidOperationException("DOCTOR_NOT_ACTIVE");
+        }
+
+        // Lay RaceEntry kem Race va Horse
+        var raceEntry = await _context.RaceEntries
+            .Include(e => e.Race)
+            .Include(e => e.Pairing)
+                .ThenInclude(p => p.Horse)
+            .FirstOrDefaultAsync(e => e.RaceEntryId == raceEntryId);
+
+        if (raceEntry == null)
+        {
+            throw new KeyNotFoundException("RACE_ENTRY_NOT_FOUND");
+        }
+
+        // Doctor phai duoc phan cong vao Race nay moi duoc kiem tra
+        var doctorAssigned = await _context.DoctorAssignments
+            .AnyAsync(a =>
+                a.RaceId == raceEntry.RaceId &&
+                a.DoctorId == doctorId);
+
+        if (!doctorAssigned)
+        {
+            throw new InvalidOperationException("DOCTOR_NOT_ASSIGNED_TO_RACE");
+        }
+
+        // Chi RaceEntry hop le moi duoc kiem tra
+        if (raceEntry.Status == "Cancelled" ||
+            raceEntry.Status == "Disqualified" ||
+            raceEntry.IsWithdrawn)
+        {
+            throw new InvalidOperationException("RACE_ENTRY_NOT_ELIGIBLE");
+        }
+
+        // Chi cho kiem tra truoc khi Race bat dau
+        if (raceEntry.Race.Status != "Upcoming")
+        {
+            throw new InvalidOperationException("RACE_NOT_UPCOMING");
+        }
+
+        // Neu Unfit thi bat buoc co ly do toi thieu 20 ky tu
+        if (dto.ClinicalStatus == "Unfit" &&
+            string.IsNullOrWhiteSpace(dto.UnfitReason))
+        {
+            throw new InvalidOperationException("UNFIT_REASON_REQUIRED");
+        }
+
+        if (dto.ClinicalStatus == "Unfit" &&
+            dto.UnfitReason!.Trim().Length < 20)
+        {
+            throw new InvalidOperationException("UNFIT_REASON_TOO_SHORT");
+        }
+
+        var now = DateTime.UtcNow;
+
+        raceEntry.ClinicalStatus = dto.ClinicalStatus;
+        raceEntry.ClinicalCheckedByDoctorId = doctorId;
+        raceEntry.ClinicalCheckedAt = now;
+        raceEntry.UnfitReason = dto.ClinicalStatus == "Unfit"
+            ? dto.UnfitReason!.Trim()
+            : null;
+        raceEntry.UpdatedAt = now;
+
+        var isUnfit = dto.ClinicalStatus == "Unfit";
+
+        // MED.5: Unfit se kich hoat Emergency DQ
+        // Ban hien tai xu ly DQ toi thieu: cap nhat RaceEntry thanh Disqualified
+        // Phan ACID refund + notification + audit se lam o MED.7
+        if (isUnfit)
+        {
+            raceEntry.Status = "Disqualified";
+        }
+
+        await _context.SaveChangesAsync();
+
+        return new ClinicalCheckResultDto
+        {
+            RaceEntryId = raceEntry.RaceEntryId,
+            RaceId = raceEntry.RaceId,
+            DoctorId = doctorId,
+            DoctorName = doctor.Doctor.FullName,
+            HorseName = raceEntry.Pairing.Horse.Name,
+            ClinicalStatus = dto.ClinicalStatus,
+            UnfitReason = raceEntry.UnfitReason,
+            IsEmergencyDisqualified = isUnfit,
+            RaceEntryStatus = raceEntry.Status,
+            Message = isUnfit
+                ? "Horse is unfit. Race entry has been disqualified."
+                : "Horse is fit for racing."
+        };
+    }
 }

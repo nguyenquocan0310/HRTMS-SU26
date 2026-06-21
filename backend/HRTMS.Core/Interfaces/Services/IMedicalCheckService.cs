@@ -13,4 +13,8 @@ public interface IMedicalCheckService
         int doctorId,
         int raceEntryId,
         RecordHorseIdentityDto dto);
+    Task<ClinicalCheckResultDto> RecordClinicalCheckAsync(
+        int doctorId,
+        int raceEntryId,
+    RecordClinicalCheckDto dto);
 }
