@@ -28,6 +28,7 @@ public static class ApplicationServiceExtensions
         services.AddScoped<IPredictionService, PredictionService>();
         services.AddScoped<IReconciliationService, ReconciliationService>();
         services.AddScoped<IIndependenceCheckService, IndependenceCheckService>();
+        services.AddScoped<IEmergencyDisqualificationService, EmergencyDisqualificationService>();
         return services;
     }
 }
