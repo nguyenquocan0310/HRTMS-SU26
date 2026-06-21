@@ -27,6 +27,7 @@ public static class ApplicationServiceExtensions
         services.AddScoped<IProfileService, ProfileService>();
         services.AddScoped<IPredictionService, PredictionService>();
         services.AddScoped<IReconciliationService, ReconciliationService>();
+        services.AddScoped<IIndependenceCheckService, IndependenceCheckService>();
         return services;
     }
 }
