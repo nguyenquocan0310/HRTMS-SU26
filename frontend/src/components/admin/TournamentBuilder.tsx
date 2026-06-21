@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FiPlus, FiEdit2 } from 'react-icons/fi';
 import DataTable, { type DataTableColumn } from '../../components/common/DataTable';
 import StatusBadge, { type StatusType } from '../../components/common/StatusBadge';
@@ -7,6 +7,8 @@ import TabBasicInfo from './tabs/TabBasicInfo';
 import TabPrizeDistribution from './tabs/TabPrizeDistribution';
 import TabRoundsRaces from './tabs/TabRoundsRaces';
 import TabPostPositionDraw from './tabs/TabPostPositionDraw';
+import * as tournamentService from '../../services/tournamentService';
+import type { TournamentResponse } from '../../services/tournamentService';
 import styles from './TournamentBuilder.module.scss';
 
 // ─── Shared types — dùng chung cho cả 4 tab ─────────────────────────────────
@@ -100,14 +102,6 @@ export const createEmptyTournament = (): TournamentDraft => ({
   rounds: [],
 });
 
-// ─── Mock data danh sách giải đã tạo — TODO: GET /api/admin/tournaments ────
-const MOCK_TOURNAMENT_LIST: { id: string; name: string; status: TournamentStatus; startDate: string }[] = [
-  { id: 'tn1', name: 'Royal Stakes — Ascot Cup 2026', status: 'OpenRegistration', startDate: '15/07/2026' },
-  { id: 'tn2', name: 'Dubai World Sprint', status: 'Draft', startDate: '02/08/2026' },
-  { id: 'tn3', name: 'Melbourne Classic — Flemington', status: 'Completed', startDate: '10/05/2026' },
-  { id: 'tn4', name: 'Spring Maiden Series', status: 'Cancelled', startDate: '20/04/2026' },
-];
-
 const TABS = [
   { key: 'basic', label: 'Thông số' },
   { key: 'prize', label: 'Prize Distribution' },
@@ -122,6 +116,27 @@ const TournamentBuilder = () => {
   const [activeTab, setActiveTab] = useState<TabKey>('basic');
   const [draft, setDraft] = useState<TournamentDraft>(createEmptyTournament());
   const [showCancelModal, setShowCancelModal] = useState(false);
+
+  const [tournamentList, setTournamentList] = useState<TournamentResponse[]>([]);
+  const [isLoadingList, setIsLoadingList] = useState(true);
+  const [listError, setListError] = useState('');
+
+  const loadTournaments = async () => {
+    setIsLoadingList(true);
+    setListError('');
+    try {
+      const data = await tournamentService.getTournaments();
+      setTournamentList(data);
+    } catch (err) {
+      setListError(err instanceof Error ? err.message : 'Không tải được danh sách giải đấu.');
+    } finally {
+      setIsLoadingList(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTournaments();
+  }, []);
 
   // ─── Validate điều kiện Publish (tổng hợp cả 4 tab) ───────────────────────
   const isBasicInfoValid = (): boolean => {
@@ -168,36 +183,96 @@ const TournamentBuilder = () => {
     setView('wizard');
   };
 
-  const handleEdit = (id: string) => {
-    // TODO: gọi API thật khi có Swagger — GET /api/admin/tournaments/:id
+  const handleEdit = (id: number) => {
+    // TODO Bước B: gọi tournamentService.getTournamentById(id) để load đầy đủ vào draft
     console.log('[TournamentBuilder] Edit tournament', id);
     setDraft(createEmptyTournament());
     setActiveTab('basic');
     setView('wizard');
   };
 
-  const handleSaveDraft = () => {
-    // TODO: gọi API thật — POST/PUT /api/admin/tournaments (status giữ Draft)
-    console.log('[TournamentBuilder] Save Draft', draft);
-    setView('list');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+
+  const buildCreatePayload = (): tournamentService.CreateTournamentPayload => {
+    const b = draft.basicInfo;
+    return {
+      name: b.name,
+      startDate: b.startDate,
+      endDate: b.endDate,
+      maxHorses: typeof b.maxHorses === 'number' ? b.maxHorses : undefined,
+      allowedBreed: b.allowedBreed,
+      trackType: b.trackType,
+      raceDistance: typeof b.raceDistance === 'number' ? b.raceDistance : undefined,
+      raceCategory: b.raceCategory,
+      minJockeyExperienceYears:
+        typeof b.minJockeyExperienceYears === 'number' ? b.minJockeyExperienceYears : undefined,
+      purseAmount: typeof b.purseAmount === 'number' ? b.purseAmount : undefined,
+      entryFeeAmount: b.entryFeeAmount,
+      preRaceWeightThresholdKg: b.preRaceWeightThresholdKg,
+      postRaceWeightDiffThresholdKg: b.postRaceWeightDiffThresholdKg,
+    };
   };
 
-  const handlePublish = () => {
+  // Tournament mới (chưa có trên BE) có id dạng "t-<timestamp>" (string).
+  // Tournament đã tồn tại trên BE có id là số nguyên thật — dùng để phân biệt
+  // giữa "tạo mới" (POST) và "cập nhật" (PUT).
+  const isNewDraft = draft.id.startsWith('t-');
+
+  const handleSaveDraft = async () => {
+    setIsSaving(true);
+    setSaveError('');
+    try {
+      const payload = buildCreatePayload();
+      if (isNewDraft) {
+        const created = await tournamentService.createTournament(payload);
+        setDraft((prev) => ({ ...prev, id: String(created.tournamentId), status: created.status as TournamentStatus }));
+      } else {
+        await tournamentService.updateTournament(Number(draft.id), payload);
+      }
+      await loadTournaments();
+      setView('list');
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Lưu giải đấu thất bại.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handlePublish = async () => {
     if (!canPublish) return;
-    // TODO: gọi API thật — PATCH /api/admin/tournaments/:id/publish (status → OpenRegistration)
-    console.log('[TournamentBuilder] Publish', draft);
-    setView('list');
+    setIsSaving(true);
+    setSaveError('');
+    try {
+      // Đảm bảo giải đã tồn tại trên BE trước khi đổi status
+      let tournamentId = Number(draft.id);
+      if (isNewDraft) {
+        const created = await tournamentService.createTournament(buildCreatePayload());
+        tournamentId = created.tournamentId;
+      } else {
+        await tournamentService.updateTournament(tournamentId, buildCreatePayload());
+      }
+      await tournamentService.updateTournamentStatus(tournamentId, 'OpenRegistration');
+      await loadTournaments();
+      setView('list');
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Publish giải đấu thất bại.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleConfirmCancel = () => {
-    // TODO: gọi API thật — PATCH /api/admin/tournaments/:id/cancel
+    // TODO: gọi API thật — PATCH /api/tournament/:id/status (Cancelled)
     console.log('[TournamentBuilder] Cancel Tournament', draft.id);
     setShowCancelModal(false);
     setView('list');
   };
 
   // ─── Columns cho danh sách giải ────────────────────────────────────────────
-  const listColumns: DataTableColumn<typeof MOCK_TOURNAMENT_LIST[number]>[] = [
+  const formatDate = (iso: string) => new Date(iso).toLocaleDateString('vi-VN');
+
+  const listColumns: DataTableColumn<TournamentResponse>[] = [
     {
       key: 'name',
       header: 'Tên giải',
@@ -206,7 +281,7 @@ const TournamentBuilder = () => {
     {
       key: 'startDate',
       header: 'Ngày bắt đầu',
-      render: (row) => row.startDate,
+      render: (row) => formatDate(row.startDate),
     },
     {
       key: 'status',
@@ -218,7 +293,7 @@ const TournamentBuilder = () => {
       header: '',
       width: '120px',
       render: (row) => (
-        <button type="button" className={styles.editBtn} onClick={() => handleEdit(row.id)}>
+        <button type="button" className={styles.editBtn} onClick={() => handleEdit(row.tournamentId)}>
           <FiEdit2 size={13} /> Edit
         </button>
       ),
@@ -238,12 +313,18 @@ const TournamentBuilder = () => {
           </button>
         </div>
 
-        <DataTable
-          columns={listColumns}
-          data={MOCK_TOURNAMENT_LIST}
-          rowKey={(row) => row.id}
-          emptyMessage="Chưa có giải đấu nào được tạo."
-        />
+        {listError && <div className={styles.listError}>{listError}</div>}
+
+        {isLoadingList ? (
+          <p className={styles.loadingText}>Đang tải danh sách giải đấu...</p>
+        ) : (
+          <DataTable
+            columns={listColumns}
+            data={tournamentList}
+            rowKey={(row) => row.tournamentId}
+            emptyMessage="Chưa có giải đấu nào được tạo."
+          />
+        )}
       </div>
     );
   }
@@ -315,23 +396,25 @@ const TournamentBuilder = () => {
       </div>
 
       {/* ═══ ACTION BAR (cố định ở mọi tab) ══════════════════════ */}
+{saveError && <div className={styles.listError}>{saveError}</div>}
+
       <div className={styles.actionBar}>
         <button type="button" className={styles.cancelTournamentBtn} onClick={() => setShowCancelModal(true)}>
           Cancel Tournament
         </button>
 
         <div className={styles.actionBarRight}>
-          <button type="button" className={styles.saveDraftBtn} onClick={handleSaveDraft}>
-            Save Draft
+          <button type="button" className={styles.saveDraftBtn} onClick={handleSaveDraft} disabled={isSaving}>
+            {isSaving ? 'Đang lưu...' : 'Save Draft'}
           </button>
           <button
             type="button"
             className={styles.publishBtn}
             onClick={handlePublish}
-            disabled={!canPublish}
+            disabled={!canPublish || isSaving}
             title={!canPublish ? 'Cần hoàn tất đủ điều kiện cả 4 tab trước khi Publish.' : undefined}
           >
-            Publish
+            {isSaving ? 'Đang xử lý...' : 'Publish'}
           </button>
         </div>
       </div>
