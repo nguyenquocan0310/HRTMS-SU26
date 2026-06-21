@@ -67,6 +67,11 @@ public class RaceEntryService : IRaceEntryService
         if (pairing.Horse.AdminApprovalStatus != "Approved")
             throw new InvalidOperationException("HORSE_NOT_APPROVED");
 
+        // EC-21 (BR-05) — tai kiem tra kinh nghiem Jockey tai thoi diem dua cap vao Race cu the,
+        // vi nguong MinJockeyExperienceYears phu thuoc tung giai.
+        if (pairing.Jockey.ExperienceYears < race.Round.Tournament.MinJockeyExperienceYears)
+            throw new InvalidOperationException("JOCKEY_EXPERIENCE_TOO_LOW");
+
         // SCH.7 / EC-46 — chan khi so entry hop le da dat MaxHorses (khong ap so toi thieu).
         var currentCount = await _context.RaceEntries
             .CountAsync(e => e.RaceId == raceId && ActiveEntryStatuses.Contains(e.Status));
