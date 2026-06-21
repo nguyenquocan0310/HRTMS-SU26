@@ -321,7 +321,7 @@ namespace HRTMS.Infrastructure.Services
                         RecipientId = userId,
                         Title = "Giải đấu bị hủy",
                         Message = $"Giải đấu '{tournament.Name}' đã bị hủy bởi Ban tổ chức.",
-                        Type = "Tournament_Cancelled",
+                        Type = "In-app",
                         IsRead = false,
                         RelatedEntityType = "Tournament",
                         RelatedEntityId = tournamentId,
