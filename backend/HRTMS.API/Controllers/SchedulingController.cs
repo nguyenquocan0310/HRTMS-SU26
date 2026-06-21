@@ -154,16 +154,18 @@ public class SchedulingController : ControllerBase
         }
     }
 
-    // SCH.5 — Owner rut lui (idempotent).
-    [HttpPatch("race-entries/{id:int}/withdraw")]
+    // SCH.5 — Owner rut lui (Withdrawal Flow, idempotent).
+    // DELETE theo contract; ly do (tuy chon) truyen qua query: ?reason=...
+    [HttpDelete("race-entries/{id:int}")]
     [Authorize(Roles = "Owner")]
-    public async Task<IActionResult> Withdraw(int id, [FromBody] WithdrawEntryDto dto)
+    public async Task<IActionResult> Withdraw(int id, [FromQuery] string? reason)
     {
         if (!TryGetUserId(out var ownerId))
             return UnauthorizedResult();
 
         try
         {
+            var dto = new WithdrawEntryDto { Reason = reason };
             var result = await _service.WithdrawAsync(ownerId, id, dto);
             return Ok(result);
         }
