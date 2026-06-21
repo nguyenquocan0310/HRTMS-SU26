@@ -20,7 +20,7 @@ public class SchedulingController : ControllerBase
     }
 
     // SCH.1 — Admin phan bo Pairing vao Race.
-    [HttpPost("races/{raceId:int}/entries")]
+    [HttpPost("admin/races/{raceId:int}/entries")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Allocate(int raceId, [FromBody] AllocateEntryDto dto)
     {
@@ -30,7 +30,8 @@ public class SchedulingController : ControllerBase
         try
         {
             var result = await _service.AllocateAsync(adminId, raceId, dto);
-            return CreatedAtAction(nameof(GetSchedule), new { raceId }, result);
+            // Lich cong khai xem qua GET /api/races/{raceId}/entries (TournamentController - Module B).
+            return Created($"/api/races/{raceId}/entries", result);
         }
         catch (KeyNotFoundException ex) when (ex.Message == "RACE_NOT_FOUND")
         {
@@ -56,6 +57,11 @@ public class SchedulingController : ControllerBase
         {
             return UnprocessableEntity(Err("HORSE_NOT_APPROVED", "The horse has not been approved."));
         }
+        catch (InvalidOperationException ex) when (ex.Message == "JOCKEY_EXPERIENCE_TOO_LOW")
+        {
+            return UnprocessableEntity(Err("JOCKEY_EXPERIENCE_TOO_LOW",
+                "The jockey does not meet the tournament's minimum experience requirement."));
+        }
         catch (InvalidOperationException ex) when (ex.Message == "MAX_HORSES_REACHED")
         {
             return Conflict(Err("MAX_HORSES_REACHED", "The race already reached the maximum number of horses."));
@@ -75,7 +81,7 @@ public class SchedulingController : ControllerBase
     }
 
     // SCH.2 — Admin boc tham vi tri xuat phat (nguyen tu).
-    [HttpPost("races/{raceId:int}/draw")]
+    [HttpPost("admin/races/{raceId:int}/draw")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Draw(int raceId)
     {
@@ -105,21 +111,8 @@ public class SchedulingController : ControllerBase
         }
     }
 
-    // SCH.3 — Lich thi dau cong khai (khong yeu cau dang nhap).
-    [HttpGet("races/{raceId:int}/schedule")]
-    [AllowAnonymous]
-    public async Task<IActionResult> GetSchedule(int raceId)
-    {
-        try
-        {
-            var result = await _service.GetRaceScheduleAsync(raceId);
-            return Ok(result);
-        }
-        catch (KeyNotFoundException ex) when (ex.Message == "RACE_NOT_FOUND")
-        {
-            return NotFound(Err("RACE_NOT_FOUND", "Race was not found."));
-        }
-    }
+    // SCH.3 — Lich thi dau cong khai da co san: GET /api/races/{raceId}/entries
+    // (TournamentController - Module B). Service van expose GetRaceScheduleAsync de tai su dung neu can.
 
     // SCH.4 — Owner xac nhan tham gia.
     [HttpPatch("race-entries/{id:int}/confirm")]
@@ -153,16 +146,18 @@ public class SchedulingController : ControllerBase
         }
     }
 
-    // SCH.5 — Owner rut lui (idempotent).
-    [HttpPatch("race-entries/{id:int}/withdraw")]
+    // SCH.5 — Owner rut lui (Withdrawal Flow, idempotent).
+    // DELETE theo contract; ly do (tuy chon) truyen qua query: ?reason=...
+    [HttpDelete("race-entries/{id:int}")]
     [Authorize(Roles = "Owner")]
-    public async Task<IActionResult> Withdraw(int id, [FromBody] WithdrawEntryDto dto)
+    public async Task<IActionResult> Withdraw(int id, [FromQuery] string? reason)
     {
         if (!TryGetUserId(out var ownerId))
             return UnauthorizedResult();
 
         try
         {
+            var dto = new WithdrawEntryDto { Reason = reason };
             var result = await _service.WithdrawAsync(ownerId, id, dto);
             return Ok(result);
         }

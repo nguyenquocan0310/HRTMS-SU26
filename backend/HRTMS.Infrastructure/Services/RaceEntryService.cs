@@ -67,6 +67,11 @@ public class RaceEntryService : IRaceEntryService
         if (pairing.Horse.AdminApprovalStatus != "Approved")
             throw new InvalidOperationException("HORSE_NOT_APPROVED");
 
+        // EC-21 (BR-05) — tai kiem tra kinh nghiem Jockey tai thoi diem dua cap vao Race cu the,
+        // vi nguong MinJockeyExperienceYears phu thuoc tung giai.
+        if (pairing.Jockey.ExperienceYears < race.Round.Tournament.MinJockeyExperienceYears)
+            throw new InvalidOperationException("JOCKEY_EXPERIENCE_TOO_LOW");
+
         // SCH.7 / EC-46 — chan khi so entry hop le da dat MaxHorses (khong ap so toi thieu).
         var currentCount = await _context.RaceEntries
             .CountAsync(e => e.RaceId == raceId && ActiveEntryStatuses.Contains(e.Status));
@@ -99,12 +104,14 @@ public class RaceEntryService : IRaceEntryService
             throw new InvalidOperationException("DOUBLE_BOOKED");
 
         var now = DateTime.UtcNow;
+        // Giai mien phi (EntryFeeAmount == 0) -> tu dong Paid; nguoc lai Unpaid cho Admin xac nhan sau.
+        var feeStatus = race.Round.Tournament.EntryFeeAmount == 0 ? "Paid" : "Unpaid";
         var entry = new RaceEntry
         {
             RaceId = raceId,
             PairingId = dto.PairingId,
             Status = "Pending",
-            EntryFeeStatus = "Unpaid",
+            EntryFeeStatus = feeStatus,
             IsWithdrawn = false,
             CreatedAt = now,
             UpdatedAt = now
