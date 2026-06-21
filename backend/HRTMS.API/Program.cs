@@ -8,6 +8,7 @@ builder.Services.AddApplicationServices();
 builder.Services.AddJwtAuth(builder.Configuration);
 builder.Services.AddCorsPolicy();
 builder.Services.AddSwaggerServices();
+builder.Services.AddHangfireJobs(builder.Configuration);
 builder.Services.AddControllers();
 builder.Services.AddStackExchangeRedisCache(options =>
 {
@@ -34,4 +35,8 @@ app.UseMiddleware<TokenBlacklistMiddleware>();
 
 app.UseAuthorization();
 app.MapControllers();
+
+// Module E (BR-08) — dang ky recurring job auto-cancel entry qua han.
+app.UseHangfireRecurringJobs();
+
 app.Run();
