@@ -1,7 +1,5 @@
 ﻿using HRTMS.Core.Common;
 using HRTMS.Core.DTOs.Horse;
-using HRTMS.Core.DTOs.Horse;
-using HRTMS.Core.Interfaces.Services;
 using HRTMS.Core.Interfaces.Services;
 using HRTMS.Infrastructure.Data;
 using HRTMS.Infrastructure.Services;
