@@ -41,7 +41,7 @@ export default function LoginPage() {
 
     setIsSubmitting(true);
     try {
-      const result = await authService.login({ credential, password });
+      const result = await authService.login({ email: credential, password });
       setAuth(result.token, result.user);
       navigate(getRoleHomePath(result.user.role), { replace: true });
     } catch (err) {

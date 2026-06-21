@@ -31,6 +31,17 @@ const StepIdentity = ({ data, onChange }: Props) => {
         </div>
 
         <div className={styles.field}>
+  <label className={styles.label}>Họ và Tên</label>
+  <input
+    type="text"
+    className={styles.input}
+    placeholder="Enter your full name"
+    value={data.fullName}
+    onChange={(e) => handleChange('fullName', e.target.value)}
+  />
+</div>
+
+        <div className={styles.field}>
           <label className={styles.label}>Email Address</label>
           <input
             type="email"

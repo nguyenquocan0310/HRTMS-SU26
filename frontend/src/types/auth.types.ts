@@ -3,9 +3,9 @@ import { RegRole } from './role.types';
 // ─── Step 2: Identity ─────────────────────────────────────────────────────────
 export interface IdentityData {
   username: string;
+  fullName: string;
   email: string;
 }
-
 // ─── Step 3: Credentials ─────────────────────────────────────────────────────
 export interface CredentialsData {
   password: string;
@@ -60,6 +60,7 @@ export const initialFormData: RegisterFormData = {
   role: null,
   identity: {
     username: '',
+    fullName: '',
     email: '',
   },
   credentials: {
