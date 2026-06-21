@@ -106,21 +106,8 @@ public class SchedulingController : ControllerBase
         }
     }
 
-    // SCH.3 — Lich thi dau cong khai (khong yeu cau dang nhap).
-    [HttpGet("races/{raceId:int}/schedule")]
-    [AllowAnonymous]
-    public async Task<IActionResult> GetSchedule(int raceId)
-    {
-        try
-        {
-            var result = await _service.GetRaceScheduleAsync(raceId);
-            return Ok(result);
-        }
-        catch (KeyNotFoundException ex) when (ex.Message == "RACE_NOT_FOUND")
-        {
-            return NotFound(Err("RACE_NOT_FOUND", "Race was not found."));
-        }
-    }
+    // SCH.3 — Lich thi dau cong khai da co san: GET /api/races/{raceId}/entries
+    // (TournamentController - Module B). Service van expose GetRaceScheduleAsync de tai su dung neu can.
 
     // SCH.4 — Owner xac nhan tham gia.
     [HttpPatch("race-entries/{id:int}/confirm")]
