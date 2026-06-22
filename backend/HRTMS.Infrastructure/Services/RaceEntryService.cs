@@ -2,6 +2,7 @@ using HRTMS.Core.DTOs.RaceEntry;
 using HRTMS.Core.Entities;
 using HRTMS.Core.Interfaces.Services;
 using HRTMS.Infrastructure.Data;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace HRTMS.Infrastructure.Services;
@@ -123,15 +124,26 @@ public class RaceEntryService : IRaceEntryService
         {
             await _context.SaveChangesAsync();
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (
+            ex.InnerException is SqlException sqlEx &&
+            (sqlEx.Number == 2601 || sqlEx.Number == 2627))
         {
-            // UQ_RaceEntries_RacePairing chong cung Pairing vao Race 2 lan (race condition).
+            // CHI map khi that su vi pham UNIQUE (2601/2627) — vd UQ_RaceEntries_RacePairing.
+            // Cac loi DB khac (CHECK, FK, NOT NULL...) duoc nem tiep de lo nguyen nhan that.
             throw new InvalidOperationException("DUPLICATE_IN_RACE");
         }
 
         await _audit.LogAsync(adminId, "ALLOCATE_RACE_ENTRY", "RaceEntry",
             entry.RaceEntryId.ToString(), null,
             $"RaceId={raceId};PairingId={dto.PairingId}");
+
+        // Bao Owner: ngua da duoc xep vao cuoc dua, can xac nhan tham gia truoc cut-off.
+        await _notification.SendAsync(
+            pairing.Horse.OwnerId,
+            "Ngựa đã được xếp vào cuộc đua",
+            $"Ngựa '{pairing.Horse.Name}' đã được xếp vào cuộc đua #{raceId}. Vui lòng xác nhận tham gia trước hạn chốt.",
+            relatedEntityType: "RaceEntry",
+            relatedEntityId: entry.RaceEntryId);
 
         return MapToResponse(entry, pairing);
     }
@@ -192,6 +204,17 @@ public class RaceEntryService : IRaceEntryService
 
         await _audit.LogAsync(adminId, "DRAW_POST_POSITIONS", "Race",
             raceId.ToString(), null, $"Entries={entries.Count}");
+
+        // Bao Owner cong xuat phat cua tung ngua (sau khi da commit boc tham).
+        foreach (var e in entries)
+        {
+            await _notification.SendAsync(
+                e.Pairing.Horse.OwnerId,
+                "Đã bốc thăm vị trí xuất phát",
+                $"Ngựa '{e.Pairing.Horse.Name}' nhận cổng xuất phát số {e.PostPosition} ở cuộc đua #{raceId}.",
+                relatedEntityType: "Race",
+                relatedEntityId: raceId);
+        }
 
         return new PostPositionDrawResultDto
         {
@@ -380,6 +403,22 @@ public class RaceEntryService : IRaceEntryService
                     relatedEntityType: "RaceEntry",
                     relatedEntityId: raceEntryId);
             }
+
+            // Bao Owner va Jockey cua cap dau bi huy (dung SRS: 3 ben).
+            // Pairing.JockeyId = Users.UserId (shared PK voi JockeyProfiles).
+            await _notification.SendAsync(
+                entry.Pairing.Horse.OwnerId,
+                "Đăng ký cuộc đua đã bị hủy",
+                $"Ngựa '{entry.Pairing.Horse.Name}' đã rút khỏi cuộc đua #{entry.RaceId}. Lý do: {reason}.",
+                relatedEntityType: "RaceEntry",
+                relatedEntityId: raceEntryId);
+
+            await _notification.SendAsync(
+                entry.Pairing.JockeyId,
+                "Đăng ký cuộc đua đã bị hủy",
+                $"Cặp đấu với ngựa '{entry.Pairing.Horse.Name}' ở cuộc đua #{entry.RaceId} đã bị hủy. Lý do: {reason}.",
+                relatedEntityType: "RaceEntry",
+                relatedEntityId: raceEntryId);
 
             await _audit.LogAsync(actorId,
                 isSystem ? "AUTO_CANCEL_RACE_ENTRY" : "WITHDRAW_RACE_ENTRY",
