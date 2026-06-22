@@ -17,6 +17,8 @@ import OwnerLayout from './pages/owner/OwnerLayout'
 import RegisterHorse from './pages/owner/RegisterHorse'
 import HorseDetail from './pages/owner/HorseDetail'
 import ScheduleConfirm from './pages/owner/ScheduleConfirm'
+import RaceEntries from './pages/owner/RaceEntries'
+import JockeyInvite from './pages/owner/JockeyInvite'
 
 // ── Import các trang Jockey ──
 import JockeyLayout from './pages/jockey/JockeyLayout'
@@ -95,7 +97,9 @@ export default function App() {
           <Route path="horses" element={<MyHorses />} />
           <Route path="horses/register" element={<RegisterHorse />} />
           <Route path="horses/:id" element={<HorseDetail />} />
+          <Route path="race-entries" element={<RaceEntries />} />
           <Route path="schedule-confirm" element={<ScheduleConfirm />} />
+          <Route path="jockey-invite" element={<JockeyInvite />} />
           <Route path="protest" element={<Protest userRole="HorseOwner" />} />
         </Route>
 

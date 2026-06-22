@@ -1,55 +1,46 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Horse } from '../../types/owner.types';
 import HorseStatusBadge from '../../components/owner/HorseStatusBadge';
+import { getHorseById } from '../../services/ownerService';
 
-// Dữ liệu mẫu
+// Dữ liệu mẫu làm fallback
 const mockHorses: Horse[] = [
   {
-    horseID: 'H001',
-    ownerID: 'owner-001',
-    breedCode: 'THO',
-    name: 'Thunder',
-    birthYear: 2020,
-    gender: 'Stallion',
-    color: 'Black',
-    vaccinationRecordRef: 'VAC-2024-001',
-    dopingTestDate: new Date('2024-06-10'),
-    dopingTestResult: 'Clean',
-    status: 'Approved',
-    createdAt: new Date('2024-01-15'),
+    name: 'Thunder Storm', birthYear: 2019, gender: 'Stallion',
+    color: 'Bay', dopingTestResult: 'Clean',
+    status: 'Approved', breed: 'THO', vaccinationRecordRef: 'VAC-001',
+    weight: 450, identifyingMarks: 'Vết bớt trắng ở trán', legalConsentAccepted: true,
+    horseID: 'H001', ownerID: 'O001', createdAt: new Date()
   },
   {
-    horseID: 'H002',
-    ownerID: 'owner-001',
-    breedCode: 'ARAB',
-    name: 'Bella',
-    birthYear: 2021,
-    gender: 'Mare',
-    color: 'Chestnut',
-    vaccinationRecordRef: 'VAC-2024-002',
-    dopingTestDate: new Date('2024-06-12'),
-    dopingTestResult: 'Pending',
-    status: 'Pending',
-    createdAt: new Date('2024-02-20'),
+    name: 'Golden Arrow', birthYear: 2020, gender: 'Filly',
+    color: 'Chestnut', dopingTestResult: 'Pending',
+    status: 'Pending', breed: 'ARAB', vaccinationRecordRef: 'VAC-002',
+    weight: 420, identifyingMarks: 'Không có', legalConsentAccepted: true,
+    horseID: 'H002', ownerID: 'O001', createdAt: new Date()
   },
   {
-    horseID: 'H003',
-    ownerID: 'owner-001',
-    breedCode: 'QUAR',
-    name: 'Shadow',
-    birthYear: 2019,
-    gender: 'Colt',
-    color: 'Gray',
-    dopingTestResult: 'Failed',
-    status: 'Rejected',
+    name: 'Dark Knight', birthYear: 2018, gender: 'Colt',
+    color: 'Black', dopingTestResult: 'Failed',
+    status: 'Rejected', breed: 'THO', vaccinationRecordRef: 'VAC-003',
+    weight: 480, identifyingMarks: 'Vết sẹo ở cổ', legalConsentAccepted: true,
     rejectionReason: 'Kết quả xét nghiệm doping không hợp lệ',
-    createdAt: new Date('2024-03-10'),
-  },
+    horseID: 'H003', ownerID: 'O001', createdAt: new Date()
+  }
 ];
 
 const getGenderLabel = (gender: Horse['gender']): string => {
   switch (gender) {
+    case 'Male':
+    case 'male':
+      return 'Đực (Male)';
+    case 'Female':
+    case 'female':
+      return 'Cái (Female)';
+    case 'Gelding':
+    case 'gelding':
+      return 'Bị thiến (Gelding)';
     case 'Stallion':
       return 'Ngựa đực (trưởng thành)';
     case 'Colt':
@@ -64,23 +55,68 @@ const getGenderLabel = (gender: Horse['gender']): string => {
 };
 
 export default function HorseDetail() {
-  const { id } = useParams<{ horseID: string }>();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [horse, setHorse] = useState<Horse | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Tìm ngựa từ dữ liệu mẫu
-  const horse = mockHorses.find((h) => h.horseID === id);
-  if (!horse) {
+  useEffect(() => {
+    const fetchHorse = async () => {
+      if (!id) return;
+      try {
+        setLoading(true);
+        const horseIdNum = Number(id);
+        if (!isNaN(horseIdNum)) {
+          const data = await getHorseById(horseIdNum);
+          setHorse(data);
+        } else {
+          // If ID is a string (e.g. H001 in mock), use fallback
+          const mock = mockHorses.find((h) => h.horseID === id);
+          if (mock) {
+            setHorse(mock);
+          } else {
+            setError('Không tìm thấy thông tin ngựa');
+          }
+        }
+      } catch (err) {
+        console.warn(`Lỗi khi tải chi tiết ngựa ID ${id} từ API, dùng dữ liệu mẫu làm fallback:`, err);
+        const mock = mockHorses.find((h) => h.horseID === id);
+        if (mock) {
+          setHorse(mock);
+        } else {
+          setError('Không tìm thấy thông tin ngựa');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchHorse();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4 animate-duration-500"></div>
+          <p className="text-gray-600 text-lg">Đang tải chi tiết ngựa...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !horse) {
     return (
       <div className="min-h-screen bg-gray-50 py-12 px-4 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-800 mb-4">
-            Không tìm thấy ngựa
+            {error || 'Không tìm thấy ngựa'}
           </h2>
           <button
             onClick={() => navigate('/owner/horses')}
             className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition-colors"
           >
-            Quay lại
+            Quay lại danh sách
           </button>
         </div>
       </div>
@@ -111,7 +147,7 @@ export default function HorseDetail() {
       case 'Failed':
         return 'Dương tính';
       default:
-        return result;
+        return result || 'Chưa kiểm tra';
     }
   };
 
@@ -135,7 +171,7 @@ export default function HorseDetail() {
             </h1>
             <div className="flex items-center gap-3">
               <span className="text-sm text-gray-600 font-medium">Trạng thái:</span>
-              <HorseStatusBadge status={horse.status} />
+              <HorseStatusBadge status={(horse.status as 'Approved' | 'Pending' | 'Rejected') || 'Pending'} />
             </div>
           </div>
 
@@ -153,7 +189,7 @@ export default function HorseDetail() {
             <div className="bg-gray-50 rounded-lg p-4">
               <p className="text-sm text-gray-600 font-medium mb-1">Giống ngựa</p>
               <p className="text-lg font-semibold text-gray-800">
-                {horse.breedCode}
+                {horse.breed}
               </p>
             </div>
 
@@ -231,7 +267,7 @@ export default function HorseDetail() {
                 Ngày đăng ký
               </p>
               <p className="text-lg font-semibold text-gray-800">
-                {new Date(horse.createdAt).toLocaleDateString('vi-VN')}
+                {horse.createdAt ? new Date(horse.createdAt).toLocaleDateString('vi-VN') : 'N/A'}
               </p>
             </div>
           </div>
@@ -245,7 +281,7 @@ export default function HorseDetail() {
               Quay lại
             </button>
             <button
-              onClick={() => navigate(`/owner/horses/edit/${horse.horseID}`)}
+              onClick={() => navigate(`/owner/horses/edit/${horse.horseID || (horse as any).horseId || id || ''}`)}
               className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
             >
               Cập nhật thông tin
@@ -256,3 +292,4 @@ export default function HorseDetail() {
     </div>
   );
 }
+
