@@ -116,29 +116,97 @@ const StepVerification = ({ role, formData, onChange }: Props) => {
           </div>
 
           {/* Family / Conflict of Interest Declaration */}
+          {/* Family / Conflict of Interest Declaration */}
           <div className={styles.coiBox}>
-            <h4 className={styles.coiTitle}>
-              Family / Conflict of Interest Declaration
-            </h4>
+            <h4 className={styles.coiTitle}>Family / Conflict of Interest Declaration</h4>
             <p className={styles.coiDesc}>
-              Declare any family relationships with other participants to prevent
-              conflicts of interest during races.
+              Khai báo quan hệ gia đình với các thành viên khác trong ngành (nếu có).
             </p>
-            <textarea
-              className={styles.textarea}
-              placeholder="Describe any family relationships or conflicts of interest (or write 'None')"
-              rows={4}
-              value={formData.jockeyVerification.familyDeclaration}
-              onChange={(e) =>
-                onChange({
-                  jockeyVerification: {
-                    ...formData.jockeyVerification,
-                    familyDeclaration: e.target.value,
-                  },
-                })
-              }
-            />
+
+            {formData.jockeyVerification.familyDeclarations.map((decl, idx) => (
+              <div key={idx} className={styles.coiItem}>
+                <div className={styles.field}>
+                  <label className={styles.label}>Họ tên người liên quan</label>
+                  <input
+                    type="text"
+                    className={styles.input}
+                    value={decl.relatedPersonName}
+                    onChange={(e) => {
+                      const updated = [...formData.jockeyVerification.familyDeclarations];
+                      updated[idx] = { ...updated[idx], relatedPersonName: e.target.value };
+                      onChange({ jockeyVerification: { ...formData.jockeyVerification, familyDeclarations: updated } });
+                    }}
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label}>Quan hệ</label>
+                  <input
+                    type="text"
+                    className={styles.input}
+                    placeholder="Ví dụ: Parent, Sibling, Spouse"
+                    value={decl.relationType}
+                    onChange={(e) => {
+                      const updated = [...formData.jockeyVerification.familyDeclarations];
+                      updated[idx] = { ...updated[idx], relationType: e.target.value };
+                      onChange({ jockeyVerification: { ...formData.jockeyVerification, familyDeclarations: updated } });
+                    }}
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label}>Vai trò trong ngành</label>
+                  <input
+                    type="text"
+                    className={styles.input}
+                    placeholder="Ví dụ: Owner, Referee, Doctor"
+                    value={decl.industryRole}
+                    onChange={(e) => {
+                      const updated = [...formData.jockeyVerification.familyDeclarations];
+                      updated[idx] = { ...updated[idx], industryRole: e.target.value };
+                      onChange({ jockeyVerification: { ...formData.jockeyVerification, familyDeclarations: updated } });
+                    }}
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label}>Ghi chú</label>
+                  <input
+                    type="text"
+                    className={styles.input}
+                    value={decl.notes}
+                    onChange={(e) => {
+                      const updated = [...formData.jockeyVerification.familyDeclarations];
+                      updated[idx] = { ...updated[idx], notes: e.target.value };
+                      onChange({ jockeyVerification: { ...formData.jockeyVerification, familyDeclarations: updated } });
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className={styles.removeBtn}
+                  onClick={() => {
+                    const updated = formData.jockeyVerification.familyDeclarations.filter((_, i) => i !== idx);
+                    onChange({ jockeyVerification: { ...formData.jockeyVerification, familyDeclarations: updated } });
+                  }}
+                >
+                  Xóa khai báo này
+                </button>
+              </div>
+            ))}
+
+            <button
+              type="button"
+              className={styles.addBtn}
+              onClick={() => {
+                const updated = [
+                  ...formData.jockeyVerification.familyDeclarations,
+                  { relatedPersonName: '', relationType: '', industryRole: '', notes: '' },
+                ];
+                onChange({ jockeyVerification: { ...formData.jockeyVerification, familyDeclarations: updated } });
+              }}
+            >
+              + Thêm khai báo
+            </button>
           </div>
+
         </div>
       </div>
     );

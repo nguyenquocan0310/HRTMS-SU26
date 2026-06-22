@@ -45,7 +45,7 @@ export const login = async (payload: LoginPayload): Promise<LoginResult> => {
     username: payload.email.split('@')[0],
     fullName: res.data.fullName,
     email: payload.email,
-    role: res.data.role,
+    role: mapApiRoleToRole(res.data.role as string),
     status: 'Active',
   };
 
@@ -75,13 +75,29 @@ export interface RegisterResult {
 const mapRoleToApiRole = (role: Role): string => {
   const mapping: Record<Role, string> = {
     Admin: 'Admin',
-    HorseOwner: 'Owner',
+    HorseOwner: 'Owner',       // FE → BE
+    Owner: 'Owner',
     Jockey: 'Jockey',
-    RaceReferee: 'Referee',
+    RaceReferee: 'Referee',    // FE → BE
+    Referee: 'Referee',
     Doctor: 'Doctor',
     Spectator: 'Spectator',
   };
-  return mapping[role];
+  return mapping[role] ?? 'Spectator';
+};
+
+const mapApiRoleToRole = (apiRole: string): Role => {
+  const mapping: Record<string, Role> = {
+    Admin: 'Admin',
+    Owner: 'HorseOwner',       // BE → FE
+    HorseOwner: 'HorseOwner',
+    Jockey: 'Jockey',
+    Referee: 'RaceReferee',    // BE → FE
+    RaceReferee: 'RaceReferee',
+    Doctor: 'Doctor',
+    Spectator: 'Spectator',
+  };
+  return mapping[apiRole] ?? 'Spectator';
 };
 
 interface RegisterApiPayload {
@@ -97,6 +113,8 @@ interface RegisterApiPayload {
   selfDeclaredWeight?: number;
   certificationLevel?: string;
   medicalLicenseNumber?: string;
+  bloodType?: string;      
+  healthStatus?: string;
   familyDeclarations?: {
     relatedPersonName: string;
     relatedUserId?: number;
@@ -124,12 +142,27 @@ export const register = async (payload: RegisterPayload): Promise<RegisterResult
     selfDeclaredWeight: v.selfDeclaredWeight as number | undefined,
     certificationLevel: v.certificationLevel as string | undefined,
     medicalLicenseNumber: v.medicalLicenseNumber as string | undefined,
+  bloodType: (v.bloodType as string) || undefined,
+  healthStatus: (v.healthStatus as string) || undefined,
   };
 
   // familyDeclaration ở FE là 1 chuỗi text tự do, BE cần mảng object có cấu
   // trúc — nếu có nội dung, gói lại thành 1 item đơn giản.
+  // familyDeclarations: nếu có mảng thật (từ Jockey form mới) thì dùng luôn,
+  // nếu chỉ có text tự do (legacy) thì wrap lại.
+  const familyDeclarations = v.familyDeclarations as {
+    relatedPersonName: string;
+    relatedUserId?: number;
+    relationType: string;
+    industryRole?: string;
+    notes?: string;
+  }[] | undefined;
+
   const familyText = v.familyDeclaration as string | undefined;
-  if (familyText && familyText.trim() !== '') {
+
+  if (familyDeclarations && familyDeclarations.length > 0) {
+    apiPayload.familyDeclarations = familyDeclarations;
+  } else if (familyText && familyText.trim() !== '' && familyText.trim().toLowerCase() !== 'none') {
     apiPayload.familyDeclarations = [
       {
         relatedPersonName: 'N/A',
