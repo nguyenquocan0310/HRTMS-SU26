@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Horse } from '../../types/owner.types';
 import HorseCard from '../../components/owner/HorseCard';
+import { getMyHorses } from '../../services/ownerService';
 
 const MyHorses: React.FC = () => {
   const navigate = useNavigate();
@@ -13,33 +14,18 @@ const MyHorses: React.FC = () => {
     const fetchHorses = async () => {
       try {
         setLoading(true);
-
-        // Dữ liệu mẫu
-        const mockData: Horse[] = [
-          {
-            horseID: 'H001', ownerID: 'O001', breedCode: 'THO',
-            name: 'Thunder Storm', birthYear: 2019, gender: 'Stallion',
-            color: 'Bay', dopingTestResult: 'Clean',
-            status: 'Approved', createdAt: new Date()
-          },
-          {
-            horseID: 'H002', ownerID: 'O001', breedCode: 'ARAB',
-            name: 'Golden Arrow', birthYear: 2020, gender: 'Filly',
-            color: 'Chestnut', dopingTestResult: 'Pending',
-            status: 'Pending', createdAt: new Date()
-          },
-          {
-            horseID: 'H003', ownerID: 'O001', breedCode: 'THO',
-            name: 'Dark Knight', birthYear: 2018, gender: 'Colt',
-            color: 'Black', dopingTestResult: 'Failed',
-            status: 'Rejected', rejectionReason: 'Kết quả xét nghiệm doping không hợp lệ',
-            createdAt: new Date()
-          }
-        ];
-
-        setHorses(mockData);
+        setError(null);
+        const data = await getMyHorses();
+        if (data && data.length > 0) {
+          setHorses(data);
+        } else {
+          setHorses([]);
+          setError('Không có ngựa');
+        }
       } catch (err) {
-        setError('Không thể tải danh sách ngựa');
+        console.error('Lỗi khi tải danh sách ngựa:', err);
+        setHorses([]);
+        setError('Không có ngựa');
       } finally {
         setLoading(false);
       }
@@ -67,26 +53,14 @@ const MyHorses: React.FC = () => {
     );
   }
 
-  // Trạng thái lỗi
-  if (error) {
+  // Trạng thái lỗi hoặc rỗng
+  if (error || horses.length === 0) {
     return (
-      <div className="p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <h3 className="text-red-800 font-semibold mb-2">Lỗi</h3>
-          <p className="text-red-700">{error}</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Trạng thái rỗng
-  if (horses.length === 0) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center bg-white p-8 border border-gray-200 rounded-xl shadow-sm max-w-md mx-auto">
           <div className="text-6xl mb-4">🐴</div>
           <h2 className="text-2xl font-bold text-gray-800 mb-4">
-            Bạn chưa có ngựa nào
+            {error || 'Không có ngựa'}
           </h2>
           <button
             onClick={handleRegisterHorse}

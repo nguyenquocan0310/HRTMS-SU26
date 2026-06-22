@@ -1,4 +1,5 @@
-import axios, { AxiosInstance } from 'axios';
+import axios from 'axios';
+import type  { AxiosInstance } from 'axios';
 import type {
   JockeyProfile,
   RaceInvitation,
@@ -33,7 +34,7 @@ axiosInstance.interceptors.request.use(
 export const getMyProfile = async (): Promise<JockeyProfile> => {
   try {
     const response = await axiosInstance.get<JockeyProfile>(
-      '/api/jockeys/my-profile'
+      'http://localhost:5222/api/jockeys/profile'
     );
     return response.data;
   } catch (error) {
@@ -43,14 +44,59 @@ export const getMyProfile = async (): Promise<JockeyProfile> => {
 };
 
 /**
- * Get all race invitations for the current jockey
+ * Update the current jockey's professional profile
  */
-export const getMyInvitations = async (): Promise<RaceInvitation[]> => {
+export interface UpdateProfilePayload {
+  licenseCertificate: string;
+  experienceYears: number;
+  bloodType: string;
+  healthStatus: string;
+  selfDeclaredWeight: number;
+}
+
+export const updateMyProfile = async (
+  payload: UpdateProfilePayload
+): Promise<{ message: string }> => {
   try {
-    const response = await axiosInstance.get<RaceInvitation[]>(
-      '/api/jockey-invitations/my'
+    const response = await axiosInstance.patch<{ message: string }>(
+      'http://localhost:5222/api/jockeys/profile',
+      payload
     );
     return response.data;
+  } catch (error) {
+    console.error('Error updating jockey profile:', error);
+    throw error;
+  }
+};
+
+
+/**
+ * Get all race invitations for the current jockey
+ */
+export const getMyInvitations = async (
+  status?: string,
+  page: number = 1,
+  pageSize: number = 20
+): Promise<any[]> => {
+  try {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    params.append('page', String(page));
+    params.append('pageSize', String(pageSize));
+
+    const response = await axiosInstance.get<any>(
+      `http://localhost:5222/api/jockeys/invitations?${params.toString()}`
+    );
+    const data = response.data;
+
+    // Extract array of invitations
+    if (Array.isArray(data)) return data;
+    if (data && data.data) {
+      if (Array.isArray(data.data)) return data.data;
+      if (data.data.items && Array.isArray(data.data.items)) return data.data.items;
+    }
+    if (data && data.items && Array.isArray(data.items)) return data.items;
+    return [];
   } catch (error) {
     console.error('Error fetching jockey invitations:', error);
     throw error;
@@ -62,7 +108,7 @@ export const getMyInvitations = async (): Promise<RaceInvitation[]> => {
  */
 export const respondToInvitation = async (
   invitationID: string,
-  status: 'Accept' | 'Decline'
+  status: 'Accepted' | 'Declined'
 ): Promise<void> => {
   try {
     await axiosInstance.put(
@@ -104,6 +150,21 @@ export const getMyRaceHistory = async (): Promise<JockeyRaceResult[]> => {
     return response.data;
   } catch (error) {
     console.error('Error fetching jockey race history:', error);
+    throw error;
+  }
+};
+
+/**
+ * Accept a pairing invitation
+ */
+export const acceptPairing = async (pairingId: string): Promise<any> => {
+  try {
+    const response = await axiosInstance.patch<any>(
+      `http://localhost:5222/api/pairings/${pairingId}/accept`
+    );
+    return response.data;
+  } catch (error) {
+    console.error(`Error accepting pairing ${pairingId}:`, error);
     throw error;
   }
 };

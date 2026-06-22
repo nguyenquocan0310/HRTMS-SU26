@@ -7,14 +7,17 @@
  * Represents a jockey's profile information
  */
 export interface JockeyProfile {
-  jockeyID: string;
-  userID: string;
-  licenseNumber: string;
+  jockeyId: number;
+  username: string;
+  fullName: string;
+  email: string;
+  licenseCertificate: string;
   experienceYears: number;
-  weight: number;
-  winCount: number;
-  totalRaces: number;
+  selfDeclaredWeight: number;
+  bloodType: string;
+  healthStatus: string;
   status: 'Active' | 'Suspended' | 'Retired';
+  createdAt: string;
 }
 
 /**
@@ -22,15 +25,16 @@ export interface JockeyProfile {
  */
 export interface RaceInvitation {
   invitationID: string;
-  raceID: string;
+  raceID?: string;
   ownerID: string;
   ownerName: string;
   horseName: string;
   breedCode: string;
-  raceScheduledTime: string;
-  status: 'Pending' | 'Accept' | 'Decline';
+  raceScheduledTime?: string;
+  status: 'Pending' | 'Accepted' | 'Declined';
   invitedAt: string;
   respondedAt?: string;
+  requestMessage?: string;
 }
 
 /**
