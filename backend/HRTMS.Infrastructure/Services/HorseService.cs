@@ -445,7 +445,9 @@ public class HorseService : IHorseService
 
     public async Task<ApiResponse<string>> ConfirmEntryFeeAsync(int adminId, int raceEntryId)
     {
-        var entry = await _context.RaceEntries.FindAsync(raceEntryId);
+        var entry = await _context.RaceEntries
+            .Include(e => e.Pairing).ThenInclude(p => p.Horse)
+            .FirstOrDefaultAsync(e => e.RaceEntryId == raceEntryId);
         if (entry == null) return ApiResponse<string>.Fail("RACE_ENTRY_NOT_FOUND");
         if (entry.EntryFeeStatus == "Paid") return ApiResponse<string>.Fail("FEE_ALREADY_CONFIRMED");
 
@@ -457,6 +459,20 @@ public class HorseService : IHorseService
 
         await _auditLog.LogAsync(adminId, "Confirm_Entry_Fee", "RaceEntry",
             raceEntryId.ToString(), "Unpaid", "Paid", null);
+
+        // Bao Owner: le phi da duoc xac nhan (Type phai la In-app/Email/Both).
+        _context.Notifications.Add(new Notification
+        {
+            RecipientId = entry.Pairing.Horse.OwnerId,
+            Title = "Lệ phí tham gia đã được xác nhận",
+            Message = $"Lệ phí cho ngựa '{entry.Pairing.Horse.Name}' (đăng ký #{raceEntryId}) đã được xác nhận (Paid).",
+            Type = "In-app",
+            IsRead = false,
+            RelatedEntityType = "RaceEntry",
+            RelatedEntityId = raceEntryId,
+            SentAt = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
 
         return ApiResponse<string>.Ok("Lệ phí đã được xác nhận.");
     }
