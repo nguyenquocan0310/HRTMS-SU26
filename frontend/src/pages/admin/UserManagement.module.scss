@@ -223,3 +223,23 @@
     width: 100%;
   }
 }
+
+.approveBtn {
+  padding: 0.3rem 0.8rem;
+  border-radius: 6px;
+  border: 1px solid rgba(39, 174, 96, 0.4);
+  background: rgba(39, 174, 96, 0.15);
+  color: #2ecc71;
+  font-size: 0.8rem;
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(39, 174, 96, 0.25);
+  }
+}
+
+.loadingText {
+  color: var(--color-text-secondary);
+  padding: 2rem;
+  text-align: center;
+}
