@@ -183,13 +183,65 @@ const TournamentBuilder = () => {
     setView('wizard');
   };
 
-  const handleEdit = (id: number) => {
-    // TODO Bước B: gọi tournamentService.getTournamentById(id) để load đầy đủ vào draft
-    console.log('[TournamentBuilder] Edit tournament', id);
-    setDraft(createEmptyTournament());
+const handleEdit = async (id: number) => {
+  setIsSaving(true);
+  setListError('');
+  try {
+    const t = await tournamentService.getTournamentById(id);
+    setDraft({
+      id: String(t.tournamentId),
+      status: t.status as TournamentStatus,
+      basicInfo: {
+        name: t.name,
+        startDate: t.startDate,
+        endDate: t.endDate,
+        allowedBreed: t.allowedBreed as AllowedBreed,
+        trackType: t.trackType as TrackType,
+        raceDistance: t.raceDistance,
+        raceCategory: t.raceCategory as RaceCategory,
+        maxHorses: t.maxHorses,
+        minJockeyExperienceYears: t.minJockeyExperienceYears,
+        purseAmount: t.purseAmount,
+        entryFeeAmount: t.entryFeeAmount,
+        preRaceWeightThresholdKg: t.preRaceWeightThresholdKg,
+        postRaceWeightDiffThresholdKg: t.postRaceWeightDiffThresholdKg,
+      },
+      prizeDistribution: t.prizeDistributions?.map((p) => ({
+        rank: p.position as 1 | 2 | 3 | 4 | 5,
+        percentage: p.percentage,
+      })) ?? [
+        { rank: 1, percentage: 40 },
+        { rank: 2, percentage: 25 },
+        { rank: 3, percentage: 15 },
+        { rank: 4, percentage: 12 },
+        { rank: 5, percentage: 8 },
+      ],
+      rounds: t.rounds?.map((r) => ({
+        id: String(r.roundId),
+        name: r.name,
+        scheduledDate: r.scheduledDate,
+        races: r.races?.map((race) => ({
+          id: String(race.raceId),
+          sequenceOrder: race.raceNumber,
+          scheduledDate: r.scheduledDate,
+          raceNumber: race.raceNumber,
+          scheduledTime: race.scheduledTime,
+          purseAmount: race.purseAmount,
+          raceDistanceOverride: race.raceDistanceOverride ?? '',
+          trackTypeOverride: (race.trackTypeOverride as TrackType) ?? '',
+          isPostPositionDrawn: race.status !== 'Upcoming',
+          entries: [],
+        })) ?? [],
+      })) ?? [],
+    });
     setActiveTab('basic');
     setView('wizard');
-  };
+  } catch (err) {
+    setListError(err instanceof Error ? err.message : 'Không tải được giải đấu.');
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -219,25 +271,67 @@ const TournamentBuilder = () => {
   // giữa "tạo mới" (POST) và "cập nhật" (PUT).
   const isNewDraft = draft.id.startsWith('t-');
 
-  const handleSaveDraft = async () => {
-    setIsSaving(true);
-    setSaveError('');
-    try {
-      const payload = buildCreatePayload();
-      if (isNewDraft) {
-        const created = await tournamentService.createTournament(payload);
-        setDraft((prev) => ({ ...prev, id: String(created.tournamentId), status: created.status as TournamentStatus }));
-      } else {
-        await tournamentService.updateTournament(Number(draft.id), payload);
-      }
-      await loadTournaments();
-      setView('list');
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Lưu giải đấu thất bại.');
-    } finally {
-      setIsSaving(false);
+const handleSaveDraft = async () => {
+  setIsSaving(true);
+  setSaveError('');
+  try {
+    const payload = buildCreatePayload();
+    let tournamentId: number;
+
+    if (isNewDraft) {
+      const created = await tournamentService.createTournament(payload);
+      tournamentId = created.tournamentId;
+      setDraft((prev) => ({
+        ...prev,
+        id: String(created.tournamentId),
+        status: created.status as TournamentStatus,
+      }));
+    } else {
+      tournamentId = Number(draft.id);
+      await tournamentService.updateTournament(tournamentId, payload);
     }
-  };
+
+    if (isPrizeValid()) {
+      await tournamentService.updatePrizeDistributions(
+        tournamentId,
+        draft.prizeDistribution.map((p) => ({ position: p.rank, percentage: p.percentage }))
+      );
+    }
+
+    for (const round of draft.rounds) {
+      let roundId = Number(round.id);
+      if (!/^\d+$/.test(round.id)) {
+        const created = await tournamentService.createRound(tournamentId, {
+          name: round.name,
+          sequenceOrder: draft.rounds.indexOf(round) + 1,
+          scheduledDate: round.scheduledDate,
+        });
+        roundId = created.roundId;
+      }
+      for (const race of round.races) {
+        if (!/^\d+$/.test(race.id)) {
+          await tournamentService.createRace(roundId, {
+            raceNumber: race.raceNumber,
+            scheduledTime: race.scheduledTime,
+            purseAmount: Number(race.purseAmount) || 0,
+            trackTypeOverride: race.trackTypeOverride || undefined,
+            raceDistanceOverride:
+              typeof race.raceDistanceOverride === 'number'
+                ? race.raceDistanceOverride
+                : undefined,
+          });
+        }
+      }
+    }
+
+    await loadTournaments();
+    setView('list');
+  } catch (err) {
+    setSaveError(err instanceof Error ? err.message : 'Lưu giải đấu thất bại.');
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   const handlePublish = async () => {
     if (!canPublish) return;
