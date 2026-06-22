@@ -7,10 +7,15 @@ interface FormData {
   name: string;
   breedCode: string;
   birthYear: number | '';
-  gender: 'Colt' | 'Filly' | 'Stallion' | 'Mare' | '';
+  gender: string;
   color: string;
+  pedigree: string;
+  weight: number | '';
+  identifyingMarks: string;
   vaccinationRecordRef: string;
-  dopingTestResult: 'Clean' | 'Pending' | 'Failed';
+  dopingTestDate: string;
+  dopingTestResult: string;
+  legalConsentAccepted: boolean;
 }
 
 const initialFormData: FormData = {
@@ -19,15 +24,19 @@ const initialFormData: FormData = {
   birthYear: '',
   gender: '',
   color: '',
+  pedigree: '',
+  weight: '',
+  identifyingMarks: '',
   vaccinationRecordRef: '',
+  dopingTestDate: new Date().toISOString().split('T')[0],
   dopingTestResult: 'Pending',
+  legalConsentAccepted: true, // Default to true as required in format
 };
 
-const genderOptions: { value: 'Stallion' | 'Colt' | 'Mare' | 'Filly'; label: string }[] = [
-  { value: 'Stallion', label: 'Ngựa đực (trưởng thành)' },
-  { value: 'Colt', label: 'Ngựa đực (non)' },
-  { value: 'Mare', label: 'Ngựa cái (trưởng thành)' },
-  { value: 'Filly', label: 'Ngựa cái (non)' },
+const genderOptions = [
+  { value: 'Male', label: 'Đực (Male)' },
+  { value: 'Female', label: 'Cái (Female)' },
+  { value: 'Gelding', label: 'Bị thiến (Gelding)' },
 ];
 
 export default function RegisterHorse() {
@@ -36,7 +45,12 @@ export default function RegisterHorse() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const breedOptions = ['THO', 'ARAB', 'QUAR', 'APPA'];
+  const breedOptions = [
+    { value: 'Mixed', label: 'Mixed' },
+    { value: 'Quarter Horse', label: 'Quarter Horse' },
+    { value: 'Arabian', label: 'Arabian' },
+    { value: 'Thoroughbred', label: 'Thoroughbred' }
+  ];
 
   const validateForm = (): boolean => {
     if (!formData.name.trim()) {
@@ -59,18 +73,53 @@ export default function RegisterHorse() {
       setError('Màu sắc là bắt buộc');
       return false;
     }
+    if (formData.weight === '') {
+      setError('Cân nặng là bắt buộc');
+      return false;
+    }
+    if (!formData.identifyingMarks.trim()) {
+      setError('Đặc điểm nhận dạng là bắt buộc');
+      return false;
+    }
     return true;
   };
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    const { name, value } = e.target;
+    const { name, value, type } = e.target as HTMLInputElement;
+    const val = type === 'checkbox'
+      ? (e.target as HTMLInputElement).checked
+      : name === 'birthYear' || name === 'weight'
+        ? (value ? parseFloat(value) : '')
+        : value;
+
     setFormData((prev) => ({
       ...prev,
       [name]: name === 'birthYear' ? (value ? parseInt(value, 10) : '') : value,
     }));
     setError(null);
+  };
+
+  // Hàm lấy thông tin của form sau khi người dùng xác nhận đăng ký
+  const getRegisteredHorseInfo = () => {
+    const info = {
+      breedCode: formData.breedCode,
+      name: formData.name,
+      birthYear: Number(formData.birthYear),
+      gender: formData.gender,
+      color: formData.color,
+      pedigree: formData.pedigree || 'string',
+      weight: Number(formData.weight),
+      identifyingMarks: formData.identifyingMarks,
+      breed: formData.breedCode,
+      vaccinationRecordRef: formData.vaccinationRecordRef || 'string',
+      dopingTestDate: formData.dopingTestDate,
+      dopingTestResult: formData.dopingTestResult,
+      legalConsentAccepted: formData.legalConsentAccepted,
+    };
+    console.log('Thông tin đăng ký ngựa đã xác nhận:', info);
+    return info;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -80,19 +129,27 @@ export default function RegisterHorse() {
       return;
     }
 
+    // Lấy thông tin form sau khi xác nhận đăng ký
+    const formInfo = getRegisteredHorseInfo();
+
     try {
       setLoading(true);
       setError(null);
 
+      // dataToSubmit theo đúng format người dùng yêu cầu
       const dataToSubmit: Omit<Horse, 'horseID' | 'ownerID' | 'createdAt'> = {
-        breedCode: formData.breedCode,
-        name: formData.name,
-        birthYear: formData.birthYear as number,
-        gender: formData.gender as 'Colt' | 'Filly' | 'Stallion' | 'Mare',
-        color: formData.color,
-        vaccinationRecordRef: formData.vaccinationRecordRef || undefined,
-        dopingTestResult: formData.dopingTestResult,
-        status: 'Pending',
+        breed: formInfo.breedCode,
+        name: formInfo.name,
+        birthYear: formInfo.birthYear,
+        gender: formInfo.gender,
+        color: formInfo.color,
+        // pedigree: formInfo.pedigree,
+        weight: formInfo.weight,
+        identifyingMarks: formInfo.identifyingMarks,
+        vaccinationRecordRef: formInfo.vaccinationRecordRef,
+        dopingTestDate: formInfo.dopingTestDate,
+        dopingTestResult: formInfo.dopingTestResult,
+        legalConsentAccepted: formInfo.legalConsentAccepted,
       };
 
       await createHorse(dataToSubmit);
@@ -162,8 +219,8 @@ export default function RegisterHorse() {
                 >
                   <option value="">Chọn giống ngựa</option>
                   {breedOptions.map((breed) => (
-                    <option key={breed} value={breed}>
-                      {breed}
+                    <option key={breed.value} value={breed.value}>
+                      {breed.label}
                     </option>
                   ))}
                 </select>
@@ -230,6 +287,65 @@ export default function RegisterHorse() {
                   value={formData.vaccinationRecordRef}
                   onChange={handleInputChange}
                   placeholder="Nhập mã tham chiếu (không bắt buộc)"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                />
+              </div>
+
+              {/* Ngày kiểm tra doping */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Ngày kiểm tra doping <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="date"
+                  name="dopingTestDate"
+                  value={formData.dopingTestDate}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                />
+              </div>
+
+              {/* Cân nặng */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Cân nặng (Weight) <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="number"
+                  name="weight"
+                  value={formData.weight}
+                  onChange={handleInputChange}
+                  placeholder="Nhập cân nặng"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                />
+              </div>
+
+              {/* Kết quả doping */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Kết quả doping (DopingTestResult) <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="dopingTestResult"
+                  value={formData.dopingTestResult}
+                  onChange={handleInputChange}
+                  placeholder="Nhập kết quả doping (ví dụ: Clean)"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                />
+              </div>
+
+              {/* Đặc điểm nhận dạng */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Đặc điểm nhận dạng (IdentifyingMarks) <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="identifyingMarks"
+                  value={formData.identifyingMarks}
+                  onChange={handleInputChange}
+                  placeholder="Nhập đặc điểm nhận dạng"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                 />
               </div>

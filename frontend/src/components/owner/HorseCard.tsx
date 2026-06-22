@@ -39,6 +39,15 @@ const HorseCard: React.FC<HorseCardProps> = ({ horse, onViewDetail }) => {
 
   const getGenderLabel = (gender: Horse['gender']): string => {
     switch (gender) {
+      case 'Male':
+      case 'male':
+        return 'Đực (Male)';
+      case 'Female':
+      case 'female':
+        return 'Cái (Female)';
+      case 'Gelding':
+      case 'gelding':
+        return 'Bị thiến (Gelding)';
       case 'Stallion':
         return 'Ngựa đực (trưởng thành)';
       case 'Colt':
@@ -60,7 +69,7 @@ const HorseCard: React.FC<HorseCardProps> = ({ horse, onViewDetail }) => {
       {/* Thông tin ngựa */}
       <div className="text-sm text-gray-700 mb-3 space-y-1">
         <p>
-          <span className="font-medium">Giống ngựa:</span> {horse.breedCode}
+          <span className="font-medium">Giống ngựa:</span> {horse.breed || (horse as any).breedCode}
         </p>
         <p>
           <span className="font-medium">Giới tính:</span> {getGenderLabel(horse.gender)}
@@ -74,8 +83,8 @@ const HorseCard: React.FC<HorseCardProps> = ({ horse, onViewDetail }) => {
       <div className="mb-3">
         <p>
           <span className="font-medium text-sm text-gray-700">Kiểm tra doping:</span>{' '}
-          <span className={`font-medium ${getDopingTextColor(horse.dopingTestResult)}`}>
-            {getDopingLabel(horse.dopingTestResult)}
+          <span className={`font-medium ${getDopingTextColor(horse.dopingTestResult || '')}`}>
+            {getDopingLabel(horse.dopingTestResult || '')}
           </span>
         </p>
       </div>
@@ -83,12 +92,12 @@ const HorseCard: React.FC<HorseCardProps> = ({ horse, onViewDetail }) => {
       {/* Badge trạng thái */}
       <div className="mb-4 flex items-center gap-2">
         <span className="text-sm text-gray-700 font-medium">Trạng thái:</span>
-        <HorseStatusBadge status={horse.status} />
+        <HorseStatusBadge status={horse.status || (horse as any).adminApprovalStatus || 'Pending'} />
       </div>
 
       {/* Nút xem chi tiết */}
       <button
-        onClick={() => onViewDetail(horse.horseID)}
+        onClick={() => onViewDetail(String(horse.horseID || (horse as any).horseId))}
         className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
       >
         Xem chi tiết
