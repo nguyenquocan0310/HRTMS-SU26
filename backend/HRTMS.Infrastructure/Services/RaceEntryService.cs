@@ -2,6 +2,7 @@ using HRTMS.Core.DTOs.RaceEntry;
 using HRTMS.Core.Entities;
 using HRTMS.Core.Interfaces.Services;
 using HRTMS.Infrastructure.Data;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace HRTMS.Infrastructure.Services;
@@ -123,9 +124,12 @@ public class RaceEntryService : IRaceEntryService
         {
             await _context.SaveChangesAsync();
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (
+            ex.InnerException is SqlException sqlEx &&
+            (sqlEx.Number == 2601 || sqlEx.Number == 2627))
         {
-            // UQ_RaceEntries_RacePairing chong cung Pairing vao Race 2 lan (race condition).
+            // CHI map khi that su vi pham UNIQUE (2601/2627) — vd UQ_RaceEntries_RacePairing.
+            // Cac loi DB khac (CHECK, FK, NOT NULL...) duoc nem tiep de lo nguyen nhan that.
             throw new InvalidOperationException("DUPLICATE_IN_RACE");
         }
 
