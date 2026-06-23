@@ -54,6 +54,8 @@ public partial class HRTMSDbContext : DbContext
 
     public virtual DbSet<Tournament> Tournaments { get; set; }
 
+    public virtual DbSet<TournamentParticipant> TournamentParticipants { get; set; }
+
     public virtual DbSet<User> Users { get; set; }
 
     public virtual DbSet<Violation> Violations { get; set; }
@@ -170,6 +172,8 @@ public partial class HRTMSDbContext : DbContext
 
             entity.HasIndex(e => e.OwnerId, "IX_Horses_Owner");
 
+            entity.HasIndex(e => e.TournamentId, "IX_Horses_Tournament");
+
             entity.Property(e => e.AdminApprovalStatus)
                 .HasMaxLength(20)
                 .IsUnicode(false)
@@ -204,6 +208,11 @@ public partial class HRTMSDbContext : DbContext
                 .HasForeignKey(d => d.OwnerId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Horses_Owner");
+
+            entity.HasOne(d => d.Tournament).WithMany(p => p.Horses)
+                .HasForeignKey(d => d.TournamentId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Horses_Tournament");
         });
 
         modelBuilder.Entity<JockeyProfile>(entity =>
@@ -628,6 +637,41 @@ public partial class HRTMSDbContext : DbContext
             entity.HasOne(d => d.CreatedByNavigation).WithMany(p => p.Tournaments)
                 .HasForeignKey(d => d.CreatedBy)
                 .HasConstraintName("FK_Tournaments_CreatedBy");
+        });
+
+        modelBuilder.Entity<TournamentParticipant>(entity =>
+        {
+            entity.HasKey(e => e.ParticipantId);
+
+            entity.HasIndex(e => new { e.TournamentId, e.UserId }, "UQ_TournamentParticipants_TourUser")
+                .IsUnique();
+
+            entity.HasIndex(e => new { e.TournamentId, e.Role, e.Status }, "IX_TournamentParticipants_Roster");
+
+            entity.Property(e => e.Role)
+                .HasMaxLength(20)
+                .IsUnicode(false);
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasDefaultValue("Pending");
+            entity.Property(e => e.RejectionReason).HasMaxLength(500);
+            entity.Property(e => e.RegisteredAt).HasDefaultValueSql("(getutcdate())");
+
+            entity.HasOne(d => d.Tournament).WithMany(p => p.TournamentParticipants)
+                .HasForeignKey(d => d.TournamentId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_TournamentParticipants_Tournament");
+
+            entity.HasOne(d => d.User).WithMany(p => p.TournamentParticipants)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_TournamentParticipants_User");
+
+            entity.HasOne(d => d.ApprovedByNavigation).WithMany()
+                .HasForeignKey(d => d.ApprovedBy)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_TournamentParticipants_ApprovedBy");
         });
 
         modelBuilder.Entity<User>(entity =>

@@ -48,4 +48,8 @@ public partial class Tournament
     public virtual ICollection<PrizeDistribution> PrizeDistributions { get; set; } = new List<PrizeDistribution>();
 
     public virtual ICollection<Round> Rounds { get; set; } = new List<Round>();
+
+    public virtual ICollection<Horse> Horses { get; set; } = new List<Horse>();
+
+    public virtual ICollection<TournamentParticipant> TournamentParticipants { get; set; } = new List<TournamentParticipant>();
 }
