@@ -11,6 +11,7 @@ export type StatusType =
   | 'Disqualified'
   | 'Draft'
   | 'OpenRegistration'
+  | 'Open Registration'  
   | 'Closed'
   | 'Completed'
   | 'Cancelled';
@@ -39,7 +40,7 @@ const STATUS_CONFIG: Record<StatusType, { label: string; className: string }> = 
   Withdrawn: { label: 'Withdrawn', className: 'statusUrgent' },
   Disqualified: { label: 'Disqualified', className: 'statusUrgent' },
   Draft: { label: 'Draft', className: 'statusDraft' },
-  OpenRegistration: { label: 'Open Registration', className: 'statusApproved' },
+'Open Registration': { label: 'Open Registration', className: 'statusApproved' },
   Closed: { label: 'Closed', className: 'statusAutoRejected' },
   Completed: { label: 'Completed', className: 'statusCompleted' },
   Cancelled: { label: 'Cancelled', className: 'statusUrgent' },
