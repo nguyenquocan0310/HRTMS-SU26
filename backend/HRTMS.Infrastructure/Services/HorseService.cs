@@ -45,9 +45,27 @@ public class HorseService : IHorseService
         if (dto.DopingTestDate > DateOnly.FromDateTime(DateTime.UtcNow))
             return ApiResponse<HorseResponseDto>.Fail("Ngày kiểm tra doping không được ở tương lai.");
 
+        // Giải đấu phải tồn tại và đang mở đăng ký
+        var tournament = await _context.Tournaments.FindAsync(dto.TournamentId);
+        if (tournament == null)
+            return ApiResponse<HorseResponseDto>.Fail("TOURNAMENT_NOT_FOUND");
+        if (tournament.Status != "Open Registration")
+            return ApiResponse<HorseResponseDto>.Fail("Giải không ở trạng thái mở đăng ký.");
+
+        // Owner phải đã được Admin duyệt tham gia giải (roster Approved)
+        var ownerApproved = await _context.TournamentParticipants.AnyAsync(p =>
+            p.TournamentId == dto.TournamentId &&
+            p.UserId == ownerId &&
+            p.Role == "Owner" &&
+            p.Status == "Approved");
+        if (!ownerApproved)
+            return ApiResponse<HorseResponseDto>.Fail(
+                "Bạn chưa được duyệt tham gia giải này. Hãy đăng ký tham gia giải và chờ Admin duyệt trước khi đăng ký ngựa.");
+
         var horse = new Horse
         {
             OwnerId = ownerId,
+            TournamentId = dto.TournamentId,
             Name = dto.Name.Trim(),
             BirthYear = dto.BirthYear,
             Gender = dto.Gender,
@@ -66,10 +84,22 @@ public class HorseService : IHorseService
             UpdatedAt = DateTime.UtcNow
         };
 
+        // REQ-F-HRS.4: auto-reject ngay khi đăng ký (Breed ≠ AllowedBreed / Doping = Failed)
+        string? autoRejectCode = await RunAutoRejectCheckAsync(horse);
+
         _context.Horses.Add(horse);
         await _context.SaveChangesAsync();
 
-        return ApiResponse<HorseResponseDto>.Ok(MapToDto(horse), "Hồ sơ ngựa đã được khai báo thành công.");
+        if (autoRejectCode != null)
+        {
+            await _auditLog.LogAsync(ownerId, "AutoReject_Horse", "Horse",
+                horse.HorseId.ToString(), "Pending", $"Rejected: {horse.RejectionReason}");
+            return ApiResponse<HorseResponseDto>.Ok(MapToDto(horse),
+                $"Hồ sơ ngựa bị tự động từ chối: {horse.RejectionReason}");
+        }
+
+        return ApiResponse<HorseResponseDto>.Ok(MapToDto(horse),
+            "Hồ sơ ngựa đã được khai báo thành công, chờ Admin duyệt.");
     }
 
     public async Task<ApiResponse<List<HorseResponseDto>>> GetMyHorsesAsync(
@@ -151,7 +181,7 @@ public class HorseService : IHorseService
             }
 
             // Chạy lại auto-reject check
-            RunAutoRejectCheck(horse);
+            await RunAutoRejectCheckAsync(horse);
         }
 
         await _context.SaveChangesAsync();
@@ -200,7 +230,7 @@ public class HorseService : IHorseService
             return ApiResponse<string>.Fail("ALREADY_APPROVED");
 
         // Chạy auto-reject check trước khi approve
-        string? rejectReason = RunAutoRejectCheck(horse);
+        string? rejectReason = await RunAutoRejectCheckAsync(horse);
         if (rejectReason != null)
         {
             horse.UpdatedAt = DateTime.UtcNow;
@@ -293,7 +323,7 @@ public class HorseService : IHorseService
     /// Trả về null nếu hợp lệ, trả về mã lỗi nếu bị reject.
     /// Tự động set AdminApprovalStatus = "Rejected" nếu vi phạm (không cần SaveChanges ở đây).
     /// </summary>
-    private string? RunAutoRejectCheck(Horse horse)
+    private async Task<string?> RunAutoRejectCheckAsync(Horse horse)
     {
         // Check doping trước — không cần query thêm
         if (horse.DopingTestResult == "Failed")
@@ -303,9 +333,25 @@ public class HorseService : IHorseService
             return "AUTO_REJECTED_DOPING";
         }
 
-        // TODO (Bước 2 - khi có RaceEntry): check breed khớp Tournament.AllowedBreed
-        // Hiện tại chưa có RaceEntry context nên bỏ qua breed check tại đây.
-        // Breed check sẽ được thực hiện tại endpoint ApproveRaceEntry.
+        // Breed check theo AllowedBreed của giải ngựa đăng ký vào (REQ-F-HRS.4 / BR-01)
+        var tournament = await _context.Tournaments
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.TournamentId == horse.TournamentId);
+
+        if (tournament == null)
+        {
+            horse.AdminApprovalStatus = "Rejected";
+            horse.RejectionReason = "Auto-reject: không xác định được giải đấu của ngựa.";
+            return "AUTO_REJECTED_NO_TOURNAMENT";
+        }
+
+        if (!string.Equals(horse.Breed, tournament.AllowedBreed, StringComparison.OrdinalIgnoreCase))
+        {
+            horse.AdminApprovalStatus = "Rejected";
+            horse.RejectionReason =
+                $"Auto-reject: giống ngựa '{horse.Breed}' không khớp giống cho phép '{tournament.AllowedBreed}' của giải.";
+            return "AUTO_REJECTED_BREED";
+        }
 
         return null;
     }
@@ -314,6 +360,7 @@ public class HorseService : IHorseService
     {
         HorseId = h.HorseId,
         OwnerId = h.OwnerId,
+        TournamentId = h.TournamentId,
         Name = h.Name,
         BirthYear = h.BirthYear,
         Gender = h.Gender,
