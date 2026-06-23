@@ -50,6 +50,23 @@ public class DoctorAssignmentService : IDoctorAssignmentService
             throw new InvalidOperationException("DOCTOR_NOT_ACTIVE");
         }
 
+        // Doctor phai co trong roster Approved cua giai chua Race nay
+        var tournamentId = await _context.Races
+            .Where(r => r.RaceId == raceId)
+            .Select(r => r.Round.TournamentId)
+            .FirstOrDefaultAsync();
+
+        var doctorInRoster = await _context.TournamentParticipants.AnyAsync(p =>
+            p.TournamentId == tournamentId &&
+            p.UserId == dto.DoctorId &&
+            p.Role == "Doctor" &&
+            p.Status == "Approved");
+
+        if (!doctorInRoster)
+        {
+            throw new InvalidOperationException("DOCTOR_NOT_IN_TOURNAMENT_ROSTER");
+        }
+
         // Kiem tra Doctor da duoc gan vao Race nay chua
         var alreadyAssigned = await _context.DoctorAssignments
             .AnyAsync(a =>

@@ -197,11 +197,21 @@ public class JockeyService : IJockeyService
             .Select(p => p.JockeyId)
             .ToListAsync();
 
+        // Chi jockey co trong roster Approved cua giai moi duoc hien thi
+        var rosterJockeyIds = await _context.TournamentParticipants
+            .Where(p =>
+                p.TournamentId == tournamentId &&
+                p.Role == "Jockey" &&
+                p.Status == "Approved")
+            .Select(p => p.UserId)
+            .ToListAsync();
+
         var query = _context.JockeyProfiles
             .Include(j => j.Jockey)
             .Where(j =>
                 j.Status == "Active" &&
                 j.ExperienceYears >= tournament.MinJockeyExperienceYears &&
+                rosterJockeyIds.Contains(j.JockeyId) &&
                 !pendingJockeyIds.Contains(j.JockeyId));
 
         var total = await query.CountAsync();
