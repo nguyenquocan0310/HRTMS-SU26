@@ -43,12 +43,17 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var context = services.GetRequiredService<HRTMSDbContext>();
-        context.Database.Migrate();
-        System.Console.WriteLine("--> THÀNH CÔNG: Đã tự động cập nhật cấu trúc bảng Database đích danh!");
+        // DB-first: schema quản lý bằng database/hrtms_schema.sql + patches.
+        // KHÔNG dùng EF migrations (tránh tạo bảng __EFMigrationsHistory & xung đột schema).
+        // Chỉ kiểm tra kết nối DB lúc khởi động.
+        if (context.Database.CanConnect())
+            System.Console.WriteLine("--> DB OK: kết nối tới HRTMS thành công.");
+        else
+            System.Console.WriteLine("--> CẢNH BÁO: không kết nối được DB. Hãy chạy hrtms_schema.sql + patches.");
     }
     catch (System.Exception ex)
     {
-        System.Console.WriteLine($"--> LỖI MIGRATION TỰ ĐỘNG: {ex.Message}");
+        System.Console.WriteLine($"--> LỖI KIỂM TRA KẾT NỐI DB: {ex.Message}");
     }
 }
 app.Run();
