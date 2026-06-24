@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { FiPlus, FiEdit2 } from 'react-icons/fi';
 import DataTable, { type DataTableColumn } from '../../components/common/DataTable';
 import StatusBadge, { type StatusType } from '../../components/common/StatusBadge';
@@ -134,8 +135,20 @@ type TabKey = typeof TABS[number]['key'];
 const toDateInput = (value?: string | null): string => (value ?? '').slice(0, 10);
 const toTimeInput = (value?: string | null): string => (value ?? '').slice(0, 5);
 
+// Đường dẫn route
+const LIST_PATH = '/admin/tournaments';
+const WIZARD_PATH = '/admin/tournament-builder';
+
 const TournamentBuilder = () => {
-  const [view, setView] = useState<'list' | 'wizard'>('list');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { id: routeId } = useParams<{ id?: string }>();
+
+  // view suy ra từ URL: ở wizard nếu path là /admin/tournament-builder[/:id],
+  // ngược lại là list (/admin/tournaments). Nhờ vậy nút Back của trình duyệt
+  // đi đúng cấp (wizard → list → dashboard) thay vì nhảy thẳng về home.
+  const view: 'list' | 'wizard' = location.pathname.startsWith(WIZARD_PATH) ? 'wizard' : 'list';
+
   const [activeTab, setActiveTab] = useState<TabKey>('basic');
   const [draft, setDraft] = useState<TournamentDraft>(createEmptyTournament());
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -158,8 +171,18 @@ const TournamentBuilder = () => {
   };
 
   useEffect(() => {
-    loadTournaments();
-  }, []);
+    if (view === 'list') {
+      loadTournaments();
+    } else if (routeId) {
+      // Wizard ở chế độ EDIT: nạp giải theo id trên URL.
+      loadDraft(Number(routeId));
+    } else {
+      // Wizard ở chế độ TẠO MỚI: reset về giải rỗng.
+      setDraft(createEmptyTournament());
+      setActiveTab('basic');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, routeId]);
 
   // ─── Validate điều kiện Publish (tổng hợp cả 4 tab) ───────────────────────
   const isBasicInfoValid = (): boolean => {
@@ -200,15 +223,15 @@ const TournamentBuilder = () => {
   const canPublish = isBasicInfoValid() && isPrizeValid() && isRoundsValid();
 
   // ─── Handlers ────────────────────────────────────────────────────────────
-  const handleCreateNew = () => {
-    setDraft(createEmptyTournament());
-    setActiveTab('basic');
-    setView('wizard');
-  };
+  // Điều hướng sang wizard tạo mới (useEffect sẽ reset draft khi tới URL).
+  const handleCreateNew = () => navigate(WIZARD_PATH);
 
-const handleEdit = async (id: number) => {
+  // Điều hướng sang wizard sửa (useEffect sẽ nạp draft theo :id).
+  const goEdit = (id: number) => navigate(`${WIZARD_PATH}/${id}`);
+
+const loadDraft = async (id: number) => {
   setIsSaving(true);
-  setListError('');
+  setSaveError('');
   try {
     const t = await tournamentService.getTournamentById(id);
     setDraft({
@@ -261,9 +284,8 @@ const handleEdit = async (id: number) => {
       })) ?? [],
     });
     setActiveTab('basic');
-    setView('wizard');
   } catch (err) {
-    setListError(err instanceof Error ? err.message : 'Không tải được giải đấu.');
+    setSaveError(err instanceof Error ? err.message : 'Không tải được giải đấu.');
   } finally {
     setIsSaving(false);
   }
@@ -368,8 +390,7 @@ const handleSaveDraft = async () => {
       }
     }
 
-    await loadTournaments();
-    setView('list');
+    navigate(LIST_PATH);
   } catch (err) {
     setSaveError(err instanceof Error ? err.message : 'Lưu giải đấu thất bại.');
   } finally {
@@ -393,8 +414,7 @@ const handleSaveDraft = async () => {
       // Phải gửi ĐÚNG chuỗi DB chấp nhận: "Open Registration" (có dấu cách).
       // Gửi "OpenRegistration" sẽ bị BE từ chối (không khớp ValidTransitions).
       await tournamentService.updateTournamentStatus(tournamentId, 'Open Registration');
-      await loadTournaments();
-      setView('list');
+      navigate(LIST_PATH);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Publish giải đấu thất bại.');
     } finally {
@@ -406,7 +426,7 @@ const handleSaveDraft = async () => {
     // TODO: gọi API thật — PATCH /api/tournament/:id/status (Cancelled)
     console.log('[TournamentBuilder] Cancel Tournament', draft.id);
     setShowCancelModal(false);
-    setView('list');
+    navigate(LIST_PATH);
   };
 
   // ─── Columns cho danh sách giải ────────────────────────────────────────────
@@ -436,7 +456,7 @@ const handleSaveDraft = async () => {
         const next = NEXT_STATUS[row.status as TournamentStatus];
         return (
           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-            <button type="button" className={styles.editBtn} onClick={() => handleEdit(row.tournamentId)}>
+            <button type="button" className={styles.editBtn} onClick={() => goEdit(row.tournamentId)}>
               <FiEdit2 size={13} /> Edit
             </button>
             {next && (
@@ -491,7 +511,7 @@ const handleSaveDraft = async () => {
   return (
     <div className={styles.container}>
       <div className={styles.wizardHeader}>
-        <button type="button" className={styles.backLink} onClick={() => setView('list')}>
+        <button type="button" className={styles.backLink} onClick={() => navigate(LIST_PATH)}>
           ← Quay lại danh sách
         </button>
         <h1 className={styles.heading}>

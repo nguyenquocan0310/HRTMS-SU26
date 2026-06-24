@@ -162,7 +162,11 @@ export default function App() {
   <Route index element={<AdminDashboard />} />
   <Route path="approval-center" element={<ApprovalCenter />} />
   <Route path="users" element={<UserManagement />} />
+  {/* Danh sách giải đấu — trang riêng */}
+  <Route path="tournaments" element={<TournamentBuilder />} />
+  {/* Wizard tạo mới / chỉnh sửa giải đấu */}
   <Route path="tournament-builder" element={<TournamentBuilder />} />
+  <Route path="tournament-builder/:id" element={<TournamentBuilder />} />
 </Route>
 
         <Route path="/unauthorized" element={<div>403 — Không có quyền truy cập</div>} />
