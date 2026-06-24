@@ -89,7 +89,7 @@ const AdminDashboard = () => {
           label="Giải đang mở"
           value={MOCK_STATS.openTournaments}
           icon={<FiFlag />}
-          linkTo="/admin/tournament-builder"
+          linkTo="/admin/tournaments"
         />
         <StatTile
           label="Hồ sơ chờ duyệt"
