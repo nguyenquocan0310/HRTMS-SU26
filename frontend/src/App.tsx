@@ -70,7 +70,7 @@ function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
 export function getRoleHomePath(role: Role): string {
   switch (role) {
     case 'Admin':       return '/admin'
-    case 'HorseOwner':  return '/owner'
+    case 'Owner':  return '/owner'
     case 'Jockey':      return '/jockey'
     case 'RaceReferee': return '/referee'
     case 'Doctor':      return '/doctor'
@@ -89,7 +89,7 @@ export default function App() {
 
         {/* Owner routes */}
         <Route path="/owner" element={
-          <ProtectedRoute allowedRoles={['HorseOwner']}>
+          <ProtectedRoute allowedRoles={['Owner']}>
             <OwnerLayout />
           </ProtectedRoute>
         }>
