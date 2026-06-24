@@ -1,12 +1,13 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { FiSearch, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import DataTable, { type DataTableColumn } from '../../components/common/DataTable';
 import StatusBadge, { type StatusType } from '../../components/common/StatusBadge';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
+import { apiFetch } from '../../services/apiClient';
 import styles from './UserManagement.module.scss';
 
-// ─── Types ──────────────────────────────────────────────────────────────────
-type UserRole = 'Admin' | 'HorseOwner' | 'Jockey' | 'RaceReferee' | 'Doctor' | 'Spectator';
+// ─── Types ───────────────────────────────────────────────────────────────────
+type UserRole = 'Admin' | 'HorseOwner' |'Owner'| 'Jockey' | 'RaceReferee' |'Referee'| 'Doctor' | 'Spectator';
 type UserStatus = 'Active' | 'Suspended' | 'Pending' | 'Rejected';
 
 interface SystemUser {
@@ -18,36 +19,39 @@ interface SystemUser {
   joinedDate: string;
 }
 
+interface ApiUser {
+  userId: number;
+  username: string;
+  email: string;
+  role: string;
+  status: string;
+  createdAt: string;
+}
+
 const ROLE_LABELS: Record<UserRole, string> = {
   Admin: 'Admin',
+  Owner: 'Owner',
   HorseOwner: 'Owner',
   Jockey: 'Jockey',
+  Referee: 'Referee',
   RaceReferee: 'Referee',
   Doctor: 'Doctor',
   Spectator: 'Spectator',
 };
 
-// ─── Mock data — TODO: thay bằng API thật khi có Swagger (Điều 6) ──────────
-// Dự kiến: GET /api/admin/users?role=&status=&search=&page=
-const MOCK_USERS: SystemUser[] = [
-  { id: 'u1', username: 'thomas_owner', email: 'thomas@hrtms.com', role: 'HorseOwner', status: 'Active', joinedDate: '12/01/2026' },
-  { id: 'u2', username: 'jockey_hung', email: 'hung.tran@hrtms.com', role: 'Jockey', status: 'Active', joinedDate: '15/01/2026' },
-  { id: 'u3', username: 'ref_lan', email: 'lan.pham@hrtms.com', role: 'RaceReferee', status: 'Suspended', joinedDate: '20/01/2026' },
-  { id: 'u4', username: 'dr_huy', email: 'huy.do@hrtms.com', role: 'Doctor', status: 'Active', joinedDate: '02/02/2026' },
-  { id: 'u5', username: 'spectator_an', email: 'an.nguyen@hrtms.com', role: 'Spectator', status: 'Active', joinedDate: '08/02/2026' },
-  { id: 'u6', username: 'owner_royal', email: 'royal.stable@hrtms.com', role: 'HorseOwner', status: 'Suspended', joinedDate: '14/02/2026' },
-  { id: 'u7', username: 'jockey_khoi', email: 'khoi.le@hrtms.com', role: 'Jockey', status: 'Pending', joinedDate: '01/03/2026' },
-  { id: 'u8', username: 'admin_root', email: 'admin@hrtms.com', role: 'Admin', status: 'Active', joinedDate: '01/01/2026' },
-  { id: 'u9', username: 'spectator_mai', email: 'mai.vu@hrtms.com', role: 'Spectator', status: 'Rejected', joinedDate: '10/03/2026' },
-  { id: 'u10', username: 'jockey_son', email: 'son.bui@hrtms.com', role: 'Jockey', status: 'Active', joinedDate: '18/03/2026' },
-  { id: 'u11', username: 'owner_meydan', email: 'meydan.stable@hrtms.com', role: 'HorseOwner', status: 'Active', joinedDate: '22/03/2026' },
-  { id: 'u12', username: 'ref_tuan', email: 'tuan.hoang@hrtms.com', role: 'RaceReferee', status: 'Active', joinedDate: '25/03/2026' },
-];
+// Map role → approve endpoint
+const APPROVE_ENDPOINT: Partial<Record<UserRole, string>> = {
+  Jockey: '/admin/jockeys',
+  Referee: '/admin/referees',   
+  RaceReferee: '/admin/referees',
+  Doctor: '/admin/doctors',
+};
 
 const PAGE_SIZE = 8;
 
 const UserManagement = () => {
-  const [users, setUsers] = useState<SystemUser[]>(MOCK_USERS);
+  const [users, setUsers] = useState<SystemUser[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<UserStatus | 'all'>('all');
@@ -55,8 +59,35 @@ const UserManagement = () => {
 
   const [pendingAction, setPendingAction] = useState<{
     user: SystemUser;
-    action: 'suspend' | 'activate';
+    action: 'suspend' | 'activate' | 'approve';
   } | null>(null);
+
+  // ─── Fetch users từ API ───────────────────────────────────────────────────
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await apiFetch<{ success: boolean; data: ApiUser[] }>('/admin/users');
+      if (res.success && res.data) {
+        const mapped: SystemUser[] = res.data.map((u) => ({
+          id: String(u.userId),
+          username: u.username,
+          email: u.email,
+          role: u.role as UserRole,
+          status: u.status as UserStatus,
+          joinedDate: new Date(u.createdAt).toLocaleDateString('vi-VN'),
+        }));
+        setUsers(mapped);
+      }
+    } catch (err) {
+      console.error('Failed to fetch users:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   // ─── Filter + search ──────────────────────────────────────────────────────
   const filteredUsers = useMemo(() => {
@@ -77,20 +108,31 @@ const UserManagement = () => {
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE
   );
-
   const resetToFirstPage = () => setCurrentPage(1);
 
-  const handleConfirmAction = () => {
-    if (!pendingAction) return;
-    const newStatus: UserStatus = pendingAction.action === 'suspend' ? 'Suspended' : 'Active';
+  // ─── Confirm action ───────────────────────────────────────────────────────
+const handleConfirmAction = async () => {
+  if (!pendingAction) return;
+  const { user, action } = pendingAction;
 
-    // TODO: gọi API thật khi có Swagger — PATCH /api/admin/users/:id/status
-    setUsers((prev) =>
-      prev.map((u) => (u.id === pendingAction.user.id ? { ...u, status: newStatus } : u))
-    );
+  try {
+    if (action === 'approve') {
+      const endpoint = APPROVE_ENDPOINT[user.role];
+      if (!endpoint) return;
+      await apiFetch(`${endpoint}/${user.id}/approve`, { method: 'PATCH' });
+    } else {
+      // suspend và activate đều gọi /suspend — BE tự toggle
+      await apiFetch(`/admin/users/${user.id}/suspend`, { method: 'PATCH' });
+    }
+    await fetchUsers();
+  } catch (err) {
+    console.error('Action failed:', err);
+  } finally {
     setPendingAction(null);
-  };
+  }
+};
 
+  // ─── Columns ──────────────────────────────────────────────────────────────
   const columns: DataTableColumn<SystemUser>[] = [
     {
       key: 'username',
@@ -105,7 +147,7 @@ const UserManagement = () => {
     {
       key: 'role',
       header: 'Role',
-      render: (row) => <span className={styles.roleBadge}>{ROLE_LABELS[row.role]}</span>,
+      render: (row) => <span className={styles.roleBadge}>{ROLE_LABELS[row.role] ?? row.role}</span>,
     },
     {
       key: 'status',
@@ -120,9 +162,18 @@ const UserManagement = () => {
     {
       key: 'action',
       header: '',
-      width: '220px',
+      width: '240px',
       render: (row) => (
         <div className={styles.actionCell}>
+          {row.status === 'Pending' && APPROVE_ENDPOINT[row.role] && (
+            <button
+              type="button"
+              className={styles.approveBtn}
+              onClick={() => setPendingAction({ user: row, action: 'approve' })}
+            >
+              Approve
+            </button>
+          )}
           {row.status === 'Active' && (
             <button
               type="button"
@@ -154,7 +205,6 @@ const UserManagement = () => {
       {/* ═══ HEADER ═══════════════════════════════════════════ */}
       <div className={styles.header}>
         <h1 className={styles.heading}>User Management</h1>
-
         <div className={styles.filters}>
           <div className={styles.searchWrap}>
             <FiSearch className={styles.searchIcon} size={15} />
@@ -163,20 +213,13 @@ const UserManagement = () => {
               className={styles.searchInput}
               placeholder="Tìm theo username/email..."
               value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                resetToFirstPage();
-              }}
+              onChange={(e) => { setSearchQuery(e.target.value); resetToFirstPage(); }}
             />
           </div>
-
           <select
             className={styles.filterSelect}
             value={roleFilter}
-            onChange={(e) => {
-              setRoleFilter(e.target.value as UserRole | 'all');
-              resetToFirstPage();
-            }}
+            onChange={(e) => { setRoleFilter(e.target.value as UserRole | 'all'); resetToFirstPage(); }}
           >
             <option value="all">Tất cả Role</option>
             <option value="Admin">Admin</option>
@@ -186,14 +229,10 @@ const UserManagement = () => {
             <option value="Doctor">Doctor</option>
             <option value="Spectator">Spectator</option>
           </select>
-
           <select
             className={styles.filterSelect}
             value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value as UserStatus | 'all');
-              resetToFirstPage();
-            }}
+            onChange={(e) => { setStatusFilter(e.target.value as UserStatus | 'all'); resetToFirstPage(); }}
           >
             <option value="all">Tất cả Status</option>
             <option value="Active">Active</option>
@@ -205,12 +244,16 @@ const UserManagement = () => {
       </div>
 
       {/* ═══ TABLE ════════════════════════════════════════════ */}
-      <DataTable
-        columns={columns}
-        data={pagedUsers}
-        rowKey={(row) => row.id}
-        emptyMessage="Không tìm thấy người dùng phù hợp."
-      />
+      {loading ? (
+        <p className={styles.loadingText}>Đang tải danh sách người dùng...</p>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={pagedUsers}
+          rowKey={(row) => row.id}
+          emptyMessage="Không tìm thấy người dùng phù hợp."
+        />
+      )}
 
       {/* ═══ PAGINATION ═══════════════════════════════════════ */}
       <div className={styles.pagination}>
@@ -240,12 +283,19 @@ const UserManagement = () => {
       {/* ═══ CONFIRM DIALOG ═══════════════════════════════════ */}
       {pendingAction && (
         <ConfirmDialog
-          title={pendingAction.action === 'suspend' ? 'Suspend tài khoản' : 'Activate tài khoản'}
+          title={
+            pendingAction.action === 'approve' ? 'Phê duyệt tài khoản' :
+            pendingAction.action === 'suspend' ? 'Suspend tài khoản' : 'Activate tài khoản'
+          }
           message={`Bạn có chắc muốn ${
+            pendingAction.action === 'approve' ? 'phê duyệt' :
             pendingAction.action === 'suspend' ? 'Suspend' : 'Activate'
           } tài khoản "${pendingAction.user.username}"?`}
           variant={pendingAction.action === 'suspend' ? 'danger' : 'default'}
-          confirmLabel={pendingAction.action === 'suspend' ? 'Suspend' : 'Activate'}
+          confirmLabel={
+            pendingAction.action === 'approve' ? 'Approve' :
+            pendingAction.action === 'suspend' ? 'Suspend' : 'Activate'
+          }
           onConfirm={handleConfirmAction}
           onCancel={() => setPendingAction(null)}
         />
