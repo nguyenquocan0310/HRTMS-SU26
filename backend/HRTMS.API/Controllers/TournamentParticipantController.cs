@@ -27,7 +27,7 @@ public class TournamentParticipantController : ControllerBase
         User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
 
     /// <summary>Owner/Jockey/Doctor/Referee tự đăng ký tham gia một giải → Pending.</summary>
-    [HttpPost("tournaments/{tournamentId:int}/participants")]
+    [HttpPost("tournament/{tournamentId:int}/participants")]
     [Authorize(Roles = "Owner,Jockey,Doctor,Referee")]
     [ProducesResponseType(typeof(ApiResponse<ParticipantResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -40,7 +40,7 @@ public class TournamentParticipantController : ControllerBase
     }
 
     /// <summary>Admin xem roster của giải (lọc tuỳ chọn theo role/status).</summary>
-    [HttpGet("tournaments/{tournamentId:int}/participants")]
+    [HttpGet("tournament/{tournamentId:int}/participants")]
     [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(ApiResponse<List<ParticipantResponseDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetRoster(
