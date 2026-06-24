@@ -16,7 +16,25 @@ import styles from './TournamentBuilder.module.scss';
 export type AllowedBreed = 'Thoroughbred' | 'Arabian' | 'Quarter Horse' | 'Mixed';
 export type TrackType = 'Turf' | 'Dirt' | 'Synthetic';
 export type RaceCategory = 'Open' | 'Classic' | 'Maiden';
-export type TournamentStatus = 'Draft' | 'OpenRegistration' | 'Closed' | 'Completed' | 'Cancelled';
+// Phải khớp ĐÚNG với DB (CHK_Tournaments_Status) và state machine ở BE.
+export type TournamentStatus =
+  | 'Draft'
+  | 'Open Registration'
+  | 'Closed Registration'
+  | 'Pre-Race'
+  | 'In-Progress'
+  | 'Completed'
+  | 'Cancelled';
+
+// State machine khớp ValidTransitions ở BE (TournamentSevice.cs).
+// Trả về status kế tiếp, hoặc null nếu đã ở cuối / không thể tiến.
+export const NEXT_STATUS: Partial<Record<TournamentStatus, TournamentStatus>> = {
+  Draft: 'Open Registration',
+  'Open Registration': 'Closed Registration',
+  'Closed Registration': 'Pre-Race',
+  'Pre-Race': 'In-Progress',
+  'In-Progress': 'Completed',
+};
 
 export interface TournamentBasicInfo {
   name: string;
@@ -111,6 +129,11 @@ const TABS = [
 
 type TabKey = typeof TABS[number]['key'];
 
+// ─── Chuẩn hóa giá trị từ BE cho input HTML ──────────────────────────────────
+// BE trả DateTime/Time dạng ISO; input date cần "yyyy-MM-dd", input time cần "HH:mm".
+const toDateInput = (value?: string | null): string => (value ?? '').slice(0, 10);
+const toTimeInput = (value?: string | null): string => (value ?? '').slice(0, 5);
+
 const TournamentBuilder = () => {
   const [view, setView] = useState<'list' | 'wizard'>('list');
   const [activeTab, setActiveTab] = useState<TabKey>('basic');
@@ -193,8 +216,11 @@ const handleEdit = async (id: number) => {
       status: t.status as TournamentStatus,
       basicInfo: {
         name: t.name,
-        startDate: t.startDate,
-        endDate: t.endDate,
+        // BE trả DateTime → JSON ISO "2026-06-30T18:00:00".
+        // <input type="date"> chỉ nhận "yyyy-MM-dd" nên phải cắt 10 ký tự đầu,
+        // nếu không ô ngày sẽ hiển thị trống.
+        startDate: toDateInput(t.startDate),
+        endDate: toDateInput(t.endDate),
         allowedBreed: t.allowedBreed as AllowedBreed,
         trackType: t.trackType as TrackType,
         raceDistance: t.raceDistance,
@@ -219,13 +245,13 @@ const handleEdit = async (id: number) => {
       rounds: t.rounds?.map((r) => ({
         id: String(r.roundId),
         name: r.name,
-        scheduledDate: r.scheduledDate,
+        scheduledDate: toDateInput(r.scheduledDate),
         races: r.races?.map((race) => ({
           id: String(race.raceId),
           sequenceOrder: race.raceNumber,
-          scheduledDate: r.scheduledDate,
+          scheduledDate: toDateInput(r.scheduledDate),
           raceNumber: race.raceNumber,
-          scheduledTime: race.scheduledTime,
+          scheduledTime: toTimeInput(race.scheduledTime),
           purseAmount: race.purseAmount,
           raceDistanceOverride: race.raceDistanceOverride ?? '',
           trackTypeOverride: (race.trackTypeOverride as TrackType) ?? '',
@@ -242,6 +268,24 @@ const handleEdit = async (id: number) => {
     setIsSaving(false);
   }
 };
+
+  // ─── Đẩy giải sang status kế tiếp trong vòng đời (gọi BE ChangeStatus) ──────
+  const [advancingId, setAdvancingId] = useState<number | null>(null);
+  const handleAdvanceStatus = async (row: TournamentResponse) => {
+    const next = NEXT_STATUS[row.status as TournamentStatus];
+    if (!next) return;
+    setListError('');
+    setAdvancingId(row.tournamentId);
+    try {
+      await tournamentService.updateTournamentStatus(row.tournamentId, next);
+      await loadTournaments();
+    } catch (err) {
+      // BE có thể từ chối (vd chưa đủ 5 PrizeDistributions để mở đăng ký).
+      setListError(err instanceof Error ? err.message : 'Không chuyển được trạng thái.');
+    } finally {
+      setAdvancingId(null);
+    }
+  };
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -346,7 +390,9 @@ const handleSaveDraft = async () => {
       } else {
         await tournamentService.updateTournament(tournamentId, buildCreatePayload());
       }
-      await tournamentService.updateTournamentStatus(tournamentId, 'OpenRegistration');
+      // Phải gửi ĐÚNG chuỗi DB chấp nhận: "Open Registration" (có dấu cách).
+      // Gửi "OpenRegistration" sẽ bị BE từ chối (không khớp ValidTransitions).
+      await tournamentService.updateTournamentStatus(tournamentId, 'Open Registration');
       await loadTournaments();
       setView('list');
     } catch (err) {
@@ -385,12 +431,28 @@ const handleSaveDraft = async () => {
     {
       key: 'action',
       header: '',
-      width: '120px',
-      render: (row) => (
-        <button type="button" className={styles.editBtn} onClick={() => handleEdit(row.tournamentId)}>
-          <FiEdit2 size={13} /> Edit
-        </button>
-      ),
+      width: '320px',
+      render: (row) => {
+        const next = NEXT_STATUS[row.status as TournamentStatus];
+        return (
+          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+            <button type="button" className={styles.editBtn} onClick={() => handleEdit(row.tournamentId)}>
+              <FiEdit2 size={13} /> Edit
+            </button>
+            {next && (
+              <button
+                type="button"
+                className={styles.editBtn}
+                disabled={advancingId === row.tournamentId}
+                onClick={() => handleAdvanceStatus(row)}
+                title={`Chuyển sang "${next}"`}
+              >
+                {advancingId === row.tournamentId ? 'Đang chuyển...' : `→ ${next}`}
+              </button>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
