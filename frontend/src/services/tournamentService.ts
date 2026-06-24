@@ -119,7 +119,7 @@ export const deleteTournament = (id: number): Promise<void> =>
 export const updateTournamentStatus = (id: number, status: string): Promise<TournamentResponse> =>
   apiFetch<ApiResponse<TournamentResponse>>(`/tournament/${id}/status`, {
     method: 'PATCH',
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ targetStatus: status }),
   }).then((res) => {
     if (!res.success || !res.data) throw new Error(res.message || 'Cập nhật trạng thái thất bại.');
     return res.data;
