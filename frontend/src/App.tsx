@@ -71,6 +71,7 @@ function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
 export function getRoleHomePath(role: Role): string {
   switch (role) {
     case 'Admin':       return '/admin'
+    case 'HorseOwner':
     case 'Owner':  return '/owner'
     case 'Jockey':      return '/jockey'
     case 'RaceReferee': 
