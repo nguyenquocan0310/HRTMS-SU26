@@ -29,12 +29,18 @@ public class JwtService
             new Claim(ClaimTypes.Role, user.Role)
         };
 
+        var now = DateTime.UtcNow;
         var token = new JwtSecurityToken(
             issuer: _config["JwtSettings:Issuer"],
             audience: _config["JwtSettings:Audience"],
             claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(
-                int.Parse(_config["JwtSettings:ExpiryMinutes"]!)),
+            // notBefore buộc thư viện ghi `iat` (IssuedAt) vào JWT payload.
+            // Thiếu notBefore → JwtSecurityToken.IssuedAt == DateTime.MinValue
+            // → TokenBlacklistMiddleware.ExtractIssuedAt trả null
+            // → không thể so sánh với blacklistedSince → token cũ sau Logout/Suspend
+            // vẫn được chấp nhận trong window còn sống (EC-29 bị phá vỡ).
+            notBefore: now,
+            expires: now.AddMinutes(int.Parse(_config["JwtSettings:ExpiryMinutes"]!)),
             signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
         );
 
