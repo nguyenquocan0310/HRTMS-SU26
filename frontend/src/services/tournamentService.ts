@@ -134,9 +134,11 @@ export const updatePrizeDistributions = (
   id: number,
   prizeDistributions: UpdatePrizeDistributionPayload[]
 ): Promise<TournamentResponse> =>
+  // BE nhận field "distributions" (SetPrizeDistributionDto.Distributions).
+  // Gửi sai key "prizeDistributions" sẽ làm DTO rỗng → ModelState 400 (MinLength 5).
   apiFetch<ApiResponse<TournamentResponse>>(`/tournament/${id}/prize-distributions`, {
     method: 'PUT',
-    body: JSON.stringify({ prizeDistributions }),
+    body: JSON.stringify({ distributions: prizeDistributions }),
   }).then((res) => {
     if (!res.success || !res.data) throw new Error(res.message || 'Cập nhật tỷ lệ giải thưởng thất bại.');
     return res.data;
