@@ -186,3 +186,11 @@ export const register = async (payload: RegisterPayload): Promise<RegisterResult
     walletBonus: payload.role === 'Spectator' ? 1000 : undefined,
   };
 };
+
+
+ //-----Logout--------------------------------------//
+ export const logout = async (): Promise<void> => {
+  await mockDelay();
+  // TODO: khi có API thật, gọi POST /api/auth/logout để revoke token ở BE
+  // return apiFetch('/auth/logout', { method: 'POST' });
+};

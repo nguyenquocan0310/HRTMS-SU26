@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { useState, useRef, useEffect } from 'react';
+import { Outlet, useNavigate } from 'react-router-dom';
 import {
   FiSearch,
   FiBell,
@@ -10,27 +10,57 @@ import {
   FiLogOut,
 } from 'react-icons/fi';
 import AdminSidebar from '../components/admin/AdminSidebar';
+import useAuthStore from '../store/authStore';
+import { logout } from '../services/authService'; 
 import styles from './AdminLayout.module.scss';
 
 const AdminLayout = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
-  // TODO: lấy từ authStore thật khi có BE — Điều 6
+  const navigate = useNavigate();
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const { user, clearAuth } = useAuthStore();
+
   const currentUser = {
-    name: 'Admin User',
-    role: 'Administrator',
+    name: user?.fullName ?? 'Admin User',
+    role: user?.role ?? 'Administrator',
   };
 
   const unreadNotifications = 3;
+
+  // Đóng dropdown khi click ra ngoài
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setAccountMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      setLoggingOut(true);
+      await logout();
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      clearAuth();
+      setLoggingOut(false);
+      navigate('/login', { replace: true });
+    }
+  };
 
   return (
     <div className={styles.layout}>
       {/* ═══ TOPBAR ═══════════════════════════════════════════ */}
       <header className={styles.topbar}>
         <div className={styles.topbarLeft}>
-          {/* Hamburger — chỉ hiện mobile */}
           <button
             type="button"
             className={styles.hamburgerBtn}
@@ -64,7 +94,7 @@ const AdminLayout = () => {
             <FiHelpCircle size={18} />
           </button>
 
-          <div className={styles.accountWrap}>
+          <div className={styles.accountWrap} ref={menuRef}>
             <button
               type="button"
               className={styles.accountBtn}
@@ -81,13 +111,25 @@ const AdminLayout = () => {
 
             {accountMenuOpen && (
               <div className={styles.accountMenu}>
-                <button type="button" className={styles.accountMenuItem}>
+                <button
+                  type="button"
+                  className={styles.accountMenuItem}
+                  onClick={() => {
+                    setAccountMenuOpen(false);
+                    navigate('/admin/my-account'); // chỉnh route nếu khác
+                  }}
+                >
                   <FiUser size={15} />
                   My Account
                 </button>
-                <button type="button" className={styles.accountMenuItem}>
+                <button
+                  type="button"
+                  className={styles.accountMenuItem}
+                  onClick={handleLogout}
+                  disabled={loggingOut}
+                >
                   <FiLogOut size={15} />
-                  Logout
+                  {loggingOut ? 'Đang đăng xuất...' : 'Logout'}
                 </button>
               </div>
             )}
@@ -97,12 +139,10 @@ const AdminLayout = () => {
 
       {/* ═══ BODY ═════════════════════════════════════════════ */}
       <div className={styles.body}>
-        {/* Sidebar desktop/tablet */}
         <div className={styles.sidebarDesktop}>
           <AdminSidebar collapsed={sidebarCollapsed} />
         </div>
 
-        {/* Sidebar mobile overlay */}
         {mobileOpen && (
           <>
             <div
@@ -115,7 +155,6 @@ const AdminLayout = () => {
           </>
         )}
 
-        {/* Collapse toggle (desktop) */}
         <button
           type="button"
           className={styles.collapseToggle}
@@ -125,7 +164,6 @@ const AdminLayout = () => {
           {sidebarCollapsed ? '›' : '‹'}
         </button>
 
-        {/* Main content */}
         <main className={styles.content}>
           <Outlet />
         </main>
