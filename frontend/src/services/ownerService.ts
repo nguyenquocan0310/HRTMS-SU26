@@ -51,7 +51,7 @@ export const createHorse = async (
   data: Omit<Horse, 'horseID' | 'ownerID' | 'createdAt'>
 ): Promise<Horse> => {
   try {
-    const response = await axiosInstance.post<Horse>('http://localhost:5000/api/horses', data);
+    const response = await axiosInstance.post<Horse>('http://localhost:5222/api/horses', data);
     return response.data;
   } catch (error) {
     console.error('Error creating horse:', error);
