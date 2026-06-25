@@ -83,12 +83,9 @@ public class PredictionService : IPredictionService
 
     // =========================================================
     // REQ-F-PRD.4 — Form Score: 40% lịch sử ngựa + 35% lịch sử Jockey
-    // + 25% kết quả trung bình theo loại vòng đua. Tính server-side
-    // qua EF (dịch sang SQL thực thi tại DB) — KHÔNG AI/ML.
+    // + 25% kết quả trung bình theo loại vòng đua. Tính server-side.
     //
-    // GHI CHÚ: cần xác nhận lại tên field trên Pairing/Horse/JockeyProfile
-    // (giả định Pairing.HorseId, Pairing.JockeyId, Horse.HorseName) —
-    // chỉnh sửa property cho khớp entity thật trước khi build.
+    // FIX #1: Tải toàn bộ lịch sử 1 lần trước vòng lặp (loại bỏ N+1 query).
     // =========================================================
     public async Task<ApiResponse<List<FormScoreDto>>> GetFormScoresAsync(int raceId)
     {
@@ -105,48 +102,76 @@ public class PredictionService : IPredictionService
                 .ThenInclude(p => p.Horse)
             .Include(re => re.Pairing)
                 .ThenInclude(p => p.Jockey)
-                    .ThenInclude(jp => jp.Jockey) // JockeyProfile.Jockey = User (lấy FullName)
+                    .ThenInclude(jp => jp.Jockey)
             .ToListAsync();
 
-        var result = new List<FormScoreDto>();
+        if (entries.Count == 0)
+            return ApiResponse<List<FormScoreDto>>.Ok(new List<FormScoreDto>());
+
+        var horseIds = entries.Select(e => e.Pairing.HorseId).ToHashSet();
+        var jockeyIds = entries.Select(e => e.Pairing.JockeyId).ToHashSet();
+        var roundName = race.Round.Name;
+
+        // --- Load toàn bộ lịch sử 1 lần, tránh N+1 ---
+
+        // 40% — lịch sử ngựa: tất cả race entries đã hoàn tất của các ngựa liên quan
+        var horseHistory = await _context.RaceEntries
+            .AsNoTracking()
+            .Where(re => horseIds.Contains(re.Pairing.HorseId) && re.FinishPosition != null)
+            .Select(re => new { re.Pairing.HorseId, re.FinishPosition })
+            .ToListAsync();
+
+        // 35% — lịch sử Jockey: tương tự
+        var jockeyHistory = await _context.RaceEntries
+            .AsNoTracking()
+            .Where(re => jockeyIds.Contains(re.Pairing.JockeyId) && re.FinishPosition != null)
+            .Select(re => new { re.Pairing.JockeyId, re.FinishPosition })
+            .ToListAsync();
+
+        // 25% — kết quả theo loại vòng đua (Round.Name) cho các ngựa liên quan
+        var roundHistory = await _context.RaceEntries
+            .AsNoTracking()
+            .Where(re => horseIds.Contains(re.Pairing.HorseId)
+                         && re.FinishPosition != null
+                         && re.Race.Round.Name == roundName)
+            .Select(re => new { re.Pairing.HorseId, re.FinishPosition })
+            .ToListAsync();
+
+        // Group theo key để tra cứu O(1)
+        var horseHistoryByHorse = horseHistory.GroupBy(x => x.HorseId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.FinishPosition!.Value).ToList());
+
+        var jockeyHistoryByJockey = jockeyHistory.GroupBy(x => x.JockeyId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.FinishPosition!.Value).ToList());
+
+        var roundHistoryByHorse = roundHistory.GroupBy(x => x.HorseId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.FinishPosition!.Value).ToList());
+
+        // --- Tính FormScore trong memory ---
+        var result = new List<FormScoreDto>(entries.Count);
 
         foreach (var entry in entries)
         {
             var horseId = entry.Pairing.HorseId;
             var jockeyId = entry.Pairing.JockeyId;
 
-            // 40% — lịch sử ngựa: tỉ lệ về Top-1 trên các race đã hoàn tất
-            var horseFinishedEntries = await _context.RaceEntries
-                .Where(re => re.Pairing.HorseId == horseId && re.FinishPosition != null)
-                .ToListAsync();
-            decimal horseScore = horseFinishedEntries.Count == 0
+            // 40% — tỉ lệ về Top-1 của ngựa
+            var horseFinished = horseHistoryByHorse.GetValueOrDefault(horseId);
+            decimal horseScore = horseFinished == null || horseFinished.Count == 0
                 ? 0
-                : (decimal)horseFinishedEntries.Count(re => re.FinishPosition == 1)
-                  / horseFinishedEntries.Count * 100m;
+                : (decimal)horseFinished.Count(p => p == 1) / horseFinished.Count * 100m;
 
-            // 35% — lịch sử Jockey: tỉ lệ về Top-1
-            var jockeyFinishedEntries = await _context.RaceEntries
-                .Where(re => re.Pairing.JockeyId == jockeyId && re.FinishPosition != null)
-                .ToListAsync();
-            decimal jockeyScore = jockeyFinishedEntries.Count == 0
+            // 35% — tỉ lệ về Top-1 của Jockey
+            var jockeyFinished = jockeyHistoryByJockey.GetValueOrDefault(jockeyId);
+            decimal jockeyScore = jockeyFinished == null || jockeyFinished.Count == 0
                 ? 0
-                : (decimal)jockeyFinishedEntries.Count(re => re.FinishPosition == 1)
-                  / jockeyFinishedEntries.Count * 100m;
+                : (decimal)jockeyFinished.Count(p => p == 1) / jockeyFinished.Count * 100m;
 
-            // 25% — kết quả trung bình theo loại vòng đua.
-            // Round không có field RoundType riêng -> dùng Round.Name
-            // (vd "Vòng loại"/"Bán kết"/"Chung kết") làm tiêu chí phân loại.
-            var roundName = race.Round.Name;
-            var sameRoundTypeEntries = await _context.RaceEntries
-                .Where(re => re.Pairing.HorseId == horseId
-                             && re.FinishPosition != null
-                             && re.Race.Round.Name == roundName)
-                .Select(re => re.FinishPosition!.Value)
-                .ToListAsync();
-            decimal roundTypeAvgScore = sameRoundTypeEntries.Count == 0
+            // 25% — vị trí trung bình theo loại vòng (điểm cao hơn nếu vị trí trung bình gần 1)
+            var roundFinished = roundHistoryByHorse.GetValueOrDefault(horseId);
+            decimal roundTypeAvgScore = roundFinished == null || roundFinished.Count == 0
                 ? 0
-                : 100m - ((decimal)sameRoundTypeEntries.Average() - 1m) * 10m; // điểm càng cao nếu vị trí trung bình càng gần 1
-
+                : 100m - ((decimal)roundFinished.Average() - 1m) * 10m;
             roundTypeAvgScore = Math.Max(0, roundTypeAvgScore);
 
             var formScore = horseScore * 0.40m + jockeyScore * 0.35m + roundTypeAvgScore * 0.25m;
@@ -172,6 +197,9 @@ public class PredictionService : IPredictionService
     // REQ-F-PRD.3 — Chỉ hỗ trợ Win
     // REQ-F-PRD.5 — Đặt dự đoán: trừ ví + ghi ledger cùng transaction (BR-39)
     // REQ-F-PRD.6 — Server-side gate (BR-23, EC-05)
+    //
+    // FIX #2: Dùng ExecuteUpdateAsync để trừ Balance nguyên tử (tránh race condition).
+    // FIX #3: Duplicate check dựa vào unique index UQ_Predictions_SpectatorEntry.
     // =========================================================
     public async Task<ApiResponse<PredictionResponseDto>> PlacePredictionAsync(
         int spectatorId, PlacePredictionDto dto, string? ipAddress)
@@ -202,16 +230,39 @@ public class PredictionService : IPredictionService
             if (raceEntry == null || raceEntry.IsWithdrawn)
                 return ApiResponse<PredictionResponseDto>.Fail("RaceEntry không hợp lệ hoặc đã rút lui.");
 
-            // PRD.3: chỉ hỗ trợ Win — không nhận loại khác từ client
-            var wallet = await _context.Wallets
-                .FirstOrDefaultAsync(w => w.SpectatorId == spectatorId);
-            if (wallet == null)
-                return ApiResponse<PredictionResponseDto>.Fail("Không tìm thấy ví của Spectator.");
+            // FIX #3: Kiểm tra duplicate trước khi thao tác ví
+            // (unique index UQ_Predictions_SpectatorEntry chặn ở tầng DB,
+            //  check sớm ở đây để trả lỗi thân thiện thay vì DbUpdateException)
+            var alreadyPlaced = await _context.Predictions.AnyAsync(p =>
+                p.SpectatorId == spectatorId &&
+                p.RaceEntryId == dto.RaceEntryId &&
+                p.PredictionType == PredictionTypeWin);
+            if (alreadyPlaced)
+                return ApiResponse<PredictionResponseDto>.Fail("Bạn đã đặt dự đoán Win cho ngựa này trong cuộc đua này.");
 
-            if (wallet.Balance < dto.PointsPlaced)
+            // FIX #2: Trừ Balance nguyên tử bằng UPDATE có điều kiện —
+            // nếu số dư không đủ, affected rows = 0 → phát hiện race condition.
+            var now = DateTime.UtcNow;
+
+            var affected = await _context.Wallets
+                .Where(w => w.SpectatorId == spectatorId && w.Balance >= dto.PointsPlaced)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(w => w.Balance, w => w.Balance - dto.PointsPlaced)
+                    .SetProperty(w => w.UpdatedAt, now));
+
+            if (affected == 0)
                 return ApiResponse<PredictionResponseDto>.Fail("Số dư ví không đủ để đặt dự đoán.");
 
-            var now = DateTime.UtcNow;
+            // Đọc lại Balance sau khi update để trả về cho client
+            var walletBalance = await _context.Wallets
+                .Where(w => w.SpectatorId == spectatorId)
+                .Select(w => w.Balance)
+                .FirstOrDefaultAsync();
+
+            var walletId = await _context.Wallets
+                .Where(w => w.SpectatorId == spectatorId)
+                .Select(w => w.WalletId)
+                .FirstOrDefaultAsync();
 
             var prediction = new Prediction
             {
@@ -224,16 +275,11 @@ public class PredictionService : IPredictionService
                 CreatedAt = now
             };
             _context.Predictions.Add(prediction);
-            // Save trước để DB sinh PredictionId, dùng làm ReferenceId cho ledger.
-            // Vẫn nằm trong cùng DB transaction nên không phá tính nguyên tử.
-            await _context.SaveChangesAsync();
-
-            wallet.Balance -= dto.PointsPlaced;
-            wallet.UpdatedAt = now;
+            await _context.SaveChangesAsync(); // sinh PredictionId
 
             _context.VirtualPointsTransactions.Add(new VirtualPointsTransaction
             {
-                Wallet = wallet,
+                WalletId = walletId,
                 Amount = -dto.PointsPlaced,
                 Type = TxnTypePredictionPlaced,
                 ReferenceId = prediction.PredictionId.ToString(),
@@ -241,7 +287,6 @@ public class PredictionService : IPredictionService
             });
 
             await _context.SaveChangesAsync();
-
             await transaction.CommitAsync();
 
             await _auditLog.LogAsync(
@@ -262,7 +307,7 @@ public class PredictionService : IPredictionService
                 Status = prediction.Status,
                 PointsAwarded = prediction.PointsAwarded,
                 CreatedAt = prediction.CreatedAt,
-                WalletBalanceAfter = wallet.Balance
+                WalletBalanceAfter = walletBalance
             }, "Đặt dự đoán thành công.");
         }
         catch

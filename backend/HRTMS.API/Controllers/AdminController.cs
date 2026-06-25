@@ -70,6 +70,36 @@ public class AdminController : ControllerBase
         return Ok(new { message = "User suspended successfully." });
     }
 
+    // REQ-F-ACC.4 — Kích hoạt lại tài khoản đã Suspended
+    // Không áp dụng cho Jockey/Referee/Doctor đang Pending onboarding
+    // (dùng endpoint approve riêng cho từng role đó).
+    [HttpPatch("users/{id}/activate")]
+    public async Task<IActionResult> ActivateUser(int id)
+    {
+        var user = await _context.Users.FindAsync(id);
+        if (user == null)
+            return NotFound(new { message = "User not found." });
+
+        if (user.Status != "Suspended")
+            return BadRequest(new { message = $"Chỉ có thể kích hoạt lại tài khoản đang Suspended. Trạng thái hiện tại: {user.Status}." });
+
+        var oldStatus = user.Status;
+        user.Status = "Active";
+        user.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        await _auditLogService.LogAsync(
+            actorId: CurrentAdminId,
+            action: "Activate_User",
+            entityName: "User",
+            entityId: user.UserId.ToString(),
+            oldValue: oldStatus,
+            newValue: user.Status,
+            ipAddress: ClientIp);
+
+        return Ok(new { message = "Tài khoản đã được kích hoạt lại." });
+    }
+
     [HttpPatch("referees/{id}/approve")]
     public async Task<IActionResult> ApproveReferee(int id)
     {

@@ -38,6 +38,14 @@ export default function OwnerLayout() {
             }>
             🏁 Đăng ký cuộc đua
           </NavLink>
+          <NavLink to="/owner/tournaments"
+            className={({ isActive }) =>
+              `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                isActive ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+              }`
+            }>
+            🏆 Danh sách Giải đấu
+          </NavLink>
           <NavLink to="/owner/jockey-invite"
             className={({ isActive }) =>
               `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
