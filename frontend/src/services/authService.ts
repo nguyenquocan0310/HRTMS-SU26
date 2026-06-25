@@ -55,6 +55,16 @@ export const login = async (payload: LoginPayload): Promise<LoginResult> => {
   };
 };
 
+// Gọi BE để blacklist token (EC-29). Best-effort: nếu lỗi vẫn cho đăng xuất
+// phía client (xóa token) để không kẹt người dùng.
+export const logout = async (): Promise<void> => {
+  try {
+    await apiFetch<ApiResponse<unknown>>('/auth/logout', { method: 'POST' });
+  } catch {
+    // Bỏ qua lỗi mạng/timeout — vẫn xóa token ở client.
+  }
+};
+
 export interface RegisterPayload {
   role: Role;
   username: string;
