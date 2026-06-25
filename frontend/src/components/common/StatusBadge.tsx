@@ -60,7 +60,7 @@ const FALLBACK = { label: 'Unknown', className: 'statusDraft' as const };
 
 const StatusBadge = ({ status, label }: StatusBadgeProps) => {
   const config = STATUS_CONFIG[status] ?? {
-    label: status ? String(status) : FALLBACK.label,
+label: status ? String(status) : FALLBACK.label,
     className: FALLBACK.className,
   };
 
