@@ -1,6 +1,2 @@
 allowBuilds:
-<<<<<<< HEAD
   '@parcel/watcher': false
-=======
-  '@parcel/watcher': set this to true or false
->>>>>>> b61eed9e22776bd9f4592d0f374dff5821b8aef8
