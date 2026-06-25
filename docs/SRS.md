@@ -5641,4 +5641,4 @@ Glossary đồng bộ với **SRS 1.3 (Definitions)**, **3.2 (FR)**, **3.4 (ERD)
 
 ---
 
-*PHỤ LỤC (Use Case Diagram, Design Decisions, Glossary)                                                        
+*PHỤ LỤC (Use Case Diagram, Design Decisions, Glossary)                                                        
