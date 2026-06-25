@@ -379,20 +379,20 @@ const persistDraft = async (): Promise<number> => {
       });
       roundId = created.roundId;
     }
-    for (const race of round.races) {
-      if (!/^\d+$/.test(race.id)) {
-        await tournamentService.createRace(roundId, {
-          raceNumber: race.raceNumber,
-          scheduledTime: race.scheduledTime,
-          purseAmount: Number(race.purseAmount) || 0,
-          trackTypeOverride: race.trackTypeOverride || undefined,
-          raceDistanceOverride:
-            typeof race.raceDistanceOverride === 'number'
-              ? race.raceDistanceOverride
-              : undefined,
-        });
-      }
-    }
+for (const race of round.races) {
+  if (!/^\d+$/.test(race.id)) {
+    await tournamentService.createRace(roundId, {
+      raceNumber: race.raceNumber,
+      scheduledTime: new Date(`${race.scheduledDate}T${race.scheduledTime}:00`).toISOString(),
+      purseAmount: Number(race.purseAmount) || 0,
+      trackTypeOverride: race.trackTypeOverride || undefined,
+      raceDistanceOverride:
+        typeof race.raceDistanceOverride === 'number'
+          ? race.raceDistanceOverride
+          : undefined,
+    });
+  }
+}
   }
 
   return tournamentId;

@@ -136,7 +136,7 @@ export const updatePrizeDistributions = (
 ): Promise<TournamentResponse> =>
   apiFetch<ApiResponse<TournamentResponse>>(`/tournament/${id}/prize-distributions`, {
     method: 'PUT',
-    body: JSON.stringify({ prizeDistributions }),
+    body: JSON.stringify({ distributions: prizeDistributions }),
   }).then((res) => {
     if (!res.success || !res.data) throw new Error(res.message || 'Cập nhật tỷ lệ giải thưởng thất bại.');
     return res.data;
