@@ -303,9 +303,7 @@ public class HorseService : IHorseService
             return "AUTO_REJECTED_DOPING";
         }
 
-        // TODO (Bước 2 - khi có RaceEntry): check breed khớp Tournament.AllowedBreed
-        // Hiện tại chưa có RaceEntry context nên bỏ qua breed check tại đây.
-        // Breed check sẽ được thực hiện tại endpoint ApproveRaceEntry.
+        
 
         return null;
     }

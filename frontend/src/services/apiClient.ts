@@ -29,6 +29,19 @@ export async function apiFetch<T>(
   });
 
   if (!response.ok) {
+    // 401 = token hết hạn / không hợp lệ / bị blacklist (EC-29).
+    // Xóa token và đưa về trang đăng nhập thay vì kẹt ở "API error: 401".
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      if (window.location.pathname !== '/login') {
+        // Đánh dấu lý do để trang login có thể hiển thị thông báo (tùy chọn).
+        sessionStorage.setItem('authReason', 'expired');
+        window.location.href = '/login';
+      }
+      throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+
     let errorBody: ApiErrorResponse | null = null;
     try {
       errorBody = await response.json();
