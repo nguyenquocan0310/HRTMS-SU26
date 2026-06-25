@@ -78,6 +78,14 @@ export function getRoleHomePath(role: Role): string {
     case 'Referee': return '/referee'
     case 'Doctor': return '/doctor'
     case 'Spectator': return '/spectator'
+    case 'Admin':       return '/admin'
+    case 'HorseOwner':
+    case 'Owner':  return '/owner'
+    case 'Jockey':      return '/jockey'
+    case 'RaceReferee': 
+    case 'Referee':     return '/referee'    
+    case 'Doctor':      return '/doctor'
+    case 'Spectator':   return '/spectator'
   }
 }
 
