@@ -346,7 +346,7 @@ const handleSaveDraft = async () => {
       } else {
         await tournamentService.updateTournament(tournamentId, buildCreatePayload());
       }
-      await tournamentService.updateTournamentStatus(tournamentId, 'OpenRegistration');
+      await tournamentService.updateTournamentStatus(tournamentId, 'Open Registration');
       await loadTournaments();
       setView('list');
     } catch (err) {

@@ -17,6 +17,8 @@ import OwnerLayout from './pages/owner/OwnerLayout'
 import RegisterHorse from './pages/owner/RegisterHorse'
 import HorseDetail from './pages/owner/HorseDetail'
 import ScheduleConfirm from './pages/owner/ScheduleConfirm'
+import RaceEntries from './pages/owner/RaceEntries'
+import JockeyInvite from './pages/owner/JockeyInvite'
 
 // ── Import các trang Jockey ──
 import JockeyLayout from './pages/jockey/JockeyLayout'
@@ -68,9 +70,11 @@ function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
 export function getRoleHomePath(role: Role): string {
   switch (role) {
     case 'Admin':       return '/admin'
-    case 'HorseOwner':  return '/owner'
+    case 'HorseOwner':  
+    case 'Owner':       return '/owner'    
     case 'Jockey':      return '/jockey'
-    case 'RaceReferee': return '/referee'
+    case 'RaceReferee': 
+    case 'Referee':     return '/referee'    
     case 'Doctor':      return '/doctor'
     case 'Spectator':   return '/spectator'
   }
@@ -85,17 +89,19 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 
-        {/* Owner routes */}
-        <Route path="/owner" element={
-          <ProtectedRoute allowedRoles={['HorseOwner']}>
-            <OwnerLayout />
-          </ProtectedRoute>
-        }>
+    {/* Owner routes */}
+<Route path="/owner" element={
+  <ProtectedRoute allowedRoles={['HorseOwner', 'Owner']}>
+    <OwnerLayout />
+  </ProtectedRoute>
+}>
           <Route index element={<OwnerDashboard />} />
           <Route path="horses" element={<MyHorses />} />
           <Route path="horses/register" element={<RegisterHorse />} />
           <Route path="horses/:id" element={<HorseDetail />} />
+          <Route path="race-entries" element={<RaceEntries />} />
           <Route path="schedule-confirm" element={<ScheduleConfirm />} />
+          <Route path="jockey-invite" element={<JockeyInvite />} />
           <Route path="protest" element={<Protest userRole="HorseOwner" />} />
         </Route>
 
@@ -125,10 +131,10 @@ export default function App() {
 
         {/* ── Cấu trúc Route của TRỌNG TÀI (Referee) ── */}
         <Route path="/referee" element={
-          <ProtectedRoute allowedRoles={['RaceReferee']}>
-            <RefereeLayout />
-          </ProtectedRoute>
-        }>
+  <ProtectedRoute allowedRoles={['RaceReferee', 'Referee']}>
+    <RefereeLayout />
+  </ProtectedRoute>
+}>
           <Route index element={<RefereeDashboard />} />
           <Route path="officiating" element={<RaceOfficiating />} />
           <Route path="protest" element={<ProtestHandling />} />

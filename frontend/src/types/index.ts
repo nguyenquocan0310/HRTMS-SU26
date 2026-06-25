@@ -2,8 +2,10 @@
 export type Role =
   | 'Admin'
   | 'HorseOwner'
+  | 'Owner'
   | 'Jockey'
   | 'RaceReferee'
+  | 'Referee'
   | 'Doctor'
   | 'Spectator'
 

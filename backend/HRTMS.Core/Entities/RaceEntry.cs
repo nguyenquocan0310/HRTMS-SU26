@@ -68,4 +68,43 @@ public partial class RaceEntry
     public virtual ICollection<Violation> ViolationPlaceBehindEntries { get; set; } = new List<Violation>();
 
     public virtual ICollection<Violation> ViolationRaceEntries { get; set; } = new List<Violation>();
+    // Ket qua xac minh danh tinh ngua tai Paddock
+    // Gia tri: Matched hoac Mismatch
+    public string? HorseIdentityStatus { get; set; }
+
+    // Doctor thuc hien xac minh danh tinh ngua
+    public int? HorseIdentityCheckedByDoctorId { get; set; }
+
+    // Thoi gian xac minh danh tinh ngua
+    public DateTime? HorseIdentityCheckedAt { get; set; }
+
+    // Navigation den Doctor da xac minh danh tinh ngua
+    public virtual DoctorProfile? HorseIdentityCheckedByDoctor { get; set; }
+    // Ket qua kiem tra suc khoe ngua
+    // Gia tri: Fit hoac Unfit
+    public string? ClinicalStatus { get; set; }
+
+    // Doctor thuc hien kiem tra suc khoe
+    public int? ClinicalCheckedByDoctorId { get; set; }
+
+    // Thoi gian kiem tra suc khoe
+    public DateTime? ClinicalCheckedAt { get; set; }
+
+    // Navigation den Doctor da kiem tra suc khoe
+    public virtual DoctorProfile? ClinicalCheckedByDoctor { get; set; }
+    // Ket qua kiem tra tinh doc lap cua Jockey voi Owner doi thu
+    // Gia tri: Passed hoac Failed
+    public string? IndependenceCheckStatus { get; set; }
+
+    // Referee thuc hien kiem tra
+    public int? IndependenceCheckedByRefereeId { get; set; }
+
+    // Thoi gian kiem tra
+    public DateTime? IndependenceCheckedAt { get; set; }
+
+    // Ly do vi pham neu Failed
+    public string? IndependenceViolationReason { get; set; }
+
+    // Navigation den Referee da kiem tra
+    public virtual RefereeProfile? IndependenceCheckedByReferee { get; set; }
 }

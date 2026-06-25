@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import type { JockeyProfile } from '../../types/jockey.types';
+import { getMyProfile, updateMyProfile } from '../../services/jockeyService';
+import type { UpdateProfilePayload } from '../../services/jockeyService';
 
 interface FamilyMember {
   id: string;
@@ -8,38 +11,145 @@ interface FamilyMember {
   declaredDate: string;
 }
 
-const relationshipOptions = [
-  'Cha',
-  'Mẹ',
-  'Vợ/Chồng',
-  'Anh/Chị/Em',
-];
+const relationshipOptions = ['Cha', 'Mẹ', 'Vợ/Chồng', 'Anh/Chị/Em'];
+const roleOptions = ['Chủ ngựa', 'Trọng tài', 'Huấn luyện viên', 'Ban tổ chức'];
+const bloodTypeOptions = ['A', 'B', 'AB', 'O'];
+const healthStatusOptions = ['Good', 'Fair', 'Poor'];
 
-const roleOptions = [
-  'Chủ ngựa',
-  'Trọng tài',
-  'Huấn luyện viên',
-  'Ban tổ chức',
-];
-
-// Dữ liệu mẫu hồ sơ kỵ sĩ
-const mockProfile = {
-  licenseNumber: 'JL-2024-0087',
-  experienceYears: 8,
-  selfDeclaredWeight: 55,
+// Nhãn hiển thị tiếng Việt
+const healthStatusLabel: Record<string, string> = {
+  Good: 'Tốt',
+  Fair: 'Trung bình',
+  Poor: 'Kém',
 };
 
-export default function ProfileDeclaration() {
-  // Section 1 — Thông tin chuyên môn
-  const [weight, setWeight] = useState<number>(mockProfile.selfDeclaredWeight);
-  const [weightSaved, setWeightSaved] = useState(false);
+// ──────────────────────────────────────────────
+// Sub-components
+// ──────────────────────────────────────────────
 
-  const handleWeightUpdate = () => {
-    setWeightSaved(true);
-    setTimeout(() => setWeightSaved(false), 3000);
+function ReadOnlyField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-500 mb-1.5">{label}</label>
+      <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-sm flex items-center gap-2">
+        <span className="text-gray-400 text-xs">🔒</span>
+        {value}
+      </div>
+      <p className="mt-1 text-xs text-gray-400">Thông tin chỉ đọc, không thể chỉnh sửa</p>
+    </div>
+  );
+}
+
+function SkeletonField() {
+  return (
+    <div className="animate-pulse">
+      <div className="h-4 bg-gray-200 rounded w-1/3 mb-2"></div>
+      <div className="h-10 bg-gray-100 rounded-lg"></div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────
+// Main Component
+// ──────────────────────────────────────────────
+
+export default function ProfileDeclaration() {
+  // ── Profile API state ──
+  const [profile, setProfile] = useState<JockeyProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        setProfileLoading(true);
+        const data = await getMyProfile();
+        setProfile(data);
+      } catch (err) {
+        console.error('Failed to fetch jockey profile:', err);
+        setProfileError('Không thể tải thông tin hồ sơ. Vui lòng thử lại.');
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  // ── Editable professional info state ──
+  const [editForm, setEditForm] = useState({
+    licenseCertificate: '',
+    experienceYears: 0,
+    bloodType: '',
+    healthStatus: '',
+    selfDeclaredWeight: 0,
+  });
+  const [editSaving, setEditSaving] = useState(false);
+  const [editSaved, setEditSaved] = useState(false);
+  const [editChanged, setEditChanged] = useState(false);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+  const [saveErrorMsg, setSaveErrorMsg] = useState<string | null>(null);
+
+  // Sync edit form khi profile load xong
+  useEffect(() => {
+    if (profile) {
+      setEditForm({
+        licenseCertificate: profile.licenseCertificate,
+        experienceYears: profile.experienceYears,
+        bloodType: profile.bloodType,
+        healthStatus: profile.healthStatus,
+        selfDeclaredWeight: profile.selfDeclaredWeight,
+      });
+    }
+  }, [profile]);
+
+  const handleEditChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setEditForm((prev) => ({
+      ...prev,
+      [name]: name === 'experienceYears' || name === 'selfDeclaredWeight'
+        ? Number(value)
+        : value,
+    }));
+    setEditChanged(true);
+    setEditSaved(false);
   };
 
-  // Section 2 — Khai báo gia đình (COI)
+  const handleSaveProfessional = async () => {
+    setEditSaving(true);
+    setSaveSuccessMsg(null);
+    setSaveErrorMsg(null);
+    try {
+      const payload: UpdateProfilePayload = {
+        licenseCertificate: editForm.licenseCertificate,
+        experienceYears: editForm.experienceYears,
+        bloodType: editForm.bloodType,
+        healthStatus: editForm.healthStatus,
+        selfDeclaredWeight: editForm.selfDeclaredWeight,
+      };
+      const result = await updateMyProfile(payload);
+      setSaveSuccessMsg('Cập nhật hồ sơ thành công.');
+      setEditSaved(true);
+      setEditChanged(false);
+      setTimeout(() => {
+        setEditSaved(false);
+        setSaveSuccessMsg(null);
+      }, 4000);
+    } catch (err: any) {
+      console.error('Failed to save profile:', err);
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.title ||
+        'Đã xảy ra lỗi khi lưu thông tin. Vui lòng thử lại.';
+      setSaveErrorMsg(msg);
+      setTimeout(() => setSaveErrorMsg(null), 5000);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  // ── COI Family state ──
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([
     {
       id: 'coi-001',
@@ -49,12 +159,7 @@ export default function ProfileDeclaration() {
       declaredDate: '10/06/2026',
     },
   ]);
-
-  const [memberForm, setMemberForm] = useState({
-    fullName: '',
-    relationship: '',
-    role: '',
-  });
+  const [memberForm, setMemberForm] = useState({ fullName: '', relationship: '', role: '' });
   const [memberFormError, setMemberFormError] = useState<string | null>(null);
   const [noConflict, setNoConflict] = useState(false);
   const [deleteConfirmID, setDeleteConfirmID] = useState<string | null>(null);
@@ -81,7 +186,6 @@ export default function ProfileDeclaration() {
       setMemberFormError('Vui lòng chọn vai trò trong giải.');
       return;
     }
-
     const newMember: FamilyMember = {
       id: `coi-${Date.now()}`,
       fullName: memberForm.fullName.trim(),
@@ -89,7 +193,6 @@ export default function ProfileDeclaration() {
       role: memberForm.role,
       declaredDate: new Date().toLocaleDateString('vi-VN'),
     };
-
     setFamilyMembers((prev) => [...prev, newMember]);
     setMemberForm({ fullName: '', relationship: '', role: '' });
     setMemberFormError(null);
@@ -100,99 +203,225 @@ export default function ProfileDeclaration() {
     setDeleteConfirmID(null);
   };
 
+  // ──────────────────────────────────────────────
+  // Render
+  // ──────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50 py-10 px-4">
       <div className="max-w-4xl mx-auto">
-        {/* Tiêu đề trang */}
+
+        {/* ── Tiêu đề trang ── */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-1">
-            Hồ sơ & Khai báo gia đình
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-800 mb-1">Hồ sơ &amp; Khai báo</h1>
           <p className="text-gray-500 text-sm">
-            Cập nhật thông tin chuyên môn và khai báo xung đột lợi ích theo quy định giải đấu.
+            Xem thông tin tài khoản, cập nhật hồ sơ chuyên môn và khai báo xung đột lợi ích.
           </p>
         </div>
 
-        {/* ===== SECTION 1: Thông tin chuyên môn ===== */}
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-8">
+        {/* ════════════════════════════════════════
+            SECTION 1 — Thông tin tài khoản (chỉ đọc)
+        ════════════════════════════════════════ */}
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-6">
           <h2 className="text-lg font-bold text-gray-800 mb-5 flex items-center gap-2">
-            <span className="w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center">1</span>
-            Thông tin chuyên môn
+            <span className="w-7 h-7 rounded-full bg-slate-500 text-white text-sm font-bold flex items-center justify-center">
+              1
+            </span>
+            Thông tin tài khoản
+            <span className="ml-2 text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+              Chỉ đọc
+            </span>
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            {/* Số chứng chỉ hành nghề */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Số chứng chỉ hành nghề
-              </label>
-              <input
-                type="text"
-                value={mockProfile.licenseNumber}
-                readOnly
-                className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-lg text-gray-600 text-sm cursor-not-allowed"
-              />
-              <p className="mt-1 text-xs text-gray-400">Thông tin chỉ đọc từ hồ sơ</p>
+          {profileLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[...Array(3)].map((_, i) => <SkeletonField key={i} />)}
             </div>
-
-            {/* Năm kinh nghiệm */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Năm kinh nghiệm
-              </label>
-              <input
-                type="text"
-                value={`${mockProfile.experienceYears} năm`}
-                readOnly
-                className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-lg text-gray-600 text-sm cursor-not-allowed"
-              />
-              <p className="mt-1 text-xs text-gray-400">Thông tin chỉ đọc từ hồ sơ</p>
+          ) : profileError ? (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
+              ⚠️ {profileError}
             </div>
-          </div>
-
-          {/* Cân nặng tự khai */}
-          <div className="border-t border-gray-100 pt-5">
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Cân nặng tự khai (kg)
-            </label>
-            <div className="flex items-center gap-3 max-w-xs">
-              <input
-                type="number"
-                value={weight}
-                onChange={(e) => {
-                  setWeight(Number(e.target.value));
-                  setWeightSaved(false);
-                }}
-                min={40}
-                max={100}
-                step={0.1}
-                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm"
-              />
-              <span className="text-gray-500 text-sm font-medium">kg</span>
+          ) : profile ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <ReadOnlyField label="Tên đăng nhập" value={profile.username} />
+              <ReadOnlyField label="Họ và tên" value={profile.fullName} />
+              <ReadOnlyField label="Email" value={profile.email} />
             </div>
-            <div className="mt-3 flex items-center gap-3">
-              <button
-                onClick={handleWeightUpdate}
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors"
-              >
-                Cập nhật cân nặng
-              </button>
-              {weightSaved && (
-                <span className="text-green-600 text-sm font-medium flex items-center gap-1">
-                  ✅ Đã lưu thành công!
-                </span>
-              )}
-            </div>
-            <p className="mt-2 text-xs text-gray-400">
-              * Cân nặng tự khai có thể được ban tổ chức xác minh lại.
-            </p>
-          </div>
+          ) : null}
         </div>
 
-        {/* ===== SECTION 2: Khai báo xung đột lợi ích ===== */}
+        {/* ════════════════════════════════════════
+            SECTION 2 — Thông tin chuyên môn (có thể chỉnh sửa)
+        ════════════════════════════════════════ */}
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-6">
+          <h2 className="text-lg font-bold text-gray-800 mb-5 flex items-center gap-2">
+            <span className="w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center">
+              2
+            </span>
+            Thông tin chuyên môn
+            <span className="ml-2 text-xs font-normal text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+              ✏️ Có thể chỉnh sửa
+            </span>
+          </h2>
+
+          {profileLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {[...Array(5)].map((_, i) => <SkeletonField key={i} />)}
+            </div>
+          ) : profileError ? null : profile ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+
+                {/* Chứng chỉ hành nghề */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Số chứng chỉ hành nghề
+                  </label>
+                  <input
+                    type="text"
+                    name="licenseCertificate"
+                    value={editForm.licenseCertificate}
+                    onChange={handleEditChange}
+                    placeholder="VD: LIC-JOCKEY-2026-01"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm"
+                  />
+                </div>
+
+                {/* Năm kinh nghiệm */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Số năm kinh nghiệm
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      name="experienceYears"
+                      value={editForm.experienceYears}
+                      onChange={handleEditChange}
+                      min={0}
+                      max={50}
+                      className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm"
+                    />
+                    <span className="text-gray-500 text-sm font-medium whitespace-nowrap">năm</span>
+                  </div>
+                </div>
+
+                {/* Nhóm máu */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Nhóm máu
+                  </label>
+                  <select
+                    name="bloodType"
+                    value={editForm.bloodType}
+                    onChange={handleEditChange}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm bg-white"
+                  >
+                    <option value="">— Chọn nhóm máu —</option>
+                    {bloodTypeOptions.map((bt) => (
+                      <option key={bt} value={bt}>{bt}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Tình trạng sức khoẻ */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Tình trạng sức khoẻ
+                  </label>
+                  <select
+                    name="healthStatus"
+                    value={editForm.healthStatus}
+                    onChange={handleEditChange}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm bg-white"
+                  >
+                    <option value="">— Chọn tình trạng —</option>
+                    {healthStatusOptions.map((hs) => (
+                      <option key={hs} value={hs}>{healthStatusLabel[hs] ?? hs}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Cân nặng tự khai */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Cân nặng tự khai (kg)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      name="selfDeclaredWeight"
+                      value={editForm.selfDeclaredWeight}
+                      onChange={handleEditChange}
+                      min={40}
+                      max={120}
+                      step={0.1}
+                      className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm"
+                    />
+                    <span className="text-gray-500 text-sm font-medium">kg</span>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-400">
+                    * Có thể được ban tổ chức xác minh lại.
+                  </p>
+                </div>
+              </div>
+
+              {/* Nút lưu */}
+              <div className="border-t border-gray-100 pt-5 space-y-3">
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={handleSaveProfessional}
+                    disabled={editSaving || !editChanged}
+                    className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
+                      editSaving || !editChanged
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md'
+                    }`}
+                  >
+                    {editSaving ? (
+                      <>
+                        <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
+                        Đang lưu...
+                      </>
+                    ) : (
+                      'Lưu thay đổi'
+                    )}
+                  </button>
+
+                  {editChanged && !editSaved && !editSaving && (
+                    <span className="text-amber-600 text-xs">
+                      • Có thay đổi chưa được lưu
+                    </span>
+                  )}
+                </div>
+
+                {/* Toast thành công — hiển thị message từ API */}
+                {saveSuccessMsg && (
+                  <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-green-700 text-sm font-medium">
+                    <span className="text-base">✅</span>
+                    {saveSuccessMsg}
+                  </div>
+                )}
+
+                {/* Toast lỗi */}
+                {saveErrorMsg && (
+                  <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-red-700 text-sm">
+                    <span className="text-base">⚠️</span>
+                    {saveErrorMsg}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : null}
+        </div>
+
+        {/* ════════════════════════════════════════
+            SECTION 3 — Khai báo xung đột lợi ích
+        ════════════════════════════════════════ */}
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
           <h2 className="text-lg font-bold text-gray-800 mb-1 flex items-center gap-2">
-            <span className="w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center">2</span>
+            <span className="w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center">
+              3
+            </span>
             Khai báo xung đột lợi ích
           </h2>
           <p className="text-gray-500 text-sm mb-5 ml-9">
@@ -210,7 +439,6 @@ export default function ProfileDeclaration() {
             )}
 
             <form onSubmit={handleAddMember} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Họ tên */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Họ tên <span className="text-red-500">*</span>
@@ -225,7 +453,6 @@ export default function ProfileDeclaration() {
                 />
               </div>
 
-              {/* Quan hệ */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Quan hệ <span className="text-red-500">*</span>
@@ -234,7 +461,7 @@ export default function ProfileDeclaration() {
                   name="relationship"
                   value={memberForm.relationship}
                   onChange={handleMemberFormChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm bg-white"
                 >
                   <option value="">— Chọn quan hệ —</option>
                   {relationshipOptions.map((opt) => (
@@ -243,7 +470,6 @@ export default function ProfileDeclaration() {
                 </select>
               </div>
 
-              {/* Vai trò */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Vai trò trong giải <span className="text-red-500">*</span>
@@ -252,7 +478,7 @@ export default function ProfileDeclaration() {
                   name="role"
                   value={memberForm.role}
                   onChange={handleMemberFormChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm bg-white"
                 >
                   <option value="">— Chọn vai trò —</option>
                   {roleOptions.map((opt) => (
@@ -334,7 +560,8 @@ export default function ProfileDeclaration() {
                 className="mt-0.5 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
               />
               <span className="text-sm text-gray-700 group-hover:text-gray-900 transition-colors">
-                Tôi xác nhận <strong>không có xung đột lợi ích</strong> nào khác chưa được khai báo và cam kết cung cấp thông tin trung thực theo quy định.
+                Tôi xác nhận <strong>không có xung đột lợi ích</strong> nào khác chưa được khai báo
+                và cam kết cung cấp thông tin trung thực theo quy định.
               </span>
             </label>
             {noConflict && (
@@ -346,7 +573,7 @@ export default function ProfileDeclaration() {
         </div>
       </div>
 
-      {/* Dialog xác nhận xóa */}
+      {/* ── Dialog xác nhận xóa ── */}
       {deleteConfirmID && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4">

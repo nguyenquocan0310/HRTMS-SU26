@@ -1,17 +1,22 @@
 export interface Horse {
-  horseID: string;
-  ownerID: string;
-  breedCode: string;
+  breed: string;
   name: string;
   birthYear: number;
-  gender: 'Colt' | 'Filly' | 'Stallion' | 'Mare';
+  gender: string;
   color: string;
+  pedigree?: string;
+  weight: number;
+  identifyingMarks: string;
   vaccinationRecordRef?: string;
-  dopingTestDate?: Date;
-  dopingTestResult: 'Clean' | 'Pending' | 'Failed';
-  status: 'Pending' | 'Approved' | 'Rejected';
+  dopingTestDate?: string;
+  dopingTestResult?: string;
+  legalConsentAccepted?: boolean;
+  status?: 'Approved' | 'Pending' | 'Rejected';
+  adminApprovalStatus?: string;
   rejectionReason?: string;
-  createdAt: Date;
+  horseID?: string;
+  ownerID?: string;
+  createdAt?: Date;
 }
 
 export interface RaceEntry {
@@ -32,9 +37,12 @@ export interface JockeyInvitation {
   ownerID: string;
   jockeyID: string;
   jockeyName?: string;
-  status: 'Pending' | 'Accept' | 'Decline';
+  status: 'Pending' | 'Accepted' | 'Declined';
   invitedAt: Date;
   respondedAt?: Date;
+  horseID?: string;
+  horseName?: string;
+  requestMessage?: string;
 }
 
 export interface Breed {

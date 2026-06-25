@@ -21,8 +21,17 @@ export interface OwnerVerification {
 export interface JockeyVerification {
   licenseCertificate: string;
   experienceYears: number | '';
-  selfDeclaredWeight: number | '';       // kg
-  familyDeclaration: string;             // Family / Conflict of Interest
+  selfDeclaredWeight: number | '';
+  bloodType: string;
+  healthStatus: string;
+  familyDeclaration: string; // giữ lại cho backward compat
+  // Mảng khai báo gia đình có cấu trúc đúng
+  familyDeclarations: {
+    relatedPersonName: string;
+    relationType: string;
+    industryRole: string;
+    notes: string;
+  }[];
 }
 
 export interface RefereeVerification {
@@ -72,11 +81,14 @@ export const initialFormData: RegisterFormData = {
     identityNumber: '',
   },
   jockeyVerification: {
-    licenseCertificate: '',
-    experienceYears: '',
-    selfDeclaredWeight: '',
-    familyDeclaration: '',
-  },
+  licenseCertificate: '',
+  experienceYears: '',
+  selfDeclaredWeight: '',
+  bloodType: '',
+  healthStatus: '',
+  familyDeclaration: '',
+  familyDeclarations: [],
+},
   refereeVerification: {
     certificationLevel: '',
     familyDeclaration: '',

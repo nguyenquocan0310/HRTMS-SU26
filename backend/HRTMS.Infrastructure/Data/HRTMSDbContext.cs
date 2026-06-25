@@ -481,6 +481,33 @@ public partial class HRTMSDbContext : DbContext
                 .HasForeignKey(d => d.RaceId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_RaceEntries_Race");
+            entity.Property(e => e.HorseIdentityStatus)
+                .HasMaxLength(20)
+                .IsUnicode(false);
+
+            entity.HasOne(d => d.HorseIdentityCheckedByDoctor)
+                .WithMany()
+                .HasForeignKey(d => d.HorseIdentityCheckedByDoctorId)
+                .HasConstraintName("FK_RaceEntries_HorseIdentityDoctor");
+            entity.Property(e => e.ClinicalStatus)
+                .HasMaxLength(20)
+                .IsUnicode(false);
+
+            entity.HasOne(d => d.ClinicalCheckedByDoctor)
+                .WithMany()
+                .HasForeignKey(d => d.ClinicalCheckedByDoctorId)
+                .HasConstraintName("FK_RaceEntries_ClinicalDoctor");
+            entity.Property(e => e.IndependenceCheckStatus)
+                .HasMaxLength(20)
+                .IsUnicode(false);
+
+            entity.Property(e => e.IndependenceViolationReason)
+                .HasMaxLength(500);
+
+            entity.HasOne(d => d.IndependenceCheckedByReferee)
+                .WithMany()
+                .HasForeignKey(d => d.IndependenceCheckedByRefereeId)
+                .HasConstraintName("FK_RaceEntries_IndependenceReferee");
         });
 
         modelBuilder.Entity<RaceReport>(entity =>

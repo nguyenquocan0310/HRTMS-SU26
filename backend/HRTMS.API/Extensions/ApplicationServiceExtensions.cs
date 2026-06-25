@@ -20,6 +20,16 @@ public static class ApplicationServiceExtensions
         services.AddScoped<IHorseService, HorseService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IRaceEntryService, RaceEntryService>();
+        services.AddScoped<IRefereeAssignmentService, RefereeAssignmentService>();
+        services.AddScoped<IDoctorAssignmentService, DoctorAssignmentService>();
+        services.AddScoped<IMedicalCheckService, MedicalCheckService>();
+        services.AddScoped<IPursePayoutService, PursePayoutService>();
+        services.AddScoped<IProfileService, ProfileService>();
+        services.AddScoped<IPredictionService, PredictionService>();
+        services.AddScoped<IReconciliationService, ReconciliationService>();
+        services.AddScoped<IIndependenceCheckService, IndependenceCheckService>();
+        services.AddScoped<IEmergencyDisqualificationService, EmergencyDisqualificationService>();
+        services.AddScoped<IStartingListService, StartingListService>();
         return services;
     }
 }

@@ -16,9 +16,9 @@ const InvitationCard: React.FC<InvitationCardProps> = ({
     switch (status) {
       case 'Pending':
         return 'bg-yellow-100 text-yellow-800';
-      case 'Accept':
+      case 'Accepted':
         return 'bg-green-100 text-green-800';
-      case 'Decline':
+      case 'Declined':
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -29,9 +29,9 @@ const InvitationCard: React.FC<InvitationCardProps> = ({
     switch (status) {
       case 'Pending':
         return 'Chờ phản hồi';
-      case 'Accept':
+      case 'Accepted':
         return 'Đã chấp nhận';
-      case 'Decline':
+      case 'Declined':
         return 'Đã từ chối';
       default:
         return status;
@@ -51,13 +51,22 @@ const InvitationCard: React.FC<InvitationCardProps> = ({
         <p>
           <span className="font-medium">Giống ngựa:</span> {invitation.breedCode}
         </p>
-        <p>
-          <span className="font-medium">Giờ dự kiến:</span>{' '}
-          {new Date(invitation.raceScheduledTime).toLocaleString('vi-VN')}
-        </p>
-        <p>
-          <span className="font-medium">Mã cuộc đua:</span> {invitation.raceID}
-        </p>
+        {invitation.raceScheduledTime && (
+          <p>
+            <span className="font-medium">Giờ dự kiến:</span>{' '}
+            {new Date(invitation.raceScheduledTime).toLocaleString('vi-VN')}
+          </p>
+        )}
+        {invitation.raceID && (
+          <p>
+            <span className="font-medium">Mã cuộc đua:</span> {invitation.raceID}
+          </p>
+        )}
+        {invitation.requestMessage && (
+          <p>
+            <span className="font-medium">Lời nhắn:</span> {invitation.requestMessage}
+          </p>
+        )}
       </div>
 
       {/* Badge trạng thái */}
@@ -89,8 +98,8 @@ const InvitationCard: React.FC<InvitationCardProps> = ({
         </div>
       )}
 
-      {/* Hiển thị thời gian phản hồi cho Accept/Decline */}
-      {(invitation.status === 'Accept' || invitation.status === 'Decline') && (
+      {/* Hiển thị thời gian phản hồi cho Accepted/Declined */}
+      {(invitation.status === 'Accepted' || invitation.status === 'Declined') && (
         <div className="text-sm text-gray-600">
           <p>
             <span className="font-medium">Phản hồi lúc:</span>{' '}
