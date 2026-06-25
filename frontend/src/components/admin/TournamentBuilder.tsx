@@ -342,59 +342,67 @@ const loadDraft = async (id: number) => {
   // giữa "tạo mới" (POST) và "cập nhật" (PUT).
   const isNewDraft = draft.id.startsWith('t-');
 
+// Lưu toàn bộ draft xuống BE (tạo/cập nhật giải + tỷ lệ thưởng + rounds + races).
+// Trả về tournamentId để Publish dùng tiếp.
+const persistDraft = async (): Promise<number> => {
+  const payload = buildCreatePayload();
+  let tournamentId: number;
+
+  if (isNewDraft) {
+    const created = await tournamentService.createTournament(payload);
+    tournamentId = created.tournamentId;
+    setDraft((prev) => ({
+      ...prev,
+      id: String(created.tournamentId),
+      status: created.status as TournamentStatus,
+    }));
+  } else {
+    tournamentId = Number(draft.id);
+    await tournamentService.updateTournament(tournamentId, payload);
+  }
+
+  // Lưu tỷ lệ thưởng — BẮT BUỘC cho guard Open Registration (BE cần đủ 5 dòng).
+  if (isPrizeValid()) {
+    await tournamentService.updatePrizeDistributions(
+      tournamentId,
+      draft.prizeDistribution.map((p) => ({ position: p.rank, percentage: p.percentage }))
+    );
+  }
+
+  for (const round of draft.rounds) {
+    let roundId = Number(round.id);
+    if (!/^\d+$/.test(round.id)) {
+      const created = await tournamentService.createRound(tournamentId, {
+        name: round.name,
+        sequenceOrder: draft.rounds.indexOf(round) + 1,
+        scheduledDate: round.scheduledDate,
+      });
+      roundId = created.roundId;
+    }
+    for (const race of round.races) {
+      if (!/^\d+$/.test(race.id)) {
+        await tournamentService.createRace(roundId, {
+          raceNumber: race.raceNumber,
+          scheduledTime: race.scheduledTime,
+          purseAmount: Number(race.purseAmount) || 0,
+          trackTypeOverride: race.trackTypeOverride || undefined,
+          raceDistanceOverride:
+            typeof race.raceDistanceOverride === 'number'
+              ? race.raceDistanceOverride
+              : undefined,
+        });
+      }
+    }
+  }
+
+  return tournamentId;
+};
+
 const handleSaveDraft = async () => {
   setIsSaving(true);
   setSaveError('');
   try {
-    const payload = buildCreatePayload();
-    let tournamentId: number;
-
-    if (isNewDraft) {
-      const created = await tournamentService.createTournament(payload);
-      tournamentId = created.tournamentId;
-      setDraft((prev) => ({
-        ...prev,
-        id: String(created.tournamentId),
-        status: created.status as TournamentStatus,
-      }));
-    } else {
-      tournamentId = Number(draft.id);
-      await tournamentService.updateTournament(tournamentId, payload);
-    }
-
-    if (isPrizeValid()) {
-      await tournamentService.updatePrizeDistributions(
-        tournamentId,
-        draft.prizeDistribution.map((p) => ({ position: p.rank, percentage: p.percentage }))
-      );
-    }
-
-    for (const round of draft.rounds) {
-      let roundId = Number(round.id);
-      if (!/^\d+$/.test(round.id)) {
-        const created = await tournamentService.createRound(tournamentId, {
-          name: round.name,
-          sequenceOrder: draft.rounds.indexOf(round) + 1,
-          scheduledDate: round.scheduledDate,
-        });
-        roundId = created.roundId;
-      }
-      for (const race of round.races) {
-        if (!/^\d+$/.test(race.id)) {
-          await tournamentService.createRace(roundId, {
-            raceNumber: race.raceNumber,
-            scheduledTime: race.scheduledTime,
-            purseAmount: Number(race.purseAmount) || 0,
-            trackTypeOverride: race.trackTypeOverride || undefined,
-            raceDistanceOverride:
-              typeof race.raceDistanceOverride === 'number'
-                ? race.raceDistanceOverride
-                : undefined,
-          });
-        }
-      }
-    }
-
+    await persistDraft();
     navigate(LIST_PATH);
   } catch (err) {
     setSaveError(err instanceof Error ? err.message : 'Lưu giải đấu thất bại.');
@@ -408,16 +416,10 @@ const handleSaveDraft = async () => {
     setIsSaving(true);
     setSaveError('');
     try {
-      // Đảm bảo giải đã tồn tại trên BE trước khi đổi status
-      let tournamentId = Number(draft.id);
-      if (isNewDraft) {
-        const created = await tournamentService.createTournament(buildCreatePayload());
-        tournamentId = created.tournamentId;
-      } else {
-        await tournamentService.updateTournament(tournamentId, buildCreatePayload());
-      }
+      // Lưu ĐẦY ĐỦ (gồm tỷ lệ thưởng) TRƯỚC khi đổi status — nếu không BE chặn
+      // Open Registration vì chưa đủ 5 PrizeDistributions trong DB.
+      const tournamentId = await persistDraft();
       // Phải gửi ĐÚNG chuỗi DB chấp nhận: "Open Registration" (có dấu cách).
-      // Gửi "OpenRegistration" sẽ bị BE từ chối (không khớp ValidTransitions).
       await tournamentService.updateTournamentStatus(tournamentId, 'Open Registration');
       navigate(LIST_PATH);
     } catch (err) {
