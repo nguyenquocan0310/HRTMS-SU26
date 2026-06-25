@@ -1,7 +1,13 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import DataTable, { type DataTableColumn } from '../../components/common/DataTable';
 import StatusBadge, { type StatusType } from '../../components/common/StatusBadge';
 import ApprovalDetailPanel from './ApprovalDetailPanel';
+import {
+  getPendingHorses,
+  getPendingApprovals,
+  type HorsePending,
+  type PersonPending,
+} from '../../services/approvalService';
 import styles from './ApprovalCenter.module.scss';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -9,35 +15,38 @@ export type ApprovalTab = 'horse' | 'jockey' | 'onboarding';
 
 export interface HorseApproval {
   id: string;
+  entityId: number; // horseId — dùng gọi API
   type: 'horse';
-  subject: string; // tên ngựa
+  subject: string;
   submittedDate: string;
-  stable: string; // tổ chức/chuồng ngựa
+  stable: string;
   status: StatusType;
   breed: string;
   allowedBreed: string;
-  dopingTestResult: 'Passed' | 'Failed' | 'Pending';
+  dopingTestResult: 'Passed' | 'Failed' | 'Pending' | string;
   vaccinationRecordRef: string;
   entryFeeStatus: 'Paid' | 'Unpaid';
 }
 
 export interface JockeyApproval {
   id: string;
+  entityId: number; // userId — dùng gọi API
   type: 'jockey';
-  subject: string; // tên jockey
+  subject: string;
   submittedDate: string;
-  stable: string; // tổ chức liên kết
+  stable: string;
   status: StatusType;
   licenseCertificate: string;
-  experienceYears: number;
+  experienceYears?: number;
 }
 
 export interface OnboardingApproval {
   id: string;
+  entityId: number; // userId — dùng gọi API
   type: 'onboarding';
-  subject: string; // tên người
+  subject: string;
   submittedDate: string;
-  stable: string; // role: Referee / Doctor
+  stable: string;
   status: StatusType;
   role: 'Referee' | 'Doctor';
   certificationLevel?: string;
@@ -46,47 +55,51 @@ export interface OnboardingApproval {
 
 export type ApprovalItem = HorseApproval | JockeyApproval | OnboardingApproval;
 
-// ─── Mock data — TODO: thay bằng API khi có Swagger (Điều 6) ───────────────
-// Dự kiến: GET /api/admin/approvals?type=horse|jockey|onboarding&status=pending
-const MOCK_HORSES: HorseApproval[] = [
-  {
-    id: 'h1', type: 'horse', subject: 'Thunder Bolt', submittedDate: '18/06/2026',
-    stable: 'Golden Stable', status: 'Pending', breed: 'Thoroughbred', allowedBreed: 'Thoroughbred',
-    dopingTestResult: 'Passed', vaccinationRecordRef: 'VAC-2026-0091', entryFeeStatus: 'Paid',
-  },
-  {
-    id: 'h2', type: 'horse', subject: 'Silver Wind', submittedDate: '17/06/2026',
-    stable: 'Royal Stable', status: 'Pending', breed: 'Thoroughbred', allowedBreed: 'Thoroughbred',
-    dopingTestResult: 'Passed', vaccinationRecordRef: 'VAC-2026-0088', entryFeeStatus: 'Unpaid',
-  },
-  {
-    id: 'h3', type: 'horse', subject: 'Desert Storm', submittedDate: '15/06/2026',
-    stable: 'Meydan Stable', status: 'AutoRejected', breed: 'Arabian', allowedBreed: 'Thoroughbred',
-    dopingTestResult: 'Passed', vaccinationRecordRef: 'VAC-2026-0079', entryFeeStatus: 'Paid',
-  },
-];
+// ─── Map dữ liệu BE → item hiển thị ─────────────────────────────────────────
+const formatDate = (iso: string): string =>
+  iso ? new Date(iso).toLocaleDateString('vi-VN') : '—';
 
-const MOCK_JOCKEYS: JockeyApproval[] = [
-  {
-    id: 'j1', type: 'jockey', subject: 'Trần Văn Hùng', submittedDate: '18/06/2026',
-    stable: 'Tự do', status: 'Pending', licenseCertificate: 'LIC-JK-2024-114', experienceYears: 6,
-  },
-  {
-    id: 'j2', type: 'jockey', subject: 'Lê Minh Khôi', submittedDate: '16/06/2026',
-    stable: 'Royal Stable', status: 'Pending', licenseCertificate: 'LIC-JK-2024-098', experienceYears: 3,
-  },
-];
+const mapHorse = (h: HorsePending): HorseApproval => ({
+  id: `h${h.horseId}`,
+  entityId: h.horseId,
+  type: 'horse',
+  subject: h.name,
+  submittedDate: formatDate(h.createdAt),
+  stable: `Owner #${h.ownerId}`,
+  status: h.adminApprovalStatus as StatusType,
+  breed: h.breed,
+  // Bước duyệt ngựa không gắn với 1 giải cụ thể → không có Allowed Breed để
+  // so sánh; đặt bằng breed để không hiện cảnh báo lệch giả.
+  allowedBreed: h.breed,
+  dopingTestResult: h.dopingTestResult || 'Pending',
+  vaccinationRecordRef: h.vaccinationRecordRef,
+  // Phí tham dự là khái niệm Race Entry, không áp ở duyệt ngựa → coi như Paid.
+  entryFeeStatus: 'Paid',
+});
 
-const MOCK_ONBOARDING: OnboardingApproval[] = [
-  {
-    id: 'o1', type: 'onboarding', subject: 'Phạm Thị Lan', submittedDate: '19/06/2026',
-    stable: 'Referee', status: 'Pending', role: 'Referee', certificationLevel: 'Cấp 2',
-  },
-  {
-    id: 'o2', type: 'onboarding', subject: 'Bác sĩ Đỗ Quang Huy', submittedDate: '17/06/2026',
-    stable: 'Doctor', status: 'Pending', role: 'Doctor', medicalLicenseNumber: 'MED-VN-22841',
-  },
-];
+const mapJockey = (p: PersonPending): JockeyApproval => ({
+  id: `j${p.userId}`,
+  entityId: p.userId,
+  type: 'jockey',
+  subject: p.fullName,
+  submittedDate: formatDate(p.createdAt),
+  stable: '—',
+  status: p.profileStatus as StatusType,
+  licenseCertificate: p.certificationLevel ?? '—',
+});
+
+const mapPerson = (p: PersonPending, role: 'Referee' | 'Doctor'): OnboardingApproval => ({
+  id: `o${p.userId}`,
+  entityId: p.userId,
+  type: 'onboarding',
+  subject: p.fullName,
+  submittedDate: formatDate(p.createdAt),
+  stable: role,
+  status: p.profileStatus as StatusType,
+  role,
+  certificationLevel: role === 'Referee' ? p.certificationLevel ?? undefined : undefined,
+  medicalLicenseNumber: role === 'Doctor' ? p.certificationLevel ?? undefined : undefined,
+});
 
 const TABS: { key: ApprovalTab; label: string }[] = [
   { key: 'horse', label: 'Ngựa' },
@@ -98,13 +111,39 @@ const ApprovalCenter = () => {
   const [activeTab, setActiveTab] = useState<ApprovalTab>('horse');
   const [selectedItem, setSelectedItem] = useState<ApprovalItem | null>(null);
 
-  const getDataForTab = (): ApprovalItem[] => {
-    if (activeTab === 'horse') return MOCK_HORSES;
-    if (activeTab === 'jockey') return MOCK_JOCKEYS;
-    return MOCK_ONBOARDING;
-  };
+  const [items, setItems] = useState<ApprovalItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const data = getDataForTab();
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      if (activeTab === 'horse') {
+        const horses = await getPendingHorses();
+        setItems(horses.map(mapHorse));
+      } else {
+        const { referees, doctors, jockeys } = await getPendingApprovals();
+        if (activeTab === 'jockey') {
+          setItems(jockeys.map(mapJockey));
+        } else {
+          setItems([
+            ...referees.map((r) => mapPerson(r, 'Referee')),
+            ...doctors.map((d) => mapPerson(d, 'Doctor')),
+          ]);
+        }
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không tải được danh sách hồ sơ.');
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const columns: DataTableColumn<ApprovalItem>[] = [
     {
@@ -168,26 +207,47 @@ const ApprovalCenter = () => {
             key={tab.key}
             type="button"
             className={`${styles.tabBtn} ${activeTab === tab.key ? styles.tabBtnActive : ''}`}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => {
+              setActiveTab(tab.key);
+              setSelectedItem(null);
+            }}
           >
             {tab.label}
           </button>
         ))}
       </div>
 
+      {error && (
+        <div style={{
+          padding: '0.75rem 1rem', marginBottom: '1rem', borderRadius: 8,
+          background: 'rgba(181,18,27,0.15)', border: '1px solid rgba(181,18,27,0.4)',
+          color: '#ff6b6b',
+        }}>
+          {error}
+        </div>
+      )}
+
       {/* ═══ TABLE ════════════════════════════════════════════ */}
-      <DataTable
-        columns={columns}
-        data={data}
-        rowKey={(row) => row.id}
-        emptyMessage="Không có hồ sơ nào cần duyệt."
-      />
+      {loading ? (
+        <p style={{ color: '#999', padding: '1rem 0' }}>Đang tải danh sách hồ sơ...</p>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={items}
+          rowKey={(row) => row.id}
+          emptyMessage="Không có hồ sơ nào cần duyệt."
+        />
+      )}
 
       {/* ═══ DETAIL PANEL (drawer bên phải) ══════════════════ */}
       {selectedItem && (
         <ApprovalDetailPanel
           item={selectedItem}
           onClose={() => setSelectedItem(null)}
+          onSuccess={() => {
+            setSelectedItem(null);
+            loadData();
+          }}
         />
       )}
     </div>
