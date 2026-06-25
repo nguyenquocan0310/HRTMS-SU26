@@ -1,53 +1,63 @@
 import { useState } from 'react';
-import { FiX, FiClock, FiFileText, FiCheckCircle, FiXCircle } from 'react-icons/fi';
+import { FiX, FiClock, FiCheckCircle, FiXCircle } from 'react-icons/fi';
 import type { ApprovalItem } from './ApprovalCenter';
+import {
+  approveHorse,
+  rejectHorse,
+  approveJockey,
+  approveReferee,
+  approveDoctor,
+} from '../../services/approvalService';
 import styles from './ApprovalDetailPanel.module.scss';
-
-interface VerificationLogEntry {
-  id: string;
-  label: string;
-  time: string;
-}
 
 interface Props {
   item: ApprovalItem;
   onClose: () => void;
+  onSuccess: () => void; // gọi lại để refresh danh sách sau khi duyệt/từ chối
 }
 
-// TODO: thay bằng API thật khi có Swagger — GET /api/admin/approvals/:id/logs
-const MOCK_LOGS: VerificationLogEntry[] = [
-  { id: 'l1', label: 'Hồ sơ được nộp', time: '18/06/2026 — 09:14' },
-  { id: 'l2', label: 'Hệ thống xác minh dữ liệu tự động', time: '18/06/2026 — 09:15' },
-  { id: 'l3', label: 'Đang chờ Admin xem xét', time: '18/06/2026 — 09:15' },
-];
-
-// TODO: thay bằng API thật — GET /api/admin/approvals/:id/evidence
-const MOCK_EVIDENCE = [
-  { id: 'e1', label: 'Giấy chứng nhận' },
-  { id: 'e2', label: 'Ảnh hồ sơ' },
-];
-
-const ApprovalDetailPanel = ({ item, onClose }: Props) => {
+const ApprovalDetailPanel = ({ item, onClose, onSuccess }: Props) => {
   const [showRejectForm, setShowRejectForm] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [actionError, setActionError] = useState('');
 
   const isReasonValid = rejectReason.trim().length >= 10;
 
-  // ─── Ràng buộc nghiệp vụ: chỉ áp dụng cho tab Ngựa ────────────────────────
-  const isHorse = item.type === 'horse';
-  const entryFeeUnpaid = isHorse && item.entryFeeStatus !== 'Paid';
+  // BE chỉ có endpoint từ chối cho NGỰA. Jockey/Referee/Doctor chưa có reject.
+  const canReject = item.type === 'horse';
 
-  const handleApprove = () => {
-    // TODO: gọi API thật khi có Swagger — POST /api/admin/approvals/:id/approve
-    console.log('[ApprovalDetailPanel] Approve', item.id);
-    onClose();
+  const doApprove = (): Promise<unknown> => {
+    if (item.type === 'horse') return approveHorse(item.entityId);
+    if (item.type === 'jockey') return approveJockey(item.entityId);
+    return item.role === 'Referee' ? approveReferee(item.entityId) : approveDoctor(item.entityId);
   };
 
-  const handleConfirmReject = () => {
-    if (!isReasonValid) return;
-    // TODO: gọi API thật khi có Swagger — POST /api/admin/approvals/:id/reject { reason }
-    console.log('[ApprovalDetailPanel] Reject', item.id, rejectReason);
-    onClose();
+  const handleApprove = async () => {
+    setSubmitting(true);
+    setActionError('');
+    try {
+      await doApprove();
+      onSuccess();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Duyệt hồ sơ thất bại.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleConfirmReject = async () => {
+    if (!isReasonValid || item.type !== 'horse') return;
+    setSubmitting(true);
+    setActionError('');
+    try {
+      await rejectHorse(item.entityId, rejectReason.trim());
+      onSuccess();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Từ chối hồ sơ thất bại.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -70,13 +80,7 @@ const ApprovalDetailPanel = ({ item, onClose }: Props) => {
 
             {item.type === 'horse' && (
               <div className={styles.specGrid}>
-                <SpecRow
-                  label="Breed"
-                  value={item.breed}
-                  warning={item.breed !== item.allowedBreed}
-                  warningText={`Không khớp Allowed Breed (${item.allowedBreed})`}
-                />
-                <SpecRow label="Allowed Breed (Tournament)" value={item.allowedBreed} />
+                <SpecRow label="Breed" value={item.breed} />
                 <SpecRow
                   label="Doping Test Result"
                   value={item.dopingTestResult}
@@ -84,19 +88,16 @@ const ApprovalDetailPanel = ({ item, onClose }: Props) => {
                   warningText="Doping test thất bại"
                 />
                 <SpecRow label="Vaccination Record Ref" value={item.vaccinationRecordRef} />
-                <SpecRow
-                  label="Entry Fee Status"
-                  value={item.entryFeeStatus}
-                  warning={entryFeeUnpaid}
-                  warningText="Chưa thanh toán phí tham dự"
-                />
               </div>
             )}
 
             {item.type === 'jockey' && (
               <div className={styles.specGrid}>
                 <SpecRow label="License Certificate" value={item.licenseCertificate} />
-                <SpecRow label="Experience Years" value={`${item.experienceYears} năm`} />
+                <SpecRow
+                  label="Experience Years"
+                  value={item.experienceYears != null ? `${item.experienceYears} năm` : '—'}
+                />
               </div>
             )}
 
@@ -113,39 +114,33 @@ const ApprovalDetailPanel = ({ item, onClose }: Props) => {
             )}
           </section>
 
-          {/* ═══ VERIFICATION LOGS (timeline) ═══════════════════ */}
+          {/* ═══ VERIFICATION LOGS ══════════════════════════════ */}
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>Verification Logs</h3>
             <div className={styles.timeline}>
-              {MOCK_LOGS.map((log) => (
-                <div key={log.id} className={styles.timelineItem}>
-                  <div className={styles.timelineDot}>
-                    <FiClock size={12} />
-                  </div>
-                  <div className={styles.timelineContent}>
-                    <span className={styles.timelineLabel}>{log.label}</span>
-                    <span className={styles.timelineTime}>{log.time}</span>
-                  </div>
+              <div className={styles.timelineItem}>
+                <div className={styles.timelineDot}>
+                  <FiClock size={12} />
                 </div>
-              ))}
+                <div className={styles.timelineContent}>
+                  <span className={styles.timelineLabel}>Hồ sơ được nộp</span>
+                  <span className={styles.timelineTime}>{item.submittedDate}</span>
+                </div>
+              </div>
+              <div className={styles.timelineItem}>
+                <div className={styles.timelineDot}>
+                  <FiClock size={12} />
+                </div>
+                <div className={styles.timelineContent}>
+                  <span className={styles.timelineLabel}>Đang chờ Admin xem xét</span>
+                  <span className={styles.timelineTime}>{item.status}</span>
+                </div>
+              </div>
             </div>
           </section>
 
-          {/* ═══ ATTACHED EVIDENCE ═══════════════════════════════ */}
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>Attached Evidence</h3>
-            <div className={styles.evidenceGrid}>
-              {MOCK_EVIDENCE.map((ev) => (
-                <div key={ev.id} className={styles.evidenceThumb}>
-                  <FiFileText size={22} />
-                  <span>{ev.label}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* ═══ REJECT FORM (hiện khi bấm Reject) ══════════════ */}
-          {showRejectForm && (
+          {/* ═══ REJECT FORM (chỉ Ngựa) ═════════════════════════ */}
+          {showRejectForm && canReject && (
             <section className={styles.section}>
               <h3 className={styles.sectionTitle}>Lý do từ chối</h3>
               <textarea
@@ -162,30 +157,34 @@ const ApprovalDetailPanel = ({ item, onClose }: Props) => {
               )}
             </section>
           )}
+
+          {actionError && <div className={styles.rejectError}>{actionError}</div>}
         </div>
 
         {/* ═══ FOOTER ACTIONS ══════════════════════════════════ */}
         <div className={styles.drawerFooter}>
           {!showRejectForm ? (
             <>
-              <button
-                type="button"
-                className={styles.rejectBtn}
-                onClick={() => setShowRejectForm(true)}
-              >
-                <FiXCircle size={16} />
-                REJECT REQUEST
-              </button>
+              {canReject && (
+                <button
+                  type="button"
+                  className={styles.rejectBtn}
+                  onClick={() => setShowRejectForm(true)}
+                  disabled={submitting}
+                >
+                  <FiXCircle size={16} />
+                  REJECT REQUEST
+                </button>
+              )}
 
               <button
                 type="button"
                 className={styles.approveBtn}
                 onClick={handleApprove}
-                disabled={entryFeeUnpaid}
-                title={entryFeeUnpaid ? 'Không thể duyệt khi chưa thanh toán phí tham dự (Entry Fee).' : undefined}
+                disabled={submitting}
               >
                 <FiCheckCircle size={16} />
-                APPROVE ENTRY
+                {submitting ? 'Đang xử lý...' : 'APPROVE ENTRY'}
               </button>
             </>
           ) : (
@@ -197,6 +196,7 @@ const ApprovalDetailPanel = ({ item, onClose }: Props) => {
                   setShowRejectForm(false);
                   setRejectReason('');
                 }}
+                disabled={submitting}
               >
                 Hủy
               </button>
@@ -204,9 +204,9 @@ const ApprovalDetailPanel = ({ item, onClose }: Props) => {
                 type="button"
                 className={styles.rejectConfirmBtn}
                 onClick={handleConfirmReject}
-                disabled={!isReasonValid}
+                disabled={!isReasonValid || submitting}
               >
-                Xác nhận từ chối
+                {submitting ? 'Đang xử lý...' : 'Xác nhận từ chối'}
               </button>
             </>
           )}
