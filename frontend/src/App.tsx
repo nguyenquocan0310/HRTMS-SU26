@@ -70,13 +70,14 @@ function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
 
 export function getRoleHomePath(role: Role): string {
   switch (role) {
-    case 'Admin':       return '/admin'
-    case 'Owner':  return '/owner'
-    case 'Jockey':      return '/jockey'
-    case 'RaceReferee': 
-    case 'Referee':     return '/referee'    
-    case 'Doctor':      return '/doctor'
-    case 'Spectator':   return '/spectator'
+    case 'Admin': return '/admin'
+    case 'HorseOwner':
+    case 'Owner': return '/owner'
+    case 'Jockey': return '/jockey'
+    case 'RaceReferee':
+    case 'Referee': return '/referee'
+    case 'Doctor': return '/doctor'
+    case 'Spectator': return '/spectator'
   }
 }
 
@@ -132,10 +133,10 @@ export default function App() {
 
         {/* ── Cấu trúc Route của TRỌNG TÀI (Referee) ── */}
         <Route path="/referee" element={
-  <ProtectedRoute allowedRoles={['RaceReferee', 'Referee']}>
-    <RefereeLayout />
-  </ProtectedRoute>
-}>
+          <ProtectedRoute allowedRoles={['RaceReferee', 'Referee']}>
+            <RefereeLayout />
+          </ProtectedRoute>
+        }>
           <Route index element={<RefereeDashboard />} />
           <Route path="officiating" element={<RaceOfficiating />} />
           <Route path="protest" element={<ProtestHandling />} />
@@ -155,20 +156,20 @@ export default function App() {
 
         {/* Admin */}
         {/* ── Cấu trúc Route của ADMIN ── */}
-<Route path="/admin" element={
-  <ProtectedRoute allowedRoles={['Admin']}>
-    <AdminLayout />
-  </ProtectedRoute>
-}>
-  <Route index element={<AdminDashboard />} />
-  <Route path="approval-center" element={<ApprovalCenter />} />
-  <Route path="users" element={<UserManagement />} />
-  {/* Danh sách giải đấu — trang riêng */}
-  <Route path="tournaments" element={<TournamentBuilder />} />
-  {/* Wizard tạo mới / chỉnh sửa giải đấu */}
-  <Route path="tournament-builder" element={<TournamentBuilder />} />
-  <Route path="tournament-builder/:id" element={<TournamentBuilder />} />
-</Route>
+        <Route path="/admin" element={
+          <ProtectedRoute allowedRoles={['Admin']}>
+            <AdminLayout />
+          </ProtectedRoute>
+        }>
+          <Route index element={<AdminDashboard />} />
+          <Route path="approval-center" element={<ApprovalCenter />} />
+          <Route path="users" element={<UserManagement />} />
+          {/* Danh sách giải đấu — trang riêng */}
+          <Route path="tournaments" element={<TournamentBuilder />} />
+          {/* Wizard tạo mới / chỉnh sửa giải đấu */}
+          <Route path="tournament-builder" element={<TournamentBuilder />} />
+          <Route path="tournament-builder/:id" element={<TournamentBuilder />} />
+        </Route>
 
         <Route path="/unauthorized" element={<div>403 — Không có quyền truy cập</div>} />
         <Route path="*" element={<Navigate to="/" replace />} />
