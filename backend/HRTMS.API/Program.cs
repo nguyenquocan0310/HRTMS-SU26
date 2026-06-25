@@ -12,11 +12,23 @@ builder.Services.AddCorsPolicy();
 builder.Services.AddSwaggerServices();
 builder.Services.AddHangfireJobs(builder.Configuration);
 builder.Services.AddControllers();
-builder.Services.AddStackExchangeRedisCache(options =>
+
+// Token blacklist cache (EC-29).
+// Dev: dùng in-memory cache để KHÔNG phụ thuộc Redis — tránh mỗi request có token
+// phải chờ connect-timeout ~5s tới localhost:6379 khi Redis không chạy (gây login chậm ~8s).
+// Prod: dùng Redis thật để blacklist sống xuyên restart và chia sẻ giữa nhiều instance.
+if (builder.Environment.IsDevelopment())
 {
-    options.Configuration = builder.Configuration.GetConnectionString("Redis");
-    options.InstanceName = "HRTMS:";
-});
+    builder.Services.AddDistributedMemoryCache();
+}
+else
+{
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = builder.Configuration.GetConnectionString("Redis");
+        options.InstanceName = "HRTMS:";
+    });
+}
 
 var app = builder.Build();
 

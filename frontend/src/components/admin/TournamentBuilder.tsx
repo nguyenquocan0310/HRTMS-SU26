@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { FiPlus, FiEdit2 } from 'react-icons/fi';
 import DataTable, { type DataTableColumn } from '../../components/common/DataTable';
 import StatusBadge, { type StatusType } from '../../components/common/StatusBadge';
@@ -16,7 +17,25 @@ import styles from './TournamentBuilder.module.scss';
 export type AllowedBreed = 'Thoroughbred' | 'Arabian' | 'Quarter Horse' | 'Mixed';
 export type TrackType = 'Turf' | 'Dirt' | 'Synthetic';
 export type RaceCategory = 'Open' | 'Classic' | 'Maiden';
-export type TournamentStatus = 'Draft' | 'OpenRegistration' | 'Closed' | 'Completed' | 'Cancelled';
+// Phải khớp ĐÚNG với DB (CHK_Tournaments_Status) và state machine ở BE.
+export type TournamentStatus =
+  | 'Draft'
+  | 'Open Registration'
+  | 'Closed Registration'
+  | 'Pre-Race'
+  | 'In-Progress'
+  | 'Completed'
+  | 'Cancelled';
+
+// State machine khớp ValidTransitions ở BE (TournamentSevice.cs).
+// Trả về status kế tiếp, hoặc null nếu đã ở cuối / không thể tiến.
+export const NEXT_STATUS: Partial<Record<TournamentStatus, TournamentStatus>> = {
+  Draft: 'Open Registration',
+  'Open Registration': 'Closed Registration',
+  'Closed Registration': 'Pre-Race',
+  'Pre-Race': 'In-Progress',
+  'In-Progress': 'Completed',
+};
 
 export interface TournamentBasicInfo {
   name: string;
@@ -111,8 +130,25 @@ const TABS = [
 
 type TabKey = typeof TABS[number]['key'];
 
+// ─── Chuẩn hóa giá trị từ BE cho input HTML ──────────────────────────────────
+// BE trả DateTime/Time dạng ISO; input date cần "yyyy-MM-dd", input time cần "HH:mm".
+const toDateInput = (value?: string | null): string => (value ?? '').slice(0, 10);
+const toTimeInput = (value?: string | null): string => (value ?? '').slice(0, 5);
+
+// Đường dẫn route
+const LIST_PATH = '/admin/tournaments';
+const WIZARD_PATH = '/admin/tournament-builder';
+
 const TournamentBuilder = () => {
-  const [view, setView] = useState<'list' | 'wizard'>('list');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { id: routeId } = useParams<{ id?: string }>();
+
+  // view suy ra từ URL: ở wizard nếu path là /admin/tournament-builder[/:id],
+  // ngược lại là list (/admin/tournaments). Nhờ vậy nút Back của trình duyệt
+  // đi đúng cấp (wizard → list → dashboard) thay vì nhảy thẳng về home.
+  const view: 'list' | 'wizard' = location.pathname.startsWith(WIZARD_PATH) ? 'wizard' : 'list';
+
   const [activeTab, setActiveTab] = useState<TabKey>('basic');
   const [draft, setDraft] = useState<TournamentDraft>(createEmptyTournament());
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -135,8 +171,18 @@ const TournamentBuilder = () => {
   };
 
   useEffect(() => {
-    loadTournaments();
-  }, []);
+    if (view === 'list') {
+      loadTournaments();
+    } else if (routeId) {
+      // Wizard ở chế độ EDIT: nạp giải theo id trên URL.
+      loadDraft(Number(routeId));
+    } else {
+      // Wizard ở chế độ TẠO MỚI: reset về giải rỗng.
+      setDraft(createEmptyTournament());
+      setActiveTab('basic');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, routeId]);
 
   // ─── Validate điều kiện Publish (tổng hợp cả 4 tab) ───────────────────────
   const isBasicInfoValid = (): boolean => {
@@ -177,15 +223,15 @@ const TournamentBuilder = () => {
   const canPublish = isBasicInfoValid() && isPrizeValid() && isRoundsValid();
 
   // ─── Handlers ────────────────────────────────────────────────────────────
-  const handleCreateNew = () => {
-    setDraft(createEmptyTournament());
-    setActiveTab('basic');
-    setView('wizard');
-  };
+  // Điều hướng sang wizard tạo mới (useEffect sẽ reset draft khi tới URL).
+  const handleCreateNew = () => navigate(WIZARD_PATH);
 
-const handleEdit = async (id: number) => {
+  // Điều hướng sang wizard sửa (useEffect sẽ nạp draft theo :id).
+  const goEdit = (id: number) => navigate(`${WIZARD_PATH}/${id}`);
+
+const loadDraft = async (id: number) => {
   setIsSaving(true);
-  setListError('');
+  setSaveError('');
   try {
     const t = await tournamentService.getTournamentById(id);
     setDraft({
@@ -193,8 +239,11 @@ const handleEdit = async (id: number) => {
       status: t.status as TournamentStatus,
       basicInfo: {
         name: t.name,
-        startDate: t.startDate,
-        endDate: t.endDate,
+        // BE trả DateTime → JSON ISO "2026-06-30T18:00:00".
+        // <input type="date"> chỉ nhận "yyyy-MM-dd" nên phải cắt 10 ký tự đầu,
+        // nếu không ô ngày sẽ hiển thị trống.
+        startDate: toDateInput(t.startDate),
+        endDate: toDateInput(t.endDate),
         allowedBreed: t.allowedBreed as AllowedBreed,
         trackType: t.trackType as TrackType,
         raceDistance: t.raceDistance,
@@ -206,26 +255,31 @@ const handleEdit = async (id: number) => {
         preRaceWeightThresholdKg: t.preRaceWeightThresholdKg,
         postRaceWeightDiffThresholdKg: t.postRaceWeightDiffThresholdKg,
       },
-      prizeDistribution: t.prizeDistributions?.map((p) => ({
-        rank: p.position as 1 | 2 | 3 | 4 | 5,
-        percentage: p.percentage,
-      })) ?? [
-        { rank: 1, percentage: 40 },
-        { rank: 2, percentage: 25 },
-        { rank: 3, percentage: 15 },
-        { rank: 4, percentage: 12 },
-        { rank: 5, percentage: 8 },
-      ],
+      // Phải kiểm tra LENGTH: nếu BE trả mảng rỗng [] thì [].map() vẫn ra []
+      // (không nullish) nên "?? mặc định" sẽ KHÔNG chạy → tab Prize hiện 0 dòng,
+      // tổng 0%, không thể đạt 100% để lưu/publish. Fallback khi rỗng:
+      prizeDistribution: t.prizeDistributions && t.prizeDistributions.length > 0
+        ? t.prizeDistributions.map((p) => ({
+            rank: p.position as 1 | 2 | 3 | 4 | 5,
+            percentage: p.percentage,
+          }))
+        : [
+            { rank: 1, percentage: 40 },
+            { rank: 2, percentage: 25 },
+            { rank: 3, percentage: 15 },
+            { rank: 4, percentage: 12 },
+            { rank: 5, percentage: 8 },
+          ],
       rounds: t.rounds?.map((r) => ({
         id: String(r.roundId),
         name: r.name,
-        scheduledDate: r.scheduledDate,
+        scheduledDate: toDateInput(r.scheduledDate),
         races: r.races?.map((race) => ({
           id: String(race.raceId),
           sequenceOrder: race.raceNumber,
-          scheduledDate: r.scheduledDate,
+          scheduledDate: toDateInput(r.scheduledDate),
           raceNumber: race.raceNumber,
-          scheduledTime: race.scheduledTime,
+          scheduledTime: toTimeInput(race.scheduledTime),
           purseAmount: race.purseAmount,
           raceDistanceOverride: race.raceDistanceOverride ?? '',
           trackTypeOverride: (race.trackTypeOverride as TrackType) ?? '',
@@ -235,13 +289,30 @@ const handleEdit = async (id: number) => {
       })) ?? [],
     });
     setActiveTab('basic');
-    setView('wizard');
   } catch (err) {
-    setListError(err instanceof Error ? err.message : 'Không tải được giải đấu.');
+    setSaveError(err instanceof Error ? err.message : 'Không tải được giải đấu.');
   } finally {
     setIsSaving(false);
   }
 };
+
+  // ─── Đẩy giải sang status kế tiếp trong vòng đời (gọi BE ChangeStatus) ──────
+  const [advancingId, setAdvancingId] = useState<number | null>(null);
+  const handleAdvanceStatus = async (row: TournamentResponse) => {
+    const next = NEXT_STATUS[row.status as TournamentStatus];
+    if (!next) return;
+    setListError('');
+    setAdvancingId(row.tournamentId);
+    try {
+      await tournamentService.updateTournamentStatus(row.tournamentId, next);
+      await loadTournaments();
+    } catch (err) {
+      // BE có thể từ chối (vd chưa đủ 5 PrizeDistributions để mở đăng ký).
+      setListError(err instanceof Error ? err.message : 'Không chuyển được trạng thái.');
+    } finally {
+      setAdvancingId(null);
+    }
+  };
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -271,61 +342,68 @@ const handleEdit = async (id: number) => {
   // giữa "tạo mới" (POST) và "cập nhật" (PUT).
   const isNewDraft = draft.id.startsWith('t-');
 
+// Lưu toàn bộ draft xuống BE (tạo/cập nhật giải + tỷ lệ thưởng + rounds + races).
+// Trả về tournamentId để Publish dùng tiếp.
+const persistDraft = async (): Promise<number> => {
+  const payload = buildCreatePayload();
+  let tournamentId: number;
+
+  if (isNewDraft) {
+    const created = await tournamentService.createTournament(payload);
+    tournamentId = created.tournamentId;
+    setDraft((prev) => ({
+      ...prev,
+      id: String(created.tournamentId),
+      status: created.status as TournamentStatus,
+    }));
+  } else {
+    tournamentId = Number(draft.id);
+    await tournamentService.updateTournament(tournamentId, payload);
+  }
+
+  // Lưu tỷ lệ thưởng — BẮT BUỘC cho guard Open Registration (BE cần đủ 5 dòng).
+  if (isPrizeValid()) {
+    await tournamentService.updatePrizeDistributions(
+      tournamentId,
+      draft.prizeDistribution.map((p) => ({ position: p.rank, percentage: p.percentage }))
+    );
+  }
+
+  for (const round of draft.rounds) {
+    let roundId = Number(round.id);
+    if (!/^\d+$/.test(round.id)) {
+      const created = await tournamentService.createRound(tournamentId, {
+        name: round.name,
+        sequenceOrder: draft.rounds.indexOf(round) + 1,
+        scheduledDate: round.scheduledDate,
+      });
+      roundId = created.roundId;
+    }
+    for (const race of round.races) {
+      if (!/^\d+$/.test(race.id)) {
+        await tournamentService.createRace(roundId, {
+          raceNumber: race.raceNumber,
+          scheduledTime: race.scheduledTime,
+          purseAmount: Number(race.purseAmount) || 0,
+          trackTypeOverride: race.trackTypeOverride || undefined,
+          raceDistanceOverride:
+            typeof race.raceDistanceOverride === 'number'
+              ? race.raceDistanceOverride
+              : undefined,
+        });
+      }
+    }
+  }
+
+  return tournamentId;
+};
+
 const handleSaveDraft = async () => {
   setIsSaving(true);
   setSaveError('');
   try {
-    const payload = buildCreatePayload();
-    let tournamentId: number;
-
-    if (isNewDraft) {
-      const created = await tournamentService.createTournament(payload);
-      tournamentId = created.tournamentId;
-      setDraft((prev) => ({
-        ...prev,
-        id: String(created.tournamentId),
-        status: created.status as TournamentStatus,
-      }));
-    } else {
-      tournamentId = Number(draft.id);
-      await tournamentService.updateTournament(tournamentId, payload);
-    }
-
-    if (isPrizeValid()) {
-      await tournamentService.updatePrizeDistributions(
-        tournamentId,
-        draft.prizeDistribution.map((p) => ({ position: p.rank, percentage: p.percentage }))
-      );
-    }
-
-    for (const round of draft.rounds) {
-      let roundId = Number(round.id);
-      if (!/^\d+$/.test(round.id)) {
-        const created = await tournamentService.createRound(tournamentId, {
-          name: round.name,
-          sequenceOrder: draft.rounds.indexOf(round) + 1,
-          scheduledDate: round.scheduledDate,
-        });
-        roundId = created.roundId;
-      }
-      for (const race of round.races) {
-        if (!/^\d+$/.test(race.id)) {
-          await tournamentService.createRace(roundId, {
-            raceNumber: race.raceNumber,
-            scheduledTime: race.scheduledTime,
-            purseAmount: Number(race.purseAmount) || 0,
-            trackTypeOverride: race.trackTypeOverride || undefined,
-            raceDistanceOverride:
-              typeof race.raceDistanceOverride === 'number'
-                ? race.raceDistanceOverride
-                : undefined,
-          });
-        }
-      }
-    }
-
-    await loadTournaments();
-    setView('list');
+    await persistDraft();
+    navigate(LIST_PATH);
   } catch (err) {
     setSaveError(err instanceof Error ? err.message : 'Lưu giải đấu thất bại.');
   } finally {
@@ -338,17 +416,12 @@ const handleSaveDraft = async () => {
     setIsSaving(true);
     setSaveError('');
     try {
-      // Đảm bảo giải đã tồn tại trên BE trước khi đổi status
-      let tournamentId = Number(draft.id);
-      if (isNewDraft) {
-        const created = await tournamentService.createTournament(buildCreatePayload());
-        tournamentId = created.tournamentId;
-      } else {
-        await tournamentService.updateTournament(tournamentId, buildCreatePayload());
-      }
-      await tournamentService.updateTournamentStatus(tournamentId, 'OpenRegistration');
-      await loadTournaments();
-      setView('list');
+      // Lưu ĐẦY ĐỦ (gồm tỷ lệ thưởng) TRƯỚC khi đổi status — nếu không BE chặn
+      // Open Registration vì chưa đủ 5 PrizeDistributions trong DB.
+      const tournamentId = await persistDraft();
+      // Phải gửi ĐÚNG chuỗi DB chấp nhận: "Open Registration" (có dấu cách).
+      await tournamentService.updateTournamentStatus(tournamentId, 'Open Registration');
+      navigate(LIST_PATH);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Publish giải đấu thất bại.');
     } finally {
@@ -356,11 +429,22 @@ const handleSaveDraft = async () => {
     }
   };
 
-  const handleConfirmCancel = () => {
-    // TODO: gọi API thật — PATCH /api/tournament/:id/status (Cancelled)
-    console.log('[TournamentBuilder] Cancel Tournament', draft.id);
-    setShowCancelModal(false);
-    setView('list');
+  const handleConfirmCancel = async () => {
+    setIsSaving(true);
+    setSaveError('');
+    try {
+      // Giải mới chưa lưu (id dạng "t-...") thì không có gì để hủy ở BE.
+      if (!isNewDraft) {
+        await tournamentService.deleteTournament(Number(draft.id));
+      }
+      setShowCancelModal(false);
+      navigate(LIST_PATH);
+    } catch (err) {
+      setShowCancelModal(false);
+      setSaveError(err instanceof Error ? err.message : 'Hủy giải đấu thất bại.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // ─── Columns cho danh sách giải ────────────────────────────────────────────
@@ -385,12 +469,28 @@ const handleSaveDraft = async () => {
     {
       key: 'action',
       header: '',
-      width: '120px',
-      render: (row) => (
-        <button type="button" className={styles.editBtn} onClick={() => handleEdit(row.tournamentId)}>
-          <FiEdit2 size={13} /> Edit
-        </button>
-      ),
+      width: '320px',
+      render: (row) => {
+        const next = NEXT_STATUS[row.status as TournamentStatus];
+        return (
+          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+            <button type="button" className={styles.editBtn} onClick={() => goEdit(row.tournamentId)}>
+              <FiEdit2 size={13} /> Edit
+            </button>
+            {next && (
+              <button
+                type="button"
+                className={styles.editBtn}
+                disabled={advancingId === row.tournamentId}
+                onClick={() => handleAdvanceStatus(row)}
+                title={`Chuyển sang "${next}"`}
+              >
+                {advancingId === row.tournamentId ? 'Đang chuyển...' : `→ ${next}`}
+              </button>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -429,7 +529,7 @@ const handleSaveDraft = async () => {
   return (
     <div className={styles.container}>
       <div className={styles.wizardHeader}>
-        <button type="button" className={styles.backLink} onClick={() => setView('list')}>
+        <button type="button" className={styles.backLink} onClick={() => navigate(LIST_PATH)}>
           ← Quay lại danh sách
         </button>
         <h1 className={styles.heading}>

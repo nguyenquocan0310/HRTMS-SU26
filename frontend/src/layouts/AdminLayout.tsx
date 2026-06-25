@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import {
   FiSearch,
   FiBell,
@@ -10,20 +10,36 @@ import {
   FiLogOut,
 } from 'react-icons/fi';
 import AdminSidebar from '../components/admin/AdminSidebar';
+import useAuthStore from '../store/authStore';
+import { logout as logoutApi } from '../services/authService';
 import styles from './AdminLayout.module.scss';
 
 const AdminLayout = () => {
+  const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
+  const clearAuth = useAuthStore((s) => s.clearAuth);
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
-  // TODO: lấy từ authStore thật khi có BE — Điều 6
+  // Lấy từ authStore. Khi reload, user có thể null (chỉ token được khôi phục)
+  // nên có giá trị mặc định an toàn.
   const currentUser = {
-    name: 'Admin User',
-    role: 'Administrator',
+    name: user?.fullName || 'Admin',
+    role: user?.role || 'Administrator',
   };
 
-  const unreadNotifications = 3;
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    await logoutApi();      // báo BE blacklist token (best-effort)
+    clearAuth();            // xóa token + state ở client
+    navigate('/login', { replace: true });
+  };
+
+  // TODO: nối API đếm thông báo chưa đọc (NotificationController) — tạm 0.
+  const unreadNotifications = 0;
 
   return (
     <div className={styles.layout}>
@@ -85,9 +101,14 @@ const AdminLayout = () => {
                   <FiUser size={15} />
                   My Account
                 </button>
-                <button type="button" className={styles.accountMenuItem}>
+                <button
+                  type="button"
+                  className={styles.accountMenuItem}
+                  onClick={handleLogout}
+                  disabled={loggingOut}
+                >
                   <FiLogOut size={15} />
-                  Logout
+                  {loggingOut ? 'Đang đăng xuất...' : 'Logout'}
                 </button>
               </div>
             )}
