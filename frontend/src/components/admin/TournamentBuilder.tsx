@@ -333,28 +333,62 @@ const handleSaveDraft = async () => {
   }
 };
 
-  const handlePublish = async () => {
-    if (!canPublish) return;
-    setIsSaving(true);
-    setSaveError('');
-    try {
-      // Đảm bảo giải đã tồn tại trên BE trước khi đổi status
-      let tournamentId = Number(draft.id);
-      if (isNewDraft) {
-        const created = await tournamentService.createTournament(buildCreatePayload());
-        tournamentId = created.tournamentId;
-      } else {
-        await tournamentService.updateTournament(tournamentId, buildCreatePayload());
-      }
-      await tournamentService.updateTournamentStatus(tournamentId, 'Open Registration');
-      await loadTournaments();
-      setView('list');
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : 'Publish giải đấu thất bại.');
-    } finally {
-      setIsSaving(false);
+const handlePublish = async () => {
+  if (!canPublish) return;
+  setIsSaving(true);
+  setSaveError('');
+  try {
+    let tournamentId = Number(draft.id);
+
+    if (isNewDraft) {
+      const created = await tournamentService.createTournament(buildCreatePayload());
+      tournamentId = created.tournamentId;
+      setDraft((prev) => ({ ...prev, id: String(tournamentId), status: 'Draft' }));
+    } else {
+      await tournamentService.updateTournament(tournamentId, buildCreatePayload());
     }
-  };
+
+    const fullPrize = [1, 2, 3, 4, 5].map((rank) => {
+      const found = draft.prizeDistribution.find((p) => p.rank === rank);
+      return { position: rank, percentage: found ? found.percentage : 0 };
+    });
+    await tournamentService.updatePrizeDistributions(tournamentId, fullPrize);
+
+    for (const round of draft.rounds) {
+      let roundId = Number(round.id);
+      if (!/^\d+$/.test(round.id)) {
+        const created = await tournamentService.createRound(tournamentId, {
+          name: round.name,
+          sequenceOrder: draft.rounds.indexOf(round) + 1,
+          scheduledDate: round.scheduledDate,
+        });
+        roundId = created.roundId;
+      }
+      for (const race of round.races) {
+        if (!/^\d+$/.test(race.id)) {
+          await tournamentService.createRace(roundId, {
+            raceNumber: race.raceNumber,
+            scheduledTime: race.scheduledTime,
+            purseAmount: Number(race.purseAmount) || 0,
+            trackTypeOverride: race.trackTypeOverride || undefined,
+            raceDistanceOverride:
+              typeof race.raceDistanceOverride === 'number'
+                ? race.raceDistanceOverride
+                : undefined,
+          });
+        }
+      }
+    }
+
+    await tournamentService.updateTournamentStatus(tournamentId, 'Open Registration');
+    await loadTournaments();
+    setView('list');
+  } catch (err) {
+    setSaveError(err instanceof Error ? err.message : 'Publish giải đấu thất bại.');
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   const handleConfirmCancel = () => {
     // TODO: gọi API thật — PATCH /api/tournament/:id/status (Cancelled)
