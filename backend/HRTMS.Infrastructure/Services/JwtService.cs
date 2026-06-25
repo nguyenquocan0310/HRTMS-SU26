@@ -21,15 +21,22 @@ public class JwtService
         var key = new SymmetricSecurityKey(
             Encoding.UTF8.GetBytes(_config["JwtSettings:SecretKey"]!));
 
+        var now = DateTime.UtcNow;
+
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
             new Claim(ClaimTypes.Name, user.Username),
             new Claim(ClaimTypes.Email, user.Email),
-            new Claim(ClaimTypes.Role, user.Role)
+            new Claim(ClaimTypes.Role, user.Role),
+            // iat (Issued At) — BẮT BUỘC cho TokenBlacklistMiddleware (EC-29)
+            // So sánh thời điểm phát token với mốc blacklist. Thiếu iat thì
+            // mọi token bị coi là "cũ" và bị chặn 401 sau khi user từng logout.
+            new Claim(JwtRegisteredClaimNames.Iat,
+                new DateTimeOffset(now).ToUnixTimeSeconds().ToString(),
+                ClaimValueTypes.Integer64)
         };
 
-        var now = DateTime.UtcNow;
         var token = new JwtSecurityToken(
             issuer: _config["JwtSettings:Issuer"],
             audience: _config["JwtSettings:Audience"],

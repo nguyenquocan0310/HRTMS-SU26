@@ -35,6 +35,10 @@ public partial class Tournament
 
     public decimal PostRaceWeightDiffThresholdKg { get; set; }
 
+    // FIX #8: điểm thưởng khi Spectator dự đoán đúng — mặc định 200 (REQ-F-REC.2)
+    // Admin có thể cấu hình per-tournament thay vì hardcode trong code.
+    public int PredictionRewardPoints { get; set; } = 200;
+
     public string Status { get; set; } = null!;
 
     public DateTime CreatedAt { get; set; }
