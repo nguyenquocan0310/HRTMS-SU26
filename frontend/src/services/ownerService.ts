@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type  { AxiosInstance } from 'axios';
+import type { AxiosInstance } from 'axios';
 import type { Horse, RaceEntry, JockeyInvitation } from '../types/owner.types';
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -51,7 +51,7 @@ export const createHorse = async (
   data: Omit<Horse, 'horseID' | 'ownerID' | 'createdAt'>
 ): Promise<Horse> => {
   try {
-    const response = await axiosInstance.post<Horse>('http://localhost:5222/api/horses', data);
+    const response = await axiosInstance.post<Horse>('http://localhost:5000/api/horses', data);
     return response.data;
   } catch (error) {
     console.error('Error creating horse:', error);
@@ -108,7 +108,7 @@ export const getAvailableJockeys = async (tournamentId: number = 1, page: number
   try {
     const response = await axiosInstance.get<any>(`http://localhost:5222/api/jockeys/available?tournamentId=${tournamentId}&page=${page}&pageSize=${pageSize}`);
     const data = response.data;
-    
+
     // Extract array of jockeys from standard API response envelopes
     if (Array.isArray(data)) return data;
     if (data && data.data) {
@@ -141,7 +141,7 @@ export const getOwnerPairings = async (
 
     const response = await axiosInstance.get<any>(`http://localhost:5222/api/owner/pairings?${params.toString()}`);
     const data = response.data;
-    
+
     // Extract array of pairings from standard API response envelopes
     if (Array.isArray(data)) return data;
     if (data && data.data) {
