@@ -28,11 +28,19 @@ public class ReconciliationController : ControllerBase
         return Ok(result);
     }
 
-    // UI-S34 — ví + lịch sử giao dịch
+    // UI-S34 — ví + 50 giao dịch gần nhất
     [HttpGet("wallet")]
     public async Task<IActionResult> GetMyWallet()
     {
         var result = await _reconciliationService.GetMyWalletAsync(CurrentUserId);
+        return result.Success ? Ok(result) : NotFound(result);
+    }
+
+    // FIX #5: Phân trang lịch sử giao dịch — ?page=1&pageSize=50
+    [HttpGet("wallet/transactions")]
+    public async Task<IActionResult> GetMyTransactions([FromQuery] int page = 1, [FromQuery] int pageSize = 50)
+    {
+        var result = await _reconciliationService.GetMyTransactionsAsync(CurrentUserId, page, pageSize);
         return result.Success ? Ok(result) : NotFound(result);
     }
 }
