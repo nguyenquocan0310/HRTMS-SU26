@@ -1,7 +1,10 @@
 // ─── Roles ────────────────────────────────────────────────────────────────────
 export type Role =
   | 'Admin'
+<<<<<<< HEAD
+=======
   | 'HorseOwner'
+>>>>>>> 8b7b97407f85e5618c32134c8a920b904c274325
   | 'Owner'
   | 'Jockey'
   | 'RaceReferee'
