@@ -255,16 +255,21 @@ const loadDraft = async (id: number) => {
         preRaceWeightThresholdKg: t.preRaceWeightThresholdKg,
         postRaceWeightDiffThresholdKg: t.postRaceWeightDiffThresholdKg,
       },
-      prizeDistribution: t.prizeDistributions?.map((p) => ({
-        rank: p.position as 1 | 2 | 3 | 4 | 5,
-        percentage: p.percentage,
-      })) ?? [
-        { rank: 1, percentage: 40 },
-        { rank: 2, percentage: 25 },
-        { rank: 3, percentage: 15 },
-        { rank: 4, percentage: 12 },
-        { rank: 5, percentage: 8 },
-      ],
+      // Phải kiểm tra LENGTH: nếu BE trả mảng rỗng [] thì [].map() vẫn ra []
+      // (không nullish) nên "?? mặc định" sẽ KHÔNG chạy → tab Prize hiện 0 dòng,
+      // tổng 0%, không thể đạt 100% để lưu/publish. Fallback khi rỗng:
+      prizeDistribution: t.prizeDistributions && t.prizeDistributions.length > 0
+        ? t.prizeDistributions.map((p) => ({
+            rank: p.position as 1 | 2 | 3 | 4 | 5,
+            percentage: p.percentage,
+          }))
+        : [
+            { rank: 1, percentage: 40 },
+            { rank: 2, percentage: 25 },
+            { rank: 3, percentage: 15 },
+            { rank: 4, percentage: 12 },
+            { rank: 5, percentage: 8 },
+          ],
       rounds: t.rounds?.map((r) => ({
         id: String(r.roundId),
         name: r.name,
@@ -422,11 +427,22 @@ const handleSaveDraft = async () => {
     }
   };
 
-  const handleConfirmCancel = () => {
-    // TODO: gọi API thật — PATCH /api/tournament/:id/status (Cancelled)
-    console.log('[TournamentBuilder] Cancel Tournament', draft.id);
-    setShowCancelModal(false);
-    navigate(LIST_PATH);
+  const handleConfirmCancel = async () => {
+    setIsSaving(true);
+    setSaveError('');
+    try {
+      // Giải mới chưa lưu (id dạng "t-...") thì không có gì để hủy ở BE.
+      if (!isNewDraft) {
+        await tournamentService.deleteTournament(Number(draft.id));
+      }
+      setShowCancelModal(false);
+      navigate(LIST_PATH);
+    } catch (err) {
+      setShowCancelModal(false);
+      setSaveError(err instanceof Error ? err.message : 'Hủy giải đấu thất bại.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // ─── Columns cho danh sách giải ────────────────────────────────────────────
