@@ -60,7 +60,10 @@ public class TokenBlacklistMiddleware
                 if (blacklistedSince.HasValue)
                 {
                     var issuedAt = ExtractIssuedAt(token);
-                    if (issuedAt == null || issuedAt.Value <= blacklistedSince.Value)
+                    // CHỈ chặn khi đọc được iat VÀ token phát trước mốc blacklist.
+                    // Không đọc được iat → fail-open (tránh khóa nhầm token mới);
+                    // lớp kiểm tra Status == "Suspended" ở trên vẫn bảo vệ.
+                    if (issuedAt != null && issuedAt.Value <= blacklistedSince.Value)
                     {
                         _logger.LogWarning(
                             "Blocked blacklisted token for userId={UserId}", userId.Value);
