@@ -56,14 +56,14 @@ const StepFinalize = ({ role, formData }: Props) => {
 
   // ─── Sau khi submit ───────────────────────────────────────────────────────
   if (submitted) {
-    const isSpectator = role === RegRole.Spectator;
+    const isInstantActive  = role === RegRole.Spectator || role === RegRole.Owner;
 
     return (
       <div className={styles.container}>
         <div className={styles.successBox}>
           <div className={styles.successIcon}>✅</div>
 
-          {isSpectator ? (
+          {isInstantActive  ? (
             <>
               <h2 className={styles.successTitle}>Đăng ký thành công!</h2>
               <p className={styles.successMsg}>{resultMessage}</p>
@@ -98,6 +98,8 @@ const StepFinalize = ({ role, formData }: Props) => {
         <p className={styles.summaryText}>
           {role === RegRole.Spectator
             ? '🎯 Tài khoản Spectator sẽ được kích hoạt ngay lập tức và bạn sẽ nhận 1000 điểm vào Wallet.'
+            : role === RegRole.Owner
+            ? '🎯 Tài khoản Horse Owner sẽ được kích hoạt ngay lập tức. Bạn có thể đăng nhập và sử dụng ngay.'
             : '📋 Hồ sơ của bạn sẽ được gửi đến Admin để xét duyệt. Quá trình này có thể mất 1-3 ngày làm việc.'}
         </p>
       </div>

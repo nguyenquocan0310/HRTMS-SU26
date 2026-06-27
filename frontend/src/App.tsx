@@ -19,6 +19,7 @@ import HorseDetail from './pages/owner/HorseDetail'
 import ScheduleConfirm from './pages/owner/ScheduleConfirm'
 import RaceEntries from './pages/owner/RaceEntries'
 import JockeyInvite from './pages/owner/JockeyInvite'
+import TournamentList from './pages/owner/TournamentList'
 
 // ── Import các trang Jockey ──
 import JockeyLayout from './pages/jockey/JockeyLayout'
@@ -69,9 +70,17 @@ function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
 
 export function getRoleHomePath(role: Role): string {
   switch (role) {
+    case 'Admin': return '/admin'
+    case 'HorseOwner':
+    case 'Owner': return '/owner'
+    case 'Jockey': return '/jockey'
+    case 'RaceReferee':
+    case 'Referee': return '/referee'
+    case 'Doctor': return '/doctor'
+    case 'Spectator': return '/spectator'
     case 'Admin':       return '/admin'
-    case 'HorseOwner':  
-    case 'Owner':       return '/owner'    
+    case 'HorseOwner':
+    case 'Owner':  return '/owner'
     case 'Jockey':      return '/jockey'
     case 'RaceReferee': 
     case 'Referee':     return '/referee'    
@@ -89,17 +98,18 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
 
-    {/* Owner routes */}
-<Route path="/owner" element={
-  <ProtectedRoute allowedRoles={['HorseOwner', 'Owner']}>
-    <OwnerLayout />
-  </ProtectedRoute>
-}>
+        {/* Owner routes */}
+        <Route path="/owner" element={
+          <ProtectedRoute allowedRoles={['Owner']}>
+            <OwnerLayout />
+          </ProtectedRoute>
+        }>
           <Route index element={<OwnerDashboard />} />
           <Route path="horses" element={<MyHorses />} />
           <Route path="horses/register" element={<RegisterHorse />} />
           <Route path="horses/:id" element={<HorseDetail />} />
           <Route path="race-entries" element={<RaceEntries />} />
+          <Route path="tournaments" element={<TournamentList />} />
           <Route path="schedule-confirm" element={<ScheduleConfirm />} />
           <Route path="jockey-invite" element={<JockeyInvite />} />
           <Route path="protest" element={<Protest userRole="HorseOwner" />} />
@@ -131,10 +141,10 @@ export default function App() {
 
         {/* ── Cấu trúc Route của TRỌNG TÀI (Referee) ── */}
         <Route path="/referee" element={
-  <ProtectedRoute allowedRoles={['RaceReferee', 'Referee']}>
-    <RefereeLayout />
-  </ProtectedRoute>
-}>
+          <ProtectedRoute allowedRoles={['RaceReferee', 'Referee']}>
+            <RefereeLayout />
+          </ProtectedRoute>
+        }>
           <Route index element={<RefereeDashboard />} />
           <Route path="officiating" element={<RaceOfficiating />} />
           <Route path="protest" element={<ProtestHandling />} />
@@ -154,16 +164,20 @@ export default function App() {
 
         {/* Admin */}
         {/* ── Cấu trúc Route của ADMIN ── */}
-<Route path="/admin" element={
-  <ProtectedRoute allowedRoles={['Admin']}>
-    <AdminLayout />
-  </ProtectedRoute>
-}>
-  <Route index element={<AdminDashboard />} />
-  <Route path="approval-center" element={<ApprovalCenter />} />
-  <Route path="users" element={<UserManagement />} />
-  <Route path="tournament-builder" element={<TournamentBuilder />} />
-</Route>
+        <Route path="/admin" element={
+          <ProtectedRoute allowedRoles={['Admin']}>
+            <AdminLayout />
+          </ProtectedRoute>
+        }>
+          <Route index element={<AdminDashboard />} />
+          <Route path="approval-center" element={<ApprovalCenter />} />
+          <Route path="users" element={<UserManagement />} />
+          {/* Danh sách giải đấu — trang riêng */}
+          <Route path="tournaments" element={<TournamentBuilder />} />
+          {/* Wizard tạo mới / chỉnh sửa giải đấu */}
+          <Route path="tournament-builder" element={<TournamentBuilder />} />
+          <Route path="tournament-builder/:id" element={<TournamentBuilder />} />
+        </Route>
 
         <Route path="/unauthorized" element={<div>403 — Không có quyền truy cập</div>} />
         <Route path="*" element={<Navigate to="/" replace />} />

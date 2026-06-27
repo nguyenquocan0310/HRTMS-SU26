@@ -12,11 +12,23 @@ builder.Services.AddCorsPolicy();
 builder.Services.AddSwaggerServices();
 builder.Services.AddHangfireJobs(builder.Configuration);
 builder.Services.AddControllers();
-builder.Services.AddStackExchangeRedisCache(options =>
+
+// Token blacklist cache (EC-29).
+// Dev: dùng in-memory cache để KHÔNG phụ thuộc Redis — tránh mỗi request có token
+// phải chờ connect-timeout ~5s tới localhost:6379 khi Redis không chạy (gây login chậm ~8s).
+// Prod: dùng Redis thật để blacklist sống xuyên restart và chia sẻ giữa nhiều instance.
+if (builder.Environment.IsDevelopment())
 {
-    options.Configuration = builder.Configuration.GetConnectionString("Redis");
-    options.InstanceName = "HRTMS:";
-});
+    builder.Services.AddDistributedMemoryCache();
+}
+else
+{
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = builder.Configuration.GetConnectionString("Redis");
+        options.InstanceName = "HRTMS:";
+    });
+}
 
 var app = builder.Build();
 
@@ -43,12 +55,17 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var context = services.GetRequiredService<HRTMSDbContext>();
-        context.Database.Migrate();
-        System.Console.WriteLine("--> THÀNH CÔNG: Đã tự động cập nhật cấu trúc bảng Database đích danh!");
+        // DB-first: schema quản lý bằng database/hrtms_schema.sql + patches.
+        // KHÔNG dùng EF migrations (tránh tạo bảng __EFMigrationsHistory & xung đột schema).
+        // Chỉ kiểm tra kết nối DB lúc khởi động.
+        if (context.Database.CanConnect())
+            System.Console.WriteLine("--> DB OK: kết nối tới HRTMS thành công.");
+        else
+            System.Console.WriteLine("--> CẢNH BÁO: không kết nối được DB. Hãy chạy hrtms_schema.sql + patches.");
     }
     catch (System.Exception ex)
     {
-        System.Console.WriteLine($"--> LỖI MIGRATION TỰ ĐỘNG: {ex.Message}");
+        System.Console.WriteLine($"--> LỖI KIỂM TRA KẾT NỐI DB: {ex.Message}");
     }
 }
 app.Run();
