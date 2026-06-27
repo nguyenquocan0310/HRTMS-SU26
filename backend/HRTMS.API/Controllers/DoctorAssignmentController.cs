@@ -97,6 +97,16 @@ public class DoctorAssignmentController : ControllerBase
                 message = "This doctor has a conflict of interest with an owner in this race."
             });
         }
+        catch (InvalidOperationException ex)
+            when (ex.Message == "DOCTOR_NOT_IN_TOURNAMENT_ROSTER")
+        {
+            // Doctor chua dang ky / chua duoc duyet tham gia giai chua Race nay
+            return UnprocessableEntity(new
+            {
+                error = "DOCTOR_NOT_IN_TOURNAMENT_ROSTER",
+                message = "This doctor is not an approved participant of this tournament."
+            });
+        }
     }
 
     [HttpGet]

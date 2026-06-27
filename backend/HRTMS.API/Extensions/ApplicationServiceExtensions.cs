@@ -13,6 +13,7 @@ public static class ApplicationServiceExtensions
         services.AddScoped<IFamilyDeclarationService, FamilyDeclarationService>();
         services.AddScoped<IAuditLogService, AuditLogService>();
         services.AddScoped<ITournamentServices, TournamentSevice>();
+        services.AddScoped<ITournamentParticipantService, TournamentParticipantService>();
         services.AddScoped<ITokenBlacklistService, TokenBlacklistService>();
         services.AddScoped<IJockeyService, JockeyService>();
         services.AddScoped<IPairingService, PairingService>();

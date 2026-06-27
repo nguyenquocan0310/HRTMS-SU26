@@ -108,6 +108,16 @@ public class RefereeAssignmentController : ControllerBase
                 message = "This referee is already assigned to another race at the same time."
             });
         }
+        catch (InvalidOperationException ex)
+            when (ex.Message == "REFEREE_NOT_IN_TOURNAMENT_ROSTER")
+        {
+            // Referee chua dang ky / chua duoc duyet tham gia giai chua Race nay
+            return UnprocessableEntity(new
+            {
+                error = "REFEREE_NOT_IN_TOURNAMENT_ROSTER",
+                message = "This referee is not an approved participant of this tournament."
+            });
+        }
     }
 
     [HttpGet]
