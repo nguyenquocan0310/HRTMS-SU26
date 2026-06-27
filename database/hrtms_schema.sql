@@ -691,6 +691,25 @@ BEGIN
 END;
 GO
 
+-- AuditLogs append-only — REQ-F-SEC.6 / BR-20 (luu giu toi thieu 7 nam)
+-- AuditLogs chi cho phep INSERT; moi UPDATE/DELETE bi chan cung o tang DB.
+CREATE OR ALTER TRIGGER trg_AuditLogs_AppendOnly
+ON AuditLogs
+INSTEAD OF UPDATE, DELETE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    RAISERROR('AuditLogs is append-only: UPDATE and DELETE are not allowed.', 16, 1);
+    ROLLBACK TRANSACTION;
+END;
+GO
+
+-- (Tuy chon) Cuong che bo sung bang quyen: chay SAU khi da tao app login/user rieng.
+-- Bo comment va thay <app_role> bang principal that ma ung dung dung de ket noi DB.
+-- DENY UPDATE, DELETE ON AuditLogs   TO <app_role>;
+-- DENY UPDATE, DELETE ON RaceReports TO <app_role>;
+-- GO
+
 -- =============================================================================
 -- INDEXES
 -- =============================================================================
@@ -758,4 +777,8 @@ GO
 -- RefereeAssignments, DoctorAssignments, RaceReports, Violations, Protests,
 -- Wallets, TicketRewardCodes, VirtualPointsTransactions, Predictions,
 -- PursePayouts, AuditLogs, Notifications
+--
+-- IMMUTABILITY (DB-enforced):
+--   trg_RaceReports_Immutable  - chan UPDATE/DELETE bien ban da khoa (IsLocked=1)  [REQ-F-PRT.7]
+--   trg_AuditLogs_AppendOnly   - chan moi UPDATE/DELETE tren AuditLogs (append-only) [REQ-F-SEC.6]
 -- =============================================================================
