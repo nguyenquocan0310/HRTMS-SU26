@@ -10,6 +10,7 @@ namespace HRTMS.Core.DTOs.Horse
     {
         public int HorseId { get; set; }
         public int OwnerId { get; set; }
+        public int TournamentId { get; set; }
         public string Name { get; set; } = null!;
         public int BirthYear { get; set; }
         public int Age => DateTime.UtcNow.Year - BirthYear;

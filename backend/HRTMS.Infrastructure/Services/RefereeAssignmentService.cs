@@ -51,6 +51,23 @@ public class RefereeAssignmentService : IRefereeAssignmentService
             throw new InvalidOperationException("REFEREE_NOT_ACTIVE");
         }
 
+        // Referee phai co trong roster Approved cua giai chua Race nay
+        var tournamentId = await _context.Races
+            .Where(r => r.RaceId == raceId)
+            .Select(r => r.Round.TournamentId)
+            .FirstOrDefaultAsync();
+
+        var refereeInRoster = await _context.TournamentParticipants.AnyAsync(p =>
+            p.TournamentId == tournamentId &&
+            p.UserId == dto.RefereeId &&
+            p.Role == "Referee" &&
+            p.Status == "Approved");
+
+        if (!refereeInRoster)
+        {
+            throw new InvalidOperationException("REFEREE_NOT_IN_TOURNAMENT_ROSTER");
+        }
+
         // Kiem tra Referee da duoc gan vao Race nay chua
         var alreadyAssigned = await _context.RefereeAssignments
             .AnyAsync(a =>
