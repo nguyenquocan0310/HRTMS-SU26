@@ -14,13 +14,15 @@ namespace HRTMS.Infrastructure.Services
     {
         private readonly HRTMSDbContext _context;
         private readonly IAuditLogService _auditLog;
+        private readonly INotificationService _notificationService; // FIX #7
 
-        private const int PredictionWinRewardPoints = 200; // REQ-F-REC.2
+        private const int PredictionWinRewardPoints = 200; // FIX #8: fallback — thực tế đọc từ race.Round.Tournament.PredictionRewardPoints
 
-        public ResultService(HRTMSDbContext context, IAuditLogService auditLog)
+        public ResultService(HRTMSDbContext context, IAuditLogService auditLog, INotificationService notificationService)
         {
             _context = context;
             _auditLog = auditLog;
+            _notificationService = notificationService; // FIX #7
         }
 
         // =====================================================================
@@ -190,6 +192,11 @@ namespace HRTMS.Infrastructure.Services
 
             int settled = 0, refunded = 0;
 
+            // FIX #8: lấy điểm thưởng từ cấu hình giải đấu, fallback về constant nếu = 0
+            var rewardPoints = race.Round.Tournament.PredictionRewardPoints > 0
+                ? race.Round.Tournament.PredictionRewardPoints
+                : PredictionWinRewardPoints;
+
             // Tập ngựa về Nhất chính thức — cho phép đồng hạng (BR-35/EC-02)
             var winningEntryIds = race.RaceEntries
                 .Where(re => re.FinishPosition == 1 && re.Status != "Cancelled" && re.Status != "Disqualified")
@@ -219,9 +226,9 @@ namespace HRTMS.Infrastructure.Services
                 if (winningEntryIds.Contains(pred.RaceEntryId))
                 {
                     pred.Status = "Won";
-                    pred.PointsAwarded = PredictionWinRewardPoints;
+                    pred.PointsAwarded = rewardPoints;
                     rewardBySpectator[pred.SpectatorId] =
-                        rewardBySpectator.GetValueOrDefault(pred.SpectatorId) + PredictionWinRewardPoints;
+                        rewardBySpectator.GetValueOrDefault(pred.SpectatorId) + rewardPoints;
                 }
                 else
                 {
@@ -237,6 +244,43 @@ namespace HRTMS.Infrastructure.Services
 
             foreach (var (spectatorId, amount) in refundBySpectator)
                 await ApplyWalletTransactionAsync(spectatorId, amount, "Prediction Refund", now);
+
+            // FIX #7: Gửi notification cho Spectator sau khi settle
+            var winnerIds = rewardBySpectator.Keys.ToList();
+            var refundIds = refundBySpectator.Keys.ToList();
+            var loserIds = predictions
+                .Where(p => p.Status == "Lost")
+                .Select(p => p.SpectatorId)
+                .Distinct()
+                .Except(winnerIds)
+                .ToList();
+
+            if (winnerIds.Count > 0)
+                await _notificationService.SendBulkAsync(
+                    recipientIds: winnerIds,
+                    title: "Dự đoán thắng! 🎉",
+                    message: $"Bạn dự đoán đúng kết quả Race #{race.RaceNumber}. +{rewardPoints} điểm đã được cộng vào ví.",
+                    type: "In-app",
+                    relatedEntityType: "Race",
+                    relatedEntityId: race.RaceId);
+
+            if (loserIds.Count > 0)
+                await _notificationService.SendBulkAsync(
+                    recipientIds: loserIds,
+                    title: "Kết quả dự đoán",
+                    message: $"Race #{race.RaceNumber} đã công bố kết quả chính thức. Dự đoán của bạn không trúng lần này.",
+                    type: "In-app",
+                    relatedEntityType: "Race",
+                    relatedEntityId: race.RaceId);
+
+            if (refundIds.Count > 0)
+                await _notificationService.SendBulkAsync(
+                    recipientIds: refundIds,
+                    title: "Hoàn điểm dự đoán",
+                    message: $"Ngựa bạn dự đoán trong Race #{race.RaceNumber} đã bị hủy/truất quyền. Điểm đặt cược đã được hoàn về ví.",
+                    type: "In-app",
+                    relatedEntityType: "Race",
+                    relatedEntityId: race.RaceId);
 
             return (settled, refunded);
         }

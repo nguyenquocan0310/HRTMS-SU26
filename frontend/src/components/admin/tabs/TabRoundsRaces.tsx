@@ -105,23 +105,19 @@ const TabRoundsRaces = ({ rounds, tournamentPurse, tournamentStartDate, tourname
   };
 
   // ─── Validate 1 race cụ thể ─────────────────────────────────────────────
-  const validateRaceTime = (round: Round, race: Race): string | null => {
-    if (!race.scheduledTime) return null;
+  // Ngày đua (scheduledDate, yyyy-MM-dd) và Giờ đua (scheduledTime, HH:mm) là
+  // 2 trường tách biệt → validate theo NGÀY, không so giờ với ngày như trước.
+  const validateRace = (round: Round, race: Race): string | null => {
+    if (!race.scheduledDate) return null;
 
-    const raceDateTime = race.scheduledTime;
-
-    if (tournamentStartDate && raceDateTime < tournamentStartDate) {
-      return 'Giờ đua không được sớm hơn ngày bắt đầu giải.';
+    if (tournamentStartDate && race.scheduledDate < tournamentStartDate) {
+      return 'Ngày đua không được sớm hơn ngày bắt đầu giải.';
     }
-    if (tournamentEndDate && raceDateTime > tournamentEndDate) {
-      return 'Giờ đua không được muộn hơn ngày kết thúc giải.';
+    if (tournamentEndDate && race.scheduledDate > tournamentEndDate) {
+      return 'Ngày đua không được muộn hơn ngày kết thúc giải.';
     }
-    if (round.scheduledDate && raceDateTime < round.scheduledDate) {
-      return 'Giờ đua không được sớm hơn ngày của Round.';
-    }
-    const now = new Date().toISOString().slice(0, 16);
-    if (raceDateTime < now) {
-      return 'Giờ đua không được ở quá khứ.';
+    if (round.scheduledDate && race.scheduledDate < round.scheduledDate) {
+      return 'Ngày đua không được sớm hơn ngày của Round.';
     }
     return null;
   };
@@ -179,7 +175,7 @@ const TabRoundsRaces = ({ rounds, tournamentPurse, tournamentStartDate, tourname
               {isExpanded && (
                 <div className={styles.racesList}>
                   {round.races.map((race) => {
-                    const timeError = validateRaceTime(round, race);
+                    const timeError = validateRace(round, race);
                     const isFrozen = race.isPostPositionDrawn;
 
                     return (
@@ -215,7 +211,7 @@ const TabRoundsRaces = ({ rounds, tournamentPurse, tournamentStartDate, tourname
                           <div className={styles.raceField}>
                             <label>Giờ đua</label>
                             <input
-                              type="datetime-local"
+                              type="time"
                               value={race.scheduledTime}
                               disabled={isFrozen}
                               title={isFrozen ? 'Đã đóng băng sau khi bốc thăm — muốn đổi phải hủy race' : undefined}

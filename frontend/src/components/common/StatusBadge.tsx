@@ -13,7 +13,12 @@ export type StatusType =
   | 'OpenRegistration'
   | 'Closed'
   | 'Completed'
-  | 'Cancelled';
+  | 'Cancelled'
+  // ─── Tournament statuses thật từ DB (CHK_Tournaments_Status) ───────────────
+  | 'Open Registration'
+  | 'Closed Registration'
+  | 'Pre-Race'
+  | 'In-Progress';
 
 interface StatusBadgeProps {
   status: StatusType;
@@ -43,10 +48,21 @@ const STATUS_CONFIG: Record<StatusType, { label: string; className: string }> = 
   Closed: { label: 'Closed', className: 'statusAutoRejected' },
   Completed: { label: 'Completed', className: 'statusCompleted' },
   Cancelled: { label: 'Cancelled', className: 'statusUrgent' },
+  // ─── Tournament statuses thật từ DB ───────────────────────────────────────
+  'Open Registration': { label: 'Open Registration', className: 'statusApproved' },
+  'Closed Registration': { label: 'Closed Registration', className: 'statusAutoRejected' },
+  'Pre-Race': { label: 'Pre-Race', className: 'statusPending' },
+  'In-Progress': { label: 'In-Progress', className: 'statusCompleted' },
 };
 
+// Fallback an toàn: status lạ (không có trong map) sẽ KHÔNG làm crash cây React.
+const FALLBACK = { label: 'Unknown', className: 'statusDraft' as const };
+
 const StatusBadge = ({ status, label }: StatusBadgeProps) => {
-  const config = STATUS_CONFIG[status];
+  const config = STATUS_CONFIG[status] ?? {
+label: status ? String(status) : FALLBACK.label,
+    className: FALLBACK.className,
+  };
 
   return (
     <span className={`${styles.badge} ${styles[config.className]}`}>
