@@ -24,3 +24,6 @@ obj/
 # VS files
 .vs/
 *.user
+
+.codegraph/
+.claude/
