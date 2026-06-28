@@ -17,14 +17,19 @@ namespace HRTMS.Infrastructure.Services
             ["Turf", "Dirt", "Synthetic"];
         private static readonly string[] ValidCategories =
             ["Open", "Classic", "Maiden"];
+        // TRN.8 — State machine cấp GIẢI một chiều: Draft → Open Registration → Closed Registration → Completed
+        // (nhánh Cancelled xử lý riêng ở CancelTournamentAsync). Pre-Race/Live/In-Progress/Unofficial/Official
+        // là trạng thái cấp RACE, KHÔNG lưu ở Tournament (BR-45, EC-36).
         private static readonly Dictionary<string, string> ValidTransitions = new()
         {
             ["Draft"]               = "Open Registration",
             ["Open Registration"]   = "Closed Registration",
-            ["Closed Registration"] = "Pre-Race",
-            ["Pre-Race"]            = "In-Progress",
-            ["In-Progress"]         = "Completed",
+            ["Closed Registration"] = "Completed",
         };
+
+        // Các trạng thái thuộc cấp Race — không bao giờ được set cho Tournament (TRN.8 AC#2).
+        private static readonly string[] RaceLevelStatuses =
+            ["Pre-Race", "Live", "In-Progress", "Unofficial", "Official"];
 
         public TournamentSevice(HRTMSDbContext context, IAuditLogService auditLog)
         {
@@ -209,6 +214,13 @@ namespace HRTMS.Infrastructure.Services
                 .FirstOrDefaultAsync(t => t.TournamentId == tournamentId)
                 ?? throw new KeyNotFoundException($"Không tìm thấy Tournament #{tournamentId}");
 
+            // TRN.8 AC#2 — chặn set Tournament sang trạng thái cấp Race (Pre-Race/Live/In-Progress/...).
+            if (RaceLevelStatuses.Contains(targetStatus))
+            {
+                throw new InvalidOperationException(
+                    $"'{targetStatus}' là trạng thái cấp Race, không áp dụng cho Tournament (TRN.8).");
+            }
+
             // Guard: chỉ cho phép transition hợp lệ
             if (!ValidTransitions.TryGetValue(tournament.Status, out var allowedNext) || allowedNext != targetStatus)
             {
@@ -220,6 +232,20 @@ namespace HRTMS.Infrastructure.Services
             if (targetStatus == "Open Registration" && tournament.PrizeDistributions.Count < 5)
             {
                 throw new InvalidOperationException("Phải cấu hình đủ 5 tỷ lệ PrizeDistributions trước khi đăng ký");
+            }
+
+            // TRN.8 AC#3 — chỉ cho Completed khi MỌI Race thuộc giải đã Official hoặc Cancelled.
+            if (targetStatus == "Completed")
+            {
+                var unfinished = tournament.Rounds
+                    .SelectMany(r => r.Races)
+                    .Where(race => race.Status != "Official" && race.Status != "Cancelled")
+                    .ToList();
+                if (unfinished.Count > 0)
+                {
+                    throw new InvalidOperationException(
+                        "Chỉ có thể hoàn thành giải khi mọi cuộc đua đã ở trạng thái Official hoặc Cancelled (TRN.8).");
+                }
             }
 
             var oldStatus = tournament.Status;
