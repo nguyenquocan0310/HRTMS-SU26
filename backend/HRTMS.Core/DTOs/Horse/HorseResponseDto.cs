@@ -21,7 +21,7 @@ namespace HRTMS.Core.DTOs.Horse
         public string IdentifyingMarks { get; set; } = null!;
         public string Breed { get; set; } = null!;
         public string VaccinationRecordRef { get; set; } = null!;
-        public DateOnly DopingTestDate { get; set; }
+        public DateOnly? DopingTestDate { get; set; }
         public string DopingTestResult { get; set; } = null!;
         public bool LegalConsentAccepted { get; set; }
         public string AdminApprovalStatus { get; set; } = null!;

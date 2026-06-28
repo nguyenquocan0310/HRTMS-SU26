@@ -21,6 +21,10 @@ public partial class DoctorProfile
 
     public virtual ICollection<DoctorAssignment> DoctorAssignments { get; set; } = new List<DoctorAssignment>();
 
+    public virtual ICollection<RaceEntry> RaceEntryClinicalCheckedByDoctors { get; set; } = new List<RaceEntry>();
+
+    public virtual ICollection<RaceEntry> RaceEntryHorseIdentityCheckedByDoctors { get; set; } = new List<RaceEntry>();
+
     public virtual ICollection<RaceEntry> RaceEntryPostRaceWeightByDoctors { get; set; } = new List<RaceEntry>();
 
     public virtual ICollection<RaceEntry> RaceEntryPreRaceWeightByDoctors { get; set; } = new List<RaceEntry>();

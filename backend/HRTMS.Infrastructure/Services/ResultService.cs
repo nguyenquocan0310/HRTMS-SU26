@@ -192,10 +192,8 @@ namespace HRTMS.Infrastructure.Services
 
             int settled = 0, refunded = 0;
 
-            // FIX #8: lấy điểm thưởng từ cấu hình giải đấu, fallback về constant nếu = 0
-            var rewardPoints = race.Round.Tournament.PredictionRewardPoints > 0
-                ? race.Round.Tournament.PredictionRewardPoints
-                : PredictionWinRewardPoints;
+            // Schema v2 đã bỏ Tournament.PredictionRewardPoints → dùng hằng số chuẩn (REC.2: +200).
+            var rewardPoints = PredictionWinRewardPoints;
 
             // Tập ngựa về Nhất chính thức — cho phép đồng hạng (BR-35/EC-02)
             var winningEntryIds = race.RaceEntries
