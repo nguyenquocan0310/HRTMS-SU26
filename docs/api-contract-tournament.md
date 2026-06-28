@@ -99,7 +99,7 @@ POST /api/tournament
 | maxHorses | int | Bắt buộc, ≥ 1 |
 | allowedBreed | string | `Thoroughbred` \| `Arabian` \| `Quarter Horse` \| `Mixed` |
 | trackType | string | `Turf` \| `Dirt` \| `Synthetic` |
-| raceDistance | int | 100–10000 (mét) |
+| raceDistance | int | Số nguyên `>1200` và `<2400` (mét); UI nên gợi ý các mốc phổ biến |
 | raceCategory | string | `Open` \| `Classic` \| `Maiden` |
 | minJockeyExperienceYears | int | 0–50 |
 | purseAmount | decimal | ≥ 0 |
@@ -155,7 +155,7 @@ POST /api/tournament
 | 400 | Thiếu field bắt buộc (`name`, `startDate`, `endDate`, v.v.) | 🟡 Data Annotation |
 | 400 | `name` > 200 ký tự | 🟡 Data Annotation |
 | 400 | `maxHorses` < 1 | 🟡 Data Annotation |
-| 400 | `raceDistance` ngoài 100–10000 | 🟡 Data Annotation |
+| 400 | `raceDistance` không `>1200` và `<2400` | 🟡 Data Annotation |
 | 400 | `allowedBreed` không hợp lệ (vd: `"Pony"`) | 🔴 Business logic |
 | 400 | `trackType` không hợp lệ (vd: `"Sand"`) | 🔴 Business logic |
 | 400 | `raceCategory` không hợp lệ (vd: `"Premium"`) | 🔴 Business logic |
@@ -340,7 +340,7 @@ POST /api/rounds/{id}/races
   "trackTypeOverride":       null,
   "raceDistanceOverride":    null,
   "confirmationCutoffHours": 24,
-  "protestDeadlineMinutes":  30
+  "protestDeadlineMinutes":  120
 }
 ```
 
@@ -350,9 +350,9 @@ POST /api/rounds/{id}/races
 | scheduledTime | datetime | Phải ở tương lai, trong `[round.scheduledDate, tournament.endDate]` |
 | purseAmount | decimal | ≥ 0; tổng tất cả race ≤ `tournament.purseAmount` |
 | trackTypeOverride | string \| null | Tuỳ chọn — override trackType của tournament |
-| raceDistanceOverride | int \| null | Tuỳ chọn — override raceDistance |
+| raceDistanceOverride | int \| null | Tuỳ chọn — override raceDistance, nếu có phải `>1200` và `<2400` |
 | confirmationCutoffHours | int | mặc định `24` nếu không truyền |
-| protestDeadlineMinutes | int | mặc định `30` nếu không truyền |
+| protestDeadlineMinutes | int | mặc định `120` nếu không truyền |
 
 ---
 
@@ -379,7 +379,7 @@ POST /api/rounds/{id}/races
     "raceDistanceOverride":    null,
     "status":                  "Upcoming",
     "confirmationCutoffHours": 24,
-    "protestDeadlineMinutes":  30
+    "protestDeadlineMinutes":  120
   }
 }
 ```
@@ -521,7 +521,7 @@ Trả về đầy đủ nested: tournament → rounds → races + prizeDistribut
             "trackTypeOverride":       null,
             "status":                  "Upcoming",
             "confirmationCutoffHours": 24,
-            "protestDeadlineMinutes":  30
+            "protestDeadlineMinutes":  120
           },
           {
             "raceId":                  2,
@@ -531,7 +531,7 @@ Trả về đầy đủ nested: tournament → rounds → races + prizeDistribut
             "trackTypeOverride":       null,
             "status":                  "Upcoming",
             "confirmationCutoffHours": 24,
-            "protestDeadlineMinutes":  30
+            "protestDeadlineMinutes":  120
           },
           {
             "raceId":                  3,
@@ -541,7 +541,7 @@ Trả về đầy đủ nested: tournament → rounds → races + prizeDistribut
             "trackTypeOverride":       "Dirt",
             "status":                  "Upcoming",
             "confirmationCutoffHours": 24,
-            "protestDeadlineMinutes":  30
+            "protestDeadlineMinutes":  120
           }
         ]
       },

@@ -17,6 +17,8 @@ namespace HRTMS.Infrastructure.Services
             ["Turf", "Dirt", "Synthetic"];
         private static readonly string[] ValidCategories =
             ["Open", "Classic", "Maiden"];
+        private const int MinRaceDistanceMeters = 1200;
+        private const int MaxRaceDistanceMeters = 2400;
         // TRN.8 — State machine cấp GIẢI một chiều: Draft → Open Registration → Closed Registration → Completed
         // (nhánh Cancelled xử lý riêng ở CancelTournamentAsync). Pre-Race/Live/In-Progress/Unofficial/Official
         // là trạng thái cấp RACE, KHÔNG lưu ở Tournament (BR-45, EC-36).
@@ -39,6 +41,18 @@ namespace HRTMS.Infrastructure.Services
 
 
         // PRIVATE HELPER
+        private static void ValidateRaceDistance(int distance, string fieldName)
+        {
+            if (distance <= MinRaceDistanceMeters || distance >= MaxRaceDistanceMeters)
+                throw new ArgumentException($"{fieldName} must be greater than {MinRaceDistanceMeters} and less than {MaxRaceDistanceMeters}");
+        }
+
+        private static void ValidateRaceDistanceOverride(int? distance)
+        {
+            if (distance.HasValue)
+                ValidateRaceDistance(distance.Value, "RaceDistanceOverride");
+        }
+
         private static TournamentResponseDto MapToResponseDto(Tournament t) => new()
         {
             TournamentId = t.TournamentId,
@@ -97,6 +111,7 @@ namespace HRTMS.Infrastructure.Services
                 throw new ArgumentException($"TrackType Invalid: {dto.TrackType}");
             if (!ValidCategories.Contains(dto.RaceCategory))
                 throw new ArgumentException($"RaceCategory Invalid: {dto.RaceCategory}");
+            ValidateRaceDistance(dto.RaceDistance, nameof(dto.RaceDistance));
 
             // 2. Validate date range
             if (dto.EndDate < dto.StartDate)
@@ -183,6 +198,8 @@ namespace HRTMS.Infrastructure.Services
                 throw new ArgumentException($"TrackType Invalid: {dto.TrackType}");
             if (dto.RaceCategory != null && !ValidCategories.Contains(dto.RaceCategory))
                 throw new ArgumentException($"RaceCategory Invalid: {dto.RaceCategory}");
+            if (dto.RaceDistance.HasValue)
+                ValidateRaceDistance(dto.RaceDistance.Value, nameof(dto.RaceDistance));
 
             // Chỉ update field nào được gửi lên (nullable pattern)
             if (dto.Name != null) tournament.Name = dto.Name;
@@ -507,6 +524,7 @@ namespace HRTMS.Infrastructure.Services
                 ?? throw new KeyNotFoundException($"Không tìm thấy Round #{roundId}");
 
             var tournament = round.Tournament;
+            ValidateRaceDistanceOverride(dto.RaceDistanceOverride);
 
             // TRN.7 — validate thời gian
             if (dto.ScheduledTime <= DateTime.UtcNow)
@@ -575,6 +593,7 @@ namespace HRTMS.Infrastructure.Services
                 ?? throw new KeyNotFoundException($"Không tìm thấy Race #{raceId}");
 
             var tournament = race.Round.Tournament;
+            ValidateRaceDistanceOverride(dto.RaceDistanceOverride);
 
             // EC-48 — dong bang khi da boc tham HOAC da co Prediction.
             var hasPrediction = await _context.Predictions.AnyAsync(p => p.RaceId == raceId);
