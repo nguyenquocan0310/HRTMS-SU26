@@ -3,13 +3,13 @@ using System.Collections.Generic;
 
 namespace HRTMS.Core.Entities;
 
+/// <summary>
+/// Schema v2: OwnerProfile chỉ còn OwnerId (FK = PK).
+/// PhoneNumber + IdentityNumber đã chuyển sang Users.PhoneNumber / Users.IdentityNumberEncrypted.
+/// </summary>
 public partial class OwnerProfile
 {
     public int OwnerId { get; set; }
-
-    public string PhoneNumber { get; set; } = null!;
-
-    public string IdentityNumber { get; set; } = null!;
 
     public DateTime CreatedAt { get; set; }
 
