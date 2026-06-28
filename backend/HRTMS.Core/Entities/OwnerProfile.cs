@@ -7,10 +7,6 @@ public partial class OwnerProfile
 {
     public int OwnerId { get; set; }
 
-    public string PhoneNumber { get; set; } = null!;
-
-    public string IdentityNumber { get; set; } = null!;
-
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }

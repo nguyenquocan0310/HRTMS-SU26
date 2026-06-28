@@ -13,6 +13,8 @@ public partial class VirtualPointsTransaction
 
     public string Type { get; set; } = null!;
 
+    public string? ReferenceType { get; set; }
+
     public string? ReferenceId { get; set; }
 
     public DateTime CreatedAt { get; set; }

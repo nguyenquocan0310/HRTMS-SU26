@@ -52,6 +52,8 @@ public partial class HRTMSDbContext : DbContext
 
     public virtual DbSet<SpectatorProfile> SpectatorProfiles { get; set; }
 
+    public virtual DbSet<TicketRewardCode> TicketRewardCodes { get; set; }
+
     public virtual DbSet<Tournament> Tournaments { get; set; }
 
     public virtual DbSet<TournamentParticipant> TournamentParticipants { get; set; }
@@ -70,6 +72,8 @@ public partial class HRTMSDbContext : DbContext
 
         modelBuilder.Entity<AuditLog>(entity =>
         {
+            entity.ToTable(tb => tb.HasTrigger("trg_AuditLogs_AppendOnly"));
+
             entity.HasIndex(e => e.ActorId, "IX_AuditLogs_Actor");
 
             entity.HasIndex(e => e.CreatedAt, "IX_AuditLogs_CreatedAt");
@@ -103,7 +107,14 @@ public partial class HRTMSDbContext : DbContext
         {
             entity.HasKey(e => new { e.RaceId, e.DoctorId });
 
+            entity.HasIndex(e => new { e.RaceId, e.CoiCheckStatus }, "IX_DocAssign_Coi");
+
             entity.Property(e => e.AssignedAt).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.CoiCheckStatus)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasDefaultValue("NotChecked");
+            entity.Property(e => e.CoiViolationReason).HasMaxLength(500);
 
             entity.HasOne(d => d.Doctor).WithMany(p => p.DoctorAssignments)
                 .HasForeignKey(d => d.DoctorId)
@@ -122,6 +133,7 @@ public partial class HRTMSDbContext : DbContext
             entity.HasIndex(e => e.MedicalLicenseNumber, "UQ_DoctorProfiles_License").IsUnique();
 
             entity.Property(e => e.DoctorId).ValueGeneratedNever();
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
             entity.Property(e => e.MedicalLicenseNumber)
                 .HasMaxLength(50)
                 .IsUnicode(false);
@@ -142,6 +154,14 @@ public partial class HRTMSDbContext : DbContext
         {
             entity.HasKey(e => e.DeclarationId).HasName("PK_FRD");
 
+            entity.HasIndex(e => new { e.RelatedPersonName, e.RelatedDateOfBirth }, "IX_FRD_NameDob").HasFilter("([RelatedDateOfBirth] IS NOT NULL)");
+
+            entity.HasIndex(e => e.RelatedEmailNormalized, "IX_FRD_RelatedEmail").HasFilter("([RelatedEmailNormalized] IS NOT NULL)");
+
+            entity.HasIndex(e => e.RelatedIdentityHash, "IX_FRD_RelatedIdentityHash").HasFilter("([RelatedIdentityHash] IS NOT NULL)");
+
+            entity.HasIndex(e => e.RelatedPhoneNormalized, "IX_FRD_RelatedPhone").HasFilter("([RelatedPhoneNormalized] IS NOT NULL)");
+
             entity.HasIndex(e => new { e.DeclarantUserId, e.RelatedUserId }, "UQ_FRD_DeclarantRelated")
                 .IsUnique()
                 .HasFilter("([RelatedUserId] IS NOT NULL)");
@@ -150,8 +170,19 @@ public partial class HRTMSDbContext : DbContext
             entity.Property(e => e.IndustryRole)
                 .HasMaxLength(20)
                 .IsUnicode(false);
+            entity.Property(e => e.MatchConfidence)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasDefaultValue("Unresolved");
             entity.Property(e => e.Notes).HasMaxLength(255);
+            entity.Property(e => e.RelatedEmailNormalized)
+                .HasMaxLength(100)
+                .IsUnicode(false);
+            entity.Property(e => e.RelatedIdentityHash).HasMaxLength(32);
             entity.Property(e => e.RelatedPersonName).HasMaxLength(100);
+            entity.Property(e => e.RelatedPhoneNormalized)
+                .HasMaxLength(20)
+                .IsUnicode(false);
             entity.Property(e => e.RelationType)
                 .HasMaxLength(20)
                 .IsUnicode(false);
@@ -168,11 +199,13 @@ public partial class HRTMSDbContext : DbContext
 
         modelBuilder.Entity<Horse>(entity =>
         {
-            entity.HasIndex(e => e.AdminApprovalStatus, "IX_Horses_Approval");
-
             entity.HasIndex(e => e.OwnerId, "IX_Horses_Owner");
 
             entity.HasIndex(e => e.TournamentId, "IX_Horses_Tournament");
+
+            entity.HasIndex(e => new { e.TournamentId, e.AdminApprovalStatus }, "IX_Horses_TournamentApproval");
+
+            entity.HasIndex(e => new { e.TournamentId, e.HorseId }, "UQ_Horses_TournamentHorse").IsUnique();
 
             entity.Property(e => e.AdminApprovalStatus)
                 .HasMaxLength(20)
@@ -182,6 +215,7 @@ public partial class HRTMSDbContext : DbContext
                 .HasMaxLength(30)
                 .IsUnicode(false);
             entity.Property(e => e.Color).HasMaxLength(50);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
             entity.Property(e => e.DopingTestResult)
                 .HasMaxLength(20)
                 .IsUnicode(false)
@@ -193,7 +227,11 @@ public partial class HRTMSDbContext : DbContext
             entity.Property(e => e.Name).HasMaxLength(100);
             entity.Property(e => e.Pedigree).HasMaxLength(255);
             entity.Property(e => e.RejectionReason).HasMaxLength(500);
-            entity.Property(e => e.LegalConsentAccepted).HasDefaultValue(false);
+            entity.Property(e => e.ScreeningReason).HasMaxLength(500);
+            entity.Property(e => e.ScreeningStatus)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasDefaultValue("NotScreened");
             entity.Property(e => e.Status)
                 .HasMaxLength(20)
                 .IsUnicode(false)
@@ -213,6 +251,12 @@ public partial class HRTMSDbContext : DbContext
                 .HasForeignKey(d => d.TournamentId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Horses_Tournament");
+
+            entity.HasOne(d => d.TournamentParticipant).WithMany(p => p.Horses)
+                .HasPrincipalKey(p => new { p.TournamentId, p.UserId })
+                .HasForeignKey(d => new { d.TournamentId, d.OwnerId })
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Horses_OwnerRoster");
         });
 
         modelBuilder.Entity<JockeyProfile>(entity =>
@@ -225,6 +269,7 @@ public partial class HRTMSDbContext : DbContext
             entity.Property(e => e.BloodType)
                 .HasMaxLength(5)
                 .IsUnicode(false);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
             entity.Property(e => e.HealthStatus)
                 .HasMaxLength(20)
                 .IsUnicode(false)
@@ -271,15 +316,8 @@ public partial class HRTMSDbContext : DbContext
         {
             entity.HasKey(e => e.OwnerId);
 
-            entity.HasIndex(e => e.IdentityNumber, "UQ_OwnerProfiles_IdNum").IsUnique();
-
             entity.Property(e => e.OwnerId).ValueGeneratedNever();
-            entity.Property(e => e.IdentityNumber)
-                .HasMaxLength(20)
-                .IsUnicode(false);
-            entity.Property(e => e.PhoneNumber)
-                .HasMaxLength(15)
-                .IsUnicode(false);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
             entity.Property(e => e.UpdatedAt).HasDefaultValueSql("(getutcdate())");
 
             entity.HasOne(d => d.Owner).WithOne(p => p.OwnerProfile)
@@ -290,6 +328,22 @@ public partial class HRTMSDbContext : DbContext
 
         modelBuilder.Entity<Pairing>(entity =>
         {
+            entity.HasIndex(e => e.HorseId, "IX_Pairings_Horse");
+
+            entity.HasIndex(e => e.JockeyId, "IX_Pairings_Jockey");
+
+            entity.HasIndex(e => e.TournamentId, "IX_Pairings_Tournament");
+
+            entity.HasIndex(e => new { e.TournamentId, e.HorseId }, "IX_Pairings_TournamentHorse");
+
+            entity.HasIndex(e => new { e.TournamentId, e.JockeyId }, "IX_Pairings_TournamentJockey");
+
+            entity.HasIndex(e => new { e.TournamentId, e.Status }, "IX_Pairings_TournamentStatus");
+
+            entity.HasIndex(e => new { e.TournamentId, e.HorseId }, "UQ_Pairings_ActiveHorseTournament")
+                .IsUnique()
+                .HasFilter("([Status] IN ('Pending', 'Accepted', 'Confirmed'))");
+
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
             entity.Property(e => e.RequestMessage).HasMaxLength(255);
             entity.Property(e => e.ResponseReason).HasMaxLength(255);
@@ -299,7 +353,7 @@ public partial class HRTMSDbContext : DbContext
                 .HasDefaultValue("Pending");
             entity.Property(e => e.UpdatedAt).HasDefaultValueSql("(getutcdate())");
 
-            entity.HasOne(d => d.Horse).WithMany(p => p.Pairings)
+            entity.HasOne(d => d.Horse).WithMany(p => p.PairingHorses)
                 .HasForeignKey(d => d.HorseId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Pairings_Horse");
@@ -308,6 +362,23 @@ public partial class HRTMSDbContext : DbContext
                 .HasForeignKey(d => d.JockeyId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Pairings_Jockey");
+
+            entity.HasOne(d => d.Tournament).WithMany(p => p.Pairings)
+                .HasForeignKey(d => d.TournamentId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Pairings_Tournament");
+
+            entity.HasOne(d => d.HorseNavigation).WithOne(p => p.PairingHorseNavigation)
+                .HasPrincipalKey<Horse>(p => new { p.TournamentId, p.HorseId })
+                .HasForeignKey<Pairing>(d => new { d.TournamentId, d.HorseId })
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Pairings_HorseTournament");
+
+            entity.HasOne(d => d.TournamentParticipant).WithMany(p => p.Pairings)
+                .HasPrincipalKey(p => new { p.TournamentId, p.UserId })
+                .HasForeignKey(d => new { d.TournamentId, d.JockeyId })
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Pairings_JockeyRoster");
         });
 
         modelBuilder.Entity<Prediction>(entity =>
@@ -345,6 +416,8 @@ public partial class HRTMSDbContext : DbContext
 
         modelBuilder.Entity<PrizeDistribution>(entity =>
         {
+            entity.HasIndex(e => e.TournamentId, "IX_PrizeDist_Tournament");
+
             entity.HasIndex(e => new { e.TournamentId, e.Position }, "UQ_PrizeDist_TourPos").IsUnique();
 
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
@@ -399,6 +472,7 @@ public partial class HRTMSDbContext : DbContext
             entity.Property(e => e.Role)
                 .HasMaxLength(20)
                 .IsUnicode(false);
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("(getutcdate())");
 
             entity.HasOne(d => d.RaceEntry).WithMany(p => p.PursePayouts)
                 .HasForeignKey(d => d.RaceEntryId)
@@ -423,6 +497,7 @@ public partial class HRTMSDbContext : DbContext
             entity.HasIndex(e => new { e.RoundId, e.RaceNumber }, "UQ_Races_RoundNumber").IsUnique();
 
             entity.Property(e => e.ConfirmationCutoffHours).HasDefaultValue(24);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
             entity.Property(e => e.ProtestDeadlineMinutes).HasDefaultValue(120);
             entity.Property(e => e.PurseAmount).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.Status)
@@ -441,6 +516,8 @@ public partial class HRTMSDbContext : DbContext
 
         modelBuilder.Entity<RaceEntry>(entity =>
         {
+            entity.HasIndex(e => e.IndependenceCheckStatus, "IX_RaceEntries_Independence");
+
             entity.HasIndex(e => e.PairingId, "IX_RaceEntries_Pairing");
 
             entity.HasIndex(e => e.RaceId, "IX_RaceEntries_Race");
@@ -453,6 +530,9 @@ public partial class HRTMSDbContext : DbContext
 
             entity.HasIndex(e => new { e.RaceId, e.PairingId }, "UQ_RaceEntries_RacePairing").IsUnique();
 
+            entity.Property(e => e.ClinicalStatus)
+                .HasMaxLength(20)
+                .IsUnicode(false);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
             entity.Property(e => e.EarningsAwarded).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.EntryFeeStatus)
@@ -460,6 +540,14 @@ public partial class HRTMSDbContext : DbContext
                 .IsUnicode(false)
                 .HasDefaultValue("Unpaid");
             entity.Property(e => e.FinishTime).HasColumnType("decimal(8, 3)");
+            entity.Property(e => e.HorseIdentityCheckStatus)
+                .HasMaxLength(20)
+                .IsUnicode(false);
+            entity.Property(e => e.IndependenceCheckStatus)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasDefaultValue("NotChecked");
+            entity.Property(e => e.IndependenceViolationReason).HasMaxLength(500);
             entity.Property(e => e.PostRaceJockeyWeight).HasColumnType("decimal(5, 2)");
             entity.Property(e => e.PreRaceJockeyWeight).HasColumnType("decimal(5, 2)");
             entity.Property(e => e.Status)
@@ -467,11 +555,24 @@ public partial class HRTMSDbContext : DbContext
                 .IsUnicode(false)
                 .HasDefaultValue("Pending");
             entity.Property(e => e.UnfitReason).HasMaxLength(255);
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("(getutcdate())");
             entity.Property(e => e.WithdrawalReason).HasMaxLength(255);
+
+            entity.HasOne(d => d.ClinicalCheckedByDoctor).WithMany(p => p.RaceEntryClinicalCheckedByDoctors)
+                .HasForeignKey(d => d.ClinicalCheckedByDoctorId)
+                .HasConstraintName("FK_RaceEntries_ClinicalDoctor");
 
             entity.HasOne(d => d.EntryFeeConfirmedByNavigation).WithMany(p => p.RaceEntries)
                 .HasForeignKey(d => d.EntryFeeConfirmedBy)
                 .HasConstraintName("FK_RaceEntries_FeeConfirmedBy");
+
+            entity.HasOne(d => d.HorseIdentityCheckedByDoctor).WithMany(p => p.RaceEntryHorseIdentityCheckedByDoctors)
+                .HasForeignKey(d => d.HorseIdentityCheckedByDoctorId)
+                .HasConstraintName("FK_RaceEntries_HorseIdentityDoctor");
+
+            entity.HasOne(d => d.IndependenceCheckedByReferee).WithMany(p => p.RaceEntries)
+                .HasForeignKey(d => d.IndependenceCheckedByRefereeId)
+                .HasConstraintName("FK_RaceEntries_IndependenceReferee");
 
             entity.HasOne(d => d.Pairing).WithMany(p => p.RaceEntries)
                 .HasForeignKey(d => d.PairingId)
@@ -490,33 +591,6 @@ public partial class HRTMSDbContext : DbContext
                 .HasForeignKey(d => d.RaceId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_RaceEntries_Race");
-            entity.Property(e => e.HorseIdentityStatus)
-                .HasMaxLength(20)
-                .IsUnicode(false);
-
-            entity.HasOne(d => d.HorseIdentityCheckedByDoctor)
-                .WithMany()
-                .HasForeignKey(d => d.HorseIdentityCheckedByDoctorId)
-                .HasConstraintName("FK_RaceEntries_HorseIdentityDoctor");
-            entity.Property(e => e.ClinicalStatus)
-                .HasMaxLength(20)
-                .IsUnicode(false);
-
-            entity.HasOne(d => d.ClinicalCheckedByDoctor)
-                .WithMany()
-                .HasForeignKey(d => d.ClinicalCheckedByDoctorId)
-                .HasConstraintName("FK_RaceEntries_ClinicalDoctor");
-            entity.Property(e => e.IndependenceCheckStatus)
-                .HasMaxLength(20)
-                .IsUnicode(false);
-
-            entity.Property(e => e.IndependenceViolationReason)
-                .HasMaxLength(500);
-
-            entity.HasOne(d => d.IndependenceCheckedByReferee)
-                .WithMany()
-                .HasForeignKey(d => d.IndependenceCheckedByRefereeId)
-                .HasConstraintName("FK_RaceEntries_IndependenceReferee");
         });
 
         modelBuilder.Entity<RaceReport>(entity =>
@@ -524,6 +598,8 @@ public partial class HRTMSDbContext : DbContext
             entity.ToTable(tb => tb.HasTrigger("trg_RaceReports_Immutable"));
 
             entity.HasIndex(e => e.RaceId, "UQ_RaceReports_Race").IsUnique();
+
+            entity.Property(e => e.SubmittedAt).HasDefaultValueSql("(getutcdate())");
 
             entity.HasOne(d => d.LeadReferee).WithMany(p => p.RaceReports)
                 .HasForeignKey(d => d.LeadRefereeId)
@@ -540,11 +616,18 @@ public partial class HRTMSDbContext : DbContext
         {
             entity.HasKey(e => new { e.RaceId, e.RefereeId });
 
+            entity.HasIndex(e => new { e.RaceId, e.CoiCheckStatus }, "IX_RefAssign_Coi");
+
             entity.HasIndex(e => e.RaceId, "UQ_RefereeAssignments_LeadReferee")
                 .IsUnique()
                 .HasFilter("([Role]='Lead Referee')");
 
             entity.Property(e => e.AssignedAt).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.CoiCheckStatus)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasDefaultValue("NotChecked");
+            entity.Property(e => e.CoiViolationReason).HasMaxLength(500);
             entity.Property(e => e.Role)
                 .HasMaxLength(30)
                 .IsUnicode(false);
@@ -567,6 +650,7 @@ public partial class HRTMSDbContext : DbContext
             entity.Property(e => e.CertificationLevel)
                 .HasMaxLength(50)
                 .IsUnicode(false);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
             entity.Property(e => e.RejectionReason).HasMaxLength(500);
             entity.Property(e => e.Status)
                 .HasMaxLength(20)
@@ -582,6 +666,8 @@ public partial class HRTMSDbContext : DbContext
 
         modelBuilder.Entity<Round>(entity =>
         {
+            entity.HasIndex(e => e.TournamentId, "IX_Rounds_Tournament");
+
             entity.HasIndex(e => new { e.TournamentId, e.SequenceOrder }, "UQ_Rounds_TourSeq").IsUnique();
 
             entity.Property(e => e.Name).HasMaxLength(100);
@@ -601,6 +687,7 @@ public partial class HRTMSDbContext : DbContext
             entity.HasKey(e => e.SpectatorId);
 
             entity.Property(e => e.SpectatorId).ValueGeneratedNever();
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
 
             entity.HasOne(d => d.Spectator).WithOne(p => p.SpectatorProfile)
                 .HasForeignKey<SpectatorProfile>(d => d.SpectatorId)
@@ -608,11 +695,34 @@ public partial class HRTMSDbContext : DbContext
                 .HasConstraintName("FK_SpectatorProfiles_Users");
         });
 
+        modelBuilder.Entity<TicketRewardCode>(entity =>
+        {
+            entity.HasIndex(e => e.RedeemedBySpectatorId, "IX_TicketRewardCodes_RedeemedBy").HasFilter("([RedeemedBySpectatorId] IS NOT NULL)");
+
+            entity.HasIndex(e => new { e.Status, e.ExpiresAt }, "IX_TicketRewardCodes_Status");
+
+            entity.HasIndex(e => e.CodeHash, "UQ_TicketRewardCodes_CodeHash").IsUnique();
+
+            entity.Property(e => e.CodeHash).HasMaxLength(32);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasDefaultValue("Active");
+
+            entity.HasOne(d => d.RedeemedBySpectator).WithMany(p => p.TicketRewardCodes)
+                .HasForeignKey(d => d.RedeemedBySpectatorId)
+                .HasConstraintName("FK_TicketRewardCodes_RedeemedBy");
+        });
+
         modelBuilder.Entity<Tournament>(entity =>
         {
+            entity.HasIndex(e => e.Status, "IX_Tournaments_Status");
+
             entity.Property(e => e.AllowedBreed)
                 .HasMaxLength(30)
                 .IsUnicode(false);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
             entity.Property(e => e.EntryFeeAmount).HasColumnType("decimal(10, 2)");
             entity.Property(e => e.Name).HasMaxLength(150);
             entity.Property(e => e.PostRaceWeightDiffThresholdKg)
@@ -643,49 +753,56 @@ public partial class HRTMSDbContext : DbContext
         {
             entity.HasKey(e => e.ParticipantId);
 
-            entity.HasIndex(e => new { e.TournamentId, e.UserId }, "UQ_TournamentParticipants_TourUser")
-                .IsUnique();
+            entity.HasIndex(e => new { e.TournamentId, e.Role, e.Status }, "IX_TP_Roster");
 
-            entity.HasIndex(e => new { e.TournamentId, e.Role, e.Status }, "IX_TournamentParticipants_Roster");
+            entity.HasIndex(e => new { e.TournamentId, e.UserId, e.Status }, "IX_TP_TournamentUserStatus");
 
+            entity.HasIndex(e => e.UserId, "IX_TP_User");
+
+            entity.HasIndex(e => new { e.TournamentId, e.UserId }, "UQ_TP_TourUser").IsUnique();
+
+            entity.Property(e => e.RegisteredAt).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.RejectionReason).HasMaxLength(500);
             entity.Property(e => e.Role)
                 .HasMaxLength(20)
                 .IsUnicode(false);
-            entity.Property(e => e.Status)
-                .HasMaxLength(20)
-                .IsUnicode(false)
-                .HasDefaultValue("Pending");
+            entity.Property(e => e.ScreeningReason).HasMaxLength(500);
             entity.Property(e => e.ScreeningStatus)
                 .HasMaxLength(20)
                 .IsUnicode(false)
                 .HasDefaultValue("NotScreened");
-            entity.Property(e => e.ScreeningReason).HasMaxLength(500);
-            entity.Property(e => e.RejectionReason).HasMaxLength(500);
-            entity.Property(e => e.RegisteredAt).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasDefaultValue("Pending");
+
+            entity.HasOne(d => d.ApprovedByNavigation).WithMany(p => p.TournamentParticipantApprovedByNavigations)
+                .HasForeignKey(d => d.ApprovedBy)
+                .HasConstraintName("FK_TP_ApprovedBy");
 
             entity.HasOne(d => d.Tournament).WithMany(p => p.TournamentParticipants)
                 .HasForeignKey(d => d.TournamentId)
-                .OnDelete(DeleteBehavior.Cascade)
-                .HasConstraintName("FK_TournamentParticipants_Tournament");
+                .HasConstraintName("FK_TP_Tournament");
 
-            entity.HasOne(d => d.User).WithMany(p => p.TournamentParticipants)
+            entity.HasOne(d => d.User).WithMany(p => p.TournamentParticipantUsers)
                 .HasForeignKey(d => d.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_TournamentParticipants_User");
-
-            entity.HasOne(d => d.ApprovedByNavigation).WithMany()
-                .HasForeignKey(d => d.ApprovedBy)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_TournamentParticipants_ApprovedBy");
+                .HasConstraintName("FK_TP_User");
         });
 
         modelBuilder.Entity<User>(entity =>
         {
+            entity.HasIndex(e => e.IdentityHash, "IX_Users_IdentityHash").HasFilter("([IdentityHash] IS NOT NULL)");
+
+            entity.HasIndex(e => e.NormalizedPhone, "IX_Users_NormalizedPhone").HasFilter("([NormalizedPhone] IS NOT NULL)");
+
             entity.HasIndex(e => e.Role, "IX_Users_Role");
 
             entity.HasIndex(e => e.Status, "IX_Users_Status");
 
             entity.HasIndex(e => e.Email, "UQ_Users_Email").IsUnique();
+
+            entity.HasIndex(e => e.NormalizedEmail, "UQ_Users_NormalizedEmail").IsUnique();
 
             entity.HasIndex(e => e.Username, "UQ_Users_Username").IsUnique();
 
@@ -694,8 +811,19 @@ public partial class HRTMSDbContext : DbContext
                 .HasMaxLength(100)
                 .IsUnicode(false);
             entity.Property(e => e.FullName).HasMaxLength(100);
+            entity.Property(e => e.IdentityHash).HasMaxLength(32);
+            entity.Property(e => e.IdentityNumberEncrypted).HasMaxLength(512);
+            entity.Property(e => e.NormalizedEmail)
+                .HasMaxLength(100)
+                .IsUnicode(false);
+            entity.Property(e => e.NormalizedPhone)
+                .HasMaxLength(20)
+                .IsUnicode(false);
             entity.Property(e => e.PasswordHash)
                 .HasMaxLength(255)
+                .IsUnicode(false);
+            entity.Property(e => e.PhoneNumber)
+                .HasMaxLength(20)
                 .IsUnicode(false);
             entity.Property(e => e.Role)
                 .HasMaxLength(20)
@@ -739,11 +867,16 @@ public partial class HRTMSDbContext : DbContext
         {
             entity.HasKey(e => e.TransactionId).HasName("PK_VPT");
 
+            entity.HasIndex(e => e.Type, "IX_VPT_Type");
+
             entity.HasIndex(e => e.WalletId, "IX_VPT_Wallet");
 
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
             entity.Property(e => e.ReferenceId)
                 .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.ReferenceType)
+                .HasMaxLength(30)
                 .IsUnicode(false);
             entity.Property(e => e.Type)
                 .HasMaxLength(30)
@@ -758,6 +891,8 @@ public partial class HRTMSDbContext : DbContext
         modelBuilder.Entity<Wallet>(entity =>
         {
             entity.HasIndex(e => e.SpectatorId, "UQ_Wallets_Spectator").IsUnique();
+
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("(getutcdate())");
 
             entity.HasOne(d => d.Spectator).WithOne(p => p.Wallet)
                 .HasForeignKey<Wallet>(d => d.SpectatorId)

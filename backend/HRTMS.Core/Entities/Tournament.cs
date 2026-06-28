@@ -35,10 +35,6 @@ public partial class Tournament
 
     public decimal PostRaceWeightDiffThresholdKg { get; set; }
 
-    // FIX #8: điểm thưởng khi Spectator dự đoán đúng — mặc định 200 (REQ-F-REC.2)
-    // Admin có thể cấu hình per-tournament thay vì hardcode trong code.
-    public int PredictionRewardPoints { get; set; } = 200;
-
     public string Status { get; set; } = null!;
 
     public DateTime CreatedAt { get; set; }
@@ -49,11 +45,13 @@ public partial class Tournament
 
     public virtual User? CreatedByNavigation { get; set; }
 
+    public virtual ICollection<Horse> Horses { get; set; } = new List<Horse>();
+
+    public virtual ICollection<Pairing> Pairings { get; set; } = new List<Pairing>();
+
     public virtual ICollection<PrizeDistribution> PrizeDistributions { get; set; } = new List<PrizeDistribution>();
 
     public virtual ICollection<Round> Rounds { get; set; } = new List<Round>();
-
-    public virtual ICollection<Horse> Horses { get; set; } = new List<Horse>();
 
     public virtual ICollection<TournamentParticipant> TournamentParticipants { get; set; } = new List<TournamentParticipant>();
 }
