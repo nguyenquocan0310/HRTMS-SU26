@@ -11,6 +11,8 @@ public class ParticipantResponseDto
     public string Email { get; set; } = string.Empty;
     public string Role { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
+    public string ScreeningStatus { get; set; } = "NotScreened";
+    public string? ScreeningReason { get; set; }
     public string? RejectionReason { get; set; }
     public DateTime RegisteredAt { get; set; }
     public DateTime? ApprovedAt { get; set; }

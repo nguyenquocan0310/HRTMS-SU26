@@ -655,6 +655,11 @@ public partial class HRTMSDbContext : DbContext
                 .HasMaxLength(20)
                 .IsUnicode(false)
                 .HasDefaultValue("Pending");
+            entity.Property(e => e.ScreeningStatus)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasDefaultValue("NotScreened");
+            entity.Property(e => e.ScreeningReason).HasMaxLength(500);
             entity.Property(e => e.RejectionReason).HasMaxLength(500);
             entity.Property(e => e.RegisteredAt).HasDefaultValueSql("(getutcdate())");
 
