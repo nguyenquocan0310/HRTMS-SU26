@@ -1,12 +1,16 @@
 using HRTMS.Core.Interfaces.Services;
 using HRTMS.Core.Models;
 using HRTMS.Infrastructure.Services;
+using Microsoft.Extensions.Configuration;
 
 namespace HRTMS.API.Extensions;
 
 public static class ApplicationServiceExtensions
 {
-    public static IServiceCollection AddApplicationServices(this IServiceCollection services)
+    // NOTI.2: nhận IConfiguration để bind SmtpSettings — fix lỗi compile "configuration" undefined
+    public static IServiceCollection AddApplicationServices(
+        this IServiceCollection services,
+        IConfiguration configuration)
     {
         services.AddScoped<JwtService>();
         services.AddScoped<IAuthService, AuthService>();
@@ -22,9 +26,10 @@ public static class ApplicationServiceExtensions
         services.AddScoped<IHorseService, HorseService>();
         services.AddScoped<INotificationService, NotificationService>();
 
-        // NOTI.2 — SMTP Email
+        // NOTI.2 — SMTP Email: bind SmtpSettings từ appsettings.json
         services.Configure<SmtpSettings>(configuration.GetSection("SmtpSettings"));
         services.AddScoped<IEmailService, EmailService>();
+
         services.AddScoped<IRaceEntryService, RaceEntryService>();
         services.AddScoped<IRefereeAssignmentService, RefereeAssignmentService>();
         services.AddScoped<IDoctorAssignmentService, DoctorAssignmentService>();
