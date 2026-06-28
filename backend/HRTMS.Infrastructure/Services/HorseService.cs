@@ -600,17 +600,34 @@ public class HorseService : IHorseService
         if (string.IsNullOrWhiteSpace(reason) || reason.Trim().Length < 10)
             return ApiResponse<string>.Fail("Lý do từ chối phải có ít nhất 10 ký tự.");
 
-        var entry = await _context.RaceEntries.FindAsync(raceEntryId);
+        var entry = await _context.RaceEntries
+            .Include(e => e.Pairing).ThenInclude(p => p.Horse)
+            .FirstOrDefaultAsync(e => e.RaceEntryId == raceEntryId);
         if (entry == null) return ApiResponse<string>.Fail("RACE_ENTRY_NOT_FOUND");
-        if (entry.Status == "Rejected") return ApiResponse<string>.Fail("ALREADY_REJECTED");
+        if (entry.Status == "Cancelled") return ApiResponse<string>.Fail("ALREADY_CANCELLED");
 
         string oldStatus = entry.Status;
-        entry.Status = "Rejected";
+        // CHK_RaceEntries_Status chỉ cho phép Pending/Confirmed/Cancelled/Disqualified
+        // → từ chối entry = "Cancelled" (trước đây set "Rejected" gây lỗi DB).
+        entry.Status = "Cancelled";
         entry.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
         await _auditLog.LogAsync(adminId, "Reject_RaceEntry", "RaceEntry",
-            raceEntryId.ToString(), oldStatus, $"Rejected: {reason}", null);
+            raceEntryId.ToString(), oldStatus, $"Cancelled: {reason}", null);
+
+        _context.Notifications.Add(new Notification
+        {
+            RecipientId = entry.Pairing.Horse.OwnerId,
+            Title = "Đăng ký race bị từ chối",
+            Message = $"Đăng ký #{raceEntryId} cho ngựa '{entry.Pairing.Horse.Name}' bị từ chối. Lý do: {reason}",
+            Type = "In-app",
+            IsRead = false,
+            RelatedEntityType = "RaceEntry",
+            RelatedEntityId = raceEntryId,
+            SentAt = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
 
         return ApiResponse<string>.Ok("Đã từ chối đăng ký.");
     }
