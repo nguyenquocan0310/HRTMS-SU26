@@ -271,6 +271,7 @@ namespace HRTMS.Infrastructure.Services
             var tournament = await _context.Tournaments
                 .Include(t => t.Rounds).ThenInclude(r => r.Races)
                     .ThenInclude(race => race.RaceEntries)
+                        .ThenInclude(e => e.Pairing).ThenInclude(p => p.Horse)
                 .Include(t => t.Rounds).ThenInclude(r => r.Races)
                     .ThenInclude(race => race.Predictions)
                 .FirstOrDefaultAsync(t => t.TournamentId == tournamentId)
@@ -302,9 +303,32 @@ namespace HRTMS.Infrastructure.Services
                         // 3. Hủy tất cả RaceEntry
                         foreach (var entry in race.RaceEntries)
                         {
-                            // Bug 1 fix — dùng EntryFeeStatus cho check phí, Status cho trạng thái tham gia
+                            // BR-41/HRS.8 — entry Paid → Refund Pending trong CÙNG transaction,
+                            // kèm Notification cho Owner + AuditLog Update_Entry_Fee_Status (không phụ thuộc trí nhớ Admin).
                             if (entry.EntryFeeStatus == "Paid")
+                            {
                                 entry.EntryFeeStatus = "Refund Pending";
+
+                                var ownerId = entry.Pairing.Horse.OwnerId;
+                                _context.Notifications.Add(new Notification
+                                {
+                                    RecipientId = ownerId,
+                                    Title = "Hoàn lệ phí tham gia",
+                                    Message = $"Giải đấu '{tournament.Name}' đã bị hủy. Lệ phí của lượt đăng ký #{entry.RaceEntryId} được chuyển sang 'Refund Pending'.",
+                                    Type = "In-app",
+                                    IsRead = false,
+                                    RelatedEntityType = "RaceEntry",
+                                    RelatedEntityId = entry.RaceEntryId,
+                                    SentAt = now,
+                                });
+                                _auditLog.LogDeferred(
+                                    actorId: adminUserId,
+                                    action: "Update_Entry_Fee_Status",
+                                    entityName: "RaceEntry",
+                                    entityId: entry.RaceEntryId.ToString(),
+                                    oldValue: "Paid",
+                                    newValue: "Refund Pending");
+                            }
 
                             entry.Status = "Cancelled";
                             entry.UpdatedAt = now;
@@ -339,7 +363,20 @@ namespace HRTMS.Infrastructure.Services
                         }
                     }
 
-                // 5. Gửi Notification cho tất cả user bị ảnh hưởng
+                // 4b. Vô hiệu các Pairing của giải (TRN.10): chuyển Cancelled cho pairing chưa kết thúc.
+                // Pairing entity không expose TournamentId → lọc qua Horse.TournamentId.
+                var pairings = await _context.Pairings
+                    .Include(p => p.Horse)
+                    .Where(p => p.Horse.TournamentId == tournamentId
+                                && p.Status != "Cancelled" && p.Status != "Declined")
+                    .ToListAsync();
+                foreach (var pairing in pairings)
+                {
+                    pairing.Status = "Cancelled";
+                    pairing.UpdatedAt = now;
+                }
+
+                // 5. Gửi Notification cho tất cả Spectator có dự đoán bị ảnh hưởng
                 foreach (var userId in affectedUserIds)
                 {
                     _context.Notifications.Add(new Notification
