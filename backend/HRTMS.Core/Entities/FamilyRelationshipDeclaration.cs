@@ -17,6 +17,16 @@ public partial class FamilyRelationshipDeclaration
 
     public string? IndustryRole { get; set; }
 
+    public byte[]? RelatedIdentityHash { get; set; }
+
+    public string? RelatedEmailNormalized { get; set; }
+
+    public string? RelatedPhoneNormalized { get; set; }
+
+    public DateOnly? RelatedDateOfBirth { get; set; }
+
+    public string MatchConfidence { get; set; } = null!;
+
     public string? Notes { get; set; }
 
     public DateTime DeclaredAt { get; set; }

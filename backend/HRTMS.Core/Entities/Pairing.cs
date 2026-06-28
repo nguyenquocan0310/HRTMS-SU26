@@ -7,6 +7,8 @@ public partial class Pairing
 {
     public int PairingId { get; set; }
 
+    public int TournamentId { get; set; }
+
     public int HorseId { get; set; }
 
     public int JockeyId { get; set; }
@@ -23,7 +25,13 @@ public partial class Pairing
 
     public virtual Horse Horse { get; set; } = null!;
 
+    public virtual Horse HorseNavigation { get; set; } = null!;
+
     public virtual JockeyProfile Jockey { get; set; } = null!;
 
     public virtual ICollection<RaceEntry> RaceEntries { get; set; } = new List<RaceEntry>();
+
+    public virtual Tournament Tournament { get; set; } = null!;
+
+    public virtual TournamentParticipant TournamentParticipant { get; set; } = null!;
 }

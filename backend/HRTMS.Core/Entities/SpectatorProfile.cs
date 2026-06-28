@@ -13,5 +13,7 @@ public partial class SpectatorProfile
 
     public virtual User Spectator { get; set; } = null!;
 
+    public virtual ICollection<TicketRewardCode> TicketRewardCodes { get; set; } = new List<TicketRewardCode>();
+
     public virtual Wallet? Wallet { get; set; }
 }

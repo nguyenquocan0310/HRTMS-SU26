@@ -9,8 +9,6 @@ public partial class Horse
 
     public int OwnerId { get; set; }
 
-    /// <summary>Giải đấu mà ngựa được đăng ký vào (Phase 1: 1 ngựa = 1 giải).
-    /// Quyết định AllowedBreed dùng cho auto-reject (REQ-F-HRS.4).</summary>
     public int TournamentId { get; set; }
 
     public string Name { get; set; } = null!;
@@ -31,17 +29,21 @@ public partial class Horse
 
     public string VaccinationRecordRef { get; set; } = null!;
 
-    public DateOnly DopingTestDate { get; set; }
+    public DateOnly? DopingTestDate { get; set; }
 
     public string DopingTestResult { get; set; } = null!;
 
+    public bool LegalConsentAccepted { get; set; }
+
     public string Status { get; set; } = null!;
+
+    public string ScreeningStatus { get; set; } = null!;
+
+    public string? ScreeningReason { get; set; }
 
     public string AdminApprovalStatus { get; set; } = null!;
 
     public string? RejectionReason { get; set; }
-
-    public bool LegalConsentAccepted { get; set; }
 
     public DateTime CreatedAt { get; set; }
 
@@ -49,7 +51,11 @@ public partial class Horse
 
     public virtual OwnerProfile Owner { get; set; } = null!;
 
+    public virtual Pairing? PairingHorseNavigation { get; set; }
+
+    public virtual ICollection<Pairing> PairingHorses { get; set; } = new List<Pairing>();
+
     public virtual Tournament Tournament { get; set; } = null!;
 
-    public virtual ICollection<Pairing> Pairings { get; set; } = new List<Pairing>();
+    public virtual TournamentParticipant TournamentParticipant { get; set; } = null!;
 }

@@ -13,22 +13,23 @@ public partial class User
 
     public string Email { get; set; } = null!;
 
+    public string NormalizedEmail { get; set; } = null!;
+
+    public string? PhoneNumber { get; set; }
+
+    public string? NormalizedPhone { get; set; }
+
+    public DateTime? DateOfBirth { get; set; }
+
+    public byte[]? IdentityNumberEncrypted { get; set; }
+
+    public byte[]? IdentityHash { get; set; }
+
     public string PasswordHash { get; set; } = null!;
 
     public string Role { get; set; } = null!;
 
     public string Status { get; set; } = null!;
-
-    // ACC.1A — định danh bắt buộc cho Owner/Jockey/Referee/Doctor
-    public string? PhoneNumber { get; set; }
-
-    public DateTime? DateOfBirth { get; set; }
-
-    /// <summary>CCCD 12 số, mã hoá AES trước khi lưu (schema: VARBINARY(512))</summary>
-    public byte[]? IdentityNumberEncrypted { get; set; }
-
-    /// <summary>SHA-256 của CCCD plain-text để tra cứu duy nhất (schema: VARBINARY(32))</summary>
-    public byte[]? IdentityHash { get; set; }
 
     public int FailedLoginAttempts { get; set; }
 
@@ -64,7 +65,9 @@ public partial class User
 
     public virtual SpectatorProfile? SpectatorProfile { get; set; }
 
-    public virtual ICollection<Tournament> Tournaments { get; set; } = new List<Tournament>();
+    public virtual ICollection<TournamentParticipant> TournamentParticipantApprovedByNavigations { get; set; } = new List<TournamentParticipant>();
 
-    public virtual ICollection<TournamentParticipant> TournamentParticipants { get; set; } = new List<TournamentParticipant>();
+    public virtual ICollection<TournamentParticipant> TournamentParticipantUsers { get; set; } = new List<TournamentParticipant>();
+
+    public virtual ICollection<Tournament> Tournaments { get; set; } = new List<Tournament>();
 }

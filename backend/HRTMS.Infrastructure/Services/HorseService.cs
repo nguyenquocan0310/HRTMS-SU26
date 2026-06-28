@@ -137,7 +137,7 @@ public class HorseService : IHorseService
         int ownerId, int horseId, UpdateHorseDto dto)
     {
         var horse = await _context.Horses
-            .Include(h => h.Pairings)
+            .Include(h => h.PairingHorses)
             .FirstOrDefaultAsync(h => h.HorseId == horseId);
 
         if (horse == null)
@@ -174,7 +174,7 @@ public class HorseService : IHorseService
             horse.AdminApprovalStatus = "Pending";
 
             // Treo tất cả Pairing liên quan
-            foreach (var pairing in horse.Pairings)
+            foreach (var pairing in horse.PairingHorses)
             {
                 pairing.Status = "Suspended";
                 pairing.UpdatedAt = DateTime.UtcNow;

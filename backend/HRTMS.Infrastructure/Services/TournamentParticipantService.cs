@@ -44,24 +44,45 @@ public class TournamentParticipantService : ITournamentParticipantService
         if (existing != null)
             return ApiResponse<ParticipantResponseDto>.Fail("Bạn đã đăng ký tham gia giải này rồi.");
 
+        var now = DateTime.UtcNow;
         var participant = new TournamentParticipant
         {
             TournamentId = tournamentId,
             UserId = userId,
             Role = role,
-            Status = "Pending",
-            RegisteredAt = DateTime.UtcNow
+            RegisteredAt = now,
+            ScreeningStatus = "AutoEligible"
         };
+
+        // TRN.11 — Auto-screening roster:
+        // - Owner Active đăng ký thành công → AutoEligible + Approved ngay, KHÔNG vào Admin approval queue (AC#3).
+        // - Jockey/Referee/Doctor đã Active (đã qua ValidateGlobalCredentialAsync) → AutoEligible nhưng
+        //   chỉ vào bulk approval queue, Status = Pending cho tới khi Admin duyệt (AC#4, AC#5).
+        string successMessage;
+        if (role == "Owner")
+        {
+            participant.Status = "Approved";
+            participant.ApprovedAt = now;
+            participant.ScreeningReason = "Owner Active → tự động đủ điều kiện tham gia.";
+            successMessage = "Đăng ký tham gia giải thành công, bạn đã được tự động phê duyệt.";
+        }
+        else
+        {
+            participant.Status = "Pending";
+            participant.ScreeningReason = "Hồ sơ Active → đủ điều kiện sơ bộ, chờ Admin duyệt cuối.";
+            successMessage = "Đăng ký tham gia giải thành công, chờ Admin duyệt.";
+        }
 
         _context.TournamentParticipants.Add(participant);
         await _context.SaveChangesAsync();
 
         await _auditLog.LogAsync(userId, "Register_TournamentParticipant", "TournamentParticipant",
-            participant.ParticipantId.ToString(), null, $"Tournament={tournamentId}, Role={role}, Pending");
+            participant.ParticipantId.ToString(), null,
+            $"Tournament={tournamentId}, Role={role}, Screening=AutoEligible, Status={participant.Status}");
 
         return ApiResponse<ParticipantResponseDto>.Ok(
             await MapByIdAsync(participant.ParticipantId),
-            "Đăng ký tham gia giải thành công, chờ Admin duyệt.");
+            successMessage);
     }
 
     public async Task<ApiResponse<List<ParticipantResponseDto>>> GetRosterAsync(
@@ -191,6 +212,8 @@ public class TournamentParticipantService : ITournamentParticipantService
         Email = p.User != null ? p.User.Email : string.Empty,
         Role = p.Role,
         Status = p.Status,
+        ScreeningStatus = p.ScreeningStatus,
+        ScreeningReason = p.ScreeningReason,
         RejectionReason = p.RejectionReason,
         RegisteredAt = p.RegisteredAt,
         ApprovedAt = p.ApprovedAt

@@ -1,8 +1,13 @@
 # API Contract — Module B: Quản lý Giải đấu
 
-**Phiên bản:** 2.0 (cập nhật theo implementation thực tế)
+**Phiên bản:** 3.0 — đồng bộ SRS v2 (TRN.8 state machine cấp giải, TRN.10 cancellation flow, TRN.11 roster screening)
 **Base URL:** `http://localhost:5000/api`
 **Auth header:** `Authorization: Bearer <jwt_token>`
+
+> **Thay đổi quan trọng so với v2.0 (FE phải đọc):**
+> - State machine giải đấu **bỏ `Pre-Race` và `In-Progress`** — đây là trạng thái cấp **Race**, không còn ở Tournament. Tournament chỉ còn `Draft → Open Registration → Closed Registration → Completed` (+ `Cancelled`).
+> - Endpoint cập nhật giải (PUT) chỉ cho sửa khi `Draft` hoặc `Open Registration`.
+> - Bổ sung nhóm endpoint **Tournament Participants (roster)** — TRN.11.
 
 ---
 
@@ -15,9 +20,11 @@
 | Kiểu ID | integer |
 | Cấu trúc response | `{ "success": true/false, "message": "...", "data": {...} }` |
 
-**Trạng thái Tournament:** `Draft` → `Open Registration` → `Closed Registration` → `Pre-Race` → `In-Progress` → `Completed` (một chiều, không lùi lại)
+**Trạng thái Tournament (cấp giải):** `Draft` → `Open Registration` → `Closed Registration` → `Completed` (một chiều, không lùi lại); nhánh `Cancelled` qua endpoint hủy giải.
 **Trạng thái Round:** `Upcoming` · `In-Progress` · `Completed` · `Cancelled`
-**Trạng thái Race:** `Upcoming` · `Live` · `Unofficial` · `Official` · `Cancelled`
+**Trạng thái Race (cấp cuộc đua, độc lập với giải):** `Upcoming` · `Pre-Race` · `Live` · `Unofficial` · `Official` · `Cancelled`
+
+> ⚠️ `Pre-Race`/`Live`/`Unofficial`/`Official` **chỉ tồn tại ở Race**, không bao giờ là trạng thái Tournament. Trạng thái "giải đang diễn ra" được suy ra từ trạng thái các Race con. FE không được hiển thị/gửi các giá trị này cho Tournament.
 
 ---
 
@@ -35,7 +42,19 @@
 | 6 | GET | `/api/tournament/{id}` | Public | Chi tiết giải đấu |
 | 7 | PUT | `/api/tournament/{id}` | Admin | Cập nhật thông tin giải |
 | 8 | PATCH | `/api/tournament/{id}/status` | Admin | Chuyển trạng thái |
-| 9 | DELETE | `/api/tournament/{id}` | Admin | Hủy giải đấu |
+| 9 | DELETE | `/api/tournament/{id}` | Admin | Hủy giải đấu (cancellation flow) |
+
+### Nhóm Roster — Tournament Participants (TRN.11)
+
+| # | Method | Endpoint | Auth | Mô tả |
+|---|--------|----------|------|-------|
+| 10 | POST | `/api/tournament/{tournamentId}/participants` | Owner/Jockey/Doctor/Referee | Tự đăng ký tham gia giải |
+| 11 | GET | `/api/tournament/{tournamentId}/participants` | Admin | Xem roster (lọc theo role/status) |
+| 12 | GET | `/api/my/tournament-participations` | Authenticated | Các giải user đã đăng ký |
+| 13 | PATCH | `/api/admin/tournament-participants/{participantId}/approve` | Admin | Duyệt tham gia |
+| 14 | PATCH | `/api/admin/tournament-participants/{participantId}/reject` | Admin | Từ chối (reason ≥ 10 ký tự) |
+
+> Endpoint #4, #10–14 dùng route gốc khác: tạo race là `/api/rounds/{id}/races`; participants nằm trên `TournamentParticipantController`.
 
 ---
 ---
@@ -579,8 +598,8 @@ Chỉ gửi các trường cần cập nhật (partial update).
 
 ### Business rules
 
-- Chỉ được cập nhật khi `status ∈ {Draft, Open Registration, Closed Registration}`.
-- Không cho sửa khi `status ∈ {Pre-Race, In-Progress, Completed, Cancelled}`.
+- Chỉ được cập nhật khi `status ∈ {Draft, Open Registration}`.
+- Không cho sửa khi `status ∈ {Closed Registration, Completed, Cancelled}`.
 
 ---
 
@@ -630,15 +649,18 @@ PATCH /api/tournament/{id}/status
 
 ### Business rules
 
-Chỉ cho phép transition theo đúng thứ tự:
+Chỉ cho phép transition theo đúng thứ tự (TRN.8):
 
 ```
-Draft → Open Registration → Closed Registration → Pre-Race → In-Progress → Completed
+Draft → Open Registration → Closed Registration → Completed
 ```
 
 - Để chuyển sang `Open Registration`: bắt buộc phải có đủ 5 `prizeDistributions`.
+- Để chuyển sang `Completed`: **mọi Race** thuộc giải phải đã ở `Official` hoặc `Cancelled` (TRN.8 AC#3) — nếu còn race chưa kết thúc → 400.
+- **Không nhận** `targetStatus` là trạng thái cấp Race (`Pre-Race`, `Live`, `In-Progress`, `Unofficial`, `Official`) → 400 (TRN.8 AC#2).
 - Không thể nhảy cóc, không thể lùi lại.
-- Trạng thái `Completed` không có đường đi tiếp.
+- Trạng thái `Completed` không có đường đi tiếp; `Cancelled` đi qua endpoint hủy giải (#9), không qua endpoint này.
+- Mỗi lần chuyển trạng thái thành công đều ghi `AuditLogs` (action `Change_Tournament_Status`).
 
 ---
 
@@ -662,12 +684,12 @@ Draft → Open Registration → Closed Registration → Pre-Race → In-Progress
 |---|----|------|-----------|----------|
 | ✅ | Draft | Open Registration | Có đủ 5 prize distributions | 200 |
 | ✅ | Open Registration | Closed Registration | — | 200 |
-| ✅ | Closed Registration | Pre-Race | — | 200 |
-| ✅ | Pre-Race | In-Progress | — | 200 |
-| ✅ | In-Progress | Completed | — | 200 |
+| ✅ | Closed Registration | Completed | Mọi Race đã Official/Cancelled | 200 |
+| ❌ | Closed Registration | Completed | Còn Race chưa kết thúc | 400 |
 | ❌ | Draft | Open Registration | Chưa có prize distributions | 400 |
+| ❌ | Closed Registration | Pre-Race | Trạng thái cấp Race | 400 |
+| ❌ | Open Registration | In-Progress | Trạng thái cấp Race | 400 |
 | ❌ | Draft | Completed | Nhảy cóc | 400 |
-| ❌ | Draft | Pre-Race | Nhảy cóc | 400 |
 | ❌ | Open Registration | Draft | Lùi lại | 400 |
 | ❌ | Completed | bất kỳ | Đã hoàn thành | 400 |
 
@@ -694,12 +716,18 @@ DELETE /api/tournament/{id}
 
 ---
 
-### Business rules
+### Business rules (TRN.10 — Cancellation Flow, toàn bộ trong 1 transaction)
 
-- Không xóa khỏi DB — chuyển `status = "Cancelled"`.
+- Không xóa khỏi DB (soft-delete) — chuyển `Tournament.status = "Cancelled"`.
 - Không thể hủy giải đã `Completed`.
-- Hoàn điểm dự đoán (`PointsPlaced`) vào `Wallet.Balance` của Spectator nếu có Prediction chưa giải quyết.
-- Toàn bộ thao tác trong transaction — rollback nếu có lỗi.
+- Cascade trong cùng transaction (lỗi bất kỳ bước → ROLLBACK toàn bộ):
+  1. Mọi `Race` → `Cancelled`.
+  2. Mọi `RaceEntry` → `Cancelled`; entry đang `Paid` → `EntryFeeStatus = "Refund Pending"`, kèm **Notification cho Owner** + `AuditLogs` (action `Update_Entry_Fee_Status`).
+  3. Mọi `Prediction` đang `Pending` → `Refunded`; hoàn `PointsPlaced` vào `Wallet.Balance` của Spectator + ghi sổ cái `VirtualPointsTransactions` (type `Prediction Refund`) + Notification.
+  4. Mọi `Pairing` của giải (chưa `Cancelled`/`Declined`) → `Cancelled`.
+  5. Ghi `AuditLogs` action `Cancel_Tournament`.
+
+> FE: sau khi hủy thành công, các màn hình roster/pairing/entry/prediction của giải nên refetch — trạng thái đã đổi hàng loạt.
 
 ---
 
@@ -720,3 +748,121 @@ DELETE /api/tournament/{id}
 |------|----------------|------|
 | 400 | Tournament đã `Completed` | 🔴 Business logic |
 | 404 | `id` không tồn tại | 🔴 Business logic |
+
+---
+---
+
+## 10. Đăng ký tham gia giải (Roster — TRN.11)
+
+> Roster là danh sách thành viên (Owner/Jockey/Doctor/Referee) tham gia **một giải cụ thể**. Việc duyệt chứng chỉ/bằng cấp là GLOBAL (Module A) — roster chỉ quản lý việc tham gia giải này.
+
+### 10.1 — Tự đăng ký tham gia giải
+
+```
+POST /api/tournament/{tournamentId}/participants
+```
+
+**Auth:** `Owner` | `Jockey` | `Doctor` | `Referee` (userId lấy từ JWT, không gửi trong body) · **Body:** không có
+
+#### Business rules (auto-screening)
+
+- Giải phải đang ở `Open Registration` → nếu không: 400.
+- Mỗi user chỉ 1 bản ghi/giải (UNIQUE `TournamentId + UserId`) → đăng ký lại: 400.
+- Profile phải hợp lệ: Owner cần `OwnerProfile`; Jockey/Doctor/Referee cần profile `Status = Active` (đã duyệt global) → nếu chưa: 400.
+- **Kết quả screening:**
+  - **Owner Active** → `screeningStatus = "AutoEligible"`, `status = "Approved"` ngay (KHÔNG vào queue duyệt).
+  - **Jockey/Doctor/Referee Active** → `screeningStatus = "AutoEligible"`, `status = "Pending"` → vào **bulk approval queue** chờ Admin duyệt.
+
+#### Response — 200 OK
+
+```json
+{
+  "success": true,
+  "message": "Đăng ký tham gia giải thành công, chờ Admin duyệt.",
+  "data": {
+    "participantId":   5,
+    "tournamentId":    10,
+    "tournamentName":  "Giải Đua Mùa Hè 2026",
+    "userId":          42,
+    "fullName":        "Nguyễn Văn A",
+    "email":           "a@example.com",
+    "role":            "Jockey",
+    "status":          "Pending",
+    "screeningStatus": "AutoEligible",
+    "screeningReason": "Hồ sơ Active → đủ điều kiện sơ bộ, chờ Admin duyệt cuối.",
+    "rejectionReason": null,
+    "registeredAt":    "2026-06-28T09:00:00Z",
+    "approvedAt":      null
+  }
+}
+```
+
+> Với Owner: `status = "Approved"`, `approvedAt` có giá trị, `message` báo đã tự động phê duyệt.
+
+#### Lỗi
+
+| HTTP | Khi nào xảy ra |
+|------|----------------|
+| 400 | Giải không ở `Open Registration` / đã đăng ký rồi / profile chưa Active |
+| 401 | Chưa đăng nhập |
+| 403 | Role không thuộc Owner/Jockey/Doctor/Referee |
+| 404 | `tournamentId` không tồn tại |
+
+---
+
+### 10.2 — Admin xem roster
+
+```
+GET /api/tournament/{tournamentId}/participants?role=Jockey&status=Pending
+```
+
+**Auth:** Admin · **Query (tuỳ chọn):** `role`, `status`
+
+- FE dùng `status=Pending` để dựng **bulk approval queue**.
+- Trả về mảng `ParticipantResponseDto` (cấu trúc như 10.1), sắp xếp theo `role` rồi `registeredAt` giảm dần.
+
+---
+
+### 10.3 — User xem các giải mình đã đăng ký
+
+```
+GET /api/my/tournament-participations
+```
+
+**Auth:** Authenticated (mọi role) — trả về mọi bản ghi roster của user hiện tại (mọi trạng thái).
+
+---
+
+### 10.4 — Admin duyệt tham gia
+
+```
+PATCH /api/admin/tournament-participants/{participantId}/approve
+```
+
+**Auth:** Admin · **Body:** không có → set `status = "Approved"`, `approvedBy`, `approvedAt`.
+
+| HTTP | Khi nào xảy ra |
+|------|----------------|
+| 400 | Đã `Approved` trước đó |
+| 404 | `participantId` không tồn tại |
+
+---
+
+### 10.5 — Admin từ chối tham gia
+
+```
+PATCH /api/admin/tournament-participants/{participantId}/reject
+```
+
+**Auth:** Admin
+
+```json
+{ "reason": "Hồ sơ chưa đủ điều kiện tham gia giải này" }
+```
+
+- `reason` bắt buộc, **≥ 10 ký tự** → set `status = "Rejected"`, `rejectionReason`.
+
+| HTTP | Khi nào xảy ra |
+|------|----------------|
+| 400 | `reason` < 10 ký tự / đã `Rejected` |
+| 404 | `participantId` không tồn tại |
