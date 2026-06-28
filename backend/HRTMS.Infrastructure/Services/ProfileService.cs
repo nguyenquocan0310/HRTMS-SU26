@@ -134,12 +134,15 @@ public class ProfileService : IProfileService
                 })
                 .FirstOrDefaultAsync(),
 
-            "Owner" => await _context.OwnerProfiles
+            // Schema v2: PhoneNumber + IdentityNumber đã chuyển sang Users.
+            // Profile Owner chỉ còn OwnerId — trả về từ Users context.
+            "Owner" => await _context.Users
                 .AsNoTracking()
-                .Where(o => o.OwnerId == userId)
-                .Select(o => new {
-                    o.PhoneNumber,
-                    o.IdentityNumber
+                .Where(u => u.UserId == userId)
+                .Select(u => new {
+                    u.PhoneNumber,
+                    // IdentityNumber KHÔNG trả ra API (encrypted, restricted)
+                    HasIdentity = u.IdentityHash != null
                 })
                 .FirstOrDefaultAsync(),
 

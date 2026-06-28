@@ -269,17 +269,11 @@ public partial class HRTMSDbContext : DbContext
 
         modelBuilder.Entity<OwnerProfile>(entity =>
         {
+            // Schema v2: OwnerProfiles chỉ còn OwnerId.
+            // PhoneNumber + IdentityNumber đã chuyển sang Users (identity encrypted).
             entity.HasKey(e => e.OwnerId);
 
-            entity.HasIndex(e => e.IdentityNumber, "UQ_OwnerProfiles_IdNum").IsUnique();
-
             entity.Property(e => e.OwnerId).ValueGeneratedNever();
-            entity.Property(e => e.IdentityNumber)
-                .HasMaxLength(20)
-                .IsUnicode(false);
-            entity.Property(e => e.PhoneNumber)
-                .HasMaxLength(15)
-                .IsUnicode(false);
             entity.Property(e => e.UpdatedAt).HasDefaultValueSql("(getutcdate())");
 
             entity.HasOne(d => d.Owner).WithOne(p => p.OwnerProfile)
@@ -703,6 +697,18 @@ public partial class HRTMSDbContext : DbContext
             entity.Property(e => e.Username)
                 .HasMaxLength(50)
                 .IsUnicode(false);
+            // ACC.1A — định danh theo role
+            entity.Property(e => e.PhoneNumber)
+                .HasMaxLength(20)
+                .IsUnicode(false);
+            entity.Property(e => e.DateOfBirth)
+                .HasColumnType("date");
+            entity.Property(e => e.IdentityNumberEncrypted)
+                .HasMaxLength(512);
+            entity.Property(e => e.IdentityHash)
+                .HasMaxLength(32);
+            entity.HasIndex(e => e.IdentityHash, "IX_Users_IdentityHash")
+                .HasFilter("[IdentityHash] IS NOT NULL");
         });
 
         modelBuilder.Entity<Violation>(entity =>
