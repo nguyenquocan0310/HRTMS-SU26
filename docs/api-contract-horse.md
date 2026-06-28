@@ -1,8 +1,10 @@
 # API Contract — Module C: Đăng ký Ngựa & Duyệt Hồ sơ
 
-**Phiên bản:** 1.0\
+**Phiên bản:** 1.1 — đồng bộ schema v2 (Horse có `ScreeningStatus`/`ScreeningReason`; `dopingTestDate` cho phép NULL)\
 **Base URL:** `http://localhost:5000/api`\
 **Auth header:** `Authorization: Bearer <jwt_token>`
+
+> **Thay đổi so với v1.0 (FE đọc):** trường `dopingTestDate` trong **response có thể là `null`** (DB cho phép NULL). Khi **tạo ngựa** vẫn **bắt buộc** nhập `dopingTestDate`. FE phải xử lý trường hợp null khi hiển thị.
 
 ---
 
