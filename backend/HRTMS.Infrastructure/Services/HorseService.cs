@@ -160,6 +160,12 @@ public class HorseService : IHorseService
         if (horse.OwnerId != ownerId)
             return ApiResponse<HorseResponseDto>.Fail("HORSE_NOT_OWNED");
 
+        // HRS.1/HRS.2: validate trước khi lưu (đồng bộ với CreateHorseAsync)
+        if (dto.BirthYear != null && dto.BirthYear > DateTime.UtcNow.Year)
+            return ApiResponse<HorseResponseDto>.Fail("Năm sinh không được ở tương lai.");
+        if (dto.DopingTestDate != null && dto.DopingTestDate > DateOnly.FromDateTime(DateTime.UtcNow))
+            return ApiResponse<HorseResponseDto>.Fail("Ngày kiểm tra doping không được ở tương lai.");
+
         // Kiểm tra có sửa trường nhạy cảm không
         bool sensitiveChanged =
             (dto.Breed != null && dto.Breed != horse.Breed) ||
