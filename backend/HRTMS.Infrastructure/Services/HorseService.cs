@@ -528,7 +528,7 @@ public class HorseService : IHorseService
         entry.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        await _auditLog.LogAsync(adminId, "Confirm_Entry_Fee", "RaceEntry",
+        await _auditLog.LogAsync(adminId, "Update_Entry_Fee_Status", "RaceEntry",
             raceEntryId.ToString(), "Unpaid", "Paid", null);
 
         // Bao Owner: le phi da duoc xac nhan (Type phai la In-app/Email/Both).
