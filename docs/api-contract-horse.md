@@ -1,10 +1,13 @@
 # API Contract — Module C: Đăng ký Ngựa & Duyệt Hồ sơ
 
-**Phiên bản:** 1.1 — đồng bộ schema v2 (Horse có `ScreeningStatus`/`ScreeningReason`; `dopingTestDate` cho phép NULL)\
+**Phiên bản:** 2.0 — đồng bộ SRS v2 Pha 3 (screening 3 nhánh AutoEligible/ManualReview/AutoRejected; auto-reject chạy ngay khi submit; AutoEligible tự Approved)\
 **Base URL:** `http://localhost:5000/api`\
 **Auth header:** `Authorization: Bearer <jwt_token>`
 
-> **Thay đổi so với v1.0 (FE đọc):** trường `dopingTestDate` trong **response có thể là `null`** (DB cho phép NULL). Khi **tạo ngựa** vẫn **bắt buộc** nhập `dopingTestDate`. FE phải xử lý trường hợp null khi hiển thị.
+> **Thay đổi so với v1.1 (FE + BE đọc):**
+> - Khi Owner **submit hồ sơ ngựa** (endpoint 1), hệ thống **screen ngay** (không chờ Admin): trả về `screeningStatus` ∈ `AutoEligible | ManualReview | AutoRejected`. `AutoEligible` → hồ sơ **tự động `Approved`**; `ManualReview` → vào hàng đợi Admin (`Pending`); `AutoRejected` → `Rejected` (Admin **không** override được).
+> - Response Horse có thêm `screeningStatus` và `screeningReason`.
+> - `dopingTestDate` trong **response có thể là `null`** (DB cho phép NULL); khi tạo ngựa vẫn **bắt buộc** nhập.
 
 ---
 
@@ -19,7 +22,8 @@
 | Cấu trúc lỗi | `{ "error": "<MÃ_LỖI>", "message": "<mô tả>" }` |
 
 **Trạng thái AdminApprovalStatus (Horse):** `Pending` · `Approved` · `Rejected`\
-**Trạng thái Status (Horse):** `Declared` · `Inactive`\
+**Trạng thái ScreeningStatus (Horse):** `NotScreened` · `AutoEligible` · `ManualReview` · `AutoRejected` *(triage tự động; `AutoRejected` đánh dấu auto-reject cứng — Admin không override)*\
+**Trạng thái Status (Horse):** `Declared` · `Active` · `Retired` *(theo CHECK constraint DB)*\
 **DopingTestResult:** `Clean` · `Pending` · `Failed`\
 **Gender:** `Male` · `Female` · `Gelding` *(theo CHECK constraint DB — Male = ngựa đực nguyên, Female = ngựa cái, Gelding = ngựa đực đã thiến)*\
 **Breed:** `Mixed` · `Quarter Horse` · `Arabian` · `Thoroughbred` *(theo CHECK constraint DB)* — Việc so khớp với `Tournament.AllowedBreed` xảy ra khi Admin duyệt RaceEntry.\
@@ -106,8 +110,11 @@ Horse Owner khai báo hồ sơ hành chính và thông số y tế của ngựa.
 
 - `age` được tính tự động ở backend: `age = currentYear − birthYear`. Frontend không gửi trường này.
 - `legalConsentAccepted = false` → từ chối ngay, không tạo record.
-- Horse mới được tạo với `AdminApprovalStatus = "Pending"`, `Status = "Declared"`.
-- Không chạy auto-reject tại bước tạo — auto-reject chỉ chạy khi Admin click Approve (endpoint 7).
+- Owner phải đã `Approved` trong roster của giải (`TournamentParticipants`) và giải đang `Open Registration` (REQ-F-HRS.4 AC#3) — nếu không → chặn tạo.
+- **Screening chạy ngay khi tạo (Pha 3):** sau khi lưu, hệ thống set `screeningStatus`:
+  - **AutoEligible** (breed khớp `Tournament.AllowedBreed` + doping `Clean` + consent) → `adminApprovalStatus = "Approved"` tự động.
+  - **ManualReview** (doping `Pending`) → `adminApprovalStatus = "Pending"`, vào hàng đợi Admin.
+  - **AutoRejected** (doping `Failed` HOẶC breed mismatch) → `adminApprovalStatus = "Rejected"`, `screeningReason` nêu lý do; Admin không override.
 
 ---
 
@@ -116,7 +123,7 @@ Horse Owner khai báo hồ sơ hành chính và thông số y tế của ngựa.
 ```json
 {
   "success":   true,
-  "message":   "Hồ sơ ngựa đã được khai báo thành công.",
+  "message":   "Hồ sơ ngựa hợp lệ và đã được hệ thống tự động phê duyệt.",
   "data": {
     "horseId":               1,
     "ownerId":               5,
@@ -133,13 +140,20 @@ Horse Owner khai báo hồ sơ hành chính và thông số y tế của ngựa.
     "dopingTestDate":        "2024-06-10",
     "dopingTestResult":      "Clean",
     "legalConsentAccepted":  true,
-    "adminApprovalStatus":   "Pending",
+    "screeningStatus":       "AutoEligible",
+    "screeningReason":       null,
+    "adminApprovalStatus":   "Approved",
     "rejectionReason":       null,
     "createdAt":             "2026-06-20T10:00:00Z",
     "updatedAt":             "2026-06-20T10:00:00Z"
   }
 }
 ```
+
+> `message` và `screeningStatus`/`adminApprovalStatus` thay đổi theo kết quả screening:
+> - `AutoEligible` → message "…tự động phê duyệt.", `adminApprovalStatus = "Approved"`.
+> - `ManualReview` → message "…chờ Admin duyệt. Lý do cần xem xét: …", `adminApprovalStatus = "Pending"`.
+> - `AutoRejected` → message "Hồ sơ ngựa bị tự động từ chối: …", `adminApprovalStatus = "Rejected"`, `screeningReason` có lý do.
 
 ---
 
@@ -323,23 +337,25 @@ Chỉ gửi các trường cần cập nhật.
 
 ### Business rules
 
-**Re-validate (EC-23):** Nếu ít nhất một trong 4 trường nhạy cảm thay đổi giá trị so với bản ghi hiện tại:
+**Re-validate (EC-23):** Chỉ kích hoạt khi hồ sơ **đang `Approved`** và ít nhất một trong 4 trường nhạy cảm thay đổi giá trị so với bản ghi hiện tại:
 
-1. `Horse.AdminApprovalStatus` → `"Pending"`.
-2. Tất cả `Pairing` liên quan Horse này → `Pairing.Status = "Suspended"`.
-3. Chạy lại auto-reject check (breed + doping). Nếu vi phạm → `AdminApprovalStatus = "Rejected"` ngay.
-4. Admin bắt buộc duyệt lại trước khi ngựa được đưa vào lịch thi đấu.
+1. Tất cả `Pairing` liên quan Horse này đang ở `Pending/Accepted/Confirmed` → `Pairing.Status = "Cancelled"` (DB không hỗ trợ `Suspended`; ghi `ResponseReason` nêu lý do EC-23).
+2. Chạy lại screening (breed + doping):
+   - Vi phạm cứng (breed mismatch / doping `Failed`) → `screeningStatus = "AutoRejected"`, `adminApprovalStatus = "Rejected"`.
+   - Còn lại → `adminApprovalStatus = "Pending"` (bắt buộc Admin duyệt lại trước khi vào lịch).
+3. Sửa trường KHÔNG nhạy cảm, hoặc hồ sơ chưa `Approved` → không re-validate.
 
 ---
+
+> Trạng thái re-validate được phản ánh qua `message` và `data.adminApprovalStatus` / `data.screeningStatus` (không có field `revalidated` riêng).
 
 ### Response — 200 OK (không có re-validate)
 
 ```json
 {
-  "success":     true,
-  "message":     "Cập nhật hồ sơ thành công.",
-  "data":        { "...full horse object như endpoint 3..." },
-  "revalidated": false
+  "success": true,
+  "message": "Cập nhật hồ sơ thành công.",
+  "data":    { "...full horse object như endpoint 3..." }
 }
 ```
 
@@ -347,10 +363,9 @@ Chỉ gửi các trường cần cập nhật.
 
 ```json
 {
-  "success":     true,
-  "message":     "Cập nhật thành công. Hồ sơ đã được đưa về trạng thái chờ duyệt lại do thay đổi thông tin y tế.",
-  "data":        { "...full horse object, adminApprovalStatus: 'Pending'..." },
-  "revalidated": true
+  "success": true,
+  "message": "Cập nhật thành công. Hồ sơ đã được đưa về trạng thái chờ duyệt lại do thay đổi thông tin y tế.",
+  "data":    { "...full horse object, adminApprovalStatus: 'Pending', screeningStatus: 'ManualReview'/'AutoEligible'..." }
 }
 ```
 
@@ -498,11 +513,13 @@ Admin xem chi tiết đầy đủ hồ sơ bất kỳ để phục vụ quyết 
 PATCH /api/admin/horses/{id}/approve
 ```
 
-Admin phê duyệt hồ sơ ngựa. Endpoint này chạy lại auto-reject check trước khi cho phép approve.
+Admin phê duyệt hồ sơ ngựa **ManualReview**. Endpoint chạy lại screening trước khi cho phép approve.
 
 **Auth:** Admin\
 **Path param:** `id` — horseId (integer)\
 **Request body:** Không có
+
+> Chỉ áp dụng cho hồ sơ `ManualReview` (đang `Pending`). Hồ sơ `AutoEligible` đã được hệ thống tự duyệt; hồ sơ `AutoRejected` không thể duyệt.
 
 ---
 
@@ -510,12 +527,14 @@ Admin phê duyệt hồ sơ ngựa. Endpoint này chạy lại auto-reject check
 
 Thực hiện theo thứ tự, dừng lại và trả lỗi ngay nếu bước nào fail:
 
-1. **Auto-reject check — breed:** So sánh `Horse.Breed` với tất cả `Tournament.AllowedBreed` của các giải mà ngựa đang đăng ký (trace qua `RaceEntry → Pairing → Race → Round → Tournament`). Nếu bất kỳ giải nào không khớp → từ chối approve, trả 422.
-2. **Auto-reject check — doping:** Nếu `Horse.DopingTestResult = "Failed"` → từ chối approve, trả 422. Admin không được override.
-3. **Kiểm tra trạng thái:** Nếu `AdminApprovalStatus` đã là `"Approved"` → trả 409.
+1. **Kiểm tra trạng thái:** Nếu `AdminApprovalStatus` đã là `"Approved"` → trả 409.
+2. **Khóa override auto-reject cứng:** Nếu `ScreeningStatus = "AutoRejected"` → trả 422, Admin không được override.
+3. **Re-screen:** chạy lại screening (breed khớp `Horse.Tournament.AllowedBreed` + doping). Nếu kết quả `AutoRejected` (breed mismatch / doping `Failed`) → set `Rejected` + trả 422.
 4. Set `Horse.AdminApprovalStatus = "Approved"`.
 5. Ghi `AuditLog`: `action = "Approve_Horse"`, `entityName = "Horse"`, `entityId = horseId`.
-6. Gửi Notification đến Owner: `title = "Hồ sơ ngựa được phê duyệt"`, `type = "HorseApproved"`, `relatedEntityType = "Horse"`, `relatedEntityId = horseId`.
+6. Gửi Notification đến Owner: `title = "Hồ sơ ngựa được phê duyệt"`, `relatedEntityType = "Horse"`, `relatedEntityId = horseId`.
+
+> **Breed check dùng `Horse.TournamentId` trực tiếp** (schema v2: mỗi hồ sơ ngựa gắn đúng 1 giải) — không còn trace qua chuỗi `RaceEntry → … → Tournament`.
 
 ---
 
@@ -538,8 +557,7 @@ Thực hiện theo thứ tự, dừng lại và trả lỗi ngay nếu bước n
 | 403 | `FORBIDDEN` | Role không phải Admin |
 | 404 | `HORSE_NOT_FOUND` | `horseId` không tồn tại |
 | 409 | `ALREADY_APPROVED` | Hồ sơ đã ở trạng thái `Approved` |
-| 422 | `AUTO_REJECTED_BREED` | Breed không khớp AllowedBreed của giải — kèm message nêu tên giải và breed mâu thuẫn |
-| 422 | `AUTO_REJECTED_DOPING` | `DopingTestResult = Failed` — không thể override |
+| 422 | `AUTO_REJECTED` | `ScreeningStatus = "AutoRejected"` hoặc re-screen ra vi phạm cứng (breed mismatch / doping `Failed`) — không thể override; message kèm `screeningReason` |
 
 ---
 
@@ -948,25 +966,24 @@ Thực hiện theo thứ tự:
 
 ---
 
-## Ghi chú — Auto-reject logic (REQ-F-HRS.4)
+## Ghi chú — Screening & Auto-reject logic (REQ-F-HRS.4 + Pha 3)
 
-Auto-reject được chạy tại **hai thời điểm**:
+Screening được chạy tại **ba thời điểm**:
 
-1. Khi Admin click **Approve hồ sơ ngựa** (endpoint 7) — chạy trước khi set `Approved`.
-2. Khi Owner **cập nhật trường nhạy cảm** sau khi đã `Approved` (endpoint 4) — chạy lại ngay trong cùng request.
+1. Khi Owner **submit hồ sơ ngựa** (endpoint 1) — phân loại ngay AutoEligible/ManualReview/AutoRejected.
+2. Khi Admin click **Approve** (endpoint 7) — re-screen trước khi set `Approved`.
+3. Khi Owner **cập nhật trường nhạy cảm** sau khi đã `Approved` (endpoint 4) — re-screen trong cùng request.
 
-**Điều kiện auto-reject (Admin không được override):**
+**Phân loại screening:**
 
-| Điều kiện | Hành động |
-| --- | --- |
-| `Horse.Breed ≠ Tournament.AllowedBreed` của bất kỳ giải nào đang đăng ký | Set `AdminApprovalStatus = "Rejected"`, trả lỗi `AUTO_REJECTED_BREED` |
-| `Horse.DopingTestResult = "Failed"` | Set `AdminApprovalStatus = "Rejected"`, trả lỗi `AUTO_REJECTED_DOPING` |
+| Điều kiện | `screeningStatus` | `adminApprovalStatus` |
+| --- | --- | --- |
+| `Horse.DopingTestResult = "Failed"` | `AutoRejected` | `Rejected` (Admin không override) |
+| `Horse.Breed ≠ Horse.Tournament.AllowedBreed` | `AutoRejected` | `Rejected` (Admin không override) |
+| `Horse.DopingTestResult = "Pending"` | `ManualReview` | `Pending` (chờ Admin) |
+| Breed khớp + doping `Clean` + consent | `AutoEligible` | `Approved` (tự động) |
 
-**Chain query để lấy AllowedBreed:**
-
-```
-Horse → Pairings → RaceEntries → Race → Round → Tournament → AllowedBreed
-```
+**Breed check (schema v2):** dùng `Horse.TournamentId` trực tiếp — mỗi hồ sơ ngựa gắn đúng 1 giải; không trace qua chuỗi `RaceEntry → … → Tournament`.
 
 ---
 
