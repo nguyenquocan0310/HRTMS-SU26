@@ -1,5 +1,4 @@
 ﻿using HRTMS.Core.Common;
-using HRTMS.Core.DTOs.Auth;
 using HRTMS.Core.DTOs.Horse;
 using HRTMS.Core.Interfaces.Services;
 using HRTMS.Infrastructure.Data;
@@ -12,6 +11,7 @@ using System.Security.Claims;
 
 namespace HRTMS.API.Controllers;
 
+[Tags("admin")]
 [ApiController]
 [Route("api/admin")]
 [Authorize(Roles = "Admin")]
@@ -21,20 +21,17 @@ public class AdminController : ControllerBase
     private readonly IAuditLogService _auditLogService;
     private readonly ITokenBlacklistService _tokenBlacklistService;
     private readonly IHorseService _horseService;
-    private readonly IAuthService _authService;
 
     public AdminController(
         HRTMSDbContext context,
         IAuditLogService auditLogService,
         ITokenBlacklistService tokenBlacklistService,
-        IHorseService horseService,
-        IAuthService authService)
+        IHorseService horseService)
     {
         _context = context;
         _auditLogService = auditLogService;
         _tokenBlacklistService = tokenBlacklistService;
         _horseService = horseService;
-        _authService = authService;
     }
 
     private int CurrentAdminId =>
@@ -42,23 +39,6 @@ public class AdminController : ControllerBase
 
     private string? ClientIp =>
         HttpContext.Connection.RemoteIpAddress?.ToString();
-
-    /// <summary>ACC.2 — Admin tạo tài khoản cho bất kỳ role nào kể cả Admin</summary>
-    [HttpPost("users")]
-    public async Task<IActionResult> CreateUser([FromBody] AdminCreateUserDto dto)
-    {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
-
-        var result = await _authService.AdminCreateUserAsync(dto, CurrentAdminId, ClientIp);
-        if (!result.Success)
-        {
-            var isConflict = result.Message?.Contains("tồn tại") == true
-                          || result.Message?.Contains("đã được đăng ký") == true;
-            return isConflict ? Conflict(result) : BadRequest(result);
-        }
-        return Created($"/api/admin/users/{result.Data}", result);
-    }
 
     [HttpPatch("users/{id}/suspend")]
     public async Task<IActionResult> SuspendUser(int id)

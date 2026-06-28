@@ -7,6 +7,7 @@ using System.Security.Claims;
 
 namespace HRTMS.API.Controllers;
 
+[Tags("scheduling")]
 [ApiController]
 [Route("api/race-entries")]
 [Authorize]
@@ -21,10 +22,6 @@ public class RaceEntryController : ControllerBase
 
     private int CurrentUserId =>
         int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
-    // RaceEntry chi do Admin tao qua SCH.1 (POST /api/admin/races/{raceId}/entries).
-    // Owner chi khai bao ngua + moi jockey; khong tu tao RaceEntry.
-    // Endpoint nay chi de Owner xem cac entry cua minh.
 
     [HttpGet("my")]
     [Authorize(Roles = "Owner")]

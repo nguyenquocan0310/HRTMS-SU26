@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 
 namespace HRTMS.API.Controllers
 {
+    [Tags("tournament")]
     [ApiController]
     [Route("api/tournament")]
     [Authorize(Roles = "Admin")]
@@ -72,24 +73,20 @@ namespace HRTMS.API.Controllers
 
         // PUT/api/tournaments/{id}
         [HttpPut("{id}")]
-        public async Task<ActionResult<ApiResponse<TournamentResponseDto>>> Update (int id, [FromBody] UpdateTournamentDto dto)
+        public async Task<ActionResult<ApiResponse<TournamentResponseDto>>> Update(int id, [FromBody] UpdateTournamentDto dto)
         {
             try
             {
                 var result = await _tournamentService.UpdateTournamentAsync(id, dto);
-                return Ok(ApiResponse<TournamentResponseDto>.Ok(result, "Cap nhat thanh cong")); 
+                return Ok(ApiResponse<TournamentResponseDto>.Ok(result, "Cap nhat thanh cong"));
             }
-            catch(KeyNotFoundException ex)
+            catch (KeyNotFoundException ex)
             {
-                return NotFound(ApiResponse<TournamentResponseDto>.Fail(ex.Message)); 
+                return NotFound(ApiResponse<TournamentResponseDto>.Fail(ex.Message));
             }
-            catch(InvalidOperationException ex)
+            catch (InvalidOperationException ex)
             {
                 return BadRequest(ApiResponse<TournamentResponseDto>.Fail($"{ex.Message}"));
-            }
-            catch(ArgumentException ex)
-            {
-                return BadRequest(ApiResponse<TournamentResponseDto>.Fail(ex.Message));
             }
         }
 
@@ -146,10 +143,6 @@ namespace HRTMS.API.Controllers
             {
                 return BadRequest(ApiResponse<List<PrizeDistributionResponseDto>>.Fail(ex.Message));
             }
-            catch (KeyNotFoundException ex)
-            {
-                return NotFound(ApiResponse<List<PrizeDistributionResponseDto>>.Fail(ex.Message));
-            }
         }
 
         // POST /api/tournaments/{id}/rounds
@@ -170,10 +163,6 @@ namespace HRTMS.API.Controllers
             {
                 return BadRequest(ApiResponse<RoundResponseDto>.Fail(ex.Message));
             }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(ApiResponse<RoundResponseDto>.Fail(ex.Message));
-            }
         }
 
         // POST /api/rounds/{id}/races  ← route khác! không phải /tournaments
@@ -191,10 +180,6 @@ namespace HRTMS.API.Controllers
                 return NotFound(ApiResponse<RaceResponseDto>.Fail(ex.Message));
             }
             catch (ArgumentException ex)
-            {
-                return BadRequest(ApiResponse<RaceResponseDto>.Fail(ex.Message));
-            }
-            catch (InvalidOperationException ex)
             {
                 return BadRequest(ApiResponse<RaceResponseDto>.Fail(ex.Message));
             }
@@ -253,10 +238,6 @@ namespace HRTMS.API.Controllers
             {
                 return Conflict(ApiResponse<RaceResponseDto>.Fail(
                     "Cấu hình cuộc đua đã bị khóa sau khi bốc thăm hoặc đã có dự đoán (EC-48)."));
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(ApiResponse<RaceResponseDto>.Fail(ex.Message));
             }
             catch (ArgumentException ex)
             {

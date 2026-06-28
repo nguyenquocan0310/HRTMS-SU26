@@ -8,6 +8,7 @@ using System.Security.Claims;
 
 namespace HRTMS.API.Controllers;
 
+[Tags("referee")]
 [ApiController]
 [Route("api/family-declarations")]
 [Authorize(Roles = "Jockey,Referee,Doctor")] // Owner và Spectator không khai báo FRD

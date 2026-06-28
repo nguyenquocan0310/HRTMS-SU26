@@ -6,6 +6,7 @@ using System.Security.Claims;
 
 namespace HRTMS.API.Controllers;
 
+[Tags("jockey")]
 [ApiController]
 [Route("api")]
 public class PairingController : ControllerBase

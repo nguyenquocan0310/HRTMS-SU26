@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace HRTMS.API.Controllers;
 
+[Tags("referee")]
 [ApiController]
 [Route("api/referee/race-entries")]
 [Authorize(Roles = "Referee")]
