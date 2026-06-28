@@ -196,7 +196,7 @@ CREATE TABLE Tournaments (
     CONSTRAINT CHK_Tournaments_MaxHorses CHECK (MaxHorses > 0),
     CONSTRAINT CHK_Tournaments_Breed CHECK (AllowedBreed IN ('Thoroughbred','Arabian','Quarter Horse','Mixed')),
     CONSTRAINT CHK_Tournaments_TrackType CHECK (TrackType IN ('Turf','Dirt','Synthetic')),
-    CONSTRAINT CHK_Tournaments_Distance CHECK (RaceDistance IN (1200,1600,2000,2400)),
+    CONSTRAINT CHK_Tournaments_Distance CHECK (RaceDistance > 1200 AND RaceDistance < 2400),
     CONSTRAINT CHK_Tournaments_Category CHECK (RaceCategory IN ('Open','Classic','Maiden')),
     CONSTRAINT CHK_Tournaments_MinExp CHECK (MinJockeyExperienceYears >= 0),
     CONSTRAINT CHK_Tournaments_Purse CHECK (PurseAmount >= 0),
@@ -289,7 +289,7 @@ CREATE TABLE Races (
     CONSTRAINT CHK_Races_RaceNumber CHECK (RaceNumber > 0),
     CONSTRAINT CHK_Races_Purse CHECK (PurseAmount >= 0),
     CONSTRAINT CHK_Races_TrackOverride CHECK (TrackTypeOverride IS NULL OR TrackTypeOverride IN ('Turf','Dirt','Synthetic')),
-    CONSTRAINT CHK_Races_DistOverride CHECK (RaceDistanceOverride IS NULL OR RaceDistanceOverride IN (1200,1600,2000,2400)),
+    CONSTRAINT CHK_Races_DistOverride CHECK (RaceDistanceOverride IS NULL OR (RaceDistanceOverride > 1200 AND RaceDistanceOverride < 2400)),
     CONSTRAINT CHK_Races_Status CHECK ([Status] IN ('Upcoming','Pre-Race','Live','Unofficial','Official','Cancelled')),
     CONSTRAINT CHK_Races_CutoffHrs CHECK (ConfirmationCutoffHours > 0),
     CONSTRAINT CHK_Races_ProtestMins CHECK (ProtestDeadlineMinutes > 0)

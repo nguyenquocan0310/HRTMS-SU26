@@ -15,8 +15,9 @@ namespace HRTMS.Core.DTOs.Tournament
         public decimal PurseAmount { get; set; }
 
         public string? TrackTypeOverride { get; set; }
+        [Range(1201, 2399, ErrorMessage = "RaceDistanceOverride must be greater than 1200 and less than 2400")]
         public int? RaceDistanceOverride { get; set; }
         public int ConfirmationCutoffHours { get; set; } = 24;
-        public int ProtestDeadlineMinutes { get; set; } = 30;
+        public int ProtestDeadlineMinutes { get; set; } = 120;
     }
 }

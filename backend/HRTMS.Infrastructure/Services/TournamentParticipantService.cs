@@ -14,6 +14,14 @@ public class TournamentParticipantService : ITournamentParticipantService
 
     private static readonly string[] AllowedRoles = ["Owner", "Jockey", "Doctor", "Referee"];
 
+    private sealed record ScreeningDecision(
+        string ParticipantStatus,
+        string ScreeningStatus,
+        string ScreeningReason,
+        string? RejectionReason,
+        bool ApprovedImmediately,
+        string SuccessMessage);
+
     public TournamentParticipantService(HRTMSDbContext context, IAuditLogService auditLog)
     {
         _context = context;
@@ -33,11 +41,6 @@ public class TournamentParticipantService : ITournamentParticipantService
         if (tournament.Status != "Open Registration")
             return ApiResponse<ParticipantResponseDto>.Fail("Giải không ở trạng thái mở đăng ký.");
 
-        // Chứng chỉ/bằng cấp phải được duyệt GLOBAL (Module A) trước khi vào giải
-        var credentialError = await ValidateGlobalCredentialAsync(userId, role);
-        if (credentialError != null)
-            return ApiResponse<ParticipantResponseDto>.Fail(credentialError);
-
         // Chặn đăng ký trùng (UNIQUE TournamentId + UserId)
         var existing = await _context.TournamentParticipants
             .FirstOrDefaultAsync(p => p.TournamentId == tournamentId && p.UserId == userId);
@@ -45,44 +48,54 @@ public class TournamentParticipantService : ITournamentParticipantService
             return ApiResponse<ParticipantResponseDto>.Fail("Bạn đã đăng ký tham gia giải này rồi.");
 
         var now = DateTime.UtcNow;
+        var decision = await BuildScreeningDecisionAsync(userId, role, tournament);
+        if (decision == null)
+            return ApiResponse<ParticipantResponseDto>.Fail("USER_NOT_FOUND");
+
         var participant = new TournamentParticipant
         {
             TournamentId = tournamentId,
             UserId = userId,
             Role = role,
             RegisteredAt = now,
-            ScreeningStatus = "AutoEligible"
+            Status = decision.ParticipantStatus,
+            ScreeningStatus = decision.ScreeningStatus,
+            ScreeningReason = decision.ScreeningReason,
+            RejectionReason = decision.RejectionReason,
+            ApprovedAt = decision.ApprovedImmediately ? now : null
         };
 
         // TRN.11 — Auto-screening roster:
         // - Owner Active đăng ký thành công → AutoEligible + Approved ngay, KHÔNG vào Admin approval queue (AC#3).
-        // - Jockey/Referee/Doctor đã Active (đã qua ValidateGlobalCredentialAsync) → AutoEligible nhưng
-        //   chỉ vào bulk approval queue, Status = Pending cho tới khi Admin duyệt (AC#4, AC#5).
-        string successMessage;
-        if (role == "Owner")
-        {
-            participant.Status = "Approved";
-            participant.ApprovedAt = now;
-            participant.ScreeningReason = "Owner Active → tự động đủ điều kiện tham gia.";
-            successMessage = "Đăng ký tham gia giải thành công, bạn đã được tự động phê duyệt.";
-        }
-        else
-        {
-            participant.Status = "Pending";
-            participant.ScreeningReason = "Hồ sơ Active → đủ điều kiện sơ bộ, chờ Admin duyệt cuối.";
-            successMessage = "Đăng ký tham gia giải thành công, chờ Admin duyệt.";
-        }
+        // - Jockey/Referee/Doctor Active + đủ điều kiện → AutoEligible, Status = Pending cho bulk approval.
+        // - Dữ liệu mơ hồ → ManualReview; vi phạm cứng → AutoRejected + Rejected.
 
         _context.TournamentParticipants.Add(participant);
         await _context.SaveChangesAsync();
 
+        if (participant.Status == "Rejected")
+        {
+            _context.Notifications.Add(new Notification
+            {
+                RecipientId = userId,
+                Title = "Đăng ký giải bị từ chối tự động",
+                Message = participant.RejectionReason ?? participant.ScreeningReason,
+                Type = "In-app",
+                IsRead = false,
+                RelatedEntityType = "TournamentParticipant",
+                RelatedEntityId = participant.ParticipantId,
+                SentAt = now
+            });
+            await _context.SaveChangesAsync();
+        }
+
         await _auditLog.LogAsync(userId, "Register_TournamentParticipant", "TournamentParticipant",
             participant.ParticipantId.ToString(), null,
-            $"Tournament={tournamentId}, Role={role}, Screening=AutoEligible, Status={participant.Status}");
+            $"Tournament={tournamentId}, Role={role}, Screening={participant.ScreeningStatus}, Status={participant.Status}");
 
         return ApiResponse<ParticipantResponseDto>.Ok(
             await MapByIdAsync(participant.ParticipantId),
-            successMessage);
+            decision.SuccessMessage);
     }
 
     public async Task<ApiResponse<List<ParticipantResponseDto>>> GetRosterAsync(
@@ -168,30 +181,101 @@ public class TournamentParticipantService : ITournamentParticipantService
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /// <summary>Trả về null nếu credential global hợp lệ, ngược lại trả về thông báo lỗi.</summary>
-    private async Task<string?> ValidateGlobalCredentialAsync(int userId, string role)
+    private async Task<ScreeningDecision?> BuildScreeningDecisionAsync(int userId, string role, Tournament tournament)
     {
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null)
+            return null;
+
+        if (user.Role != role)
+            return AutoRejected($"Tài khoản role {user.Role} không khớp role đăng ký {role}.");
+
+        if (user.Status != "Active")
+            return AutoRejected("Tài khoản chưa Active nên không đủ điều kiện tham gia giải.");
+
         switch (role)
         {
             case "Owner":
                 var ownerOk = await _context.OwnerProfiles.AnyAsync(o => o.OwnerId == userId);
-                return ownerOk ? null : "Bạn cần hoàn thiện hồ sơ chủ ngựa trước.";
+                return ownerOk
+                    ? new ScreeningDecision(
+                        "Approved",
+                        "AutoEligible",
+                        "Owner Active và có hồ sơ chủ ngựa → tự động đủ điều kiện tham gia.",
+                        null,
+                        true,
+                        "Đăng ký tham gia giải thành công, bạn đã được tự động phê duyệt.")
+                    : AutoRejected("Bạn cần hoàn thiện hồ sơ chủ ngựa trước.");
+
             case "Jockey":
                 var jockey = await _context.JockeyProfiles.FirstOrDefaultAsync(j => j.JockeyId == userId);
-                if (jockey == null) return "Bạn cần khai báo hồ sơ Jockey trước.";
-                return jockey.Status == "Active" ? null : "Hồ sơ Jockey chưa được Admin duyệt (Active).";
+                if (jockey == null) return AutoRejected("Bạn cần khai báo hồ sơ Jockey trước.");
+                if (jockey.Status != "Active") return AutoRejected("Hồ sơ Jockey chưa được Admin duyệt Active.");
+                if (string.IsNullOrWhiteSpace(jockey.LicenseCertificate))
+                    return AutoRejected("Jockey thiếu chứng chỉ/license bắt buộc.");
+                if (!HasRequiredIdentity(user))
+                    return AutoRejected("Jockey thiếu định danh, số điện thoại hoặc ngày sinh bắt buộc.");
+                if (jockey.ExperienceYears < tournament.MinJockeyExperienceYears)
+                    return AutoRejected($"Jockey cần ít nhất {tournament.MinJockeyExperienceYears} năm kinh nghiệm cho giải này.");
+                if (jockey.SelfDeclaredWeight <= 0)
+                    return ManualReview("Jockey chưa có cân nặng tự khai báo hợp lệ.");
+                if (!string.IsNullOrWhiteSpace(jockey.HealthStatus) && jockey.HealthStatus != "Good")
+                    return ManualReview($"Tình trạng sức khỏe Jockey cần Admin xem xét: {jockey.HealthStatus}.");
+                return AutoEligible("Hồ sơ Jockey Active, đủ định danh/license và đạt kinh nghiệm tối thiểu.");
+
             case "Doctor":
                 var doctor = await _context.DoctorProfiles.FirstOrDefaultAsync(d => d.DoctorId == userId);
-                if (doctor == null) return "Bạn cần khai báo hồ sơ Doctor trước.";
-                return doctor.Status == "Active" ? null : "Hồ sơ Doctor chưa được Admin duyệt (Active).";
+                if (doctor == null) return AutoRejected("Bạn cần khai báo hồ sơ Doctor trước.");
+                if (doctor.Status != "Active") return AutoRejected("Hồ sơ Doctor chưa được Admin duyệt Active.");
+                if (!HasRequiredIdentity(user))
+                    return AutoRejected("Doctor thiếu định danh, số điện thoại hoặc ngày sinh bắt buộc.");
+                if (string.IsNullOrWhiteSpace(doctor.MedicalLicenseNumber))
+                    return ManualReview("Doctor chưa có mã giấy phép y tế rõ ràng.");
+                return AutoEligible("Hồ sơ Doctor Active, đủ định danh và giấy phép y tế.");
+
             case "Referee":
                 var referee = await _context.RefereeProfiles.FirstOrDefaultAsync(r => r.RefereeId == userId);
-                if (referee == null) return "Bạn cần khai báo hồ sơ Referee trước.";
-                return referee.Status == "Active" ? null : "Hồ sơ Referee chưa được Admin duyệt (Active).";
+                if (referee == null) return AutoRejected("Bạn cần khai báo hồ sơ Referee trước.");
+                if (referee.Status != "Active") return AutoRejected("Hồ sơ Referee chưa được Admin duyệt Active.");
+                if (!HasRequiredIdentity(user))
+                    return AutoRejected("Referee thiếu định danh, số điện thoại hoặc ngày sinh bắt buộc.");
+                if (string.IsNullOrWhiteSpace(referee.CertificationLevel))
+                    return ManualReview("Referee chưa có cấp chứng nhận rõ ràng.");
+                return AutoEligible("Hồ sơ Referee Active, đủ định danh và chứng nhận.");
+
             default:
-                return "Role không hợp lệ.";
+                return AutoRejected("Role không hợp lệ.");
         }
     }
+
+    private static bool HasRequiredIdentity(User user) =>
+        user.IdentityHash != null
+        && !string.IsNullOrWhiteSpace(user.PhoneNumber)
+        && user.DateOfBirth != null;
+
+    private static ScreeningDecision AutoEligible(string reason) => new(
+        "Pending",
+        "AutoEligible",
+        $"{reason} Chờ Admin duyệt cuối.",
+        null,
+        false,
+        "Đăng ký tham gia giải thành công, chờ Admin duyệt.");
+
+    private static ScreeningDecision ManualReview(string reason) => new(
+        "ManualReview",
+        "ManualReview",
+        reason,
+        null,
+        false,
+        $"Đăng ký tham gia giải cần Admin xem xét: {reason}");
+
+    private static ScreeningDecision AutoRejected(string reason) => new(
+        "Rejected",
+        "AutoRejected",
+        reason,
+        reason,
+        false,
+        $"Đăng ký tham gia giải bị tự động từ chối: {reason}");
 
     private async Task<ParticipantResponseDto> MapByIdAsync(int participantId)
     {

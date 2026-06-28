@@ -17,6 +17,8 @@ namespace HRTMS.Infrastructure.Services
             ["Turf", "Dirt", "Synthetic"];
         private static readonly string[] ValidCategories =
             ["Open", "Classic", "Maiden"];
+        private const int MinRaceDistanceMeters = 1200;
+        private const int MaxRaceDistanceMeters = 2400;
         // TRN.8 — State machine cấp GIẢI một chiều: Draft → Open Registration → Closed Registration → Completed
         // (nhánh Cancelled xử lý riêng ở CancelTournamentAsync). Pre-Race/Live/In-Progress/Unofficial/Official
         // là trạng thái cấp RACE, KHÔNG lưu ở Tournament (BR-45, EC-36).
@@ -39,6 +41,69 @@ namespace HRTMS.Infrastructure.Services
 
 
         // PRIVATE HELPER
+        private static void ValidateRaceDistance(int distance, string fieldName)
+        {
+            if (distance <= MinRaceDistanceMeters || distance >= MaxRaceDistanceMeters)
+                throw new ArgumentException($"{fieldName} must be greater than {MinRaceDistanceMeters} and less than {MaxRaceDistanceMeters}");
+        }
+
+        private static void ValidateRaceDistanceOverride(int? distance)
+        {
+            if (distance.HasValue)
+                ValidateRaceDistance(distance.Value, "RaceDistanceOverride");
+        }
+
+        private static void ValidateTournamentWindow(DateTime startDate, DateTime endDate)
+        {
+            if (endDate <= startDate)
+                throw new ArgumentException("EndDate must be after StartDate");
+        }
+
+        private static void ValidateTournamentNumbers(
+            int maxHorses,
+            int minJockeyExperienceYears,
+            decimal purseAmount,
+            decimal entryFeeAmount,
+            decimal preRaceWeightThresholdKg,
+            decimal postRaceWeightDiffThresholdKg)
+        {
+            if (maxHorses <= 0)
+                throw new ArgumentException("MaxHorses must be greater than 0");
+            if (minJockeyExperienceYears < 0)
+                throw new ArgumentException("MinJockeyExperienceYears must be greater than or equal to 0");
+            if (purseAmount < 0)
+                throw new ArgumentException("PurseAmount must be greater than or equal to 0");
+            if (entryFeeAmount < 0)
+                throw new ArgumentException("EntryFeeAmount must be greater than or equal to 0");
+            if (preRaceWeightThresholdKg <= 0)
+                throw new ArgumentException("PreRaceWeightThresholdKg must be greater than 0");
+            if (postRaceWeightDiffThresholdKg <= 0)
+                throw new ArgumentException("PostRaceWeightDiffThresholdKg must be greater than 0");
+        }
+
+        private static void ValidateTournamentScheduleIntegrity(Tournament tournament)
+        {
+            foreach (var round in tournament.Rounds)
+            {
+                if (round.ScheduledDate < tournament.StartDate || round.ScheduledDate > tournament.EndDate)
+                    throw new ArgumentException($"Round #{round.RoundId} is outside the tournament date range");
+
+                foreach (var race in round.Races)
+                {
+                    if (race.ScheduledTime < tournament.StartDate || race.ScheduledTime > tournament.EndDate)
+                        throw new ArgumentException($"Race #{race.RaceId} is outside the tournament date range");
+                    if (race.ScheduledTime < round.ScheduledDate)
+                        throw new ArgumentException($"Race #{race.RaceId} is scheduled before its round");
+                }
+            }
+
+            var allocatedPurse = tournament.Rounds
+                .SelectMany(r => r.Races)
+                .Sum(r => r.PurseAmount);
+            if (allocatedPurse > tournament.PurseAmount)
+                throw new ArgumentException($"Total race purse ({allocatedPurse}) exceeds tournament purse ({tournament.PurseAmount})");
+        }
+
         private static TournamentResponseDto MapToResponseDto(Tournament t) => new()
         {
             TournamentId = t.TournamentId,
@@ -97,10 +162,17 @@ namespace HRTMS.Infrastructure.Services
                 throw new ArgumentException($"TrackType Invalid: {dto.TrackType}");
             if (!ValidCategories.Contains(dto.RaceCategory))
                 throw new ArgumentException($"RaceCategory Invalid: {dto.RaceCategory}");
+            ValidateRaceDistance(dto.RaceDistance, nameof(dto.RaceDistance));
 
-            // 2. Validate date range
-            if (dto.EndDate < dto.StartDate)
-                throw new ArgumentException("EndDate must be above StartDate");
+            // 2. Validate date range and numeric constraints
+            ValidateTournamentWindow(dto.StartDate, dto.EndDate);
+            ValidateTournamentNumbers(
+                dto.MaxHorses,
+                dto.MinJockeyExperienceYears,
+                dto.PurseAmount,
+                dto.EntryFeeAmount,
+                dto.PreRaceWeightThresholdKg,
+                dto.PostRaceWeightDiffThresholdKg);
 
             // 3. Tạo entity — Status luôn là "Draft" khi mới tạo
             var tournament = new Tournament
@@ -183,6 +255,26 @@ namespace HRTMS.Infrastructure.Services
                 throw new ArgumentException($"TrackType Invalid: {dto.TrackType}");
             if (dto.RaceCategory != null && !ValidCategories.Contains(dto.RaceCategory))
                 throw new ArgumentException($"RaceCategory Invalid: {dto.RaceCategory}");
+            if (dto.RaceDistance.HasValue)
+                ValidateRaceDistance(dto.RaceDistance.Value, nameof(dto.RaceDistance));
+
+            var mergedStartDate = dto.StartDate ?? tournament.StartDate;
+            var mergedEndDate = dto.EndDate ?? tournament.EndDate;
+            var mergedMaxHorses = dto.MaxHorses ?? tournament.MaxHorses;
+            var mergedMinJockeyExperienceYears = dto.MinJockeyExperienceYears ?? tournament.MinJockeyExperienceYears;
+            var mergedPurseAmount = dto.PurseAmount ?? tournament.PurseAmount;
+            var mergedEntryFeeAmount = dto.EntryFeeAmount ?? tournament.EntryFeeAmount;
+            var mergedPreRaceWeightThresholdKg = dto.PreRaceWeightThresholdKg ?? tournament.PreRaceWeightThresholdKg;
+            var mergedPostRaceWeightDiffThresholdKg = dto.PostRaceWeightDiffThresholdKg ?? tournament.PostRaceWeightDiffThresholdKg;
+
+            ValidateTournamentWindow(mergedStartDate, mergedEndDate);
+            ValidateTournamentNumbers(
+                mergedMaxHorses,
+                mergedMinJockeyExperienceYears,
+                mergedPurseAmount,
+                mergedEntryFeeAmount,
+                mergedPreRaceWeightThresholdKg,
+                mergedPostRaceWeightDiffThresholdKg);
 
             // Chỉ update field nào được gửi lên (nullable pattern)
             if (dto.Name != null) tournament.Name = dto.Name;
@@ -200,6 +292,8 @@ namespace HRTMS.Infrastructure.Services
             if (dto.PreRaceWeightThresholdKg.HasValue) tournament.PreRaceWeightThresholdKg = dto.PreRaceWeightThresholdKg.Value;
             if (dto.PostRaceWeightDiffThresholdKg.HasValue) tournament.PostRaceWeightDiffThresholdKg = dto.PostRaceWeightDiffThresholdKg.Value;
 
+            ValidateTournamentScheduleIntegrity(tournament);
+
             tournament.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
@@ -208,6 +302,10 @@ namespace HRTMS.Infrastructure.Services
 
         public async Task<TournamentResponseDto> ChangeStatusAsync(int tournamentId, string targetStatus, int adminUserId)
         {
+            targetStatus = targetStatus?.Trim() ?? string.Empty;
+            if (targetStatus.Length == 0)
+                throw new InvalidOperationException("TargetStatus is required");
+
             var tournament = await _context.Tournaments
                 .Include(t => t.Rounds).ThenInclude(r => r.Races)
                 .Include(t => t.PrizeDistributions)
@@ -364,16 +462,41 @@ namespace HRTMS.Infrastructure.Services
                     }
 
                 // 4b. Vô hiệu các Pairing của giải (TRN.10): chuyển Cancelled cho pairing chưa kết thúc.
-                // Pairing entity không expose TournamentId → lọc qua Horse.TournamentId.
+                // Schema mới expose Pairing.TournamentId nên lọc trực tiếp theo tournament.
                 var pairings = await _context.Pairings
-                    .Include(p => p.Horse)
-                    .Where(p => p.Horse.TournamentId == tournamentId
+                    .Where(p => p.TournamentId == tournamentId
                                 && p.Status != "Cancelled" && p.Status != "Declined")
                     .ToListAsync();
                 foreach (var pairing in pairings)
                 {
                     pairing.Status = "Cancelled";
                     pairing.UpdatedAt = now;
+                }
+
+                // 4c. Đưa payout liên quan về trạng thái chưa chi trả khi giải bị hủy.
+                var payouts = await _context.PursePayouts
+                    .Where(p => p.RaceEntry.Race.Round.TournamentId == tournamentId)
+                    .ToListAsync();
+                foreach (var payout in payouts)
+                {
+                    var oldPayoutStatus = payout.PayoutStatus;
+                    var oldPaidAt = payout.PaidAt;
+
+                    payout.PayoutStatus = "Unpaid";
+                    payout.PaidAt = null;
+                    payout.UpdatedByAdminId = adminUserId;
+                    payout.UpdatedAt = now;
+
+                    if (oldPayoutStatus != "Unpaid" || oldPaidAt != null)
+                    {
+                        _auditLog.LogDeferred(
+                            actorId: adminUserId,
+                            action: "Cancel_Tournament_PursePayout",
+                            entityName: "PursePayout",
+                            entityId: payout.PursePayoutId.ToString(),
+                            oldValue: oldPayoutStatus,
+                            newValue: "Unpaid");
+                    }
                 }
 
                 // 5. Gửi Notification cho tất cả Spectator có dự đoán bị ảnh hưởng
@@ -507,6 +630,7 @@ namespace HRTMS.Infrastructure.Services
                 ?? throw new KeyNotFoundException($"Không tìm thấy Round #{roundId}");
 
             var tournament = round.Tournament;
+            ValidateRaceDistanceOverride(dto.RaceDistanceOverride);
 
             // TRN.7 — validate thời gian
             if (dto.ScheduledTime <= DateTime.UtcNow)
@@ -517,6 +641,9 @@ namespace HRTMS.Infrastructure.Services
                     $"ScheduledTime phải nằm trong cửa sổ giải [{tournament.StartDate:d}, {tournament.EndDate:d}]");
 
             // Bug 8 fix — kiểm tra trùng RaceNumber trong cùng round
+            if (dto.ScheduledTime < round.ScheduledDate)
+                throw new ArgumentException("ScheduledTime must not be earlier than the round date");
+
             var isDuplicateRaceNumber = await _context.Races
                 .AnyAsync(r => r.RoundId == roundId && r.RaceNumber == dto.RaceNumber);
             if (isDuplicateRaceNumber)
@@ -575,6 +702,7 @@ namespace HRTMS.Infrastructure.Services
                 ?? throw new KeyNotFoundException($"Không tìm thấy Race #{raceId}");
 
             var tournament = race.Round.Tournament;
+            ValidateRaceDistanceOverride(dto.RaceDistanceOverride);
 
             // EC-48 — dong bang khi da boc tham HOAC da co Prediction.
             var hasPrediction = await _context.Predictions.AnyAsync(p => p.RaceId == raceId);

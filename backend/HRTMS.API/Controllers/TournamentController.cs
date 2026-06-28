@@ -87,6 +87,10 @@ namespace HRTMS.API.Controllers
             {
                 return BadRequest(ApiResponse<TournamentResponseDto>.Fail($"{ex.Message}"));
             }
+            catch(ArgumentException ex)
+            {
+                return BadRequest(ApiResponse<TournamentResponseDto>.Fail(ex.Message));
+            }
         }
 
         // PATH/api/tournaments/{id}/status
@@ -142,6 +146,10 @@ namespace HRTMS.API.Controllers
             {
                 return BadRequest(ApiResponse<List<PrizeDistributionResponseDto>>.Fail(ex.Message));
             }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ApiResponse<List<PrizeDistributionResponseDto>>.Fail(ex.Message));
+            }
         }
 
         // POST /api/tournaments/{id}/rounds
@@ -162,6 +170,10 @@ namespace HRTMS.API.Controllers
             {
                 return BadRequest(ApiResponse<RoundResponseDto>.Fail(ex.Message));
             }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ApiResponse<RoundResponseDto>.Fail(ex.Message));
+            }
         }
 
         // POST /api/rounds/{id}/races  ← route khác! không phải /tournaments
@@ -179,6 +191,10 @@ namespace HRTMS.API.Controllers
                 return NotFound(ApiResponse<RaceResponseDto>.Fail(ex.Message));
             }
             catch (ArgumentException ex)
+            {
+                return BadRequest(ApiResponse<RaceResponseDto>.Fail(ex.Message));
+            }
+            catch (InvalidOperationException ex)
             {
                 return BadRequest(ApiResponse<RaceResponseDto>.Fail(ex.Message));
             }
@@ -237,6 +253,10 @@ namespace HRTMS.API.Controllers
             {
                 return Conflict(ApiResponse<RaceResponseDto>.Fail(
                     "Cấu hình cuộc đua đã bị khóa sau khi bốc thăm hoặc đã có dự đoán (EC-48)."));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ApiResponse<RaceResponseDto>.Fail(ex.Message));
             }
             catch (ArgumentException ex)
             {
