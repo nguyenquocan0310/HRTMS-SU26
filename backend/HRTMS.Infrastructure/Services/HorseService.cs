@@ -579,6 +579,19 @@ public class HorseService : IHorseService
         await _auditLog.LogAsync(adminId, "Approve_RaceEntry", "RaceEntry",
             raceEntryId.ToString(), "Pending", "Confirmed", null);
 
+        _context.Notifications.Add(new Notification
+        {
+            RecipientId = entry.Pairing.Horse.OwnerId,
+            Title = "Đăng ký race được xác nhận",
+            Message = $"Đăng ký #{raceEntryId} cho ngựa '{entry.Pairing.Horse.Name}' đã được Admin xác nhận tham gia cuộc đua.",
+            Type = "In-app",
+            IsRead = false,
+            RelatedEntityType = "RaceEntry",
+            RelatedEntityId = raceEntryId,
+            SentAt = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+
         return ApiResponse<string>.Ok("Đăng ký tham gia cuộc đua đã được xác nhận.");
     }
 
