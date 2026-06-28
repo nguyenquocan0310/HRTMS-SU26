@@ -19,10 +19,16 @@ public class AuthController : ControllerBase
         _profileService = profileService;
     }
 
+    private int CurrentUserId =>
+        int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+    private string? ClientIp =>
+        HttpContext.Connection.RemoteIpAddress?.ToString();
+
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterDto dto)
     {
-        var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var ip = ClientIp;
         var result = await _authService.RegisterAsync(dto, ip);
         if (!result.Success)
         {
@@ -35,8 +41,7 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginDto dto)
     {
-        var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
-        var result = await _authService.LoginAsync(dto, ip);
+        var result = await _authService.LoginAsync(dto, ClientIp);
         return result.Success ? Ok(result) : Unauthorized(result);
     }
 
@@ -44,9 +49,7 @@ public class AuthController : ControllerBase
     [Authorize]
     public async Task<IActionResult> Logout()
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
-        var result = await _authService.LogoutAsync(userId, ip);
+        var result = await _authService.LogoutAsync(CurrentUserId, ClientIp);
         return Ok(result);
     }
 
@@ -60,12 +63,36 @@ public class AuthController : ControllerBase
         return Ok(new { userId, username, role });
     }
 
+    /// <summary>ACC.3 — Lấy profile đầy đủ của user hiện tại</summary>
     [HttpGet("profile")]
     [Authorize]
     public async Task<IActionResult> GetProfile()
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        var result = await _profileService.GetProfileAsync(userId);
+        var result = await _profileService.GetProfileAsync(CurrentUserId);
         return result.Success ? Ok(result) : NotFound(result);
+    }
+
+    /// <summary>ACC.3 — Cập nhật FullName và Email</summary>
+    [HttpPatch("me")]
+    [Authorize]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateBasicInfoDto dto)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        var result = await _profileService.UpdateBasicInfoAsync(CurrentUserId, dto, ClientIp);
+        return result.Success ? Ok(result) : BadRequest(result);
+    }
+
+    /// <summary>ACC.3 — Đổi mật khẩu (yêu cầu mật khẩu hiện tại)</summary>
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        var result = await _profileService.ChangePasswordAsync(CurrentUserId, dto, ClientIp);
+        return result.Success ? Ok(result) : BadRequest(result);
     }
 }

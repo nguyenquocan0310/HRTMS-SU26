@@ -19,7 +19,7 @@ public partial class User
 
     public string? NormalizedPhone { get; set; }
 
-    public DateOnly? DateOfBirth { get; set; }
+    public DateTime? DateOfBirth { get; set; }
 
     public byte[]? IdentityNumberEncrypted { get; set; }
 
