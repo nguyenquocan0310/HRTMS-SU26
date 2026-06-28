@@ -27,3 +27,7 @@ obj/
 
 .codegraph/
 .claude/
+.agents/
+.claude-flow/
+.mcp.json
+CLAUDE.md

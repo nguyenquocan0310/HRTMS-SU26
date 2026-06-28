@@ -137,7 +137,7 @@ Toàn bộ các nghiệp vụ sau đây thuộc phạm vi phát triển trong Ph
     - **Thông tin cơ bản:** Tên giải đấu, thời gian bắt đầu, thời gian kết thúc, quy mô giải.
     - **Giống ngựa cho phép (`AllowedBreed`):** Chọn từ danh mục chuẩn hóa (Thoroughbred, Arabian, Quarter Horse, Mixed) dưới dạng **single-select dropdown (chọn đúng 1 giống ngựa duy nhất cho mỗi giải)**. Không được để trống.
     - **Mặt đường chạy (`TrackType`):** Chọn loại mặt đường thi đấu (Turf – Đường cỏ, Dirt – Đường cát/đất nện, Synthetic – Đường tổng hợp).
-    - **Khoảng cách đua (`RaceDistance`):** Thiết lập khoảng cách thi đấu tính bằng mét (ví dụ: 1200m, 1600m, 2000m, 2400m).
+    - **Khoảng cách đua (`RaceDistance`):** Thiết lập khoảng cách thi đấu tính bằng mét, cho phép Admin nhập số nguyên trong khoảng `>1200` và `<2400`; UI gợi ý các mốc phổ biến như 1600m/2000m để giảm nhập sai.
     - **Hạng mục thi đấu (`RaceCategory`):** Chọn phân hạng thi đấu của cuộc đua (Open – Giải mở, Classic – Giải tiêu chuẩn đỉnh cao, Maiden – Giải dành cho ngựa chưa từng thắng).
     - **Kinh nghiệm tối thiểu của Jockey (`MinJockeyExperienceYears`):** Quy định số năm kinh nghiệm tối thiểu nài ngựa phải có để đăng ký tham gia giải đấu này (ví dụ: giải quốc gia yêu cầu tối thiểu 5 năm, giải địa phương yêu cầu tối thiểu 1 năm).
     - **Lệ phí đăng ký tham gia (`EntryFeeAmount`):** Admin thiết lập mức lệ phí mà Horse Owner phải đóng khi đăng ký ngựa vào một cuộc đua cụ thể. Giá trị mặc định là `0` (miễn phí). Nếu `EntryFeeAmount = 0`, hệ thống tự động bỏ qua toàn bộ luồng xác nhận phí — xem Module C.
@@ -4100,7 +4100,7 @@ Tổng cộng **27 bảng** chia thành 6 nhóm phân hệ. Dưới đây là da
 - Attributes: 18 (TournamentId, Name, Description, StartDate, EndDate, MaxHorses, AllowedBreed, TrackType, RaceDistance, RaceCategory, MinJockeyExperienceYears, PurseAmount, EntryFeeAmount, PreRaceWeightThresholdKg, PostRaceWeightDiffThresholdKg, Status, CreatedAt, UpdatedAt, CreatedBy)
 - PK: TournamentId (INT, Identity)
 - FKs: CreatedBy → Users.UserId
-- Key constraints: CHECK EndDate > StartDate; CHECK Status IN (6 trạng thái); CHECK AllowedBreed, TrackType, RaceDistance, RaceCategory theo danh mục chuẩn; CHECK PurseAmount >= 0; CHECK EntryFeeAmount >= 0
+- Key constraints: CHECK EndDate > StartDate; CHECK Status IN (6 trạng thái); CHECK AllowedBreed, TrackType, RaceCategory theo danh mục chuẩn; CHECK RaceDistance > 1200 AND < 2400; CHECK PurseAmount >= 0; CHECK EntryFeeAmount >= 0
 
 **Bảng: PrizeDistributions** (MỚI — EC-33)
 - Attributes: 6 (PrizeDistributionId, TournamentId, Position, Percentage, CreatedAt, UpdatedAt)
@@ -5257,7 +5257,7 @@ Bảng tổng hợp toàn bộ 27 bảng (chi tiết cấp cột: xem guide 3.4.
 | `FamilyRelationshipDeclarations.RelationType` | `Spouse`/`Parent`/`Child`/`Sibling` | Quan hệ ruột thịt — phục vụ COI/Independence Check |
 | `Tournaments.AllowedBreed` | `Thoroughbred`/`Arabian`/`Quarter Horse`/`Mixed` | Mỗi giải 1 giống; Auto-reject Horse sai giống |
 | `Tournaments.TrackType` *(và `Races.TrackTypeOverride`)* | `Turf`/`Dirt`/`Synthetic` | Loại đường đua |
-| `Tournaments.RaceDistance` *(và override)* | `1200`/`1600`/`2000`/`2400` | Khoảng cách (mét) |
+| `Tournaments.RaceDistance` *(và override)* | Số nguyên `>1200` và `<2400` | Khoảng cách (mét); UI gợi ý mốc phổ biến |
 | `Tournaments.RaceCategory` | `Open`/`Classic`/`Maiden` | Hạng giải |
 | `Tournaments.Status` | `Draft`/`Open Registration`/`Closed Registration`/`Completed`/`Cancelled` | State machine cấp giải; không chứa Pre-Race/In-Progress |
 | `Rounds.Status` | `Upcoming`/`In-Progress`/`Completed`/`Cancelled` | Trạng thái vòng |
@@ -5323,7 +5323,7 @@ Phạm vi (D4 = B): **DB-level constraints + application-level rules** (định 
 | --- | --- |
 | `Email` | RFC 5322 cơ bản (`local@domain`); lowercase chuẩn hóa |
 | `*.CreatedAt/UpdatedAt/...` (DATETIME2) | ISO 8601 UTC (`YYYY-MM-DDTHH:mm:ssZ`) |
-| `Tournaments.RaceDistance` | Số nguyên thuộc {1200,1600,2000,2400} |
+| `Tournaments.RaceDistance` | Số nguyên `>1200` và `<2400` |
 | `OwnerProfiles.PhoneNumber` | Chuỗi số/`+`/`-`, độ dài ≤ 15 (E.164 khuyến nghị) `[CẦN CHỐT định dạng chính xác]` |
 | `OwnerProfiles.IdentityNumber` | CMND 9 số hoặc CCCD 12 số (VN) `[CẦN CHỐT]` |
 | `AuditLogs.IpAddress` | IPv4 (≤15) hoặc IPv6 (≤39) |
