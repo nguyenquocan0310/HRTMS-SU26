@@ -79,27 +79,41 @@ public class HorseService : IHorseService
             DopingTestResult = dto.DopingTestResult,
             LegalConsentAccepted = true,
             Status = "Declared",
+            ScreeningStatus = "NotScreened",
             AdminApprovalStatus = "Pending",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
 
-        // REQ-F-HRS.4: auto-reject ngay khi đăng ký (Breed ≠ AllowedBreed / Doping = Failed)
-        string? autoRejectCode = await RunAutoRejectCheckAsync(horse);
+        // REQ-F-HRS.4 + Pha 3: screen ngay khi đăng ký → AutoEligible / ManualReview / AutoRejected
+        string category = await ScreenHorseAsync(horse);
+        ApplyScreeningToApproval(horse, category);
 
         _context.Horses.Add(horse);
         await _context.SaveChangesAsync();
 
-        if (autoRejectCode != null)
+        switch (category)
         {
-            await _auditLog.LogAsync(ownerId, "AutoReject_Horse", "Horse",
-                horse.HorseId.ToString(), "Pending", $"Rejected: {horse.RejectionReason}");
-            return ApiResponse<HorseResponseDto>.Ok(MapToDto(horse),
-                $"Hồ sơ ngựa bị tự động từ chối: {horse.RejectionReason}");
-        }
+            case "AutoRejected":
+                await _auditLog.LogAsync(ownerId, "AutoReject_Horse", "Horse",
+                    horse.HorseId.ToString(), "NotScreened", $"AutoRejected: {horse.ScreeningReason}");
+                NotifyOwnerHorseRejected(horse);
+                await _context.SaveChangesAsync();
+                return ApiResponse<HorseResponseDto>.Ok(MapToDto(horse),
+                    $"Hồ sơ ngựa bị tự động từ chối: {horse.ScreeningReason}");
 
-        return ApiResponse<HorseResponseDto>.Ok(MapToDto(horse),
-            "Hồ sơ ngựa đã được khai báo thành công, chờ Admin duyệt.");
+            case "AutoEligible":
+                await _auditLog.LogAsync(ownerId, "AutoApprove_Horse", "Horse",
+                    horse.HorseId.ToString(), "NotScreened", "Approved (AutoEligible)");
+                NotifyOwnerHorseApproved(horse);
+                await _context.SaveChangesAsync();
+                return ApiResponse<HorseResponseDto>.Ok(MapToDto(horse),
+                    "Hồ sơ ngựa hợp lệ và đã được hệ thống tự động phê duyệt.");
+
+            default: // ManualReview
+                return ApiResponse<HorseResponseDto>.Ok(MapToDto(horse),
+                    $"Hồ sơ ngựa đã được khai báo, chờ Admin duyệt. Lý do cần xem xét: {horse.ScreeningReason}");
+        }
     }
 
     public async Task<ApiResponse<List<HorseResponseDto>>> GetMyHorsesAsync(
@@ -168,27 +182,36 @@ public class HorseService : IHorseService
 
         horse.UpdatedAt = DateTime.UtcNow;
 
-        // EC-23: re-validate khi trường nhạy cảm thay đổi
-        if (sensitiveChanged && horse.AdminApprovalStatus == "Approved")
+        // HRS.6 / EC-23: re-validate khi trường nhạy cảm thay đổi sau khi đã Approved
+        bool revalidated = sensitiveChanged && horse.AdminApprovalStatus == "Approved";
+        string category = "AutoEligible";
+        if (revalidated)
         {
-            horse.AdminApprovalStatus = "Pending";
-
-            // Treo tất cả Pairing liên quan
+            // Hủy tất cả Pairing liên quan (DB không hỗ trợ "Suspended" — dùng "Cancelled").
             foreach (var pairing in horse.PairingHorses)
             {
-                pairing.Status = "Suspended";
-                pairing.UpdatedAt = DateTime.UtcNow;
+                if (pairing.Status is "Pending" or "Accepted" or "Confirmed")
+                {
+                    pairing.Status = "Cancelled";
+                    pairing.ResponseReason = "Hồ sơ ngựa được sửa thông tin nhạy cảm, cần duyệt lại (EC-23).";
+                    pairing.UpdatedAt = DateTime.UtcNow;
+                }
             }
 
-            // Chạy lại auto-reject check
-            await RunAutoRejectCheckAsync(horse);
+            // Chạy lại screening → đưa về Pending/Rejected tùy kết quả.
+            category = await ScreenHorseAsync(horse);
+            ApplyScreeningToApproval(horse, category);
+            if (category == "AutoEligible")
+                horse.AdminApprovalStatus = "Pending"; // sửa hồ sơ → bắt buộc Admin duyệt lại
         }
 
         await _context.SaveChangesAsync();
 
-        string message = sensitiveChanged
-            ? "Cập nhật thành công. Hồ sơ đã được đưa về trạng thái chờ duyệt lại do thay đổi thông tin y tế."
-            : "Cập nhật hồ sơ thành công.";
+        string message = !revalidated
+            ? "Cập nhật hồ sơ thành công."
+            : category == "AutoRejected"
+                ? $"Cập nhật thành công nhưng hồ sơ bị tự động từ chối: {horse.ScreeningReason}"
+                : "Cập nhật thành công. Hồ sơ đã được đưa về trạng thái chờ duyệt lại do thay đổi thông tin y tế.";
 
         return ApiResponse<HorseResponseDto>.Ok(MapToDto(horse), message);
     }
@@ -229,15 +252,23 @@ public class HorseService : IHorseService
         if (horse.AdminApprovalStatus == "Approved")
             return ApiResponse<string>.Fail("ALREADY_APPROVED");
 
-        // Chạy auto-reject check trước khi approve
-        string? rejectReason = await RunAutoRejectCheckAsync(horse);
-        if (rejectReason != null)
+        // HRS.4: Admin KHÔNG được override auto-reject cứng (doping Failed / breed mismatch).
+        if (horse.ScreeningStatus == "AutoRejected")
+            return ApiResponse<string>.Fail(
+                $"AUTO_REJECTED: không thể override. Lý do: {horse.ScreeningReason}");
+
+        // Re-screen tại thời điểm duyệt để bắt dữ liệu vi phạm cứng phát sinh sau khai báo.
+        string category = await ScreenHorseAsync(horse);
+        if (category == "AutoRejected")
         {
+            ApplyScreeningToApproval(horse, category);
             horse.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
-            return ApiResponse<string>.Fail(rejectReason);
+            return ApiResponse<string>.Fail(
+                $"AUTO_REJECTED: không thể override. Lý do: {horse.ScreeningReason}");
         }
 
+        // ManualReview/AutoEligible → Admin chốt Approved.
         horse.AdminApprovalStatus = "Approved";
         horse.RejectionReason = null;
         horse.UpdatedAt = DateTime.UtcNow;
@@ -319,42 +350,102 @@ public class HorseService : IHorseService
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Chạy auto-reject check theo breed và doping.
-    /// Trả về null nếu hợp lệ, trả về mã lỗi nếu bị reject.
-    /// Tự động set AdminApprovalStatus = "Rejected" nếu vi phạm (không cần SaveChanges ở đây).
+    /// REQ-F-HRS.4 + Pha 3: screen hồ sơ ngựa, set <see cref="Horse.ScreeningStatus"/> và
+    /// <see cref="Horse.ScreeningReason"/>. KHÔNG đụng AdminApprovalStatus (xem ApplyScreeningToApproval).
+    /// Trả về category: "AutoRejected" | "ManualReview" | "AutoEligible".
     /// </summary>
-    private async Task<string?> RunAutoRejectCheckAsync(Horse horse)
+    private async Task<string> ScreenHorseAsync(Horse horse)
     {
-        // Check doping trước — không cần query thêm
+        // Auto-reject cứng — doping Failed (BR-02). Admin không override.
         if (horse.DopingTestResult == "Failed")
         {
-            horse.AdminApprovalStatus = "Rejected";
-            horse.RejectionReason = "Auto-reject: kết quả kiểm tra doping là Failed.";
-            return "AUTO_REJECTED_DOPING";
+            horse.ScreeningStatus = "AutoRejected";
+            horse.ScreeningReason = "Kết quả kiểm tra doping là Failed.";
+            return "AutoRejected";
         }
 
-        // Breed check theo AllowedBreed của giải ngựa đăng ký vào (REQ-F-HRS.4 / BR-01)
         var tournament = await _context.Tournaments
             .AsNoTracking()
             .FirstOrDefaultAsync(t => t.TournamentId == horse.TournamentId);
 
         if (tournament == null)
         {
-            horse.AdminApprovalStatus = "Rejected";
-            horse.RejectionReason = "Auto-reject: không xác định được giải đấu của ngựa.";
-            return "AUTO_REJECTED_NO_TOURNAMENT";
+            horse.ScreeningStatus = "AutoRejected";
+            horse.ScreeningReason = "Không xác định được giải đấu của ngựa.";
+            return "AutoRejected";
         }
 
+        // Auto-reject cứng — breed mismatch (BR-01). Admin không override.
         if (!string.Equals(horse.Breed, tournament.AllowedBreed, StringComparison.OrdinalIgnoreCase))
         {
-            horse.AdminApprovalStatus = "Rejected";
-            horse.RejectionReason =
-                $"Auto-reject: giống ngựa '{horse.Breed}' không khớp giống cho phép '{tournament.AllowedBreed}' của giải.";
-            return "AUTO_REJECTED_BREED";
+            horse.ScreeningStatus = "AutoRejected";
+            horse.ScreeningReason =
+                $"Giống ngựa '{horse.Breed}' không khớp giống cho phép '{tournament.AllowedBreed}' của giải.";
+            return "AutoRejected";
         }
 
-        return null;
+        // Manual review — doping chưa có kết quả rõ ràng (Pha 3: ManualReview).
+        if (horse.DopingTestResult == "Pending")
+        {
+            horse.ScreeningStatus = "ManualReview";
+            horse.ScreeningReason = "Kết quả doping đang chờ (Pending) — cần Admin xem xét.";
+            return "ManualReview";
+        }
+
+        // Auto eligible — breed khớp, doping Clean, consent đã tích, hồ sơ đủ.
+        horse.ScreeningStatus = "AutoEligible";
+        horse.ScreeningReason = null;
+        return "AutoEligible";
     }
+
+    /// <summary>
+    /// Ánh xạ category screening → AdminApprovalStatus (giữ 3 giá trị Pending/Approved/Rejected
+    /// để FE/contract ổn định; phân biệt auto-reject cứng qua ScreeningStatus = "AutoRejected").
+    /// </summary>
+    private static void ApplyScreeningToApproval(Horse horse, string category)
+    {
+        switch (category)
+        {
+            case "AutoEligible":
+                horse.AdminApprovalStatus = "Approved";
+                horse.RejectionReason = null;
+                break;
+            case "AutoRejected":
+                horse.AdminApprovalStatus = "Rejected";
+                horse.RejectionReason = horse.ScreeningReason;
+                break;
+            default: // ManualReview
+                horse.AdminApprovalStatus = "Pending";
+                horse.RejectionReason = null;
+                break;
+        }
+    }
+
+    private void NotifyOwnerHorseApproved(Horse horse) =>
+        _context.Notifications.Add(new Notification
+        {
+            RecipientId = horse.OwnerId,
+            Title = "Hồ sơ ngựa được phê duyệt",
+            Message = $"Hồ sơ ngựa '{horse.Name}' đã được phê duyệt.",
+            Type = "In-app",
+            IsRead = false,
+            RelatedEntityType = "Horse",
+            RelatedEntityId = horse.HorseId,
+            SentAt = DateTime.UtcNow
+        });
+
+    private void NotifyOwnerHorseRejected(Horse horse) =>
+        _context.Notifications.Add(new Notification
+        {
+            RecipientId = horse.OwnerId,
+            Title = "Hồ sơ ngựa bị từ chối",
+            Message = $"Hồ sơ ngựa '{horse.Name}' bị từ chối. Lý do: {horse.RejectionReason}",
+            Type = "In-app",
+            IsRead = false,
+            RelatedEntityType = "Horse",
+            RelatedEntityId = horse.HorseId,
+            SentAt = DateTime.UtcNow
+        });
 
     private static HorseResponseDto MapToDto(Horse h) => new()
     {
@@ -373,6 +464,8 @@ public class HorseService : IHorseService
         DopingTestDate = h.DopingTestDate,
         DopingTestResult = h.DopingTestResult,
         LegalConsentAccepted = h.LegalConsentAccepted,
+        ScreeningStatus = h.ScreeningStatus,
+        ScreeningReason = h.ScreeningReason,
         AdminApprovalStatus = h.AdminApprovalStatus,
         RejectionReason = h.RejectionReason,
         CreatedAt = h.CreatedAt,

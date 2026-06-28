@@ -24,6 +24,8 @@ namespace HRTMS.Core.DTOs.Horse
         public DateOnly? DopingTestDate { get; set; }
         public string DopingTestResult { get; set; } = null!;
         public bool LegalConsentAccepted { get; set; }
+        public string ScreeningStatus { get; set; } = null!;
+        public string? ScreeningReason { get; set; }
         public string AdminApprovalStatus { get; set; } = null!;
         public string? RejectionReason { get; set; }
         public DateTime CreatedAt { get; set; }
