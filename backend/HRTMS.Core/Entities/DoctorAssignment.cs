@@ -9,6 +9,12 @@ public partial class DoctorAssignment
 
     public int DoctorId { get; set; }
 
+    public string CoiCheckStatus { get; set; } = null!;
+
+    public DateTime? CoiCheckedAt { get; set; }
+
+    public string? CoiViolationReason { get; set; }
+
     public DateTime AssignedAt { get; set; }
 
     public DateTime? CertifiedAt { get; set; }

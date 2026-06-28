@@ -13,6 +13,18 @@ public partial class User
 
     public string Email { get; set; } = null!;
 
+    public string NormalizedEmail { get; set; } = null!;
+
+    public string? PhoneNumber { get; set; }
+
+    public string? NormalizedPhone { get; set; }
+
+    public DateOnly? DateOfBirth { get; set; }
+
+    public byte[]? IdentityNumberEncrypted { get; set; }
+
+    public byte[]? IdentityHash { get; set; }
+
     public string PasswordHash { get; set; } = null!;
 
     public string Role { get; set; } = null!;
@@ -53,7 +65,9 @@ public partial class User
 
     public virtual SpectatorProfile? SpectatorProfile { get; set; }
 
-    public virtual ICollection<Tournament> Tournaments { get; set; } = new List<Tournament>();
+    public virtual ICollection<TournamentParticipant> TournamentParticipantApprovedByNavigations { get; set; } = new List<TournamentParticipant>();
 
-    public virtual ICollection<TournamentParticipant> TournamentParticipants { get; set; } = new List<TournamentParticipant>();
+    public virtual ICollection<TournamentParticipant> TournamentParticipantUsers { get; set; } = new List<TournamentParticipant>();
+
+    public virtual ICollection<Tournament> Tournaments { get; set; } = new List<Tournament>();
 }

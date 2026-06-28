@@ -11,6 +11,12 @@ public partial class RefereeAssignment
 
     public string Role { get; set; } = null!;
 
+    public string CoiCheckStatus { get; set; } = null!;
+
+    public DateTime? CoiCheckedAt { get; set; }
+
+    public string? CoiViolationReason { get; set; }
+
     public DateTime AssignedAt { get; set; }
 
     public virtual Race Race { get; set; } = null!;
