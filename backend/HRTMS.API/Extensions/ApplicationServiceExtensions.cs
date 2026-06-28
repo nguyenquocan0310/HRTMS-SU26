@@ -1,4 +1,5 @@
 using HRTMS.Core.Interfaces.Services;
+using HRTMS.Core.Models;
 using HRTMS.Infrastructure.Services;
 
 namespace HRTMS.API.Extensions;
@@ -20,6 +21,10 @@ public static class ApplicationServiceExtensions
         services.AddScoped<IResultService, ResultService>();
         services.AddScoped<IHorseService, HorseService>();
         services.AddScoped<INotificationService, NotificationService>();
+
+        // NOTI.2 — SMTP Email
+        services.Configure<SmtpSettings>(configuration.GetSection("SmtpSettings"));
+        services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IRaceEntryService, RaceEntryService>();
         services.AddScoped<IRefereeAssignmentService, RefereeAssignmentService>();
         services.AddScoped<IDoctorAssignmentService, DoctorAssignmentService>();
