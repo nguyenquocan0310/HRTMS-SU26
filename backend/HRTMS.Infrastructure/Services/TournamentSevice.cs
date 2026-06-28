@@ -462,16 +462,41 @@ namespace HRTMS.Infrastructure.Services
                     }
 
                 // 4b. Vô hiệu các Pairing của giải (TRN.10): chuyển Cancelled cho pairing chưa kết thúc.
-                // Pairing entity không expose TournamentId → lọc qua Horse.TournamentId.
+                // Schema mới expose Pairing.TournamentId nên lọc trực tiếp theo tournament.
                 var pairings = await _context.Pairings
-                    .Include(p => p.Horse)
-                    .Where(p => p.Horse.TournamentId == tournamentId
+                    .Where(p => p.TournamentId == tournamentId
                                 && p.Status != "Cancelled" && p.Status != "Declined")
                     .ToListAsync();
                 foreach (var pairing in pairings)
                 {
                     pairing.Status = "Cancelled";
                     pairing.UpdatedAt = now;
+                }
+
+                // 4c. Đưa payout liên quan về trạng thái chưa chi trả khi giải bị hủy.
+                var payouts = await _context.PursePayouts
+                    .Where(p => p.RaceEntry.Race.Round.TournamentId == tournamentId)
+                    .ToListAsync();
+                foreach (var payout in payouts)
+                {
+                    var oldPayoutStatus = payout.PayoutStatus;
+                    var oldPaidAt = payout.PaidAt;
+
+                    payout.PayoutStatus = "Unpaid";
+                    payout.PaidAt = null;
+                    payout.UpdatedByAdminId = adminUserId;
+                    payout.UpdatedAt = now;
+
+                    if (oldPayoutStatus != "Unpaid" || oldPaidAt != null)
+                    {
+                        _auditLog.LogDeferred(
+                            actorId: adminUserId,
+                            action: "Cancel_Tournament_PursePayout",
+                            entityName: "PursePayout",
+                            entityId: payout.PursePayoutId.ToString(),
+                            oldValue: oldPayoutStatus,
+                            newValue: "Unpaid");
+                    }
                 }
 
                 // 5. Gửi Notification cho tất cả Spectator có dự đoán bị ảnh hưởng
