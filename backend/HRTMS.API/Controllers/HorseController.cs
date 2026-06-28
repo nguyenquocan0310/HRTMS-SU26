@@ -15,6 +15,7 @@ using System.Threading.Tasks;
 namespace HRTMS.API.Controllers
 {
 
+    [Tags("horse")]
     [ApiController]
     [Route("api/horses")]
     public class HorseController : ControllerBase

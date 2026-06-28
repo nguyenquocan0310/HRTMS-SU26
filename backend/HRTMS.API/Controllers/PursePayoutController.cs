@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 
 namespace HRTMS.API.Controllers
 {
+    [Tags("results")]
     [ApiController]
     [Authorize(Roles = "Admin")]   // REQ-F-PRZ.6 — chỉ Admin quản lý chi trả
     public class PursePayoutController : ControllerBase

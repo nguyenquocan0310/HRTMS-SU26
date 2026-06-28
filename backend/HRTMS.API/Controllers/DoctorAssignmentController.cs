@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace HRTMS.API.Controllers;
 
+[Tags("prerace")]
 [ApiController]
 [Route("api/admin/races/{raceId:int}/doctors")]
 [Authorize(Roles = "Admin")]

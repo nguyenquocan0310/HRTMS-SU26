@@ -5,6 +5,7 @@ using System.Security.Claims;
 
 namespace HRTMS.API.Controllers;
 
+[Tags("leaderboard")]
 [ApiController]
 [Route("api/reconciliation")]
 [Authorize(Roles = "Spectator")]

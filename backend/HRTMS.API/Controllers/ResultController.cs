@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 
 namespace HRTMS.API.Controllers
 {
+    [Tags("results")]
     [ApiController]
     [Route("api/races")]
     [Authorize(Roles = "Admin")]
@@ -22,11 +23,8 @@ namespace HRTMS.API.Controllers
             _resultService = resultService;
         }
 
-        // Lay UserId tu JWT claim, khong nhan tu request body — cùng pattern TournamentController
         private int GetCurrentUserId() => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-        // GET /api/races/unofficial?tournamentId=123
-        // REQ-F-RES.1 — Danh sách Race Unofficial để Admin chọn Declare (UI-S13)
         [HttpGet("unofficial")]
         public async Task<ActionResult<ApiResponse<List<UnofficialRaceListItemDto>>>> GetUnofficialRaces(
             [FromQuery] int? tournamentId)
@@ -35,8 +33,6 @@ namespace HRTMS.API.Controllers
             return Ok(ApiResponse<List<UnofficialRaceListItemDto>>.Ok(result));
         }
 
-        // POST /api/races/{id}/declare-official
-        // REQ-F-RES.2/RES.3/RES.4/RES.5 — Declare Official (ACID 6 bước)
         [HttpPost("{id}/declare-official")]
         public async Task<ActionResult<ApiResponse<DeclareOfficialResultDto>>> DeclareOfficial(
             int id, [FromBody] DeclareOfficialDto dto)
@@ -46,18 +42,9 @@ namespace HRTMS.API.Controllers
                 var result = await _resultService.DeclareOfficialAsync(id, dto, GetCurrentUserId());
                 return Ok(ApiResponse<DeclareOfficialResultDto>.Ok(result, "Công bố kết quả chính thức thành công"));
             }
-            catch (KeyNotFoundException ex)
-            {
-                return NotFound(ApiResponse<DeclareOfficialResultDto>.Fail(ex.Message));
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(ApiResponse<DeclareOfficialResultDto>.Fail(ex.Message));
-            }
-            catch (ArgumentException ex)
-            {
-                return BadRequest(ApiResponse<DeclareOfficialResultDto>.Fail(ex.Message));
-            }
+            catch (KeyNotFoundException ex) { return NotFound(ApiResponse<DeclareOfficialResultDto>.Fail(ex.Message)); }
+            catch (InvalidOperationException ex) { return BadRequest(ApiResponse<DeclareOfficialResultDto>.Fail(ex.Message)); }
+            catch (ArgumentException ex) { return BadRequest(ApiResponse<DeclareOfficialResultDto>.Fail(ex.Message)); }
         }
     }
 }

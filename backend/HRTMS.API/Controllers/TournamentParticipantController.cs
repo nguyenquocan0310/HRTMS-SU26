@@ -8,6 +8,7 @@ using System.Security.Claims;
 
 namespace HRTMS.API.Controllers;
 
+[Tags("tournament")]
 [ApiController]
 [Route("api")]
 [Authorize]

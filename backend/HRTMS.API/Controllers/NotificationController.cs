@@ -5,6 +5,7 @@ using System.Security.Claims;
 
 namespace HRTMS.API.Controllers;
 
+[Tags("notification")]
 [ApiController]
 [Route("api/notifications")]
 [Authorize]

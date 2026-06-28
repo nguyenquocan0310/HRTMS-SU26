@@ -8,6 +8,7 @@ namespace HRTMS.API.Controllers;
 
 // Module E — Lap lich, Boc tham & Rut lui (REQ-F-SCH).
 // Tach rieng khoi RaceEntryController (von phuc vu Owner dang ky entry + entry fee).
+[Tags("scheduling")]
 [ApiController]
 [Route("api")]
 public class SchedulingController : ControllerBase
