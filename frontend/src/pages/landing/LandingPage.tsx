@@ -1,45 +1,111 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FiCalendar, FiFlag, FiShield, FiUsers } from 'react-icons/fi';
 import Navbar from '../../components/common/Navbar';
+import { getTournaments } from '../../services/tournamentService';
 import styles from './LandingPage.module.scss';
 
-const TOURNAMENT = {
-  status: 'Open Registration',
-  raceCount: '5 race',
-  title: 'Cúp Đua Ngựa Quốc Gia Việt Nam 2026',
-  description:
-    'Giải mở đăng ký tại Phú Thọ, dùng để demo đăng ký giải, duyệt roster, mời ký sĩ và phân bổ race.',
-};
+// ── Types inline (tránh import type bị lỗi encoding) ─────────────────────
+interface RaceItem {
+  raceId: number;
+  raceNumber: number;
+  scheduledTime: string;
+  status: string;
+}
+interface RoundItem {
+  roundId: number;
+  name: string;
+  races: RaceItem[];
+}
+interface Tournament {
+  tournamentId: number;
+  name: string;
+  description: string | null;
+  startDate: string;
+  endDate: string;
+  maxHorses: number;
+  allowedBreed: string;
+  raceDistance: number;
+  purseAmount: number;
+  entryFeeAmount: number;
+  status: string;
+  rounds: RoundItem[];
+}
 
-const DETAILS = [
-  { label: 'Thời gian', value: '10/07/2026 - 12/07/2026' },
-  { label: 'Giống ngựa', value: 'Thoroughbred' },
-  { label: 'Cự ly', value: '1600m' },
-  { label: 'Lệ phí', value: '500.000 VND' },
-  { label: 'Quỹ thưởng', value: '50.000.000 VND' },
-  { label: 'Số ngựa tối đa', value: '12' },
+// ── Helpers ───────────────────────────────────────────────────────────────
+function formatDate(iso: string) {
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+}
+
+function formatDateTime(iso: string) {
+  const d = new Date(iso);
+  return `${formatDate(iso)} · ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function formatVND(amount: number) {
+  return amount.toLocaleString('vi-VN') + ' VND';
+}
+
+function statusLabel(status: string) {
+  const map: Record<string, string> = {
+    OpenRegistration: 'Open Registration',
+    Published: 'Published',
+    Draft: 'Draft',
+    InProgress: 'In Progress',
+    Completed: 'Completed',
+    Cancelled: 'Cancelled',
+    Upcoming: 'Upcoming',
+  };
+  return map[status] ?? status;
+}
+
+const FLOW_STEPS = [
+  'Chọn role Owner, Jockey, Referee, Doctor hoặc Spectator.',
+  'Xác thực email bằng mã gửi qua SMTP trước khi tạo tài khoản.',
+  'Role chuyên môn cung cấp phone, ngày sinh, CCCD và giấy phép liên quan.',
+  'Owner và Spectator active ngay; Jockey, Referee, Doctor chờ Admin duyệt.',
 ];
 
-const STATS = [
-  { icon: <FiFlag />, label: 'Giải đang mở', value: '1' },
-  { icon: <FiCalendar />, label: 'Tổng race', value: '6' },
-  { icon: <FiUsers />, label: 'Role tự đăng ký', value: '5' },
-  { icon: <FiShield />, label: 'Tổng quỹ thưởng', value: '85.000.000 VND' },
-];
-
-const SCHEDULE = [
-  { name: 'Vòng loại - Race 1', time: '10/07/2026 · 09:00' },
-  { name: 'Vòng loại - Race 2', time: '10/07/2026 · 14:00' },
-  { name: 'Bán kết - Race 1', time: '11/07/2026 · 09:00' },
-  { name: 'Bán kết - Race 2', time: '11/07/2026 · 14:00' },
-];
-
+// ── Component ─────────────────────────────────────────────────────────────
 export default function LandingPage() {
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getTournaments()
+      .then((data) => setTournaments(data as Tournament[]))
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const featured =
+    tournaments.find((t) => t.status === 'OpenRegistration') ?? tournaments[0] ?? null;
+
+  const openCount = tournaments.filter((t) => t.status === 'OpenRegistration').length;
+  const totalRaces = tournaments.reduce(
+    (sum, t) => sum + t.rounds.reduce((s, r) => s + r.races.length, 0), 0
+  );
+  const totalPurse = tournaments.reduce((sum, t) => sum + (t.purseAmount ?? 0), 0);
+
+  const upcomingRaces: { roundName: string; race: RaceItem }[] = [];
+  if (featured) {
+    for (const round of featured.rounds) {
+      for (const race of round.races) {
+        upcomingRaces.push({ roundName: round.name, race });
+      }
+    }
+    upcomingRaces.sort(
+      (a, b) => new Date(a.race.scheduledTime).getTime() - new Date(b.race.scheduledTime).getTime()
+    );
+  }
+
   return (
     <div className={styles.landingPage}>
       <Navbar />
-
       <main className={styles.main}>
+
         {/* ── Hero ── */}
         <section className={styles.hero}>
           <div className={styles.heroLeft}>
@@ -47,14 +113,13 @@ export default function LandingPage() {
               <FiShield size={13} />
               Dữ liệu giải đấu trực tiếp từ hệ thống
             </p>
-
-            <h1 className={styles.heroTitle}>{TOURNAMENT.title}</h1>
-
+            <h1 className={styles.heroTitle}>
+              {loading ? 'Đang tải...' : featured ? featured.name : 'HRTMS'}
+            </h1>
             <p className={styles.heroDesc}>
               Theo dõi giải đang mở đăng ký, lịch race, quỹ thưởng và nghiệp vụ
               đăng ký tài khoản theo từng vai trò.
             </p>
-
             <div className={styles.heroCta}>
               <Link to="/register" className={styles.primaryAction}>
                 Đăng ký tài khoản →
@@ -65,33 +130,76 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <article className={styles.tournamentCard}>
-            <div className={styles.cardHeader}>
-              <span className={styles.statusBadge}>{TOURNAMENT.status}</span>
-              <strong className={styles.raceCount}>{TOURNAMENT.raceCount}</strong>
+          {loading ? (
+            <div className={styles.tournamentCard}>
+              <p className={styles.loadingText}>Đang tải dữ liệu giải đấu...</p>
             </div>
-            <h2 className={styles.cardTitle}>{TOURNAMENT.title}</h2>
-            <p className={styles.cardDesc}>{TOURNAMENT.description}</p>
-            <div className={styles.detailGrid}>
-              {DETAILS.map((d) => (
-                <div className={styles.detailItem} key={d.label}>
-                  <span className={styles.detailLabel}>{d.label}</span>
-                  <strong className={styles.detailValue}>{d.value}</strong>
+          ) : error ? (
+            <div className={styles.tournamentCard}>
+              <p className={styles.errorText}>{error}</p>
+            </div>
+          ) : featured ? (
+            <article className={styles.tournamentCard}>
+              <div className={styles.cardHeader}>
+                <span className={styles.statusBadge}>{statusLabel(featured.status)}</span>
+                <strong className={styles.raceCount}>{totalRaces} race</strong>
+              </div>
+              <h2 className={styles.cardTitle}>{featured.name}</h2>
+              <p className={styles.cardDesc}>{featured.description}</p>
+              <div className={styles.detailGrid}>
+                <div className={styles.detailItem}>
+                  <span className={styles.detailLabel}>Thời gian</span>
+                  <strong className={styles.detailValue}>
+                    {formatDate(featured.startDate)} - {formatDate(featured.endDate)}
+                  </strong>
                 </div>
-              ))}
-            </div>
-          </article>
+                <div className={styles.detailItem}>
+                  <span className={styles.detailLabel}>Giống ngựa</span>
+                  <strong className={styles.detailValue}>{featured.allowedBreed}</strong>
+                </div>
+                <div className={styles.detailItem}>
+                  <span className={styles.detailLabel}>Cự ly</span>
+                  <strong className={styles.detailValue}>{featured.raceDistance}m</strong>
+                </div>
+                <div className={styles.detailItem}>
+                  <span className={styles.detailLabel}>Lệ phí</span>
+                  <strong className={styles.detailValue}>{formatVND(featured.entryFeeAmount)}</strong>
+                </div>
+                <div className={styles.detailItem}>
+                  <span className={styles.detailLabel}>Quỹ thưởng</span>
+                  <strong className={styles.detailValue}>{formatVND(featured.purseAmount)}</strong>
+                </div>
+                <div className={styles.detailItem}>
+                  <span className={styles.detailLabel}>Số ngựa tối đa</span>
+                  <strong className={styles.detailValue}>{featured.maxHorses}</strong>
+                </div>
+              </div>
+            </article>
+          ) : null}
         </section>
 
         {/* ── Stats ── */}
-        <section className={styles.statsGrid} aria-label="Tổng quan giải đấu">
-          {STATS.map((stat) => (
-            <article className={styles.statCard} key={stat.label}>
-              <span className={styles.statIcon}>{stat.icon}</span>
-              <p className={styles.statLabel}>{stat.label}</p>
-              <strong className={styles.statValue}>{stat.value}</strong>
-            </article>
-          ))}
+        <section className={styles.statsGrid}>
+          <article className={styles.statCard}>
+            <span className={styles.statIcon}><FiFlag /></span>
+            <p className={styles.statLabel}>Giải đang mở</p>
+            <strong className={styles.statValue}>{loading ? '...' : openCount}</strong>
+          </article>
+          <article className={styles.statCard}>
+            <span className={styles.statIcon}><FiCalendar /></span>
+            <p className={styles.statLabel}>Tổng race</p>
+            <strong className={styles.statValue}>{loading ? '...' : totalRaces}</strong>
+          </article>
+          <article className={styles.statCard}>
+            <span className={styles.statIcon}><FiUsers /></span>
+            <p className={styles.statLabel}>Role tự đăng ký</p>
+            <strong className={styles.statValue}>5</strong>
+          </article>
+          <article className={styles.statCard}>
+            <span className={styles.statIcon}><FiShield /></span>
+            <p className={styles.statLabel}>Tổng quỹ thưởng</p>
+            <strong className={styles.statValue}>{loading ? '...' : formatVND(totalPurse)}</strong>
+          </article>
         </section>
 
         {/* ── Info Grid ── */}
@@ -99,18 +207,24 @@ export default function LandingPage() {
           <article className={styles.panel} id="schedule">
             <div className={styles.panelHeader}>
               <h2 className={styles.panelTitle}>Lịch race gần nhất</h2>
-              <strong className={styles.panelMeta}>{TOURNAMENT.title}</strong>
+              {featured && <strong className={styles.panelMeta}>{featured.name}</strong>}
             </div>
             <div className={styles.scheduleList}>
-              {SCHEDULE.map((race) => (
-                <div className={styles.scheduleItem} key={race.name}>
-                  <div>
-                    <h3 className={styles.raceName}>{race.name}</h3>
-                    <p className={styles.raceTime}>{race.time}</p>
+              {loading ? (
+                <p className={styles.loadingText}>Đang tải...</p>
+              ) : upcomingRaces.length === 0 ? (
+                <p className={styles.emptyText}>Chưa có lịch race.</p>
+              ) : (
+                upcomingRaces.slice(0, 5).map(({ roundName, race }) => (
+                  <div className={styles.scheduleItem} key={race.raceId}>
+                    <div>
+                      <h3 className={styles.raceName}>{roundName} - Race {race.raceNumber}</h3>
+                      <p className={styles.raceTime}>{formatDateTime(race.scheduledTime)}</p>
+                    </div>
+                    <span className={styles.upcomingBadge}>{statusLabel(race.status)}</span>
                   </div>
-                  <span className={styles.upcomingBadge}>Upcoming</span>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </article>
 
@@ -120,13 +234,11 @@ export default function LandingPage() {
               <strong className={styles.panelMeta}>Email OTP + xét duyệt role</strong>
             </div>
             <div className={styles.flowText}>
-              <p>Chọn role Owner, Jockey, Referee, Doctor hoặc Spectator.</p>
-              <p>Xác thực email bằng mã gửi qua SMTP trước khi tạo tài khoản.</p>
-              <p>Role chuyên môn cung cấp phone, ngày sinh, CCCD và giấy phép liên quan.</p>
-              <p>Owner và Spectator active ngay; Jockey, Referee, Doctor chờ Admin duyệt.</p>
+              {FLOW_STEPS.map((step, i) => <p key={i}>{step}</p>)}
             </div>
           </article>
         </section>
+
       </main>
     </div>
   );
