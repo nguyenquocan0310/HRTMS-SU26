@@ -1,6 +1,9 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using BCrypt.Net;
 using HRTMS.Core.Common;
 using HRTMS.Core.DTOs.Auth;
 using HRTMS.Core.DTOs.FamilyDeclaration;
@@ -9,6 +12,7 @@ using HRTMS.Core.Interfaces.Services;
 using HRTMS.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
 
 namespace HRTMS.Infrastructure.Services;
 
@@ -19,6 +23,8 @@ public class AuthService : IAuthService
     private readonly IAuditLogService _auditLog;
     private readonly IFamilyDeclarationValidator _frdValidator;
     private readonly ITokenBlacklistService _tokenBlacklistService;
+    private readonly IEmailService _emailService;
+    private readonly IConfiguration _config;
     private readonly byte[] _encryptionKey; // 32 bytes — AES-256
 
     // ACC.1 — các role được phép tự đăng ký
@@ -48,6 +54,7 @@ public class AuthService : IAuthService
         IAuditLogService auditLog,
         IFamilyDeclarationValidator frdValidator,
         ITokenBlacklistService tokenBlacklistService,
+        IEmailService emailService,
         IConfiguration configuration)
     {
         _context = context;
@@ -55,6 +62,8 @@ public class AuthService : IAuthService
         _auditLog = auditLog;
         _frdValidator = frdValidator;
         _tokenBlacklistService = tokenBlacklistService;
+        _emailService = emailService;
+        _config = configuration;
 
         // Đọc key từ config; fallback dev-only key (KHÔNG dùng trong production)
         var keyHex = configuration["Security:IdentityEncryptionKeyHex"];
@@ -268,7 +277,6 @@ public class AuthService : IAuthService
         if (hash != null && await _context.Users.AnyAsync(u => u.IdentityHash != null && u.IdentityHash == hash))
             return ApiResponse<int>.Fail("Số CCCD đã được đăng ký với tài khoản khác.");
 
-        // Admin tạo → Active ngay với mọi role (trừ Jockey/Referee/Doctor cần profile approval)
         // Rule: Admin tạo Jockey/Referee/Doctor vẫn cần Admin duyệt profile → Pending; Admin tạo Admin/Owner/Spectator → Active
         string initialStatus = dto.Role is "Jockey" or "Referee" or "Doctor" ? "Pending" : "Active";
 
@@ -282,6 +290,7 @@ public class AuthService : IAuthService
                 Username = dto.Username,
                 FullName = dto.FullName,
                 Email = normalizedEmail,
+                NormalizedEmail = normalizedEmail.ToUpper(),
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password, workFactor: 12),
                 Role = dto.Role,
                 Status = initialStatus,
@@ -347,13 +356,79 @@ public class AuthService : IAuthService
     }
 
     // =========================================================
+    // PWD.1 — Quên mật khẩu: tạo reset token JWT 15 phút + gửi email
+    // =========================================================
+    public async Task<ApiResponse<bool>> ForgotPasswordAsync(ForgotPasswordDto dto)
+    {
+        var email = dto.Email.Trim().ToLower();
+        var user = await _context.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Email == email);
+
+        // Luôn trả về success để tránh email enumeration attack
+        if (user is null || user.Status == "Suspended")
+            return ApiResponse<bool>.Ok(true, "Nếu email tồn tại, bạn sẽ nhận được hướng dẫn đặt lại mật khẩu.");
+
+        var resetToken = GenerateResetToken(user);
+
+        var baseUrl = _config["App:FrontendUrl"]?.TrimEnd('/') ?? "http://localhost:5173";
+        var resetLink = $"{baseUrl}/reset-password?token={resetToken}";
+
+        var html = BuildResetEmailHtml(user.FullName, resetLink);
+
+        await _emailService.SendAsync(
+            user.Email,
+            user.FullName,
+            "HRTMS — Đặt lại mật khẩu",
+            html);
+
+        return ApiResponse<bool>.Ok(true, "Nếu email tồn tại, bạn sẽ nhận được hướng dẫn đặt lại mật khẩu.");
+    }
+
+    // =========================================================
+    // PWD.2 — Reset mật khẩu: verify token + update DB + blacklist
+    // =========================================================
+    public async Task<ApiResponse<bool>> ResetPasswordAsync(ResetPasswordDto dto)
+    {
+        // 1. Validate token
+        var principal = ValidateResetToken(dto.Token);
+        if (principal is null)
+            return ApiResponse<bool>.Fail("Token không hợp lệ hoặc đã hết hạn.");
+
+        // 2. Kiểm tra claim purpose
+        var purpose = principal.FindFirst("purpose")?.Value;
+        if (purpose != "password-reset")
+            return ApiResponse<bool>.Fail("Token không hợp lệ hoặc đã hết hạn.");
+
+        // 3. Lấy userId từ claim
+        var userIdStr = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId))
+            return ApiResponse<bool>.Fail("Token không hợp lệ hoặc đã hết hạn.");
+
+        // 4. Tìm user trong DB
+        var user = await _context.Users.FindAsync(userId);
+        if (user is null || user.Status == "Suspended")
+            return ApiResponse<bool>.Fail("Tài khoản không tồn tại hoặc đã bị khoá.");
+
+        // 5. Validate mật khẩu mới
+        if (string.IsNullOrWhiteSpace(dto.NewPassword) || dto.NewPassword.Length < 6)
+            return ApiResponse<bool>.Fail("Mật khẩu mới phải có ít nhất 6 ký tự.");
+
+        // 6. Hash + update
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword, workFactor: 12);
+        user.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        // 7. Blacklist toàn bộ token cũ (kể cả reset token này)
+        await _tokenBlacklistService.BlacklistUserAsync(userId);
+
+        return ApiResponse<bool>.Ok(true, "Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.");
+    }
+
+    // =========================================================
     // PRIVATE HELPERS
     // =========================================================
 
-    /// <summary>
-    /// ACC.1A — Validate định danh bắt buộc cho professional roles.
-    /// Trả về chuỗi lỗi nếu không hợp lệ, null nếu OK.
-    /// </summary>
     private static string? ValidateProfessionalIdentity(
         string? phone, DateTime? dob, string? cccd, string role)
     {
@@ -366,18 +441,12 @@ public class AuthService : IAuthService
         if (string.IsNullOrWhiteSpace(cccd))
             return $"Role {role} bắt buộc phải cung cấp số CCCD.";
 
-        // ACC chốt: CCCD = đúng 12 số (không chấp nhận CMND 9 số)
         if (!CccdRegex.IsMatch(cccd.Trim()))
             return "Số CCCD không hợp lệ. CCCD phải gồm đúng 12 chữ số.";
 
         return null;
     }
 
-    /// <summary>
-    /// Mã hoá CCCD plain-text bằng AES-256-CBC.
-    /// Trả về (encrypted, sha256Hash).
-    /// Hash dùng để lookup/unique check mà không cần decrypt.
-    /// </summary>
     private (byte[] encrypted, byte[] hash) EncryptIdentity(string cccd)
     {
         var plain = Encoding.UTF8.GetBytes(cccd.Trim());
@@ -389,20 +458,15 @@ public class AuthService : IAuthService
         using var encryptor = aes.CreateEncryptor();
         var cipherText = encryptor.TransformFinalBlock(plain, 0, plain.Length);
 
-        // Lưu IV + ciphertext để có thể decrypt sau
         var result = new byte[aes.IV.Length + cipherText.Length];
         Buffer.BlockCopy(aes.IV, 0, result, 0, aes.IV.Length);
         Buffer.BlockCopy(cipherText, 0, result, aes.IV.Length, cipherText.Length);
 
-        // Hash SHA-256 deterministic để tra cứu unique
         var hash = SHA256.HashData(plain);
 
         return (result, hash);
     }
 
-    /// <summary>
-    /// Tạo profile record tương ứng với role sau khi User đã được SaveChanges.
-    /// </summary>
     private async Task CreateRoleProfileAsync(
         int userId, string role, RegisterDto dto, DateTime now)
     {
@@ -432,7 +496,6 @@ public class AuthService : IAuthService
                 break;
 
             case "Owner":
-                // schema v2: OwnerProfiles chỉ còn OwnerId (identity pindah ke Users)
                 _context.OwnerProfiles.Add(new OwnerProfile
                 {
                     OwnerId = userId,
@@ -483,8 +546,98 @@ public class AuthService : IAuthService
                 break;
 
             case "Admin":
-                // Admin không có profile riêng
                 break;
         }
+    }
+
+    private string GenerateResetToken(User user)
+    {
+        var key = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(_config["JwtSettings:SecretKey"]!));
+
+        var now = DateTime.UtcNow;
+
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
+            new Claim("purpose", "password-reset"),
+            new Claim(JwtRegisteredClaimNames.Iat,
+                new DateTimeOffset(now).ToUnixTimeSeconds().ToString(),
+                ClaimValueTypes.Integer64)
+        };
+
+        var token = new JwtSecurityToken(
+            issuer: _config["JwtSettings:Issuer"],
+            audience: _config["JwtSettings:Audience"],
+            claims: claims,
+            notBefore: now,
+            expires: now.AddMinutes(15),
+            signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
+        );
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    private ClaimsPrincipal? ValidateResetToken(string token)
+    {
+        try
+        {
+            var key = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(_config["JwtSettings:SecretKey"]!));
+
+            var handler = new JwtSecurityTokenHandler();
+            var principal = handler.ValidateToken(token, new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidIssuer = _config["JwtSettings:Issuer"],
+                ValidateAudience = true,
+                ValidAudience = _config["JwtSettings:Audience"],
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = key,
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.Zero
+            }, out _);
+
+            return principal;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string BuildResetEmailHtml(string fullName, string resetLink)
+    {
+        var safeName = System.Net.WebUtility.HtmlEncode(fullName);
+        return $"""
+            <!DOCTYPE html>
+            <html lang="vi">
+            <body style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:24px;color:#1f2937;background:#fff">
+              <div style="border-left:4px solid #b5121b;padding-left:16px;margin-bottom:20px">
+                <h2 style="margin:0;color:#b5121b;font-size:18px">Đặt lại mật khẩu HRTMS</h2>
+              </div>
+              <p style="font-size:15px;line-height:1.7">Xin chào <strong>{safeName}</strong>,</p>
+              <p style="font-size:15px;line-height:1.7">
+                Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn.
+                Nhấn vào nút bên dưới để tiếp tục — link chỉ có hiệu lực trong <strong>15 phút</strong>.
+              </p>
+              <div style="text-align:center;margin:32px 0">
+                <a href="{resetLink}"
+                   style="display:inline-block;padding:14px 32px;background:#b5121b;color:#fff;
+                          text-decoration:none;border-radius:6px;font-weight:600;font-size:15px">
+                  Đặt lại mật khẩu
+                </a>
+              </div>
+              <p style="font-size:13px;color:#6b7280;line-height:1.6">
+                Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này.
+                Tài khoản của bạn vẫn an toàn.
+              </p>
+              <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
+              <p style="font-size:12px;color:#9ca3af;margin:0">
+                Email này được gửi tự động từ hệ thống HRTMS. Vui lòng không trả lời email này.
+              </p>
+            </body>
+            </html>
+            """;
     }
 }
