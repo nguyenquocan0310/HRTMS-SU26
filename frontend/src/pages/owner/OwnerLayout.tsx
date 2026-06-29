@@ -43,7 +43,6 @@ export default function OwnerLayout() {
       <aside className="w-56 bg-white border-r border-gray-200 p-4">
         <h2 className="font-bold text-lg mb-6 text-gray-800">🐴 Owner</h2>
         <nav className="flex flex-col gap-2">
-=======
       <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
         {/* ─── Thông tin chủ ngựa ─── */}
         <div className="p-4 border-b border-gray-100 bg-gradient-to-br from-blue-50 to-indigo-50">
@@ -84,7 +83,7 @@ export default function OwnerLayout() {
                     ? 'bg-green-100 text-green-700'
                     : 'bg-gray-100 text-gray-500'
                 }`}
-              >
+               > 
                 {loading ? '...' : (profile?.status ?? '—')}
               </span>
               <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
