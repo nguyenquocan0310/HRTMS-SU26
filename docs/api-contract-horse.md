@@ -1,13 +1,14 @@
 # API Contract — Module C: Đăng ký Ngựa & Duyệt Hồ sơ
 
-**Phiên bản:** 2.0 — đồng bộ SRS v2 Pha 3 (screening 3 nhánh AutoEligible/ManualReview/AutoRejected; auto-reject chạy ngay khi submit; AutoEligible tự Approved)\
+**Phiên bản:** 3.0 — Schema v3: tách "kho ngựa" khỏi giải đấu. Hồ sơ ngựa (`Horse`) là kho vĩnh viễn của Owner; việc tham gia từng giải tách sang **enrollment** (`HorseTournamentEntry`) với screening + AdminApproval **theo từng giải** (duyệt lại mỗi giải).\
 **Base URL:** `http://localhost:5000/api`\
 **Auth header:** `Authorization: Bearer <jwt_token>`
 
-> **Thay đổi so với v1.1 (FE + BE đọc):**
-> - Khi Owner **submit hồ sơ ngựa** (endpoint 1), hệ thống **screen ngay** (không chờ Admin): trả về `screeningStatus` ∈ `AutoEligible | ManualReview | AutoRejected`. `AutoEligible` → hồ sơ **tự động `Approved`**; `ManualReview` → vào hàng đợi Admin (`Pending`); `AutoRejected` → `Rejected` (Admin **không** override được).
-> - Response Horse có thêm `screeningStatus` và `screeningReason`.
-> - `dopingTestDate` trong **response có thể là `null`** (DB cho phép NULL); khi tạo ngựa vẫn **bắt buộc** nhập.
+> **Thay đổi so với v2.0 (FE + BE đọc):**
+> - `POST /api/horses` **không còn nhận `tournamentId`** — chỉ tạo hồ sơ ngựa vào kho. Screening breed/doping-theo-giải chuyển sang bước enroll.
+> - **Mới:** `POST /api/horses/{horseId}/enrollments` để Owner "đẩy" một con ngựa trong kho vào một giải. Response trả `screeningStatus` ∈ `AutoEligible | ManualReview | AutoRejected` cho **enrollment** đó.
+> - Admin duyệt/từ chối nay thao tác trên **enrollment** (`/api/admin/horse-entries/{enrollmentId}/...`) thay vì trên hồ sơ ngựa.
+> - `Horse` vẫn giữ `screeningStatus`/`adminApprovalStatus` ở mức **baseline hồ sơ** (chỉ chặn doping `Failed`); gate thật sự để vào giải là enrollment.
 
 ---
 
@@ -32,7 +33,7 @@
 
 > **Lưu ý kiến trúc:** `RaceEntry` không link thẳng vào `Horse` mà link qua `Pairing` (Horse + Jockey).\
 > Chuỗi quan hệ: `Race → RaceEntry → Pairing → Horse`. Việc tạo RaceEntry yêu cầu `Pairing` đã `Confirmed` (xem Module D/E).\
-> Auto-reject theo breed dùng `Horse.TournamentId` trực tiếp (schema v2: mỗi hồ sơ ngựa gắn đúng 1 giải).
+> Auto-reject theo breed so khớp `Horse.Breed` với `Tournament.AllowedBreed` tại **thời điểm enroll** (schema v3: hồ sơ ngựa không gắn giải; mỗi enrollment `HorseTournamentEntry` gắn đúng 1 giải).
 
 ---
 
@@ -40,19 +41,22 @@
 
 | \# | Method | Endpoint | Auth | Mô tả |
 | --- | --- | --- | --- | --- |
-| 1 | POST | `/api/horses` | Owner | Khai báo hồ sơ ngựa mới |
-| 2 | GET | `/api/horses/my` | Owner | Danh sách ngựa của Owner |
+| 1 | POST | `/api/horses` | Owner | Tạo hồ sơ ngựa vào **kho** (không gắn giải) |
+| 2 | GET | `/api/horses/my` | Owner | Danh sách ngựa trong kho của Owner |
 | 3 | GET | `/api/horses/{id}` | Owner | Chi tiết một con ngựa |
-| 4 | PUT | `/api/horses/{id}` | Owner | Cập nhật hồ sơ ngựa (trigger re-validate) |
-| 5 | GET | `/api/admin/horses/pending` | Admin | Danh sách hồ sơ ngựa chờ duyệt |
-| 6 | GET | `/api/admin/horses/{id}` | Admin | Chi tiết hồ sơ ngựa (Admin view) |
-| 7 | PATCH | `/api/admin/horses/{id}/approve` | Admin | Phê duyệt hồ sơ ngựa |
-| 8 | PATCH | `/api/admin/horses/{id}/reject` | Admin | Từ chối hồ sơ ngựa |
-| 9 | GET | `/api/race-entries/my` | Owner | Danh sách race entry của Owner |
-| 10 | GET | `/api/admin/entries/pending-fee` | Admin | Danh sách entries chờ xác nhận phí |
-| 11 | PATCH | `/api/admin/entries/{id}/fee-status` | Admin | Xác nhận đã nhận lệ phí (Unpaid → Paid) |
-| 12 | PATCH | `/api/admin/entries/{id}/approve` | Admin | Phê duyệt entry tham gia race (gate EntryFeeStatus) |
-| 13 | PATCH | `/api/admin/entries/{id}/reject` | Admin | Từ chối entry (→ Cancelled) |
+| 4 | PUT | `/api/horses/{id}` | Owner | Cập nhật hồ sơ ngựa (trigger re-screen enrollment) |
+| 5 | POST | `/api/horses/{horseId}/enrollments` | Owner | **Đẩy ngựa vào một giải** (screening theo giải) |
+| 6 | GET | `/api/horses/{horseId}/enrollments` | Owner | Danh sách enrollment của một con ngựa |
+| 7 | GET | `/api/horses/my/enrollments` | Owner | Tất cả enrollment của Owner (lọc theo `tournamentId`) |
+| 8 | GET | `/api/admin/horse-entries/pending` | Admin | Danh sách enrollment chờ duyệt |
+| 9 | GET | `/api/admin/horses/{id}` | Admin | Chi tiết hồ sơ ngựa (Admin view) |
+| 10 | PATCH | `/api/admin/horse-entries/{id}/approve` | Admin | Phê duyệt enrollment (ngựa vào giải) |
+| 11 | PATCH | `/api/admin/horse-entries/{id}/reject` | Admin | Từ chối enrollment |
+| 12 | GET | `/api/race-entries/my` | Owner | Danh sách race entry của Owner |
+| 13 | GET | `/api/admin/entries/pending-fee` | Admin | Danh sách entries chờ xác nhận phí |
+| 14 | PATCH | `/api/admin/entries/{id}/fee-status` | Admin | Xác nhận đã nhận lệ phí (Unpaid → Paid) |
+| 15 | PATCH | `/api/admin/entries/{id}/approve` | Admin | Phê duyệt entry tham gia race (gate EntryFeeStatus + enrollment Approved) |
+| 16 | PATCH | `/api/admin/entries/{id}/reject` | Admin | Từ chối entry (→ Cancelled) |
 
 > **Tạo RaceEntry KHÔNG thuộc Module C.** RaceEntry do **Admin allocate** Pairing `Confirmed` vào Race qua **Module E (SCH.1)** — không có endpoint `POST /api/race-entries` cho Owner. Owner chỉ **xem** entry của mình (#9).
 
@@ -112,11 +116,8 @@ Horse Owner khai báo hồ sơ hành chính và thông số y tế của ngựa.
 
 - `age` được tính tự động ở backend: `age = currentYear − birthYear`. Frontend không gửi trường này.
 - `legalConsentAccepted = false` → từ chối ngay, không tạo record.
-- Owner phải đã `Approved` trong roster của giải (`TournamentParticipants`) và giải đang `Open Registration` (REQ-F-HRS.4 AC#3) — nếu không → chặn tạo.
-- **Screening chạy ngay khi tạo (Pha 3):** sau khi lưu, hệ thống set `screeningStatus`:
-  - **AutoEligible** (breed khớp `Tournament.AllowedBreed` + doping `Clean` + consent) → `adminApprovalStatus = "Approved"` tự động.
-  - **ManualReview** (doping `Pending`) → `adminApprovalStatus = "Pending"`, vào hàng đợi Admin.
-  - **AutoRejected** (doping `Failed` HOẶC breed mismatch) → `adminApprovalStatus = "Rejected"`, `screeningReason` nêu lý do; Admin không override.
+- **Schema v3:** tạo hồ sơ vào **kho — KHÔNG cần roster/giải**. Không screening breed tại đây (chưa biết giải).
+- **Baseline profile screen:** chỉ chặn doping `Failed` → `screeningStatus = "AutoRejected"`, `adminApprovalStatus = "Rejected"`. Còn lại hồ sơ `adminApprovalStatus = "Approved"` (mức hồ sơ); gate thật sự để vào giải là **enrollment** (endpoint 5).
 
 ---
 
@@ -169,6 +170,70 @@ Horse Owner khai báo hồ sơ hành chính và thông số y tế của ngựa.
 | 403 | `FORBIDDEN` | Role không phải Owner |
 
 ---
+
+## 1b. Đẩy ngựa vào giải — Enrollment
+
+```
+POST /api/horses/{horseId}/enrollments
+```
+
+Owner "đẩy" một con ngựa **đã có trong kho** vào một giải cụ thể. Hệ thống screen breed/doping theo rule của giải và tạo bản ghi enrollment (`HorseTournamentEntry`) với AdminApproval **riêng cho giải đó**.
+
+**Auth:** Owner
+
+### Request body
+
+```json
+{ "tournamentId": 3 }
+```
+
+| Trường | Kiểu | Ràng buộc |
+| --- | --- | --- |
+| tournamentId | int | Bắt buộc, ≥ 1 — giải phải đang `Open Registration` |
+
+### Business rules
+
+- Ngựa phải thuộc Owner đang đăng nhập (`HORSE_NOT_OWNED`) và tồn tại (`HORSE_NOT_FOUND`).
+- Giải phải tồn tại (`TOURNAMENT_NOT_FOUND`) và đang `Open Registration`.
+- Owner phải đã `Approved` trong roster giải (`TournamentParticipants`) — nếu không → chặn enroll.
+- Không cho enroll **trùng** một con ngựa vào cùng một giải.
+- **Screening theo giải** → set `screeningStatus` cho enrollment:
+  - **AutoEligible** (breed khớp `Tournament.AllowedBreed` + doping `Clean`) → `adminApprovalStatus = "Approved"` tự động.
+  - **ManualReview** (doping `Pending`) → `adminApprovalStatus = "Pending"`, vào hàng đợi Admin.
+  - **AutoRejected** (doping `Failed` HOẶC breed mismatch) → `adminApprovalStatus = "Rejected"`, `screeningReason` nêu lý do; Admin không override.
+
+### Response — 201 Created
+
+```json
+{
+  "success": true,
+  "message": "Ngựa hợp lệ và đã được hệ thống tự động phê duyệt vào giải.",
+  "data": {
+    "enrollmentId":        10,
+    "horseId":             1,
+    "horseName":           "Thunder",
+    "tournamentId":        3,
+    "tournamentName":      "Giải Mùa Hè 2026",
+    "status":              "Enrolled",
+    "screeningStatus":     "AutoEligible",
+    "screeningReason":     null,
+    "adminApprovalStatus": "Approved",
+    "rejectionReason":     null,
+    "createdAt":           "2026-06-30T10:00:00Z",
+    "updatedAt":           "2026-06-30T10:00:00Z"
+  }
+}
+```
+
+### Lỗi
+
+| HTTP | error | Khi nào |
+| --- | --- | --- |
+| 404 | `HORSE_NOT_FOUND` / `TOURNAMENT_NOT_FOUND` | Không tìm thấy ngựa/giải |
+| 403 | `HORSE_NOT_OWNED` | Ngựa không thuộc Owner |
+| 400 | — | Giải không `Open Registration`, chưa `Approved` roster, hoặc enroll trùng |
+
+> `GET /api/horses/{horseId}/enrollments` và `GET /api/horses/my/enrollments?tournamentId=` trả về danh sách enrollment với cùng cấu trúc `data` (mảng).
 
 ---
 
@@ -386,13 +451,13 @@ Chỉ gửi các trường cần cập nhật.
 
 ---
 
-## 5. Danh sách hồ sơ ngựa chờ duyệt (Admin)
+## 5. Danh sách enrollment chờ duyệt (Admin)
 
 ```
-GET /api/admin/horses/pending
+GET /api/admin/horse-entries/pending
 ```
 
-Admin xem tất cả ngựa có `AdminApprovalStatus = "Pending"`.
+Admin xem tất cả **enrollment** (`HorseTournamentEntry`) có `AdminApprovalStatus = "Pending"`. Mỗi phần tử `data` theo cấu trúc `HorseEnrollmentResponseDto` (xem §1b).
 
 **Auth:** Admin
 
@@ -509,16 +574,16 @@ Admin xem chi tiết đầy đủ hồ sơ bất kỳ để phục vụ quyết 
 
 ---
 
-## 7. Phê duyệt hồ sơ ngựa (Admin)
+## 7. Phê duyệt enrollment (Admin)
 
 ```
-PATCH /api/admin/horses/{id}/approve
+PATCH /api/admin/horse-entries/{id}/approve
 ```
 
-Admin phê duyệt hồ sơ ngựa **ManualReview**. Endpoint chạy lại screening trước khi cho phép approve.
+Admin phê duyệt **enrollment ManualReview**. Endpoint chạy lại screening theo giải trước khi cho phép approve (auto-reject cứng không override được).
 
 **Auth:** Admin\
-**Path param:** `id` — horseId (integer)\
+**Path param:** `id` — enrollmentId (integer)\
 **Request body:** Không có
 
 > Chỉ áp dụng cho hồ sơ `ManualReview` (đang `Pending`). Hồ sơ `AutoEligible` đã được hệ thống tự duyệt; hồ sơ `AutoRejected` không thể duyệt.
@@ -529,14 +594,14 @@ Admin phê duyệt hồ sơ ngựa **ManualReview**. Endpoint chạy lại scree
 
 Thực hiện theo thứ tự, dừng lại và trả lỗi ngay nếu bước nào fail:
 
-1. **Kiểm tra trạng thái:** Nếu `AdminApprovalStatus` đã là `"Approved"` → trả 409.
-2. **Khóa override auto-reject cứng:** Nếu `ScreeningStatus = "AutoRejected"` → trả 422, Admin không được override.
-3. **Re-screen:** chạy lại screening (breed khớp `Horse.Tournament.AllowedBreed` + doping). Nếu kết quả `AutoRejected` (breed mismatch / doping `Failed`) → set `Rejected` + trả 422.
-4. Set `Horse.AdminApprovalStatus = "Approved"`.
-5. Ghi `AuditLog`: `action = "Approve_Horse"`, `entityName = "Horse"`, `entityId = horseId`.
-6. Gửi Notification đến Owner: `title = "Hồ sơ ngựa được phê duyệt"`, `relatedEntityType = "Horse"`, `relatedEntityId = horseId`.
+1. **Kiểm tra trạng thái:** Nếu enrollment `AdminApprovalStatus` đã là `"Approved"` → trả 409.
+2. **Khóa override auto-reject cứng:** Nếu enrollment `ScreeningStatus = "AutoRejected"` → trả 422, Admin không được override.
+3. **Re-screen:** chạy lại screening theo giải (breed khớp `Tournament.AllowedBreed` + doping). Nếu kết quả `AutoRejected` → set enrollment `Rejected` + trả 422.
+4. Set enrollment `AdminApprovalStatus = "Approved"`.
+5. Ghi `AuditLog`: `action = "Approve_Enrollment"`, `entityName = "HorseTournamentEntry"`, `entityId = enrollmentId`.
+6. Gửi Notification đến Owner: `title = "Ngựa được phê duyệt vào giải"`, `relatedEntityType = "HorseTournamentEntry"`, `relatedEntityId = enrollmentId`.
 
-> **Breed check dùng `Horse.TournamentId` trực tiếp** (schema v2: mỗi hồ sơ ngựa gắn đúng 1 giải) — không còn trace qua chuỗi `RaceEntry → … → Tournament`.
+> **Breed check dùng `Tournament.AllowedBreed` của giải enrollment** (schema v3: hồ sơ ngựa không gắn giải; screening theo từng enrollment).
 
 ---
 
@@ -565,14 +630,14 @@ Thực hiện theo thứ tự, dừng lại và trả lỗi ngay nếu bước n
 
 ---
 
-## 8. Từ chối hồ sơ ngựa (Admin)
+## 8. Từ chối enrollment (Admin)
 
 ```
-PATCH /api/admin/horses/{id}/reject
+PATCH /api/admin/horse-entries/{id}/reject
 ```
 
 **Auth:** Admin\
-**Path param:** `id` — horseId (integer)
+**Path param:** `id` — enrollmentId (integer)
 
 ---
 
@@ -845,7 +910,7 @@ Admin phê duyệt entry vào race cụ thể. **Đây là gate bị khoá cứn
 Thực hiện theo thứ tự:
 
 1. **Gate cứng — EntryFeeStatus:** Nếu `RaceEntry.EntryFeeStatus ≠ "Paid"` → **400, không thể override**. Admin phải xác nhận phí trước (endpoint 11).
-2. Kiểm tra `Horse.AdminApprovalStatus = "Approved"` (qua `RaceEntry → Pairing → Horse`) — nếu không → 422.
+2. Kiểm tra **enrollment** của ngựa trong ĐÚNG giải đã `Approved` (`HorseTournamentEntry` theo `Pairing.HorseId` + `Pairing.TournamentId`) — nếu không → 422 `HORSE_ENROLLMENT_NOT_APPROVED`.
 3. Kiểm tra `RaceEntry.Status = "Pending"` — nếu đã `"Confirmed"` → 409.
 4. Set `RaceEntry.Status = "Confirmed"`.
 5. Ghi `AuditLog`: `action = "Approve_RaceEntry"`.
@@ -873,7 +938,7 @@ Thực hiện theo thứ tự:
 | 403 | `FORBIDDEN` | Role không phải Admin |
 | 404 | `RACE_ENTRY_NOT_FOUND` | `raceEntryId` không tồn tại |
 | 409 | `ENTRY_ALREADY_CONFIRMED` | `RaceEntry.Status` đã là `Confirmed` |
-| 422 | `HORSE_NOT_APPROVED` | Horse chưa được Admin duyệt hồ sơ |
+| 422 | `HORSE_ENROLLMENT_NOT_APPROVED` | Enrollment của ngựa trong giải này chưa được Admin duyệt |
 
 ---
 
