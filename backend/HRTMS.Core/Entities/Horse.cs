@@ -9,8 +9,6 @@ public partial class Horse
 
     public int OwnerId { get; set; }
 
-    public int TournamentId { get; set; }
-
     public string Name { get; set; } = null!;
 
     public int BirthYear { get; set; }
@@ -51,11 +49,8 @@ public partial class Horse
 
     public virtual OwnerProfile Owner { get; set; } = null!;
 
-    public virtual Pairing? PairingHorseNavigation { get; set; }
-
     public virtual ICollection<Pairing> PairingHorses { get; set; } = new List<Pairing>();
 
-    public virtual Tournament Tournament { get; set; } = null!;
-
-    public virtual TournamentParticipant TournamentParticipant { get; set; } = null!;
+    // Schema v3: hồ sơ ngựa là kho vĩnh viễn; enrollment theo từng giải tách sang đây.
+    public virtual ICollection<HorseTournamentEntry> TournamentEntries { get; set; } = new List<HorseTournamentEntry>();
 }

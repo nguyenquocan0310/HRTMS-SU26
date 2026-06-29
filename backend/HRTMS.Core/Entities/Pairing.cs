@@ -25,8 +25,6 @@ public partial class Pairing
 
     public virtual Horse Horse { get; set; } = null!;
 
-    public virtual Horse HorseNavigation { get; set; } = null!;
-
     public virtual JockeyProfile Jockey { get; set; } = null!;
 
     public virtual ICollection<RaceEntry> RaceEntries { get; set; } = new List<RaceEntry>();

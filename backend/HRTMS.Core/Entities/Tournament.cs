@@ -45,7 +45,7 @@ public partial class Tournament
 
     public virtual User? CreatedByNavigation { get; set; }
 
-    public virtual ICollection<Horse> Horses { get; set; } = new List<Horse>();
+    public virtual ICollection<HorseTournamentEntry> HorseEntries { get; set; } = new List<HorseTournamentEntry>();
 
     public virtual ICollection<Pairing> Pairings { get; set; } = new List<Pairing>();
 

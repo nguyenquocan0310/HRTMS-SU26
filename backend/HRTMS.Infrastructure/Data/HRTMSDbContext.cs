@@ -22,6 +22,8 @@ public partial class HRTMSDbContext : DbContext
 
     public virtual DbSet<Horse> Horses { get; set; }
 
+    public virtual DbSet<HorseTournamentEntry> HorseTournamentEntries { get; set; }
+
     public virtual DbSet<JockeyProfile> JockeyProfiles { get; set; }
 
     public virtual DbSet<Notification> Notifications { get; set; }
@@ -201,12 +203,6 @@ public partial class HRTMSDbContext : DbContext
         {
             entity.HasIndex(e => e.OwnerId, "IX_Horses_Owner");
 
-            entity.HasIndex(e => e.TournamentId, "IX_Horses_Tournament");
-
-            entity.HasIndex(e => new { e.TournamentId, e.AdminApprovalStatus }, "IX_Horses_TournamentApproval");
-
-            entity.HasIndex(e => new { e.TournamentId, e.HorseId }, "UQ_Horses_TournamentHorse").IsUnique();
-
             entity.Property(e => e.AdminApprovalStatus)
                 .HasMaxLength(20)
                 .IsUnicode(false)
@@ -246,17 +242,45 @@ public partial class HRTMSDbContext : DbContext
                 .HasForeignKey(d => d.OwnerId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Horses_Owner");
+        });
 
-            entity.HasOne(d => d.Tournament).WithMany(p => p.Horses)
+        modelBuilder.Entity<HorseTournamentEntry>(entity =>
+        {
+            entity.HasKey(e => e.EnrollmentId).HasName("PK_HTE");
+
+            entity.HasIndex(e => e.HorseId, "IX_HTE_Horse");
+
+            entity.HasIndex(e => new { e.TournamentId, e.AdminApprovalStatus }, "IX_HTE_TournamentApproval");
+
+            entity.HasIndex(e => new { e.HorseId, e.TournamentId }, "UQ_HTE_HorseTournament").IsUnique();
+
+            entity.HasIndex(e => new { e.TournamentId, e.HorseId }, "UQ_HTE_TournamentHorse").IsUnique();
+
+            entity.Property(e => e.AdminApprovalStatus)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasDefaultValue("Pending");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.RejectionReason).HasMaxLength(500);
+            entity.Property(e => e.ScreeningReason).HasMaxLength(500);
+            entity.Property(e => e.ScreeningStatus)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasDefaultValue("NotScreened");
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasDefaultValue("Enrolled");
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("(getutcdate())");
+
+            entity.HasOne(d => d.Horse).WithMany(p => p.TournamentEntries)
+                .HasForeignKey(d => d.HorseId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_HTE_Horse");
+
+            entity.HasOne(d => d.Tournament).WithMany(p => p.HorseEntries)
                 .HasForeignKey(d => d.TournamentId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Horses_Tournament");
-
-            entity.HasOne(d => d.TournamentParticipant).WithMany(p => p.Horses)
-                .HasPrincipalKey(p => new { p.TournamentId, p.UserId })
-                .HasForeignKey(d => new { d.TournamentId, d.OwnerId })
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Horses_OwnerRoster");
+                .HasConstraintName("FK_HTE_Tournament");
         });
 
         modelBuilder.Entity<JockeyProfile>(entity =>
@@ -368,11 +392,8 @@ public partial class HRTMSDbContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Pairings_Tournament");
 
-            entity.HasOne(d => d.HorseNavigation).WithOne(p => p.PairingHorseNavigation)
-                .HasPrincipalKey<Horse>(p => new { p.TournamentId, p.HorseId })
-                .HasForeignKey<Pairing>(d => new { d.TournamentId, d.HorseId })
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Pairings_HorseTournament");
+            // FK_Pairings_HorseTournament (TournamentId, HorseId) → HorseTournamentEntries
+            // được enforce ở DB-level (patch 001). EF không cần model lại quan hệ composite này.
 
             entity.HasOne(d => d.TournamentParticipant).WithMany(p => p.Pairings)
                 .HasPrincipalKey(p => new { p.TournamentId, p.UserId })
