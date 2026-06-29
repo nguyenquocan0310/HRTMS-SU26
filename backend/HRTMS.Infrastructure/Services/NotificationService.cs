@@ -7,6 +7,16 @@ using Microsoft.Extensions.Logging;
 
 namespace HRTMS.Infrastructure.Services;
 
+/// <summary>
+/// NOTI — Notification service: in-app + SMTP email (NOTI.2).
+///
+/// Nguyên tắc:
+///   1. In-app luôn lưu trước — SMTP lỗi không mất bản ghi in-app.
+///   2. type "In-app"  → chỉ lưu DB.
+///      type "Email"   → chỉ gửi email (vẫn lưu DB để audit).
+///      type "Both"    → lưu DB + gửi email.
+///   3. SMTP lỗi chỉ log, không throw.
+/// </summary>
 public class NotificationService : INotificationService
 {
     private readonly HRTMSDbContext _db;
@@ -23,18 +33,15 @@ public class NotificationService : INotificationService
         _logger = logger;
     }
 
-    /// <summary>
-    /// NOTI.2 — Gửi notification 2 kênh.
-    /// type: "In-app" | "Email" | "Both"
-    /// SMTP lỗi sẽ chỉ log, KHÔNG mất bản ghi in-app.
-    /// </summary>
+    // ── Gửi cho 1 người ─────────────────────────────────────────────────────
+
     public async Task SendAsync(
         int recipientId, string title, string message,
         string type = "In-app",
         string? relatedEntityType = null, int? relatedEntityId = null)
     {
-        // Luôn lưu in-app trước
-        var notification = new Notification
+        // Lưu in-app trước — bảo vệ khỏi SMTP failure
+        _db.Notifications.Add(new Notification
         {
             RecipientId = recipientId,
             Title = title,
@@ -44,37 +51,26 @@ public class NotificationService : INotificationService
             RelatedEntityType = relatedEntityType,
             RelatedEntityId = relatedEntityId,
             SentAt = DateTime.UtcNow
-        };
-
-        _db.Notifications.Add(notification);
+        });
         await _db.SaveChangesAsync();
 
-        // NOTI.2 — gửi email nếu type là Email hoặc Both
+        // NOTI.2 — gửi email nếu cần
         if (type is "Email" or "Both")
-        {
-            var user = await _db.Users
-                .AsNoTracking()
-                .Where(u => u.UserId == recipientId)
-                .Select(u => new { u.Email, u.FullName })
-                .FirstOrDefaultAsync();
-
-            if (user != null)
-            {
-                var html = BuildEmailHtml(title, message);
-                await _emailService.SendAsync(user.Email, user.FullName, title, html);
-            }
-        }
+            await SendEmailToUserAsync(recipientId, title, message);
     }
+
+    // ── Gửi cho nhiều người ─────────────────────────────────────────────────
 
     public async Task SendBulkAsync(
         IEnumerable<int> recipientIds, string title, string message,
         string type = "Both",
         string? relatedEntityType = null, int? relatedEntityId = null)
     {
-        var idList = recipientIds.ToList();
+        var idList = recipientIds.Distinct().ToList();
         if (idList.Count == 0) return;
 
-        var notifications = idList.Select(id => new Notification
+        var now = DateTime.UtcNow;
+        _db.Notifications.AddRange(idList.Select(id => new Notification
         {
             RecipientId = id,
             Title = title,
@@ -83,59 +79,50 @@ public class NotificationService : INotificationService
             IsRead = false,
             RelatedEntityType = relatedEntityType,
             RelatedEntityId = relatedEntityId,
-            SentAt = DateTime.UtcNow
-        }).ToList();
-
-        _db.Notifications.AddRange(notifications);
+            SentAt = now
+        }));
         await _db.SaveChangesAsync();
 
         // NOTI.2 — gửi email bulk
         if (type is "Email" or "Both")
-        {
-            var users = await _db.Users
-                .AsNoTracking()
-                .Where(u => idList.Contains(u.UserId))
-                .Select(u => new { u.Email, u.FullName })
-                .ToListAsync();
-
-            if (users.Count > 0)
-            {
-                var html = BuildEmailHtml(title, message);
-                await _emailService.SendBulkAsync(
-                    users.Select(u => (u.Email, u.FullName)),
-                    title, html);
-            }
-        }
+            await SendEmailToUsersAsync(idList, title, message);
     }
 
-    public async Task<IEnumerable<NotificationDto>> GetUnreadAsync(int userId)
-    {
-        return await _db.Notifications
+    // ── Đọc notification ────────────────────────────────────────────────────
+
+    public async Task<IEnumerable<NotificationDto>> GetUnreadAsync(int userId) =>
+        await _db.Notifications
             .Where(n => n.RecipientId == userId && !n.IsRead)
             .OrderByDescending(n => n.SentAt)
-            .Select(n => new NotificationDto
-            {
-                NotificationId = n.NotificationId,
-                Title = n.Title,
-                Message = n.Message,
-                Type = n.Type,
-                IsRead = n.IsRead,
-                RelatedEntityType = n.RelatedEntityType,
-                RelatedEntityId = n.RelatedEntityId,
-                SentAt = n.SentAt
-            })
+            .Select(ToDto)
+            .ToListAsync();
+
+    public async Task<IEnumerable<NotificationDto>> GetAllAsync(
+        int userId, int page = 1, int pageSize = 20)
+    {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        return await _db.Notifications
+            .Where(n => n.RecipientId == userId)
+            .OrderByDescending(n => n.SentAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(ToDto)
             .ToListAsync();
     }
 
+    // ── Đánh dấu đọc ────────────────────────────────────────────────────────
+
     public async Task MarkReadAsync(int notificationId, int userId)
     {
-        var notification = await _db.Notifications
-            .FirstOrDefaultAsync(n => n.NotificationId == notificationId
-                                   && n.RecipientId == userId);
-        if (notification is null) return;
+        var n = await _db.Notifications
+            .FirstOrDefaultAsync(x => x.NotificationId == notificationId
+                                   && x.RecipientId == userId);
+        if (n is null || n.IsRead) return;
 
-        notification.IsRead = true;
-        notification.ReadAt = DateTime.UtcNow;
+        n.IsRead = true;
+        n.ReadAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
     }
 
@@ -148,24 +135,79 @@ public class NotificationService : INotificationService
                 .SetProperty(n => n.ReadAt, DateTime.UtcNow));
     }
 
-    public async Task<int> GetUnreadCountAsync(int userId)
+    public async Task<int> GetUnreadCountAsync(int userId) =>
+        await _db.Notifications.CountAsync(n => n.RecipientId == userId && !n.IsRead);
+
+    // ── Private helpers ──────────────────────────────────────────────────────
+
+    private async Task SendEmailToUserAsync(int userId, string title, string message)
     {
-        return await _db.Notifications
-            .CountAsync(n => n.RecipientId == userId && !n.IsRead);
+        var user = await _db.Users
+            .AsNoTracking()
+            .Where(u => u.UserId == userId)
+            .Select(u => new { u.Email, u.FullName })
+            .FirstOrDefaultAsync();
+
+        if (user is null)
+        {
+            _logger.LogWarning("SendEmailToUser: userId={UserId} không tồn tại", userId);
+            return;
+        }
+
+        await _emailService.SendAsync(
+            user.Email, user.FullName ?? user.Email,
+            title, BuildEmailHtml(title, message));
     }
 
-    // ── Email template tối giản ──────────────────────────────────────────────
-    private static string BuildEmailHtml(string title, string message) => $"""
-        <!DOCTYPE html>
-        <html>
-        <body style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
-          <h2 style="color:#1a56db">{System.Net.WebUtility.HtmlEncode(title)}</h2>
-          <p style="font-size:15px;line-height:1.6">{System.Net.WebUtility.HtmlEncode(message)}</p>
-          <hr style="margin:32px 0;border:none;border-top:1px solid #e5e7eb"/>
-          <p style="font-size:12px;color:#6b7280">
-            Email này được gửi tự động từ hệ thống HRTMS. Vui lòng không trả lời.
-          </p>
-        </body>
-        </html>
-        """;
+    private async Task SendEmailToUsersAsync(
+        List<int> userIds, string title, string message)
+    {
+        var users = await _db.Users
+            .AsNoTracking()
+            .Where(u => userIds.Contains(u.UserId))
+            .Select(u => new { u.Email, u.FullName })
+            .ToListAsync();
+
+        if (users.Count == 0) return;
+
+        await _emailService.SendBulkAsync(
+            users.Select(u => (u.Email, u.FullName ?? u.Email)),
+            title, BuildEmailHtml(title, message));
+    }
+
+    private static System.Linq.Expressions.Expression<Func<Notification, NotificationDto>> ToDto =>
+        n => new NotificationDto
+        {
+            NotificationId = n.NotificationId,
+            Title = n.Title,
+            Message = n.Message,
+            Type = n.Type,
+            IsRead = n.IsRead,
+            RelatedEntityType = n.RelatedEntityType,
+            RelatedEntityId = n.RelatedEntityId,
+            SentAt = n.SentAt
+        };
+
+    // HTML template cho email — đơn giản, không bị clip Gmail
+    private static string BuildEmailHtml(string title, string message)
+    {
+        var safeTitle = System.Net.WebUtility.HtmlEncode(title);
+        var safeMessage = System.Net.WebUtility.HtmlEncode(message)
+                              .Replace("\n", "<br/>");
+        return $"""
+            <!DOCTYPE html>
+            <html lang="vi">
+            <body style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:24px;color:#1f2937">
+              <div style="border-left:4px solid #1a56db;padding-left:16px;margin-bottom:20px">
+                <h2 style="margin:0;color:#1a56db;font-size:18px">{safeTitle}</h2>
+              </div>
+              <p style="font-size:15px;line-height:1.7;margin-bottom:24px">{safeMessage}</p>
+              <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
+              <p style="font-size:12px;color:#9ca3af;margin:0">
+                Email này được gửi tự động từ hệ thống HRTMS. Vui lòng không trả lời email này.
+              </p>
+            </body>
+            </html>
+            """;
+    }
 }
