@@ -100,22 +100,7 @@ public class StartingListService : IStartingListService
                 PostPosition = entry.PostPosition,
                 Status = entry.Status,
                 PreRaceJockeyWeight = entry.PreRaceJockeyWeight,
-            var dto = new StartingListEntryDto
-            {
-                RaceEntryId = entry.RaceEntryId,
-                RaceId = entry.RaceId,
-                PairingId = entry.PairingId,
-                HorseName = entry.Pairing.Horse.Name,
-                JockeyName = entry.Pairing.Jockey.Jockey.FullName,
-                OwnerName = entry.Pairing.Horse.Owner.Owner.FullName,
-                PostPosition = entry.PostPosition,
-                Status = entry.Status,
-                PreRaceJockeyWeight = entry.PreRaceJockeyWeight,
                 HorseIdentityCheckStatus = entry.HorseIdentityCheckStatus,
-                ClinicalStatus = entry.ClinicalStatus,
-                IndependenceCheckStatus = entry.IndependenceCheckStatus,
-                RejectionReason = rejectionReason
-            };
                 ClinicalStatus = entry.ClinicalStatus,
                 IndependenceCheckStatus = entry.IndependenceCheckStatus,
                 RejectionReason = rejectionReason

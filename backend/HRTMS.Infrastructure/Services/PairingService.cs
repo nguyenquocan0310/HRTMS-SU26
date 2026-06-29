@@ -460,6 +460,10 @@ public class PairingService : IPairingService
     int page,
     int pageSize)
     {
+        if (page < 1 || pageSize < 1 || pageSize > 100)
+        {
+            throw new ArgumentException("INVALID_PAGING");
+        }
         // Chuan hoa gia tri phan trang
         page = page < 1 ? 1 : page;
         pageSize = pageSize < 1 ? 20 : Math.Min(pageSize, 100);

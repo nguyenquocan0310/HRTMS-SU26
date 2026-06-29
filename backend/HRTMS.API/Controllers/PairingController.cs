@@ -296,8 +296,8 @@ public class PairingController : ControllerBase
     [HttpGet("jockeys/invitations")]
     [Authorize(Roles = "Jockey")]
     public async Task<IActionResult> GetJockeyInvitations(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20)
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 20)
     {
         // Lay JockeyId tu JWT token
         var userIdValue = User.FindFirstValue(
@@ -308,17 +308,29 @@ public class PairingController : ControllerBase
             return Unauthorized(new
             {
                 error = "UNAUTHORIZED",
-                message = "Invalid or missing user identity."
+                message = "Token khong hop le"
             });
         }
 
-        var result = await _pairingService
-            .GetJockeyInvitationsAsync(
-                jockeyId,
-                page,
-                pageSize);
+        try
+        {
+            var result = await _pairingService
+                .GetJockeyInvitationsAsync(
+                    jockeyId,
+                    page,
+                    pageSize);
 
-        return Ok(result);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+            when (ex.Message == "INVALID_PAGING")
+        {
+            return BadRequest(new
+            {
+                error = "VALIDATION_ERROR",
+                message = "Page must be greater than 0 and pageSize must be between 1 and 100."
+            });
+        }
     }
 
     [HttpPatch("pairings/{id:int}/confirm")]
