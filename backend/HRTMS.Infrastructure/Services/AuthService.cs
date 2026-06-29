@@ -181,6 +181,7 @@ public class AuthService : IAuthService
                 Username = dto.Username,
                 FullName = dto.FullName,
                 Email = normalizedEmail,
+                NormalizedEmail = normalizedEmail.ToUpper(),
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password, workFactor: 12),
                 Role = dto.Role,
                 Status = initialStatus,
