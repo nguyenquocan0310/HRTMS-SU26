@@ -7,4 +7,6 @@ public class PairingResponseDto
     public int JockeyId { get; set; }
     public string Status { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
+    public int TournamentId { get; set; }
+
 }

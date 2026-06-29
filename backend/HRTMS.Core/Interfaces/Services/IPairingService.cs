@@ -25,8 +25,13 @@ public interface IPairingService
         int? horseId,
         int page,
         int pageSize);
+
     Task<PagedResult<JockeyInvitationDto>> GetJockeyInvitationsAsync(
-    int jockeyId,
-    int page,
-    int pageSize);
+        int jockeyId,
+        int page,
+        int pageSize);
+
+    Task<PairingActionResponseDto> ConfirmAsync(
+        int ownerId,
+        int pairingId);
 }
