@@ -181,12 +181,12 @@ public class MedicalCheckService : IMedicalCheckService
 
         var now = DateTime.UtcNow;
 
-        raceEntry.HorseIdentityStatus = dto.HorseIdentityStatus;
+        raceEntry.HorseIdentityCheckStatus = dto.HorseIdentityCheckStatus;
         raceEntry.HorseIdentityCheckedByDoctorId = doctorId;
         raceEntry.HorseIdentityCheckedAt = now;
         raceEntry.UpdatedAt = now;
 
-        var isMismatch = dto.HorseIdentityStatus == "Mismatch";
+        var isMismatch = dto.HorseIdentityCheckStatus == "Mismatch";
 
         // MED.4: Mismatch se kich hoat Emergency DQ
         // Ban hien tai xu ly DQ toi thieu: cap nhat RaceEntry thanh Disqualified
@@ -209,7 +209,7 @@ public class MedicalCheckService : IMedicalCheckService
             DoctorId = doctorId,
             DoctorName = doctor.Doctor.FullName,
             HorseName = raceEntry.Pairing.Horse.Name,
-            HorseIdentityStatus = dto.HorseIdentityStatus,
+            HorseIdentityCheckStatus = dto.HorseIdentityCheckStatus,
             IsEmergencyDisqualified = isMismatch,
             RaceEntryStatus = raceEntry.Status,
             Message = isMismatch

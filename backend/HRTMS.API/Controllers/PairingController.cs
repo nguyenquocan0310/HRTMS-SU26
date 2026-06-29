@@ -293,4 +293,31 @@ public class PairingController : ControllerBase
             });
         }
     }
+    [HttpGet("jockeys/invitations")]
+    [Authorize(Roles = "Jockey")]
+    public async Task<IActionResult> GetJockeyInvitations(
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 20)
+    {
+        // Lay JockeyId tu JWT token
+        var userIdValue = User.FindFirstValue(
+            ClaimTypes.NameIdentifier);
+
+        if (!int.TryParse(userIdValue, out var jockeyId))
+        {
+            return Unauthorized(new
+            {
+                error = "UNAUTHORIZED",
+                message = "Invalid or missing user identity."
+            });
+        }
+
+        var result = await _pairingService
+            .GetJockeyInvitationsAsync(
+                jockeyId,
+                page,
+                pageSize);
+
+        return Ok(result);
+    }
 }

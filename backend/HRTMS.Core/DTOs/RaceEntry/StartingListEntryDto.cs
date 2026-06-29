@@ -20,7 +20,7 @@ public class StartingListEntryDto
 
     public decimal? PreRaceJockeyWeight { get; set; }
 
-    public string? HorseIdentityStatus { get; set; }
+    public string? HorseIdentityCheckStatus { get; set; }
 
     public string? ClinicalStatus { get; set; }
 

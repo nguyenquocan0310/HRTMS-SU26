@@ -1,4 +1,5 @@
 using HRTMS.Core.Common;
+using HRTMS.Core.DTOs.Jockey;
 using HRTMS.Core.DTOs.Pairing;
 
 namespace HRTMS.Core.Interfaces.Services;
@@ -24,4 +25,8 @@ public interface IPairingService
         int? horseId,
         int page,
         int pageSize);
+    Task<PagedResult<JockeyInvitationDto>> GetJockeyInvitationsAsync(
+    int jockeyId,
+    int page,
+    int pageSize);
 }
