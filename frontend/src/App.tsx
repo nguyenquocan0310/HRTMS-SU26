@@ -27,6 +27,7 @@ import InvitationList from './pages/jockey/InvitationList'
 import MyRaces from './pages/jockey/MyRaces'
 import RaceHistory from './pages/jockey/RaceHistory'
 import ProfileDeclaration from './pages/jockey/ProfileDeclaration'
+import JockeyTournamentList from './pages/jockey/JockeyTournamentList'
 
 // ── Import các trang shared ──
 import Protest from './pages/shared/Protest'
@@ -126,6 +127,7 @@ export default function App() {
           <Route path="races" element={<MyRaces />} />
           <Route path="history" element={<RaceHistory />} />
           <Route path="profile-declaration" element={<ProfileDeclaration />} />
+          <Route path="tournaments" element={<JockeyTournamentList />} />
           <Route path="protest" element={<Protest userRole="Jockey" />} />
         </Route>
 

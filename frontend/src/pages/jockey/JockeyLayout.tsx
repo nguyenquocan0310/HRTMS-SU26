@@ -55,6 +55,19 @@ export default function JockeyLayout() {
           </NavLink>
 
           <NavLink
+            to="/jockey/tournaments"
+            className={({ isActive }) =>
+              `block px-4 py-3 rounded-lg font-medium transition-colors ${
+                isActive
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`
+            }
+          >
+            🏆 Đăng ký giải đấu
+          </NavLink>
+
+          <NavLink
             to="/jockey/history"
             className={({ isActive }) =>
               `block px-4 py-3 rounded-lg font-medium transition-colors ${
