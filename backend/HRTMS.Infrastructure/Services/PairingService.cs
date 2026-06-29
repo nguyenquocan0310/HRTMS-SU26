@@ -1,4 +1,5 @@
 using HRTMS.Core.Common;
+using HRTMS.Core.DTOs.Jockey;
 using HRTMS.Core.DTOs.Pairing;
 using HRTMS.Core.Entities;
 using HRTMS.Core.Interfaces.Services;
@@ -447,6 +448,63 @@ public class PairingService : IPairingService
             .ToListAsync();
 
         return new PagedResult<OwnerPairingDto>
+        {
+            Items = data,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = total
+        };
+    }
+    public async Task<PagedResult<JockeyInvitationDto>> GetJockeyInvitationsAsync(
+    int jockeyId,
+    int page,
+    int pageSize)
+    {
+        // Chuan hoa gia tri phan trang
+        page = page < 1 ? 1 : page;
+        pageSize = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
+
+        // Lay danh sach loi moi Pending cua Jockey dang dang nhap
+        // Dung join truc tiep de tranh phu thuoc navigation property cua Entity
+        var query =
+            from pairing in _context.Pairings.AsNoTracking()
+            join horse in _context.Horses.AsNoTracking()
+                on pairing.HorseId equals horse.HorseId
+            join owner in _context.Users.AsNoTracking()
+                on horse.OwnerId equals owner.UserId
+            where pairing.JockeyId == jockeyId
+                  && pairing.Status == "Pending"
+            select new JockeyInvitationDto
+            {
+                PairingId = pairing.PairingId,
+
+                Horse = new InvitationHorseDto
+                {
+                    HorseId = horse.HorseId,
+                    Name = horse.Name,
+                    Breed = horse.Breed
+                },
+
+                Owner = new InvitationOwnerDto
+                {
+                    OwnerId = owner.UserId,
+                    FullName = owner.FullName
+                },
+
+                RequestMessage = pairing.RequestMessage,
+                Status = pairing.Status,
+                CreatedAt = pairing.CreatedAt
+            };
+
+        var total = await query.CountAsync();
+
+        var data = await query
+            .OrderByDescending(i => i.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return new PagedResult<JockeyInvitationDto>
         {
             Items = data,
             Page = page,

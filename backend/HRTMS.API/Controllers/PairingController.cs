@@ -293,22 +293,55 @@ public class PairingController : ControllerBase
             });
         }
     }
-    [HttpPatch("{id}/confirm")]
-    [Authorize(Roles = "Owner")]
-    public async Task<IActionResult> Confirm(int id)
+    [HttpGet("jockeys/invitations")]
+    [Authorize(Roles = "Jockey")]
+    public async Task<IActionResult> GetJockeyInvitations(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
-        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        // Lay JockeyId tu JWT token
+        var userIdValue = User.FindFirstValue(
+            ClaimTypes.NameIdentifier);
 
-        if (!int.TryParse(userIdClaim, out var ownerId))
+        if (!int.TryParse(userIdValue, out var jockeyId))
         {
             return Unauthorized(new
             {
                 error = "UNAUTHORIZED",
-                message = "Token khong hop le"
+                message = "Invalid or missing user identity."
             });
         }
 
-        var result = await _pairingService.ConfirmAsync(ownerId, id);
+        var result = await _pairingService
+            .GetJockeyInvitationsAsync(
+                jockeyId,
+                page,
+                pageSize);
+
+        return Ok(result);
+    }
+
+    [HttpPatch("pairings/{id:int}/confirm")]
+    [Authorize(Roles = "Owner")]
+    public async Task<IActionResult> Confirm(int id)
+    {
+        // Lay OwnerId tu JWT token
+        var userIdValue = User.FindFirstValue(
+            ClaimTypes.NameIdentifier);
+
+        if (!int.TryParse(userIdValue, out var ownerId))
+        {
+            return Unauthorized(new
+            {
+                error = "UNAUTHORIZED",
+                message = "Invalid or missing user identity."
+            });
+        }
+
+        var result = await _pairingService.ConfirmAsync(
+            ownerId,
+            id);
+
         return Ok(result);
     }
 }
