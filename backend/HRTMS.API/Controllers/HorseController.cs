@@ -75,5 +75,47 @@ namespace HRTMS.API.Controllers
             if (!result.Success) return result.Message.Contains("NOT_FOUND") ? NotFound(result) : Forbid();
             return Ok(result);
         }
+
+        // ── Enrollment: đẩy ngựa trong kho vào một giải ───────────────────────
+
+        [HttpPost("{horseId:int}/enrollments")]
+        [Authorize(Roles = "Owner")]
+        [ProducesResponseType(typeof(ApiResponse<HorseEnrollmentResponseDto>), StatusCodes.Status201Created)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> EnrollHorse(int horseId, [FromBody] EnrollHorseDto dto)
+        {
+            var result = await _horseService.EnrollHorseAsync(CurrentUserId, horseId, dto);
+            if (!result.Success)
+            {
+                if (result.Message.Contains("NOT_FOUND")) return NotFound(result);
+                if (result.Message.Contains("NOT_OWNED")) return Forbid();
+                return BadRequest(result);
+            }
+            return CreatedAtAction(nameof(GetHorseEnrollments), new { horseId }, result);
+        }
+
+        [HttpGet("{horseId:int}/enrollments")]
+        [Authorize(Roles = "Owner")]
+        [ProducesResponseType(typeof(ApiResponse<List<HorseEnrollmentResponseDto>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetHorseEnrollments(
+            int horseId,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20)
+        {
+            var result = await _horseService.GetMyEnrollmentsAsync(CurrentUserId, horseId, null, page, pageSize);
+            return Ok(result);
+        }
+
+        [HttpGet("my/enrollments")]
+        [Authorize(Roles = "Owner")]
+        [ProducesResponseType(typeof(ApiResponse<List<HorseEnrollmentResponseDto>>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetMyEnrollments(
+            [FromQuery] int? tournamentId,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20)
+        {
+            var result = await _horseService.GetMyEnrollmentsAsync(CurrentUserId, null, tournamentId, page, pageSize);
+            return Ok(result);
+        }
     }
 }
