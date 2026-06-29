@@ -293,4 +293,22 @@ public class PairingController : ControllerBase
             });
         }
     }
+    [HttpPatch("{id}/confirm")]
+    [Authorize(Roles = "Owner")]
+    public async Task<IActionResult> Confirm(int id)
+    {
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        if (!int.TryParse(userIdClaim, out var ownerId))
+        {
+            return Unauthorized(new
+            {
+                error = "UNAUTHORIZED",
+                message = "Token khong hop le"
+            });
+        }
+
+        var result = await _pairingService.ConfirmAsync(ownerId, id);
+        return Ok(result);
+    }
 }

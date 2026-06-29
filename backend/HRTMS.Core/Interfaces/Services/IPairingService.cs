@@ -24,4 +24,5 @@ public interface IPairingService
         int? horseId,
         int page,
         int pageSize);
+    Task<PairingActionResponseDto> ConfirmAsync(int ownerId, int pairingId);
 }
