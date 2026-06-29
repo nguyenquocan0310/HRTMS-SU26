@@ -1,6 +1,7 @@
 import axios from 'axios';
 import type { AxiosInstance } from 'axios';
 import type { Horse, RaceEntry, JockeyInvitation } from '../types/owner.types';
+import { apiFetch } from './apiClient';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -188,3 +189,55 @@ export const acceptPairing = async (pairingId: string): Promise<any> => {
   }
 };
 
+// ─── Horse + Tournament Registration (dùng apiFetch — không hard-code localhost) ───
+
+interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  data: T | null;
+}
+
+export interface HorseCreatePayload {
+  tournamentId: number;
+  name: string;
+  birthYear: number;
+  gender: string;
+  color: string;
+  pedigree?: string;
+  weight: number;
+  identifyingMarks: string;
+  breed: string;
+  vaccinationRecordRef?: string;
+  dopingTestDate?: string;
+  dopingTestResult?: string;
+  legalConsentAccepted: boolean;
+}
+
+export interface HorseCreateResponse {
+  horseId: number;
+  name: string;
+  breed: string;
+  birthYear: number;
+  gender: string;
+  color: string;
+  weight: number;
+  identifyingMarks: string;
+  screeningStatus: 'AutoEligible' | 'ManualReview' | 'AutoRejected' | string;
+  screeningReason: string | null;
+  adminApprovalStatus: string | null;
+}
+
+/**
+ * POST /api/horses
+ * Gửi kèm tournamentId, lấy Owner từ JWT.
+ * Trả về HorseCreateResponse với screeningStatus.
+ */
+export const createHorseWithTournament = (payload: HorseCreatePayload): Promise<HorseCreateResponse> =>
+  apiFetch<ApiResponse<HorseCreateResponse>>('/horses', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }).then((res) => {
+    if (!res.success || !res.data)
+      throw new Error(res.message || 'Đăng ký ngựa thất bại.');
+    return res.data;
+  });
