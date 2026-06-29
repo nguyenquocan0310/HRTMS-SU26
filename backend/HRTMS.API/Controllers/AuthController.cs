@@ -69,4 +69,26 @@ public class AuthController : ControllerBase
         var result = await _profileService.GetProfileAsync(userId);
         return result.Success ? Ok(result) : NotFound(result);
     }
+
+    /// <summary>PWD.1 — Gửi email đặt lại mật khẩu</summary>
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Email))
+            return BadRequest("Email không được để trống.");
+
+        var result = await _authService.ForgotPasswordAsync(dto);
+        return Ok(result); // Luôn 200 để tránh email enumeration
+    }
+
+    /// <summary>PWD.2 — Xác nhận token và đặt mật khẩu mới</summary>
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Token) || string.IsNullOrWhiteSpace(dto.NewPassword))
+            return BadRequest("Token và mật khẩu mới không được để trống.");
+
+        var result = await _authService.ResetPasswordAsync(dto);
+        return result.Success ? Ok(result) : BadRequest(result);
+    }
 }
