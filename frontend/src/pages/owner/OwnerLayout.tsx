@@ -41,12 +41,16 @@ export default function OwnerLayout() {
   return (
     <div className="flex min-h-screen bg-gray-50">
 <<<<<<< HEAD
+<<<<<<< HEAD
       <aside className="w-56 bg-white border-r border-gray-200 p-4 flex flex-col">
         <h2 className="font-bold text-lg mb-4 text-gray-800">🐴 Chủ ngựa</h2>
 =======
       <aside className="w-56 bg-white border-r border-gray-200 p-4">
         <h2 className="font-bold text-lg mb-6 text-gray-800">🐴 Owner</h2>
         <nav className="flex flex-col gap-2">
+=======
+      
+>>>>>>> 78e4825 (Fix owner layout JSX)
       <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
         {/* ─── Thông tin chủ ngựa ─── */}
         <div className="p-4 border-b border-gray-100 bg-gradient-to-br from-blue-50 to-indigo-50">
