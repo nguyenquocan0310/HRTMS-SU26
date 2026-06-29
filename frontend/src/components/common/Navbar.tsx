@@ -28,7 +28,7 @@ export default function Navbar() {
 
         <div className={styles.actions}>
           <Link to="/login" className={styles.loginBtn}>
-            <FiLogIn />
+            <FiLogIn size={15} />
             Đăng nhập
           </Link>
           <Link to="/register" className={styles.registerBtn}>

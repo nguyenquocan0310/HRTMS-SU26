@@ -1,106 +1,109 @@
-/* ─── Color tokens ──────────────────────────────────────── */
-$bg-dark: #0b0b0d;
-$accent-red: #b5121b;
-$accent-pink: #f3c8c3;
-$text-main: #e8e8ea;
-$text-muted: #8a8a8f;
-$border-subtle: rgba(255, 255, 255, 0.08);
-
-/* ─── Navbar ────────────────────────────────────────────── */
+/* ─── Navbar ─── */
 .navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 64px;
-  background: rgba($bg-dark, 0.92);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border-bottom: 1px solid $border-subtle;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
   z-index: 1050;
 }
 
-/* ─── Logo ──────────────────────────────────────────────── */
+.inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+/* ─── Logo ─── */
 .logo {
-  font-family: 'Inter', sans-serif;
   font-weight: 800;
-  font-size: 1.35rem;
+  font-size: 1.25rem;
   letter-spacing: 2px;
-  background: linear-gradient(135deg, $accent-red 0%, #e85d3a 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #c0392b;
   text-decoration: none;
-  transition: opacity 0.2s;
+  flex-shrink: 0;
 
   &:hover {
-    opacity: 0.85;
+    color: #a93226;
   }
 }
 
-/* ─── Nav links ─────────────────────────────────────────── */
+/* ─── Nav links ─── */
 .navList {
+  display: flex;
+  align-items: center;
   gap: 0.25rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
 }
 
 .navLink {
   display: inline-block;
-  padding: 0.4rem 1rem;
-  font-size: 0.82rem;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.88rem;
   font-weight: 500;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-  color: $text-muted;
+  color: #444;
   text-decoration: none;
   border-radius: 6px;
   transition: color 0.2s, background 0.2s;
 
   &:hover {
-    color: $text-main;
-    background: rgba(255, 255, 255, 0.05);
-  }
-
-  &.active {
-    color: #fff;
-    background: rgba(255, 255, 255, 0.08);
+    color: #111;
+    background: #f3f4f6;
   }
 }
 
-/* ─── Login button ──────────────────────────────────────── */
-.loginBtn {
-  display: inline-block;
-  padding: 0.38rem 1.3rem;
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 1.2px;
-  color: $text-main;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 6px;
-  text-decoration: none;
-  transition: all 0.25s;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.45);
-    color: #fff;
-  }
-}
-
-/* ─── Icon buttons ──────────────────────────────────────── */
-.iconGroup {
-  border-left: 1px solid $border-subtle;
-  padding-left: 1rem;
-}
-
-.iconBtn {
-  background: none;
-  border: none;
-  color: $text-muted;
-  font-size: 1.05rem;
-  padding: 0.3rem;
-  cursor: pointer;
-  transition: color 0.2s;
+/* ─── Actions ─── */
+.actions {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.loginBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 1.2rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #333;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: all 0.2s;
 
   &:hover {
-    color: $text-main;
+    background: #f9fafb;
+    border-color: #9ca3af;
+    color: #111;
+  }
+}
+
+.registerBtn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.45rem 1.2rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+  background: #c0392b;
+  border: none;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: background 0.2s;
+
+  &:hover {
+    background: #a93226;
+    color: #fff;
   }
 }
