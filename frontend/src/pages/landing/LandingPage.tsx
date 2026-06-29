@@ -1,239 +1,133 @@
 import { Link } from 'react-router-dom';
-import {
-  FiArrowRight,
-  FiChevronDown,
-  FiBarChart2,
-  FiActivity,
-  FiEye,
-} from 'react-icons/fi';
-import { LuScale } from 'react-icons/lu';
-
+import { FiCalendar, FiFlag, FiShield, FiUsers } from 'react-icons/fi';
 import Navbar from '../../components/common/Navbar';
-import Footer from '../../components/common/Footer';
 import styles from './LandingPage.module.scss';
 
-/* ─── Static data ───────────────────────────────────────── */
-const FEED_ITEMS = [
-  { name: 'Royal Stakes — Ascot Cup', status: 'LIVE', statusClass: styles.live },
-  { name: 'Dubai World Sprint — Meydan', status: 'UPCOMING', statusClass: styles.upcoming },
-  { name: 'Melbourne Classic — Flemington', status: 'COMPLETED', statusClass: styles.completed },
+const TOURNAMENT = {
+  status: 'Open Registration',
+  raceCount: '5 race',
+  title: 'Cúp Đua Ngựa Quốc Gia Việt Nam 2026',
+  description:
+    'Giải mở đăng ký tại Phú Thọ, dùng để demo đăng ký giải, duyệt roster, mời ký sĩ và phân bổ race.',
+};
+
+const DETAILS = [
+  { label: 'Thời gian', value: '10/07/2026 - 12/07/2026' },
+  { label: 'Giống ngựa', value: 'Thoroughbred' },
+  { label: 'Cự ly', value: '1600m' },
+  { label: 'Lệ phí', value: '500.000 VND' },
+  { label: 'Quỹ thưởng', value: '50.000.000 VND' },
+  { label: 'Số ngựa tối đa', value: '12' },
 ];
 
-const TRACKS = [
-  {
-    name: 'Epsom Downs',
-    badge: 'OFFICIAL TRACK',
-    condition: 'Good to Firm',
-    races: 12,
-    image: 'https://images.unsplash.com/photo-1529040181623-e04ebc611e25?w=640&q=80',
-  },
-  {
-    name: 'Meydan Dubai',
-    badge: 'FEATURED VENUE',
-    condition: 'Fast',
-    races: 8,
-    image: 'https://images.unsplash.com/photo-1582650949598-145f6e642b05?w=640&q=80',
-  },
-  {
-    name: 'Flemington Melbourne',
-    badge: 'REGIONAL CIRCUIT',
-    condition: 'Soft',
-    races: 10,
-    image: 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=640&q=80',
-  },
+const STATS = [
+  { icon: <FiFlag />, label: 'Giải đang mở', value: '1' },
+  { icon: <FiCalendar />, label: 'Tổng race', value: '6' },
+  { icon: <FiUsers />, label: 'Role tự đăng ký', value: '5' },
+  { icon: <FiShield />, label: 'Tổng quỹ thưởng', value: '85.000.000 VND' },
 ];
 
-/* ─── Component ─────────────────────────────────────────── */
+const SCHEDULE = [
+  { name: 'Vòng loại - Race 1', time: '10/07/2026 · 09:00' },
+  { name: 'Vòng loại - Race 2', time: '10/07/2026 · 14:00' },
+  { name: 'Bán kết - Race 1', time: '11/07/2026 · 09:00' },
+  { name: 'Bán kết - Race 2', time: '11/07/2026 · 14:00' },
+];
+
 export default function LandingPage() {
   return (
     <div className={styles.landingPage}>
       <Navbar />
 
-      {/* ═══ HERO ═══════════════════════════════════════════ */}
-      <section className={styles.hero} id="hero">
-        <div className={styles.heroBg} />
-        <div className={styles.heroContent}>
-          <span className={styles.heroBadge}>
-            <span className={styles.dot} />
-            SEASON 2024 NOW LIVE
-          </span>
+      <main className={styles.main}>
+        {/* ── Hero ── */}
+        <section className={styles.hero}>
+          <div className={styles.heroLeft}>
+            <p className={styles.liveTag}>
+              <FiShield size={13} />
+              Dữ liệu giải đấu trực tiếp từ hệ thống
+            </p>
 
-          <h1 className={styles.heroTitle}>
-            Experience the{' '}
-            <span className={styles.accent}>Pinnacle</span>{' '}
-            of Thoroughbred Racing
-          </h1>
+            <h1 className={styles.heroTitle}>{TOURNAMENT.title}</h1>
 
-          <p className={styles.heroDesc}>
-            Manage stables, monitor performance analytics, and experience
-            live race events — all from a single, beautifully crafted
-            management platform.
-          </p>
+            <p className={styles.heroDesc}>
+              Theo dõi giải đang mở đăng ký, lịch race, quỹ thưởng và nghiệp vụ
+              đăng ký tài khoản theo từng vai trò.
+            </p>
 
-          <div className={styles.heroCta}>
-            <Link to="/login" className={styles.btnPrimary}>
-              Enter Workspace <FiArrowRight />
-            </Link>
-            <Link to="#" className={styles.btnOutline}>
-              <FiActivity size={16} /> Live Dashboard
-            </Link>
-          </div>
-        </div>
-
-        <div className={styles.scrollIndicator}>
-          <FiChevronDown />
-        </div>
-      </section>
-
-      {/* ═══ STRATEGIC MANAGEMENT + LIVE FEED ═══════════════ */}
-      <section className={`${styles.section} container`}>
-        <div className="row g-4">
-          {/* Strategic Management */}
-          <div className="col-lg-7">
-            <div className={styles.card}>
-              <div className={styles.cardIcon}>
-                <FiBarChart2 />
-              </div>
-              <h3 className={styles.cardTitle}>Strategic Management</h3>
-              <p className={styles.cardDesc}>
-                Oversee your entire racing portfolio with real-time insights,
-                advanced analytics, and intelligent stable management tools
-                designed for elite horse owners.
-              </p>
-
-              <div className={styles.statsRow}>
-                <div className={styles.stat}>
-                  <div className={styles.statLabel}>STABLES MANAGED</div>
-                  <div className={styles.statValue}>1,248+</div>
-                </div>
-                <div className={styles.stat}>
-                  <div className={styles.statLabel}>PERFORMANCE DELTA</div>
-                  <div className={styles.statValue}>+18.4%</div>
-                </div>
-              </div>
-
-              <Link to="/owner" className={styles.cardLink}>
-                Manage Your Assets <FiArrowRight size={14} />
+            <div className={styles.heroCta}>
+              <Link to="/register" className={styles.primaryAction}>
+                Đăng ký tài khoản →
+              </Link>
+              <Link to="/login" className={styles.secondaryAction}>
+                Đăng nhập workspace
               </Link>
             </div>
           </div>
 
-          {/* Live Feed */}
-          <div className="col-lg-5">
-            <div className={styles.card}>
-              <div className="d-flex align-items-center justify-content-between mb-3">
-                <h3 className={`${styles.cardTitle} mb-0`}>Live Feed</h3>
-                <span className={styles.liveBadge}>
-                  <span className={styles.liveDot} />
-                  LIVE
-                </span>
-              </div>
-
-              <ul className={styles.feedList}>
-                {FEED_ITEMS.map((item) => (
-                  <li key={item.name} className={styles.feedItem}>
-                    <span className={styles.feedName}>{item.name}</span>
-                    <span className={`${styles.feedStatus} ${item.statusClass}`}>
-                      {item.status}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-
-              <button className={styles.feedBtn} type="button">
-                VIEW ALL RACES
-              </button>
+          <article className={styles.tournamentCard}>
+            <div className={styles.cardHeader}>
+              <span className={styles.statusBadge}>{TOURNAMENT.status}</span>
+              <strong className={styles.raceCount}>{TOURNAMENT.raceCount}</strong>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══ OFFICIATING + PREDICTIONS ══════════════════════ */}
-      <section className={`${styles.section} container`}>
-        <div className="row g-4">
-          {/* Precision Officiating */}
-          <div className="col-md-6">
-            <div className={styles.card}>
-              <div className={styles.cardIcon}>
-                <LuScale />
-              </div>
-              <h3 className={styles.cardTitle}>Precision Officiating</h3>
-              <p className={styles.cardDesc}>
-                Streamlined race adjudication with digital verification
-                protocols, ensuring integrity across every event and
-                jurisdiction.
-              </p>
-              <div className={styles.miniLabels}>
-                <span className={styles.miniLabel}>Official Verification</span>
-                <span className={styles.miniLabel}>Health Passports</span>
-                <span className={styles.miniLabel}>Audit Trails</span>
-              </div>
-            </div>
-          </div>
-
-          {/* High-Stakes Predictions */}
-          <div className="col-md-6">
-            <div className={styles.predictCard}>
-              <div className={styles.cardIcon}>
-                <FiEye />
-              </div>
-              <h3 className={styles.cardTitle}>High-Stakes Predictions</h3>
-              <p className={styles.cardDesc}>
-                Leverage AI-driven analytics and historical data to make
-                informed predictions on race outcomes, form guides, and
-                performance trajectories.
-              </p>
-              <Link to="#" className={styles.predictBtn}>
-                Start Predicting <FiArrowRight size={14} />
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══ PADDOCK EXPERIENCE ═════════════════════════════ */}
-      <section className={`${styles.paddockSection} container`}>
-        <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>The Paddock Experience</h2>
-          <p className={styles.sectionDesc}>
-            Explore world-class racecourses, from the storied turf of Epsom
-            Downs to the gleaming surfaces of Meydan Dubai.
-          </p>
-        </div>
-
-        <div className="row g-4">
-          {TRACKS.map((track) => (
-            <div className="col-md-4" key={track.name}>
-              <div className={styles.trackCard}>
-                <div className={styles.trackImageWrap}>
-                  <img
-                    className={styles.trackImage}
-                    src={track.image}
-                    alt={track.name}
-                    loading="lazy"
-                  />
-                  <span className={styles.trackBadge}>{track.badge}</span>
+            <h2 className={styles.cardTitle}>{TOURNAMENT.title}</h2>
+            <p className={styles.cardDesc}>{TOURNAMENT.description}</p>
+            <div className={styles.detailGrid}>
+              {DETAILS.map((d) => (
+                <div className={styles.detailItem} key={d.label}>
+                  <span className={styles.detailLabel}>{d.label}</span>
+                  <strong className={styles.detailValue}>{d.value}</strong>
                 </div>
-                <div className={styles.trackInfo}>
-                  <h4 className={styles.trackName}>{track.name}</h4>
-                  <div className={styles.trackMeta}>
-                    <div>
-                      <div className={styles.trackMetaLabel}>Track Condition</div>
-                      <div>{track.condition}</div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div className={styles.trackMetaLabel}>Races</div>
-                      <div>{track.races}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              ))}
             </div>
+          </article>
+        </section>
+
+        {/* ── Stats ── */}
+        <section className={styles.statsGrid} aria-label="Tổng quan giải đấu">
+          {STATS.map((stat) => (
+            <article className={styles.statCard} key={stat.label}>
+              <span className={styles.statIcon}>{stat.icon}</span>
+              <p className={styles.statLabel}>{stat.label}</p>
+              <strong className={styles.statValue}>{stat.value}</strong>
+            </article>
           ))}
-        </div>
-      </section>
+        </section>
 
-      <Footer />
+        {/* ── Info Grid ── */}
+        <section className={styles.infoGrid}>
+          <article className={styles.panel} id="schedule">
+            <div className={styles.panelHeader}>
+              <h2 className={styles.panelTitle}>Lịch race gần nhất</h2>
+              <strong className={styles.panelMeta}>{TOURNAMENT.title}</strong>
+            </div>
+            <div className={styles.scheduleList}>
+              {SCHEDULE.map((race) => (
+                <div className={styles.scheduleItem} key={race.name}>
+                  <div>
+                    <h3 className={styles.raceName}>{race.name}</h3>
+                    <p className={styles.raceTime}>{race.time}</p>
+                  </div>
+                  <span className={styles.upcomingBadge}>Upcoming</span>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article className={styles.panel} id="process">
+            <div className={styles.panelHeader}>
+              <h2 className={styles.panelTitle}>Luồng đăng ký tài khoản</h2>
+              <strong className={styles.panelMeta}>Email OTP + xét duyệt role</strong>
+            </div>
+            <div className={styles.flowText}>
+              <p>Chọn role Owner, Jockey, Referee, Doctor hoặc Spectator.</p>
+              <p>Xác thực email bằng mã gửi qua SMTP trước khi tạo tài khoản.</p>
+              <p>Role chuyên môn cung cấp phone, ngày sinh, CCCD và giấy phép liên quan.</p>
+              <p>Owner và Spectator active ngay; Jockey, Referee, Doctor chờ Admin duyệt.</p>
+            </div>
+          </article>
+        </section>
+      </main>
     </div>
   );
 }

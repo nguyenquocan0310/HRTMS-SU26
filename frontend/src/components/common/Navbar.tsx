@@ -1,65 +1,39 @@
-import { Link, useLocation } from 'react-router-dom';
-import {
-  FiSearch,
-  FiBell,
-  FiHelpCircle,
-  FiUser,
-} from 'react-icons/fi';
+import { Link } from 'react-router-dom';
+import { FiLogIn } from 'react-icons/fi';
 import styles from './Navbar.module.scss';
 
 const NAV_ITEMS = [
-  { label: 'Admin', path: '/admin' },
-  { label: 'Owner', path: '/owner' },
-  { label: 'Jockey', path: '/jockey' },
-  { label: 'Spectator', path: '/spectator' },
+  { label: 'Giải đấu', path: '#tournaments' },
+  { label: 'Lịch đua', path: '#schedule' },
+  { label: 'Quy trình', path: '#process' },
 ];
 
 export default function Navbar() {
-  const location = useLocation();
-
   return (
-    <nav className={`${styles.navbar} fixed-top`}>
-      <div className="container-fluid px-4 d-flex align-items-center justify-content-between">
-        {/* Logo */}
+    <nav className={styles.navbar}>
+      <div className={styles.inner}>
         <Link to="/" className={styles.logo}>
           HRTMS
         </Link>
 
-        {/* Centre nav */}
-        <ul className={`d-none d-md-flex align-items-center gap-1 mb-0 list-unstyled ${styles.navList}`}>
+        <ul className={styles.navList}>
           {NAV_ITEMS.map((item) => (
             <li key={item.path}>
-              <Link
-                to={item.path}
-                className={`${styles.navLink} ${
-                  location.pathname.startsWith(item.path) ? styles.active : ''
-                }`}
-              >
+              <a href={item.path} className={styles.navLink}>
                 {item.label}
-              </Link>
+              </a>
             </li>
           ))}
         </ul>
 
-        {/* Right section */}
-        <div className="d-flex align-items-center gap-3">
+        <div className={styles.actions}>
           <Link to="/login" className={styles.loginBtn}>
-            LOGIN
+            <FiLogIn />
+            Đăng nhập
           </Link>
-          <div className={`d-none d-lg-flex align-items-center gap-3 ${styles.iconGroup}`}>
-            <button className={styles.iconBtn} aria-label="Search">
-              <FiSearch />
-            </button>
-            <button className={styles.iconBtn} aria-label="Notifications">
-              <FiBell />
-            </button>
-            <button className={styles.iconBtn} aria-label="Help">
-              <FiHelpCircle />
-            </button>
-            <button className={styles.iconBtn} aria-label="Profile">
-              <FiUser />
-            </button>
-          </div>
+          <Link to="/register" className={styles.registerBtn}>
+            Đăng ký
+          </Link>
         </div>
       </div>
     </nav>
