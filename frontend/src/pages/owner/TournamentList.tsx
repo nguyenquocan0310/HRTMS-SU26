@@ -1,13 +1,20 @@
-import React, { useState, useEffect } from 'react'
-import { getTournaments, type TournamentResponse } from '../../services/tournamentService'
+import React, { useState, useEffect, useCallback } from 'react'
+import {
+  getTournaments,
+  registerForTournament,
+  getMyTournamentParticipations,
+  type TournamentResponse,
+  type ParticipationResponse,
+} from '../../services/tournamentService'
 
 // ── Màu trạng thái giải đấu ──────────────────────────────────────────────────
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; dot: string }> = {
-  Upcoming:   { label: 'Sắp diễn ra', bg: 'bg-blue-50',   text: 'text-blue-700',  dot: 'bg-blue-500'  },
-  Active:     { label: 'Đang diễn ra',bg: 'bg-green-50',  text: 'text-green-700', dot: 'bg-green-500' },
-  Completed:  { label: 'Đã kết thúc', bg: 'bg-gray-100',  text: 'text-gray-600',  dot: 'bg-gray-400'  },
-  Cancelled:  { label: 'Đã hủy',      bg: 'bg-red-50',    text: 'text-red-700',   dot: 'bg-red-500'   },
-  Draft:      { label: 'Nháp',        bg: 'bg-yellow-50', text: 'text-yellow-700',dot: 'bg-yellow-500'},
+  Upcoming:             { label: 'Sắp diễn ra',        bg: 'bg-blue-50',   text: 'text-blue-700',   dot: 'bg-blue-500'   },
+  Active:               { label: 'Đang diễn ra',       bg: 'bg-green-50',  text: 'text-green-700',  dot: 'bg-green-500'  },
+  Completed:            { label: 'Đã kết thúc',        bg: 'bg-gray-100',  text: 'text-gray-600',   dot: 'bg-gray-400'   },
+  Cancelled:            { label: 'Đã hủy',             bg: 'bg-red-50',    text: 'text-red-700',    dot: 'bg-red-500'    },
+  Draft:                { label: 'Nháp',               bg: 'bg-yellow-50', text: 'text-yellow-700', dot: 'bg-yellow-500' },
+  'Open Registration':  { label: 'Mở đăng ký',         bg: 'bg-emerald-50',text: 'text-emerald-700',dot: 'bg-emerald-500'},
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -31,7 +38,40 @@ function formatCurrency(amount: number) {
 }
 
 // ── Modal Chi tiết ────────────────────────────────────────────────────────────
-function TournamentDetailModal({ tournament, onClose }: { tournament: TournamentResponse; onClose: () => void }) {
+interface TournamentDetailModalProps {
+  tournament: TournamentResponse
+  isRegistered: boolean
+  onClose: () => void
+  onRegister: (tournamentId: number) => Promise<void>
+}
+
+function TournamentDetailModal({
+  tournament,
+  isRegistered,
+  onClose,
+  onRegister,
+}: TournamentDetailModalProps) {
+  const [registering, setRegistering] = useState(false)
+  const [regMessage, setRegMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  const canRegister = tournament.status === 'Open Registration'
+
+  const handleRegister = async () => {
+    setRegistering(true)
+    setRegMessage(null)
+    try {
+      await onRegister(tournament.tournamentId)
+      // Message sẽ được set từ parent sau khi refetch, không cần set ở đây
+    } catch (err: unknown) {
+      setRegMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Đăng ký thất bại. Vui lòng thử lại.',
+      })
+    } finally {
+      setRegistering(false)
+    }
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -132,6 +172,51 @@ function TournamentDetailModal({ tournament, onClose }: { tournament: Tournament
               </div>
             </div>
           )}
+
+          {/* ── Đăng ký tham gia ── */}
+          {canRegister && (
+            <div className="border-t border-gray-100 pt-4">
+              {/* Thông báo kết quả */}
+              {regMessage && (
+                <div
+                  className={`mb-3 px-4 py-3 rounded-xl text-sm font-medium ${
+                    regMessage.type === 'success'
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : 'bg-red-50 text-red-700 border border-red-200'
+                  }`}
+                >
+                  {regMessage.type === 'success' ? '✅' : '❌'} {regMessage.text}
+                </div>
+              )}
+
+              {isRegistered ? (
+                <button
+                  disabled
+                  className="w-full flex items-center justify-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 font-semibold py-2.5 rounded-xl text-sm cursor-not-allowed"
+                >
+                  ✅ Đã đăng ký
+                </button>
+              ) : (
+                <button
+                  onClick={handleRegister}
+                  disabled={registering}
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:from-emerald-300 disabled:to-teal-300 text-white font-semibold py-2.5 rounded-xl text-sm transition-all duration-200 shadow-sm hover:shadow-md disabled:cursor-not-allowed"
+                >
+                  {registering ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                      </svg>
+                      Đang đăng ký...
+                    </>
+                  ) : (
+                    '🏁 Đăng ký tham gia'
+                  )}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -163,13 +248,26 @@ const TournamentList: React.FC = () => {
   const [selected, setSelected] = useState<TournamentResponse | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  // Set chứa tournamentId mà Owner đã đăng ký
+  const [registeredIds, setRegisteredIds] = useState<Set<number>>(new Set())
+  const [regSuccessMsg, setRegSuccessMsg] = useState<string | null>(null)
+
+  // Fetch danh sách giải đã đăng ký
+  const fetchParticipations = useCallback(async () => {
+    try {
+      const list = await getMyTournamentParticipations()
+      setRegisteredIds(new Set(list.map((p: ParticipationResponse) => p.tournamentId)))
+    } catch {
+      // Không hiển thị lỗi nếu API participations fail — không chặn UX
+    }
+  }, [])
 
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true)
         setError(null)
-        const data = await getTournaments()
+        const [data] = await Promise.all([getTournaments(), fetchParticipations()])
         setTournaments(data)
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Không thể tải danh sách giải đấu.')
@@ -178,7 +276,22 @@ const TournamentList: React.FC = () => {
       }
     }
     load()
-  }, [])
+  }, [fetchParticipations])
+
+  // Xử lý đăng ký tham gia giải
+  const handleRegister = useCallback(async (tournamentId: number) => {
+    const participation = await registerForTournament(tournamentId)
+    // Refetch để đảm bảo trạng thái luôn đồng bộ với server
+    await fetchParticipations()
+    // Hiển thị thông báo thành công tương ứng với status trả về
+    if (participation.status === 'Approved') {
+      setRegSuccessMsg('Bạn đã được duyệt tham gia giải.')
+    } else {
+      setRegSuccessMsg('Đăng ký thành công, đang chờ Admin duyệt.')
+    }
+    // Xóa thông báo sau 5 giây
+    setTimeout(() => setRegSuccessMsg(null), 5000)
+  }, [fetchParticipations])
 
   const filtered = tournaments.filter(t => {
     const matchSearch = t.name.toLowerCase().includes(search.toLowerCase())
@@ -318,8 +431,22 @@ const TournamentList: React.FC = () => {
         </div>
       )}
 
+      {/* ── Toast thành công (toàn màn hình) ── */}
+      {regSuccessMsg && (
+        <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white px-5 py-3.5 rounded-2xl shadow-2xl text-sm font-medium flex items-center gap-2 animate-bounce">
+          ✅ {regSuccessMsg}
+        </div>
+      )}
+
       {/* ── Modal ── */}
-      {selected && <TournamentDetailModal tournament={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <TournamentDetailModal
+          tournament={selected}
+          isRegistered={registeredIds.has(selected.tournamentId)}
+          onClose={() => setSelected(null)}
+          onRegister={handleRegister}
+        />
+      )}
     </div>
   )
 }

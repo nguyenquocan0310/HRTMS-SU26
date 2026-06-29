@@ -177,3 +177,39 @@ export const createRace = (roundId: number, payload: CreateRacePayload): Promise
     if (!res.success || !res.data) throw new Error(res.message || 'Tạo Race thất bại.');
     return res.data;
   });
+
+// ─── Tournament Participation (Owner) ────────────────────────────────────────
+
+export interface ParticipationResponse {
+  participationId: number;
+  tournamentId: number;
+  tournamentName: string; // trả về ở root object từ BE
+  ownerId: number;
+  status: string; // "Pending" | "Approved" | "Rejected" | ...
+  registeredAt: string;
+}
+
+/**
+ * POST /api/tournament/{tournamentId}/participants
+ * Không gửi body — BE lấy OwnerId từ JWT claim.
+ * Trả về ParticipationResponse.
+ */
+export const registerForTournament = (tournamentId: number): Promise<ParticipationResponse> =>
+  apiFetch<ApiResponse<ParticipationResponse>>(`/tournament/${tournamentId}/participants`, {
+    method: 'POST',
+  }).then((res) => {
+    if (!res.success || !res.data)
+      throw new Error(res.message || 'Đăng ký tham gia giải thất bại.');
+    return res.data;
+  });
+
+/**
+ * GET /api/my/tournament-participations
+ * Trả về danh sách các giải Owner đã đăng ký.
+ */
+export const getMyTournamentParticipations = (): Promise<ParticipationResponse[]> =>
+  apiFetch<ApiResponse<ParticipationResponse[]>>('/my/tournament-participations').then((res) => {
+    if (!res.success || !res.data)
+      throw new Error(res.message || 'Không tải được danh sách đăng ký.');
+    return res.data;
+  });
