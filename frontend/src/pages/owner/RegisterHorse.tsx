@@ -44,19 +44,59 @@ const initialFormData: FormData = {
 };
 
 const genderOptions = [
-  { value: 'Male', label: 'Đực (Male)' },
-  { value: 'Female', label: 'Cái (Female)' },
+  { value: 'Male',    label: 'Đực (Male)' },
+  { value: 'Female',  label: 'Cái (Female)' },
   { value: 'Gelding', label: 'Bị thiến (Gelding)' },
 ];
 
 const breedOptions = [
-  { value: 'Mixed', label: 'Mixed' },
+  { value: 'Mixed',         label: 'Mixed' },
   { value: 'Quarter Horse', label: 'Quarter Horse' },
-  { value: 'Arabian', label: 'Arabian' },
-  { value: 'Thoroughbred', label: 'Thoroughbred' },
+  { value: 'Arabian',       label: 'Arabian' },
+  { value: 'Thoroughbred',  label: 'Thoroughbred' },
 ];
 
-// ─── Screening Result Badge ───────────────────────────────────────────────────
+// ─── Shared form field ────────────────────────────────────────────────────────
+
+function Field({
+  label,
+  required,
+  children,
+  hint,
+}: {
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+  hint?: string;
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+        {label}
+        {required && <span className="text-red-500 ml-0.5">*</span>}
+      </label>
+      {children}
+      {hint && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
+    </div>
+  );
+}
+
+const inputCls =
+  'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all bg-white';
+const inputDisabledCls =
+  'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-400 cursor-not-allowed';
+
+// ─── Section header ───────────────────────────────────────────────────────────
+
+function SectionHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="col-span-2 border-b border-gray-200 pb-1.5 mb-1">
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">{children}</p>
+    </div>
+  );
+}
+
+// ─── Screening Result ─────────────────────────────────────────────────────────
 
 interface ScreeningResultProps {
   result: HorseCreateResponse;
@@ -65,27 +105,27 @@ interface ScreeningResultProps {
 function ScreeningResult({ result }: ScreeningResultProps) {
   const configs: Record<
     string,
-    { bg: string; border: string; text: string; icon: string; label: string }
+    { bg: string; border: string; text: string; dot: string; label: string }
   > = {
     AutoEligible: {
-      bg: 'bg-emerald-50',
-      border: 'border-emerald-200',
-      text: 'text-emerald-800',
-      icon: '✅',
+      bg: 'bg-green-50',
+      border: 'border-green-200',
+      text: 'text-green-800',
+      dot: 'bg-green-500',
       label: 'Đã tự duyệt',
     },
     ManualReview: {
       bg: 'bg-yellow-50',
       border: 'border-yellow-200',
       text: 'text-yellow-800',
-      icon: '⏳',
+      dot: 'bg-yellow-500',
       label: 'Chờ Admin duyệt',
     },
     AutoRejected: {
       bg: 'bg-red-50',
       border: 'border-red-200',
       text: 'text-red-800',
-      icon: '❌',
+      dot: 'bg-red-500',
       label: 'Bị từ chối tự động',
     },
   };
@@ -94,32 +134,30 @@ function ScreeningResult({ result }: ScreeningResultProps) {
     bg: 'bg-gray-50',
     border: 'border-gray-200',
     text: 'text-gray-800',
-    icon: 'ℹ️',
+    dot: 'bg-gray-400',
     label: result.screeningStatus,
   };
 
   return (
-    <div className={`${cfg.bg} ${cfg.border} border rounded-xl p-5 space-y-3`}>
-      <div className="flex items-center gap-3">
-        <span className="text-2xl">{cfg.icon}</span>
+    <div className={`${cfg.bg} ${cfg.border} border rounded-lg p-4 space-y-2`}>
+      <div className="flex items-center gap-2">
+        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}`} />
         <div>
-          <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-0.5">
-            Kết quả xét duyệt
-          </p>
-          <p className={`font-bold text-lg ${cfg.text}`}>{cfg.label}</p>
+          <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Kết quả xét duyệt</p>
+          <p className={`text-sm font-bold ${cfg.text}`}>{cfg.label}</p>
         </div>
       </div>
 
       {result.screeningReason && (
-        <div className="bg-white bg-opacity-60 rounded-lg px-4 py-3">
-          <p className="text-xs text-gray-500 mb-1">Lý do</p>
+        <div className="bg-white bg-opacity-60 rounded px-3 py-2">
+          <p className="text-xs text-gray-500 mb-0.5">Lý do</p>
           <p className={`text-sm font-medium ${cfg.text}`}>{result.screeningReason}</p>
         </div>
       )}
 
       {result.adminApprovalStatus && (
-        <div className="bg-white bg-opacity-60 rounded-lg px-4 py-3">
-          <p className="text-xs text-gray-500 mb-1">Trạng thái Admin</p>
+        <div className="bg-white bg-opacity-60 rounded px-3 py-2">
+          <p className="text-xs text-gray-500 mb-0.5">Trạng thái Admin</p>
           <p className={`text-sm font-medium ${cfg.text}`}>{result.adminApprovalStatus}</p>
         </div>
       )}
@@ -265,102 +303,101 @@ export default function RegisterHorse() {
 
   // ─── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Nút quay lại */}
+    <div className="max-w-3xl">
+      {/* Page header */}
+      <div className="mb-6">
         <button
           onClick={() => navigate('/owner/horses')}
-          className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium mb-6 transition-colors"
+          className="text-sm text-blue-600 hover:text-blue-700 font-medium mb-3 flex items-center gap-1"
         >
           ← Quay lại danh sách
         </button>
+        <h1 className="text-xl font-bold text-gray-900">Đăng ký ngựa mới</h1>
+        <p className="text-sm text-gray-500 mt-0.5">
+          Điền đầy đủ thông tin để đăng ký ngựa tham gia giải đấu.
+        </p>
+      </div>
 
-        {/* Khung form */}
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-6">Đăng ký ngựa mới</h1>
+      {/* Screening result (after successful submit) */}
+      {screeningResult && (
+        <div className="mb-6">
+          <ScreeningResult result={screeningResult} />
+          <div className="mt-3 flex gap-3">
+            <button
+              type="button"
+              onClick={() => navigate('/owner/horses')}
+              className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+            >
+              Xem danh sách ngựa →
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setScreeningResult(null);
+                setFormData(initialFormData);
+              }}
+              className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Đăng ký ngựa khác
+            </button>
+          </div>
+        </div>
+      )}
 
-          {/* Kết quả screening (sau khi submit thành công) */}
-          {screeningResult && (
-            <div className="mb-6">
-              <ScreeningResult result={screeningResult} />
-              <div className="mt-4 flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => navigate('/owner/horses')}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-sm"
-                >
-                  Xem danh sách ngựa →
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setScreeningResult(null);
-                    setFormData(initialFormData);
-                  }}
-                  className="px-5 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors text-sm"
-                >
-                  Đăng ký ngựa khác
-                </button>
-              </div>
-            </div>
-          )}
+      {/* Error */}
+      {error && (
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+          <p className="text-sm text-red-700 font-medium">⚠️ {error}</p>
+        </div>
+      )}
 
-          {/* Thông báo lỗi */}
-          {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-red-800 font-medium">⚠️ {error}</p>
-            </div>
-          )}
+      {/* Warning: no approved tournament */}
+      {!participationsLoading && !hasApprovedTournament && !participationsError && (
+        <div className="mb-5 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-start gap-3">
+          <span className="text-lg mt-0.5">🏆</span>
+          <div>
+            <p className="text-sm font-semibold text-amber-800">Bạn chưa có giải đấu nào được duyệt</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              Bạn cần đăng ký tham gia một giải trước khi đăng ký ngựa.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('/owner/tournaments')}
+              className="mt-2 text-xs font-semibold text-amber-800 underline hover:text-amber-900"
+            >
+              Đến trang giải đấu →
+            </button>
+          </div>
+        </div>
+      )}
 
-          {/* Cảnh báo nếu chưa có giải Approved */}
-          {!participationsLoading && !hasApprovedTournament && !participationsError && (
-            <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-              <span className="text-xl mt-0.5">🏆</span>
-              <div>
-                <p className="font-semibold text-amber-800 text-sm">
-                  Bạn chưa có giải đấu nào được duyệt
-                </p>
-                <p className="text-amber-700 text-sm mt-0.5">
-                  Bạn cần đăng ký tham gia một giải trước khi đăng ký ngựa.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => navigate('/owner/tournaments')}
-                  className="mt-2 text-sm font-medium text-amber-800 underline hover:text-amber-900"
-                >
-                  Đến trang giải đấu →
-                </button>
-              </div>
-            </div>
-          )}
+      {participationsError && (
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+          <p className="text-sm text-red-700">⚠️ {participationsError}</p>
+        </div>
+      )}
 
-          {participationsError && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-red-700 text-sm">⚠️ {participationsError}</p>
-            </div>
-          )}
+      {/* Form — hidden when submitted */}
+      {!screeningResult && (
+        <form onSubmit={handleSubmit}>
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            {/* Form body */}
+            <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
 
-          {/* Form — ẩn nếu đã submit thành công */}
-          {!screeningResult && (
-            <form onSubmit={handleSubmit}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              {/* Section: Giải đấu */}
+              <SectionHeader>Giải đấu</SectionHeader>
 
-                {/* ── Giải đấu (chiếm full width) ── */}
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Giải đấu <span className="text-red-600">*</span>
-                  </label>
+              <div className="md:col-span-2">
+                <Field label="Giải đấu" required hint={!participationsLoading && !hasApprovedTournament ? 'Cần đăng ký và được duyệt vào ít nhất một giải để tiếp tục.' : undefined}>
                   {participationsLoading ? (
-                    <div className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-400 text-sm animate-pulse">
-                      Đang tải danh sách giải đấu...
-                    </div>
+                    <div className={inputDisabledCls}>Đang tải danh sách giải đấu...</div>
                   ) : (
                     <select
                       name="tournamentId"
                       value={formData.tournamentId}
                       onChange={handleInputChange}
                       disabled={!hasApprovedTournament}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      className={hasApprovedTournament ? inputCls : inputDisabledCls}
                     >
                       <option value="">
                         {hasApprovedTournament
@@ -374,197 +411,160 @@ export default function RegisterHorse() {
                       ))}
                     </select>
                   )}
-                  {!participationsLoading && !hasApprovedTournament && (
-                    <p className="mt-1 text-xs text-amber-600">
-                      Cần đăng ký và được duyệt vào ít nhất một giải để tiếp tục.
-                    </p>
-                  )}
-                </div>
+                </Field>
+              </div>
 
-                {/* Tên ngựa */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tên ngựa <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    placeholder="Nhập tên ngựa"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                  />
-                </div>
+              {/* Section: Thông tin cơ bản */}
+              <SectionHeader>Thông tin cơ bản</SectionHeader>
 
-                {/* Giống ngựa */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Giống ngựa <span className="text-red-600">*</span>
-                  </label>
-                  <select
-                    name="breedCode"
-                    value={formData.breedCode}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                  >
-                    <option value="">Chọn giống ngựa</option>
-                    {breedOptions.map((breed) => (
-                      <option key={breed.value} value={breed.value}>
-                        {breed.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <Field label="Tên ngựa" required>
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  placeholder="Nhập tên ngựa"
+                  className={inputCls}
+                />
+              </Field>
 
-                {/* Năm sinh */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Năm sinh <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    name="birthYear"
-                    value={formData.birthYear}
-                    onChange={handleInputChange}
-                    placeholder="Nhập năm sinh"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                  />
-                </div>
+              <Field label="Giống ngựa" required>
+                <select
+                  name="breedCode"
+                  value={formData.breedCode}
+                  onChange={handleInputChange}
+                  className={inputCls}
+                >
+                  <option value="">Chọn giống ngựa</option>
+                  {breedOptions.map((breed) => (
+                    <option key={breed.value} value={breed.value}>
+                      {breed.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
 
-                {/* Giới tính */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Giới tính <span className="text-red-600">*</span>
-                  </label>
-                  <select
-                    name="gender"
-                    value={formData.gender}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                  >
-                    <option value="">Chọn giới tính</option>
-                    {genderOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <Field label="Năm sinh" required>
+                <input
+                  type="number"
+                  name="birthYear"
+                  value={formData.birthYear}
+                  onChange={handleInputChange}
+                  placeholder="VD: 2019"
+                  className={inputCls}
+                />
+              </Field>
 
-                {/* Màu sắc */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Màu sắc chủ đạo <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="color"
-                    value={formData.color}
-                    onChange={handleInputChange}
-                    placeholder="Nhập màu sắc"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                  />
-                </div>
+              <Field label="Giới tính" required>
+                <select
+                  name="gender"
+                  value={formData.gender}
+                  onChange={handleInputChange}
+                  className={inputCls}
+                >
+                  <option value="">Chọn giới tính</option>
+                  {genderOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
 
-                {/* Hồ sơ tiêm chủng */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Mã tham chiếu hồ sơ tiêm chủng
-                  </label>
-                  <input
-                    type="text"
-                    name="vaccinationRecordRef"
-                    value={formData.vaccinationRecordRef}
-                    onChange={handleInputChange}
-                    placeholder="Nhập mã tham chiếu (không bắt buộc)"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                  />
-                </div>
+              <Field label="Màu sắc chủ đạo" required>
+                <input
+                  type="text"
+                  name="color"
+                  value={formData.color}
+                  onChange={handleInputChange}
+                  placeholder="VD: Bay, Chestnut, Black"
+                  className={inputCls}
+                />
+              </Field>
 
-                {/* Ngày kiểm tra doping */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Ngày kiểm tra doping <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    name="dopingTestDate"
-                    value={formData.dopingTestDate}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                  />
-                </div>
+              <Field label="Cân nặng (kg)" required>
+                <input
+                  type="number"
+                  name="weight"
+                  value={formData.weight}
+                  onChange={handleInputChange}
+                  placeholder="Nhập cân nặng"
+                  className={inputCls}
+                />
+              </Field>
 
-                {/* Cân nặng */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Cân nặng (kg) <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    name="weight"
-                    value={formData.weight}
-                    onChange={handleInputChange}
-                    placeholder="Nhập cân nặng"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                  />
-                </div>
-
-                {/* Kết quả doping */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Kết quả doping <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="dopingTestResult"
-                    value={formData.dopingTestResult}
-                    onChange={handleInputChange}
-                    placeholder="Ví dụ: Clean"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                  />
-                </div>
-
-                {/* Đặc điểm nhận dạng */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Đặc điểm nhận dạng <span className="text-red-600">*</span>
-                  </label>
+              <div className="md:col-span-2">
+                <Field label="Đặc điểm nhận dạng" required>
                   <input
                     type="text"
                     name="identifyingMarks"
                     value={formData.identifyingMarks}
                     onChange={handleInputChange}
-                    placeholder="Nhập đặc điểm nhận dạng"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                    placeholder="VD: Vết bớt trắng ở trán"
+                    className={inputCls}
                   />
-                </div>
+                </Field>
               </div>
 
-              {/* Nút hành động */}
-              <div className="flex justify-end gap-4">
-                <button
-                  type="button"
-                  onClick={() => navigate('/owner/horses')}
-                  className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading || !hasApprovedTournament || participationsLoading}
-                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:bg-blue-300 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  {loading && (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                  )}
-                  {loading ? 'Đang xử lý...' : 'Xác nhận Đăng ký'}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      </div>
+              {/* Section: Thông tin y tế */}
+              <SectionHeader>Thông tin y tế</SectionHeader>
+
+              <Field label="Mã tham chiếu hồ sơ tiêm chủng">
+                <input
+                  type="text"
+                  name="vaccinationRecordRef"
+                  value={formData.vaccinationRecordRef}
+                  onChange={handleInputChange}
+                  placeholder="Không bắt buộc"
+                  className={inputCls}
+                />
+              </Field>
+
+              <Field label="Ngày kiểm tra doping" required>
+                <input
+                  type="date"
+                  name="dopingTestDate"
+                  value={formData.dopingTestDate}
+                  onChange={handleInputChange}
+                  className={inputCls}
+                />
+              </Field>
+
+              <Field label="Kết quả doping" required>
+                <input
+                  type="text"
+                  name="dopingTestResult"
+                  value={formData.dopingTestResult}
+                  onChange={handleInputChange}
+                  placeholder="VD: Clean, Pending"
+                  className={inputCls}
+                />
+              </Field>
+            </div>
+
+            {/* Form footer */}
+            <div className="px-5 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => navigate('/owner/horses')}
+                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-white transition-colors"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="submit"
+                disabled={loading || !hasApprovedTournament || participationsLoading}
+                className="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:bg-blue-300 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {loading && (
+                  <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white" />
+                )}
+                {loading ? 'Đang xử lý...' : 'Xác nhận đăng ký'}
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
     </div>
   );
 }

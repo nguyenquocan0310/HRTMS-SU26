@@ -9,19 +9,20 @@ import {
 
 // ── Màu trạng thái giải đấu ──────────────────────────────────────────────────
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; dot: string }> = {
-  Upcoming:             { label: 'Sắp diễn ra',        bg: 'bg-blue-50',   text: 'text-blue-700',   dot: 'bg-blue-500'   },
-  Active:               { label: 'Đang diễn ra',       bg: 'bg-green-50',  text: 'text-green-700',  dot: 'bg-green-500'  },
-  Completed:            { label: 'Đã kết thúc',        bg: 'bg-gray-100',  text: 'text-gray-600',   dot: 'bg-gray-400'   },
-  Cancelled:            { label: 'Đã hủy',             bg: 'bg-red-50',    text: 'text-red-700',    dot: 'bg-red-500'    },
-  Draft:                { label: 'Nháp',               bg: 'bg-yellow-50', text: 'text-yellow-700', dot: 'bg-yellow-500' },
-  'Open Registration':  { label: 'Mở đăng ký',         bg: 'bg-emerald-50',text: 'text-emerald-700',dot: 'bg-emerald-500'},
+  Upcoming:             { label: 'Sắp diễn ra',   bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-500'    },
+  Active:               { label: 'Đang diễn ra',   bg: 'bg-green-50',   text: 'text-green-700',   dot: 'bg-green-500'   },
+  Completed:            { label: 'Đã kết thúc',    bg: 'bg-gray-100',   text: 'text-gray-600',    dot: 'bg-gray-400'    },
+  Cancelled:            { label: 'Đã hủy',          bg: 'bg-red-50',     text: 'text-red-700',     dot: 'bg-red-500'     },
+  Draft:                { label: 'Nháp',             bg: 'bg-yellow-50',  text: 'text-yellow-700',  dot: 'bg-yellow-500'  },
+  'Open Registration':  { label: 'Mở đăng ký',     bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
 }
 
 function StatusBadge({ status }: { status: string }) {
   const cfg = STATUS_CONFIG[status] ?? { label: status, bg: 'bg-gray-100', text: 'text-gray-600', dot: 'bg-gray-400' }
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${cfg.bg} ${cfg.text}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium border ${cfg.bg} ${cfg.text}`}
+      style={{ borderColor: 'transparent' }}>
+      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
       {cfg.label}
     </span>
   )
@@ -75,22 +76,22 @@ function TournamentDetailModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}
+      style={{ background: 'rgba(0,0,0,0.4)' }}
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto"
+        className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[88vh] overflow-y-auto border border-gray-200"
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-2xl flex justify-between items-start">
+        {/* Modal header */}
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-start justify-between rounded-t-xl">
           <div>
-            <p className="text-blue-200 text-xs font-medium uppercase tracking-widest mb-1">Chi tiết giải đấu</p>
-            <h2 className="text-xl font-bold leading-tight">{tournament.name}</h2>
+            <p className="text-xs text-gray-400 font-semibold uppercase tracking-widest mb-0.5">Chi tiết giải đấu</p>
+            <h2 className="text-base font-bold text-gray-900 leading-tight">{tournament.name}</h2>
           </div>
           <button
             onClick={onClose}
-            className="text-blue-200 hover:text-white transition-colors text-2xl leading-none font-light ml-4 mt-0.5"
+            className="text-gray-400 hover:text-gray-600 text-xl leading-none font-light ml-4 mt-0.5"
             aria-label="Đóng"
           >
             ×
@@ -101,33 +102,33 @@ function TournamentDetailModal({
           {/* Status + dates */}
           <div className="flex flex-wrap gap-3 items-center">
             <StatusBadge status={tournament.status} />
-            <span className="text-sm text-gray-500">
-              📅 {formatDate(tournament.startDate)} — {formatDate(tournament.endDate)}
+            <span className="text-xs text-gray-500">
+              {formatDate(tournament.startDate)} — {formatDate(tournament.endDate)}
             </span>
           </div>
 
           {/* Description */}
           {tournament.description && (
-            <p className="text-gray-600 text-sm leading-relaxed bg-gray-50 rounded-xl p-4 border border-gray-100">
+            <p className="text-sm text-gray-600 leading-relaxed bg-gray-50 rounded-lg p-3 border border-gray-100">
               {tournament.description}
             </p>
           )}
 
           {/* Info grid */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2">
             {[
-              { icon: '🐴', label: 'Giống ngựa', value: tournament.allowedBreed },
-              { icon: '🏟️', label: 'Loại đường đua', value: tournament.trackType },
-              { icon: '📏', label: 'Khoảng cách đua', value: `${tournament.raceDistance} m` },
-              { icon: '🏆', label: 'Hạng mục', value: tournament.raceCategory },
-              { icon: '👤', label: 'Kinh nghiệm jockey tối thiểu', value: `${tournament.minJockeyExperienceYears} năm` },
-              { icon: '🐎', label: 'Số ngựa tối đa', value: tournament.maxHorses },
-              { icon: '💰', label: 'Tổng giải thưởng', value: formatCurrency(tournament.purseAmount) },
-              { icon: '🎫', label: 'Phí tham dự', value: formatCurrency(tournament.entryFeeAmount) },
-            ].map(({ icon, label, value }) => (
-              <div key={label} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                <p className="text-xs text-gray-500 mb-0.5">{icon} {label}</p>
-                <p className="font-semibold text-gray-800 text-sm">{value}</p>
+              { label: 'Giống ngựa',              value: tournament.allowedBreed },
+              { label: 'Loại đường đua',           value: tournament.trackType },
+              { label: 'Khoảng cách đua',          value: `${tournament.raceDistance} m` },
+              { label: 'Hạng mục',                 value: tournament.raceCategory },
+              { label: 'KN jockey tối thiểu',      value: `${tournament.minJockeyExperienceYears} năm` },
+              { label: 'Số ngựa tối đa',           value: tournament.maxHorses },
+              { label: 'Tổng giải thưởng',         value: formatCurrency(tournament.purseAmount) },
+              { label: 'Phí tham dự',              value: formatCurrency(tournament.entryFeeAmount) },
+            ].map(({ label, value }) => (
+              <div key={label} className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100">
+                <p className="text-xs text-gray-400 mb-0.5">{label}</p>
+                <p className="text-sm font-semibold text-gray-800">{value}</p>
               </div>
             ))}
           </div>
@@ -135,19 +136,19 @@ function TournamentDetailModal({
           {/* Rounds */}
           {tournament.rounds.length > 0 && (
             <div>
-              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <span className="text-blue-600">🔄</span> Các vòng đấu ({tournament.rounds.length})
-              </h3>
-              <div className="space-y-2">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">
+                Các vòng đấu ({tournament.rounds.length})
+              </p>
+              <div className="space-y-1.5">
                 {tournament.rounds.map(round => (
-                  <div key={round.roundId} className="border border-gray-100 rounded-xl p-3 bg-gray-50">
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium text-gray-800 text-sm">{round.name}</span>
-                      <StatusBadge status={round.status} />
+                  <div key={round.roundId} className="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2.5 bg-gray-50">
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{round.name}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {formatDate(round.scheduledDate)} · {round.races.length} cuộc đua
+                      </p>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      📅 {formatDate(round.scheduledDate)} · {round.races.length} cuộc đua
-                    </p>
+                    <StatusBadge status={round.status} />
                   </div>
                 ))}
               </div>
@@ -157,50 +158,49 @@ function TournamentDetailModal({
           {/* Prize distributions */}
           {tournament.prizeDistributions.length > 0 && (
             <div>
-              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <span className="text-yellow-500">🏅</span> Phân chia giải thưởng
-              </h3>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-2">
+                Phân chia giải thưởng
+              </p>
               <div className="flex flex-wrap gap-2">
                 {tournament.prizeDistributions
                   .sort((a, b) => a.position - b.position)
                   .map(prize => (
-                    <div key={prize.position} className="bg-yellow-50 border border-yellow-100 rounded-xl px-4 py-2 text-center min-w-[80px]">
-                      <p className="text-yellow-700 font-bold text-lg">#{prize.position}</p>
-                      <p className="text-yellow-600 text-sm font-medium">{prize.percentage}%</p>
+                    <div key={prize.position} className="bg-yellow-50 border border-yellow-100 rounded-lg px-4 py-2 text-center min-w-[72px]">
+                      <p className="text-yellow-700 font-bold text-sm">#{prize.position}</p>
+                      <p className="text-yellow-600 text-xs font-medium">{prize.percentage}%</p>
                     </div>
                   ))}
               </div>
             </div>
           )}
 
-          {/* ── Đăng ký tham gia ── */}
+          {/* Register section */}
           {canRegister && (
             <div className="border-t border-gray-100 pt-4">
-              {/* Thông báo kết quả */}
               {regMessage && (
                 <div
-                  className={`mb-3 px-4 py-3 rounded-xl text-sm font-medium ${
+                  className={`mb-3 px-3 py-2.5 rounded-lg text-sm font-medium border ${
                     regMessage.type === 'success'
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                      : 'bg-red-50 text-red-700 border border-red-200'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-red-50 text-red-700 border-red-200'
                   }`}
                 >
-                  {regMessage.type === 'success' ? '✅' : '❌'} {regMessage.text}
+                  {regMessage.text}
                 </div>
               )}
 
               {isRegistered ? (
                 <button
                   disabled
-                  className="w-full flex items-center justify-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 font-semibold py-2.5 rounded-xl text-sm cursor-not-allowed"
+                  className="w-full flex items-center justify-center gap-2 bg-green-50 border border-green-200 text-green-700 font-semibold py-2.5 rounded-lg text-sm cursor-not-allowed"
                 >
-                  ✅ Đã đăng ký
+                  Đã đăng ký
                 </button>
               ) : (
                 <button
                   onClick={handleRegister}
                   disabled={registering}
-                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:from-emerald-300 disabled:to-teal-300 text-white font-semibold py-2.5 rounded-xl text-sm transition-all duration-200 shadow-sm hover:shadow-md disabled:cursor-not-allowed"
+                  className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold py-2.5 rounded-lg text-sm transition-colors disabled:cursor-not-allowed"
                 >
                   {registering ? (
                     <>
@@ -211,7 +211,7 @@ function TournamentDetailModal({
                       Đang đăng ký...
                     </>
                   ) : (
-                    '🏁 Đăng ký tham gia'
+                    'Đăng ký tham gia'
                   )}
                 </button>
               )}
@@ -224,19 +224,16 @@ function TournamentDetailModal({
 }
 
 // ── Skeleton Loading ──────────────────────────────────────────────────────────
-function SkeletonCard() {
+function SkeletonRow() {
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-5 animate-pulse">
-      <div className="flex justify-between items-start mb-3">
-        <div className="h-5 bg-gray-200 rounded w-2/3" />
-        <div className="h-5 bg-gray-100 rounded-full w-20" />
-      </div>
-      <div className="h-3 bg-gray-100 rounded w-1/2 mb-4" />
-      <div className="grid grid-cols-2 gap-2 mb-4">
-        {[...Array(4)].map((_, i) => <div key={i} className="h-12 bg-gray-100 rounded-xl" />)}
-      </div>
-      <div className="h-9 bg-gray-100 rounded-lg" />
-    </div>
+    <tr className="animate-pulse">
+      <td className="px-4 py-3"><div className="h-3.5 bg-gray-200 rounded w-2/3" /></td>
+      <td className="px-4 py-3"><div className="h-5 bg-gray-100 rounded-full w-24" /></td>
+      <td className="px-4 py-3"><div className="h-3 bg-gray-100 rounded w-24" /></td>
+      <td className="px-4 py-3"><div className="h-3 bg-gray-100 rounded w-20" /></td>
+      <td className="px-4 py-3"><div className="h-3 bg-gray-100 rounded w-24" /></td>
+      <td className="px-4 py-3"><div className="h-7 bg-gray-100 rounded-lg w-24" /></td>
+    </tr>
   )
 }
 
@@ -302,43 +299,33 @@ const TournamentList: React.FC = () => {
   const statusOptions = ['all', ...Array.from(new Set(tournaments.map(t => t.status)))]
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      {/* ── Header ── */}
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      {/* Header */}
+      <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            🏆 Danh sách Giải đấu
-          </h1>
-          <p className="text-gray-500 text-sm mt-0.5">
-            Xem tất cả các giải đấu đang diễn ra và sắp tới
-          </p>
+          <h1 className="text-xl font-bold text-gray-900">Danh sách giải đấu</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Xem và đăng ký tham gia các giải đấu</p>
         </div>
         {!loading && (
-          <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-2">
-            <span className="text-blue-600 font-bold text-lg">{filtered.length}</span>
-            <span className="text-blue-600 text-sm">giải đấu</span>
-          </div>
+          <span className="px-3 py-1 text-xs font-semibold bg-gray-100 text-gray-600 rounded-full">
+            {filtered.length} giải đấu
+          </span>
         )}
       </div>
 
-      {/* ── Filters ── */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        {/* Search */}
-        <div className="relative flex-1">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
-          <input
-            type="text"
-            placeholder="Tìm kiếm giải đấu..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-          />
-        </div>
-        {/* Status filter */}
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <input
+          type="text"
+          placeholder="Tìm kiếm giải đấu..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
         <select
           value={statusFilter}
           onChange={e => setStatusFilter(e.target.value)}
-          className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-700 transition-all"
+          className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-700"
         >
           <option value="all">Tất cả trạng thái</option>
           {statusOptions.filter(s => s !== 'all').map(s => (
@@ -347,98 +334,92 @@ const TournamentList: React.FC = () => {
         </select>
       </div>
 
-      {/* ── Content ── */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}
-        </div>
-      ) : error ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="text-6xl mb-4">⚠️</div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Không thể tải dữ liệu</h2>
-          <p className="text-gray-500 text-sm mb-6 max-w-xs">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-6 rounded-xl transition-colors text-sm"
-          >
-            Thử lại
-          </button>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="text-6xl mb-4">🏆</div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Không tìm thấy giải đấu</h2>
-          <p className="text-gray-500 text-sm">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {filtered.map(t => (
-            <div
-              key={t.tournamentId}
-              className="group bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-200 flex flex-col"
+      {/* Table */}
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        {error ? (
+          <div className="py-16 text-center">
+            <p className="text-sm font-semibold text-gray-700 mb-1">Không thể tải dữ liệu</p>
+            <p className="text-xs text-gray-500 mb-4">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
             >
-              {/* Card header */}
-              <div className="flex justify-between items-start gap-2 mb-2">
-                <h3 className="font-bold text-gray-900 text-base leading-tight group-hover:text-blue-700 transition-colors line-clamp-2">
-                  {t.name}
-                </h3>
-                <StatusBadge status={t.status} />
-              </div>
+              Thử lại
+            </button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Tên giải</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Trạng thái</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Thời gian</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Phí tham dự</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Giải thưởng</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Hành động</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {loading ? (
+                  [...Array(5)].map((_, i) => <SkeletonRow key={i} />)
+                ) : filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-14 text-center text-gray-400 text-sm">
+                      Không tìm thấy giải đấu nào
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map(t => (
+                    <tr key={t.tournamentId} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-gray-900">{t.name}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {t.allowedBreed} · {t.raceDistance}m · {t.rounds.length} vòng
+                        </p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={t.status} />
+                        {registeredIds.has(t.tournamentId) && (
+                          <p className="text-xs text-emerald-600 font-medium mt-1">Đã đăng ký</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-600">
+                        {formatDate(t.startDate)}<br />
+                        <span className="text-gray-400">→ {formatDate(t.endDate)}</span>
+                      </td>
+                      <td className="px-4 py-3 text-xs font-semibold text-gray-700">
+                        {formatCurrency(t.entryFeeAmount)}
+                      </td>
+                      <td className="px-4 py-3 text-xs font-semibold text-blue-700">
+                        {formatCurrency(t.purseAmount)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => setSelected(t)}
+                          className="px-3 py-1.5 text-xs font-semibold text-blue-600 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors whitespace-nowrap"
+                        >
+                          Xem chi tiết
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
-              {/* Date */}
-              <p className="text-xs text-gray-400 mb-4">
-                📅 {formatDate(t.startDate)} — {formatDate(t.endDate)}
-              </p>
-
-              {/* Quick info */}
-              <div className="grid grid-cols-2 gap-2 mb-4 flex-1">
-                <div className="bg-gray-50 rounded-xl p-2.5 border border-gray-100">
-                  <p className="text-xs text-gray-400 mb-0.5">🐴 Giống ngựa</p>
-                  <p className="text-xs font-semibold text-gray-700 truncate">{t.allowedBreed}</p>
-                </div>
-                <div className="bg-gray-50 rounded-xl p-2.5 border border-gray-100">
-                  <p className="text-xs text-gray-400 mb-0.5">🏟️ Đường đua</p>
-                  <p className="text-xs font-semibold text-gray-700 truncate">{t.trackType}</p>
-                </div>
-                <div className="bg-blue-50 rounded-xl p-2.5 border border-blue-100">
-                  <p className="text-xs text-blue-400 mb-0.5">💰 Giải thưởng</p>
-                  <p className="text-xs font-bold text-blue-700 truncate">{formatCurrency(t.purseAmount)}</p>
-                </div>
-                <div className="bg-indigo-50 rounded-xl p-2.5 border border-indigo-100">
-                  <p className="text-xs text-indigo-400 mb-0.5">🎫 Phí tham dự</p>
-                  <p className="text-xs font-bold text-indigo-700 truncate">{formatCurrency(t.entryFeeAmount)}</p>
-                </div>
-              </div>
-
-              {/* Rounds count */}
-              <div className="flex items-center gap-2 mb-4 text-xs text-gray-500">
-                <span>🔄 {t.rounds.length} vòng đấu</span>
-                <span>·</span>
-                <span>📏 {t.raceDistance} m</span>
-                <span>·</span>
-                <span>🐎 Tối đa {t.maxHorses} ngựa</span>
-              </div>
-
-              {/* CTA */}
-              <button
-                onClick={() => setSelected(t)}
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-semibold py-2.5 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md"
-              >
-                Xem chi tiết →
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ── Toast thành công (toàn màn hình) ── */}
+      {/* Toast success */}
       {regSuccessMsg && (
-        <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white px-5 py-3.5 rounded-2xl shadow-2xl text-sm font-medium flex items-center gap-2 animate-bounce">
-          ✅ {regSuccessMsg}
+        <div className="fixed bottom-6 right-6 z-50 bg-green-700 text-white px-4 py-3 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-green-300" />
+          {regSuccessMsg}
         </div>
       )}
 
-      {/* ── Modal ── */}
+      {/* Modal */}
       {selected && (
         <TournamentDetailModal
           tournament={selected}

@@ -1,39 +1,31 @@
 import React from 'react';
 
 interface HorseStatusBadgeProps {
-  status: 'Pending' | 'Approved' | 'Rejected';
+  status: 'Pending' | 'Approved' | 'Rejected' | string;
 }
 
-const HorseStatusBadge: React.FC<HorseStatusBadgeProps> = ({ status }) => {
-  const getStatusStyles = (status: HorseStatusBadgeProps['status']): string => {
-    switch (status) {
-      case 'Pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'Approved':
-        return 'bg-green-100 text-green-800';
-      case 'Rejected':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+const STATUS_MAP: Record<string, { label: string; cls: string; dot: string }> = {
+  Approved:   { label: 'Đã duyệt',   cls: 'bg-green-50 text-green-700 border-green-200',  dot: 'bg-green-500'  },
+  Pending:    { label: 'Chờ duyệt',  cls: 'bg-yellow-50 text-yellow-700 border-yellow-200', dot: 'bg-yellow-500' },
+  Rejected:   { label: 'Từ chối',    cls: 'bg-red-50 text-red-700 border-red-200',         dot: 'bg-red-500'    },
+  ManualReview: { label: 'Xét duyệt thủ công', cls: 'bg-orange-50 text-orange-700 border-orange-200', dot: 'bg-orange-500' },
+  AutoEligible: { label: 'Tự duyệt', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
+  AutoRejected: { label: 'Tự từ chối', cls: 'bg-red-50 text-red-700 border-red-200',       dot: 'bg-red-500'    },
+};
 
-  const getStatusLabel = (status: HorseStatusBadgeProps['status']): string => {
-    switch (status) {
-      case 'Pending':
-        return 'Chờ duyệt';
-      case 'Approved':
-        return 'Đã duyệt';
-      case 'Rejected':
-        return 'Từ chối';
-      default:
-        return status;
-    }
+const HorseStatusBadge: React.FC<HorseStatusBadgeProps> = ({ status }) => {
+  const cfg = STATUS_MAP[status] ?? {
+    label: status,
+    cls: 'bg-gray-50 text-gray-600 border-gray-200',
+    dot: 'bg-gray-400',
   };
 
   return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusStyles(status)}`}>
-      {getStatusLabel(status)}
+    <span
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium rounded border ${cfg.cls}`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
+      {cfg.label}
     </span>
   );
 };
