@@ -19,7 +19,7 @@ interface NavItem {
 
 const OPERATIONS_ITEMS: NavItem[] = [
   { label: 'Dashboard', path: '/admin', icon: <FiGrid size={18} /> },
-  { label: 'Approval Center', path: '/admin/approvals', icon: <FiShield size={18} /> },
+  { label: 'Approval Center', path: '/admin/approval-center', icon: <FiShield size={18} /> },
   { label: 'Users', path: '/admin/users', icon: <FiUsers size={18} /> },
   { label: 'Tournaments', path: '/admin/tournaments', icon: <FiAward size={18} /> },
   { label: 'Race Operations', path: '/admin/race-operations', icon: <FiFlag size={18} /> },
