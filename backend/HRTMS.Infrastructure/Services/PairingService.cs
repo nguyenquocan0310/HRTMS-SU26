@@ -36,14 +36,20 @@ public class PairingService : IPairingService
             throw new UnauthorizedAccessException("HORSE_NOT_OWNED");
         }
 
-        // Ngua phai thuoc dung tournament trong request
-        if (horse.TournamentId != dto.TournamentId)
+        // Schema v3: ngua phai da enroll (va duoc duyet) trong dung tournament cua request.
+        // Horse khong con gan TournamentId truc tiep — kiem tra qua HorseTournamentEntries.
+        var enrollment = await _context.HorseTournamentEntries
+            .FirstOrDefaultAsync(e =>
+                e.HorseId == dto.HorseId &&
+                e.TournamentId == dto.TournamentId);
+
+        if (enrollment == null || enrollment.Status != "Enrolled")
         {
             throw new InvalidOperationException("HORSE_NOT_IN_TOURNAMENT");
         }
 
-        // Chi ngua da duoc phe duyet moi duoc gui loi moi ghep cap
-        if (horse.AdminApprovalStatus != "Approved")
+        // Chi ngua da duoc duyet enrollment trong giai nay moi duoc gui loi moi ghep cap
+        if (enrollment.AdminApprovalStatus != "Approved")
         {
             throw new InvalidOperationException("HORSE_NOT_APPROVED");
         }
