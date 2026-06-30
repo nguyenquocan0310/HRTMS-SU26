@@ -124,6 +124,21 @@ public class HorseService : IHorseService
         if (already)
             return ApiResponse<HorseEnrollmentResponseDto>.Fail("Con ngựa này đã được đẩy vào giải này rồi.");
 
+        // Mỗi con ngựa chỉ tham gia 1 giải CHƯA kết thúc tại một thời điểm.
+        // Giải 'Open Registration'/'Closed Registration' = đang diễn ra; 'Completed'/'Cancelled' = đã xong.
+        // Enrollment đã 'Withdrawn' hoặc bị 'Rejected' không tính là đang tham gia.
+        var activeElsewhere = await _context.HorseTournamentEntries
+            .Include(e => e.Tournament)
+            .AnyAsync(e =>
+                e.HorseId == horseId &&
+                e.Status == "Enrolled" &&
+                e.AdminApprovalStatus != "Rejected" &&
+                (e.Tournament.Status == "Open Registration" ||
+                 e.Tournament.Status == "Closed Registration"));
+        if (activeElsewhere)
+            return ApiResponse<HorseEnrollmentResponseDto>.Fail(
+                "Con ngựa này đang tham gia một giải chưa kết thúc. Hãy đợi giải đó hoàn tất (Completed/Cancelled) trước khi đẩy vào giải mới.");
+
         var entry = new HorseTournamentEntry
         {
             HorseId = horseId,
