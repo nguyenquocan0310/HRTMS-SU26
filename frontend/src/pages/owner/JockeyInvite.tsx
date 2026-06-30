@@ -1,42 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { JockeyInvitation, Horse } from '../../types/owner.types';
 import { getAvailableJockeys, getMyHorses, getOwnerPairings, inviteJockey, acceptPairing } from '../../services/ownerService';
-
-// Mock data
-const mockInvitations: JockeyInvitation[] = [
-  {
-    invitationID: 'inv-001',
-    requestMessage: 'Xin mời tham gia',
-    ownerID: 'owner-001',
-    jockeyID: 'jockey-001',
-    jockeyName: 'Nguyễn Văn A',
-    status: 'Pending',
-    invitedAt: new Date('2024-06-10'),
-    horseID: 'H001',
-  },
-  {
-    invitationID: 'inv-002',
-    requestMessage: 'Xin mời tham gia',
-    ownerID: 'owner-001',
-    jockeyID: 'jockey-002',
-    jockeyName: 'Trần Thị B',
-    status: 'Accepted',
-    invitedAt: new Date('2024-06-08'),
-    respondedAt: new Date('2024-06-09'),
-    horseID: 'H002',
-  },
-  {
-    invitationID: 'inv-003',
-    requestMessage: 'Xin mời tham gia',
-    ownerID: 'owner-001',
-    jockeyID: 'jockey-003',
-    jockeyName: 'Phạm Văn C',
-    status: 'Declined',
-    invitedAt: new Date('2024-06-05'),
-    respondedAt: new Date('2024-06-06'),
-    horseID: 'H003',
-  },
-];
+import { getMyTournamentParticipations, type ParticipationResponse } from '../../services/tournamentService';
 
 // Status badge for invitation status
 const INVITE_STATUS: Record<string, { label: string; cls: string; dot: string }> = {
@@ -59,7 +24,7 @@ function InviteStatusBadge({ status }: { status: JockeyInvitation['status'] }) {
 const inputCls = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all bg-white';
 
 export default function JockeyInvite() {
-  const [invitations, setInvitations] = useState<JockeyInvitation[]>(mockInvitations);
+  const [invitations, setInvitations] = useState<JockeyInvitation[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [jockeyName, setJockeyName] = useState('');
   const [requestMessage, setRequestMessage] = useState('');
@@ -75,6 +40,12 @@ export default function JockeyInvite() {
   const [loadingInvitations, setLoadingInvitations] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [sending, setSending] = useState(false);
+  const [activeTab, setActiveTab] = useState<'available' | 'history'>('available');
+
+  // ── Tournament picker state ──────────────────────────────────────────────────
+  const [approvedTournaments, setApprovedTournaments] = useState<ParticipationResponse[]>([]);
+  const [loadingTournaments, setLoadingTournaments] = useState(false);
+  const [selectedTournamentId, setSelectedTournamentId] = useState<number | null>(null);
 
   const getHorseNameById = (horseID?: string, horseName?: string) => {
     if (!horseID) return 'Chưa gán ngựa';
@@ -90,16 +61,22 @@ export default function JockeyInvite() {
     return matchHorse && matchStatus;
   });
 
+  // ── Fetch approved tournament participations on mount ───────────────────────
   useEffect(() => {
-    const fetchJockeys = async () => {
+    const fetchTournaments = async () => {
       try {
-        setLoadingJockeys(true);
-        const data = await getAvailableJockeys(1, 1, 20); // tournamentId=1, page=1, pageSize=20
-        setAvailableJockeys(data);
+        setLoadingTournaments(true);
+        const list = await getMyTournamentParticipations();
+        const approved = list.filter((p) => p.status === 'Approved');
+        setApprovedTournaments(approved);
+        // Auto-select the first approved tournament so the table populates immediately
+        if (approved.length > 0) {
+          setSelectedTournamentId(approved[0].tournamentId);
+        }
       } catch (err) {
-        console.error('Failed to fetch available jockeys:', err);
+        console.error('Failed to fetch tournament participations:', err);
       } finally {
-        setLoadingJockeys(false);
+        setLoadingTournaments(false);
       }
     };
 
@@ -115,9 +92,30 @@ export default function JockeyInvite() {
       }
     };
 
-    fetchJockeys();
+    fetchTournaments();
     fetchHorses();
   }, []);
+
+  // ── Fetch available jockeys whenever selectedTournamentId changes ────────────
+  useEffect(() => {
+    if (!selectedTournamentId) {
+      setAvailableJockeys([]);
+      return;
+    }
+    const fetchJockeys = async () => {
+      try {
+        setLoadingJockeys(true);
+        const data = await getAvailableJockeys(selectedTournamentId, 1, 20);
+        setAvailableJockeys(data);
+      } catch (err) {
+        console.error('Failed to fetch available jockeys:', err);
+        setAvailableJockeys([]);
+      } finally {
+        setLoadingJockeys(false);
+      }
+    };
+    fetchJockeys();
+  }, [selectedTournamentId]);
 
   useEffect(() => {
     const fetchInvitations = async () => {
@@ -154,46 +152,56 @@ export default function JockeyInvite() {
   const handleSendInvitation = async () => {
     setError('');
 
+    // ── Validation ─────────────────────────────────────────────────────────────
+    if (!selectedTournamentId) {
+      setError('Vui lòng chọn giải đấu trước khi gửi lời mời.');
+      return;
+    }
     if (!selectedJockeyId) {
-      setError('Vui lòng chọn Jockey từ danh sách khả dụng');
+      setError('Vui lòng chọn Jockey từ danh sách khả dụng.');
       return;
     }
-
     if (!selectedHorseId) {
-      setError('Vui lòng chọn ngựa');
+      setError('Vui lòng chọn ngựa.');
+      return;
+    }
+    if (!requestMessage.trim()) {
+      setError('Vui lòng nhập lời nhắn.');
       return;
     }
 
-    if (!requestMessage.trim()) {
-      setError('Vui lòng nhập lời nhắn');
-      return;
-    }
+    // ── Build payload — all IDs as number ──────────────────────────────────────
+    const payload = {
+      tournamentId: selectedTournamentId,
+      horseId: Number(selectedHorseId),
+      jockeyId: Number(selectedJockeyId),
+      requestMessage: requestMessage.trim(),
+    };
+
+    console.debug('POST /api/pairings payload', payload);
 
     try {
       setSending(true);
-      // Call API to send invitation
-      await inviteJockey({
-        horseId: selectedHorseId,
-        jockeyId: selectedJockeyId,
-        requestMessage: requestMessage,
-      });
+      await inviteJockey(payload);
 
-      // Clear form inputs and close modal
+      // ── Success: reset form, close modal, refresh list, switch tab ────────────
       setJockeyName('');
       setSelectedJockeyId('');
       setSelectedHorseId('');
       setRequestMessage('');
       setShowModal(false);
-
-      // Trigger list refresh
       setRefreshTrigger((prev) => prev + 1);
+      setActiveTab('history');
     } catch (err: any) {
-      console.error('Failed to send invitation:', err);
-      setError(err?.response?.data?.message || 'Đã xảy ra lỗi khi gửi lời mời. Vui lòng thử lại.');
+      console.error('POST /api/pairings failed:', err);
+      // Surface real backend message (apiFetch throws Error with BE message)
+      const msg = err?.message || err?.response?.data?.message || 'Đã xảy ra lỗi khi gửi lời mời. Vui lòng thử lại.';
+      setError(msg);
     } finally {
       setSending(false);
     }
   };
+
 
   const handleConfirmPairing = async (invitationID: string) => {
     // try {
@@ -205,9 +213,6 @@ export default function JockeyInvite() {
     //   alert(err?.response?.data?.message || 'Đã xảy ra lỗi khi xác nhận ghép cặp. Vui lòng thử lại.');
     // }
   };
-
-
-  const [activeTab, setActiveTab] = useState<'available' | 'history'>('available');
 
   // Main Render
   return (
@@ -254,15 +259,44 @@ export default function JockeyInvite() {
 
       {/* Tab: Available Jockeys */}
       {activeTab === 'available' ? (
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-          {loadingJockeys ? (
+        <div className="space-y-3">
+          {/* Tournament picker */}
+          <div className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex flex-wrap items-center gap-3">
+            <label className="text-xs font-semibold text-gray-500 whitespace-nowrap">Giải đấu:</label>
+            {loadingTournaments ? (
+              <span className="text-sm text-gray-400 italic">Đang tải giải đấu...</span>
+            ) : approvedTournaments.length === 0 ? (
+              <span className="text-sm text-amber-600 font-medium">
+                Bạn chưa được duyệt vào giải đấu nào — không thể xem kỵ sĩ khả dụng.
+              </span>
+            ) : (
+              <select
+                value={selectedTournamentId ?? ''}
+                onChange={(e) => setSelectedTournamentId(e.target.value ? Number(e.target.value) : null)}
+                className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white"
+              >
+                {approvedTournaments.map((p) => (
+                  <option key={p.tournamentId} value={p.tournamentId}>
+                    {p.tournamentName || `Giải #${p.tournamentId}`}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          {!selectedTournamentId ? (
+            <div className="py-12 text-center text-gray-400 text-sm">
+              Chọn một giải đấu để xem kỵ sĩ khả dụng
+            </div>
+          ) : loadingJockeys ? (
             <div className="py-14 text-center">
               <div className="inline-block animate-spin rounded-full h-7 w-7 border-b-2 border-blue-600 mb-3" />
               <p className="text-sm text-gray-500">Đang tải danh sách kỵ sĩ...</p>
             </div>
           ) : availableJockeys.length === 0 ? (
             <div className="py-12 text-center text-gray-400 text-sm">
-              Không có kỵ sĩ khả dụng nào
+              Không có kỵ sĩ khả dụng cho giải này
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -313,6 +347,7 @@ export default function JockeyInvite() {
               </table>
             </div>
           )}
+          </div>
         </div>
       ) : (
         /* Tab: Invitation History */
@@ -439,6 +474,8 @@ export default function JockeyInvite() {
                 </label>
                 {loadingJockeys ? (
                   <div className="text-sm text-gray-400 italic">Đang tải danh sách jockey...</div>
+                ) : !selectedTournamentId ? (
+                  <div className="text-sm text-amber-600 italic">Vui lòng chọn giải đấu trong tab "Kỵ sĩ khả dụng" trước khi gửi lời mời.</div>
                 ) : (
                   <select
                     value={selectedJockeyId}
