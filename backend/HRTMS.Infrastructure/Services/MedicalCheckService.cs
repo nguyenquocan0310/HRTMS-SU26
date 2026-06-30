@@ -118,9 +118,9 @@ public class MedicalCheckService : IMedicalCheckService
         };
     }
     public async Task<HorseIdentityResultDto> RecordHorseIdentityAsync(
-    int doctorId,
-    int raceEntryId,
-    RecordHorseIdentityDto dto)
+     int doctorId,
+     int raceEntryId,
+     RecordHorseIdentityDto dto)
     {
         // Kiem tra Doctor co ton tai va dang Active hay khong
         var doctor = await _context.DoctorProfiles
@@ -181,16 +181,13 @@ public class MedicalCheckService : IMedicalCheckService
 
         var now = DateTime.UtcNow;
 
-        raceEntry.HorseIdentityStatus = dto.HorseIdentityStatus;
+        raceEntry.HorseIdentityCheckStatus = dto.HorseIdentityCheckStatus;
         raceEntry.HorseIdentityCheckedByDoctorId = doctorId;
         raceEntry.HorseIdentityCheckedAt = now;
         raceEntry.UpdatedAt = now;
 
-        var isMismatch = dto.HorseIdentityStatus == "Mismatch";
+        var isMismatch = dto.HorseIdentityCheckStatus == "Mismatch";
 
-        // MED.4: Mismatch se kich hoat Emergency DQ
-        // Ban hien tai xu ly DQ toi thieu: cap nhat RaceEntry thanh Disqualified
-        // Phan ACID refund + 3 notification + audit se lam o MED.7
         await _context.SaveChangesAsync();
 
         if (isMismatch)
@@ -209,7 +206,7 @@ public class MedicalCheckService : IMedicalCheckService
             DoctorId = doctorId,
             DoctorName = doctor.Doctor.FullName,
             HorseName = raceEntry.Pairing.Horse.Name,
-            HorseIdentityStatus = dto.HorseIdentityStatus,
+            HorseIdentityCheckStatus = dto.HorseIdentityCheckStatus,
             IsEmergencyDisqualified = isMismatch,
             RaceEntryStatus = raceEntry.Status,
             Message = isMismatch
@@ -217,6 +214,7 @@ public class MedicalCheckService : IMedicalCheckService
                 : "Horse identity matched successfully."
         };
     }
+    
     public async Task<ClinicalCheckResultDto> RecordClinicalCheckAsync(
     int doctorId,
     int raceEntryId,
