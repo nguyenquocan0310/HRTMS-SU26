@@ -93,6 +93,25 @@ END
 GO
 
 /* ---------------------------------------------------------------------------
+   3b) Backfill enrollment từ dữ liệu Pairings hiện có
+       → mỗi (TournamentId, HorseId) đang được dùng trong Pairings phải có
+         enrollment tương ứng, nếu không bước (4) add FK sẽ FAIL (Msg 547).
+       Pre-existing pairing = ngựa đã hợp lệ trong giải → set Approved/AutoEligible.
+       Idempotent: chỉ chèn dòng còn thiếu (NOT EXISTS).
+   --------------------------------------------------------------------------- */
+INSERT INTO HorseTournamentEntries
+    (HorseId, TournamentId, OwnerId, [Status], ScreeningStatus, AdminApprovalStatus, CreatedAt, UpdatedAt)
+SELECT DISTINCT p.HorseId, p.TournamentId, h.OwnerId, 'Enrolled', 'AutoEligible', 'Approved',
+       GETUTCDATE(), GETUTCDATE()
+FROM Pairings p
+JOIN Horses h ON h.HorseId = p.HorseId
+WHERE NOT EXISTS (
+    SELECT 1 FROM HorseTournamentEntries e
+    WHERE e.HorseId = p.HorseId AND e.TournamentId = p.TournamentId
+);
+GO
+
+/* ---------------------------------------------------------------------------
    4) Pairings: composite-FK (TournamentId, HorseId) trỏ vào enrollment
       → đảm bảo ngựa của pairing đã enroll vào đúng giải (DB-level guarantee).
    --------------------------------------------------------------------------- */
