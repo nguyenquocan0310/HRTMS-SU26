@@ -41,30 +41,60 @@ const MyHorses: React.FC = () => {
     navigate('/owner/horses/register');
   };
 
-  // Trạng thái đang tải
+  // Loading state
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-          <p className="text-gray-600 text-lg">Đang tải...</p>
+      <div>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">Ngựa của tôi</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Danh sách ngựa đã đăng ký</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="bg-white border border-gray-200 rounded-lg p-4 animate-pulse">
+              <div className="flex justify-between mb-3">
+                <div className="h-4 bg-gray-200 rounded w-1/2" />
+                <div className="h-4 bg-gray-100 rounded-full w-16" />
+              </div>
+              <div className="space-y-2">
+                {[...Array(4)].map((_, j) => <div key={j} className="h-3 bg-gray-100 rounded" />)}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
   }
 
-  // Trạng thái lỗi hoặc rỗng
+  // Empty / error state
   if (error || horses.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center bg-white p-8 border border-gray-200 rounded-xl shadow-sm max-w-md mx-auto">
-          <div className="text-6xl mb-4">🐴</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">
-            {error || 'Không có ngựa'}
-          </h2>
+      <div>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">Ngựa của tôi</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Danh sách ngựa đã đăng ký</p>
+          </div>
           <button
             onClick={handleRegisterHorse}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+          >
+            + Đăng ký ngựa
+          </button>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-10 text-center">
+          <p className="text-4xl mb-3">🐴</p>
+          <p className="text-sm font-semibold text-gray-700 mb-1">
+            {error || 'Chưa có ngựa nào'}
+          </p>
+          <p className="text-xs text-gray-500 mb-4">
+            Đăng ký ngựa để bắt đầu tham gia giải đua.
+          </p>
+          <button
+            onClick={handleRegisterHorse}
+            className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
           >
             Đăng ký ngựa đầu tiên
           </button>
@@ -73,25 +103,27 @@ const MyHorses: React.FC = () => {
     );
   }
 
-  // Danh sách ngựa
+  // Horse list
   return (
-    <div className="p-6">
+    <div>
+      {/* Page header */}
       <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-bold text-gray-800">Ngựa của tôi</h1>
-          <span className="bg-blue-100 text-blue-800 font-semibold py-1 px-3 rounded-full text-sm">
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold text-gray-900">Ngựa của tôi</h1>
+          <span className="px-2 py-0.5 text-xs font-semibold bg-gray-100 text-gray-600 rounded-full">
             {horses.length}
           </span>
         </div>
         <button
           onClick={handleRegisterHorse}
-          className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
+          className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
         >
-          <span>+</span> Đăng ký ngựa mới
+          + Đăng ký ngựa mới
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {Array.isArray(horses) && horses.map((horse) => (
           <HorseCard
             key={horse.horseID}

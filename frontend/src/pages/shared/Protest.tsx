@@ -41,30 +41,28 @@ const mockProtests: ProtestRecord[] = [
   },
 ];
 
-const getStatusBadge = (status: ProtestRecord['status']) => {
-  switch (status) {
-    case 'Đang xử lý':
-      return (
-        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800 border border-yellow-200">
-          ⏳ Đang xử lý
-        </span>
-      );
-    case 'Chấp thuận':
-      return (
-        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200">
-          ✅ Chấp thuận
-        </span>
-      );
-    case 'Bác bỏ':
-      return (
-        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200">
-          ❌ Bác bỏ
-        </span>
-      );
-  }
+const STATUS_CFG: Record<
+  ProtestRecord['status'],
+  { cls: string; dot: string }
+> = {
+  'Đang xử lý': { cls: 'bg-yellow-50 text-yellow-700 border-yellow-200', dot: 'bg-yellow-500' },
+  'Chấp thuận': { cls: 'bg-green-50 text-green-700 border-green-200',    dot: 'bg-green-500'  },
+  'Bác bỏ':     { cls: 'bg-red-50 text-red-700 border-red-200',          dot: 'bg-red-500'    },
 };
 
+function ProtestStatusBadge({ status }: { status: ProtestRecord['status'] }) {
+  const cfg = STATUS_CFG[status] ?? { cls: 'bg-gray-100 text-gray-600 border-gray-200', dot: 'bg-gray-400' };
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium rounded border ${cfg.cls}`}>
+      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
+      {status}
+    </span>
+  );
+}
+
 const MIN_REASON_LENGTH = 20;
+
+const inputCls = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all';
 
 export default function Protest({ userRole }: ProtestProps) {
   const [form, setForm] = useState<ProtestForm>({
@@ -77,10 +75,7 @@ export default function Protest({ userRole }: ProtestProps) {
   const [formError, setFormError] = useState<string | null>(null);
 
   const roleLabel = userRole === 'HorseOwner' ? 'Chủ ngựa' : 'Kỵ sĩ';
-  const targetPlaceholder =
-    userRole === 'HorseOwner'
-      ? 'Nhập tên ngựa / kỵ sĩ bị khiếu nại'
-      : 'Nhập tên ngựa / kỵ sĩ bị khiếu nại';
+  const targetPlaceholder = 'Nhập tên ngựa / kỵ sĩ bị khiếu nại';
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -123,70 +118,69 @@ export default function Protest({ userRole }: ProtestProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10 px-4">
-      <div className="max-w-5xl mx-auto">
-        {/* Tiêu đề trang */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-3xl font-bold text-gray-800">Khiếu nại kết quả</h1>
-            <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
-              {roleLabel}
-            </span>
-          </div>
-          <p className="text-gray-500 text-sm">
-            Nộp khiếu nại về kết quả cuộc đua và theo dõi tiến trình xử lý.
-          </p>
+    <div className="max-w-4xl">
+      {/* Page header */}
+      <div className="mb-5 flex items-center gap-2">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Khiếu nại kết quả</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Nộp khiếu nại và theo dõi tiến trình xử lý.</p>
+        </div>
+        <span className="ml-2 px-2 py-0.5 text-xs font-semibold bg-blue-50 text-blue-700 rounded border border-blue-100">
+          {roleLabel}
+        </span>
+      </div>
+
+      {/* ===== SECTION 1: Submission form ===== */}
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden mb-5">
+        {/* Section header */}
+        <div className="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
+          <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+            1
+          </span>
+          <p className="text-sm font-semibold text-gray-700">Nộp khiếu nại mới</p>
         </div>
 
-        {/* ===== SECTION 1: Form nộp khiếu nại ===== */}
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-8">
-          <h2 className="text-lg font-bold text-gray-800 mb-5 flex items-center gap-2">
-            <span className="w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center">1</span>
-            Nộp khiếu nại mới
-          </h2>
-
-          {/* Thông báo nộp thành công */}
+        <div className="p-5">
+          {/* Success message */}
           {submitted && (
-            <div className="mb-5 bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
-              <span className="text-xl">✅</span>
+            <div className="mb-4 bg-green-50 border border-green-200 rounded-lg px-4 py-3 flex items-start gap-2">
+              <span className="text-green-500 mt-0.5 flex-shrink-0">✓</span>
               <div>
-                <p className="text-green-800 font-semibold text-sm">Khiếu nại đã được nộp thành công!</p>
-                <p className="text-green-700 text-xs">Chúng tôi sẽ xem xét và phản hồi trong thời gian sớm nhất.</p>
+                <p className="text-sm font-semibold text-green-800">Khiếu nại đã được nộp thành công!</p>
+                <p className="text-xs text-green-700 mt-0.5">Chúng tôi sẽ xem xét và phản hồi trong thời gian sớm nhất.</p>
               </div>
             </div>
           )}
 
-          {/* Thông báo lỗi */}
+          {/* Error */}
           {formError && (
-            <div className="mb-5 bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-red-700 text-sm font-medium">⚠️ {formError}</p>
+            <div className="mb-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+              <p className="text-sm text-red-700 font-medium">⚠️ {formError}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Chọn cuộc đua */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Race select */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
                 Cuộc đua bị khiếu nại <span className="text-red-500">*</span>
               </label>
               <select
                 name="raceID"
                 value={form.raceID}
                 onChange={handleChange}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm"
+                className={inputCls}
               >
                 <option value="">— Chọn cuộc đua —</option>
                 {mockRaces.map((race) => (
-                  <option key={race.id} value={race.id}>
-                    {race.label}
-                  </option>
+                  <option key={race.id} value={race.id}>{race.label}</option>
                 ))}
               </select>
             </div>
 
-            {/* Đối tượng bị khiếu nại */}
+            {/* Target name */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
                 Đối tượng bị khiếu nại <span className="text-red-500">*</span>
               </label>
               <input
@@ -195,15 +189,15 @@ export default function Protest({ userRole }: ProtestProps) {
                 value={form.targetName}
                 onChange={handleChange}
                 placeholder={targetPlaceholder}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm"
+                className={inputCls}
               />
             </div>
 
-            {/* Lý do khiếu nại */}
+            {/* Reason */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
                 Lý do khiếu nại <span className="text-red-500">*</span>
-                <span className="text-gray-400 font-normal ml-2">(tối thiểu {MIN_REASON_LENGTH} ký tự)</span>
+                <span className="text-gray-400 font-normal ml-1">(tối thiểu {MIN_REASON_LENGTH} ký tự)</span>
               </label>
               <textarea
                 name="reason"
@@ -211,7 +205,7 @@ export default function Protest({ userRole }: ProtestProps) {
                 onChange={handleChange}
                 rows={4}
                 placeholder="Mô tả chi tiết lý do khiếu nại của bạn..."
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm resize-none"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all resize-none"
               />
               <div className="mt-1 flex justify-end">
                 <span className={`text-xs ${form.reason.length < MIN_REASON_LENGTH ? 'text-red-400' : 'text-green-600'}`}>
@@ -220,70 +214,72 @@ export default function Protest({ userRole }: ProtestProps) {
               </div>
             </div>
 
-            {/* Nút nộp */}
             <div className="flex justify-end">
               <button
                 type="submit"
-                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors text-sm"
+                className="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
               >
-                📨 Nộp khiếu nại
+                Nộp khiếu nại
               </button>
             </div>
           </form>
         </div>
+      </div>
 
-        {/* ===== SECTION 2: Danh sách khiếu nại đã nộp ===== */}
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
-            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-              <span className="w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-bold flex items-center justify-center">2</span>
-              Danh sách khiếu nại đã nộp
-            </h2>
-            <span className="ml-auto text-xs text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full font-medium">
-              {protests.length} khiếu nại
+      {/* ===== SECTION 2: Protest history ===== */}
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+              2
             </span>
+            <p className="text-sm font-semibold text-gray-700">Danh sách khiếu nại đã nộp</p>
           </div>
-
-          {protests.length === 0 ? (
-            <div className="py-12 text-center text-gray-500">
-              <div className="text-4xl mb-3">📋</div>
-              <p className="text-sm">Bạn chưa nộp khiếu nại nào.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-5 py-3.5 text-left font-semibold text-gray-700">Mã khiếu nại</th>
-                    <th className="px-5 py-3.5 text-left font-semibold text-gray-700">Cuộc đua</th>
-                    <th className="px-5 py-3.5 text-left font-semibold text-gray-700">Ngày nộp</th>
-                    <th className="px-5 py-3.5 text-left font-semibold text-gray-700">Trạng thái</th>
-                    <th className="px-5 py-3.5 text-left font-semibold text-gray-700">Phán quyết</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {protests.map((protest) => (
-                    <tr key={protest.protestID} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-5 py-4 font-mono text-blue-700 font-semibold text-xs">
-                        {protest.protestID}
-                      </td>
-                      <td className="px-5 py-4 text-gray-700">{protest.race}</td>
-                      <td className="px-5 py-4 text-gray-600">{protest.submittedDate}</td>
-                      <td className="px-5 py-4">{getStatusBadge(protest.status)}</td>
-                      <td className="px-5 py-4 text-gray-600 max-w-xs">
-                        {protest.verdict === '—' ? (
-                          <span className="text-gray-400 italic">Chưa có phán quyết</span>
-                        ) : (
-                          <span className="text-sm">{protest.verdict}</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <span className="px-2 py-0.5 text-xs font-semibold bg-gray-100 text-gray-500 rounded-full">
+            {protests.length} khiếu nại
+          </span>
         </div>
+
+        {protests.length === 0 ? (
+          <div className="py-12 text-center text-gray-400 text-sm">
+            Bạn chưa nộp khiếu nại nào.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Mã KN</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Cuộc đua</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Ngày nộp</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Trạng thái</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Phán quyết</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {protests.map((protest) => (
+                  <tr key={protest.protestID} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 font-mono text-xs font-semibold text-blue-700">
+                      {protest.protestID}
+                    </td>
+                    <td className="px-4 py-3 text-gray-700">{protest.race}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500">{protest.submittedDate}</td>
+                    <td className="px-4 py-3">
+                      <ProtestStatusBadge status={protest.status} />
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 max-w-xs">
+                      {protest.verdict === '—' ? (
+                        <span className="text-xs text-gray-400 italic">Chưa có phán quyết</span>
+                      ) : (
+                        <span className="text-xs">{protest.verdict}</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
