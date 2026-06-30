@@ -4,8 +4,7 @@
   gap: 1.75rem;
 }
 
-// ─── Header ───────────────────────────────────────────────────────────────
-
+/* ─── Header ─── */
 .header {
   display: flex;
   align-items: flex-start;
@@ -17,8 +16,8 @@
 .eyebrow {
   font-size: 0.72rem;
   font-weight: 700;
-  color: #B5121B;
-  letter-spacing: 2px;
+  color: #2563eb;
+  letter-spacing: 1.5px;
   display: block;
   margin-bottom: 0.35rem;
 }
@@ -26,7 +25,7 @@
 .heading {
   font-size: 1.65rem;
   font-weight: 800;
-  color: #fff;
+  color: #111;
   margin: 0;
 }
 
@@ -41,9 +40,9 @@
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  background: transparent;
-  border: 1px solid #2a2a30;
-  color: #ccc;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  color: #333;
   padding: 0.6rem 1.1rem;
   border-radius: 8px;
   font-size: 0.85rem;
@@ -53,8 +52,9 @@
   white-space: nowrap;
 
   &:hover {
-    border-color: #B5121B;
-    color: #F3C8C3;
+    border-color: #9ca3af;
+    background: #f9fafb;
+    color: #111;
   }
 }
 
@@ -62,7 +62,7 @@
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  background: linear-gradient(135deg, #B5121B, #8b0d13);
+  background: #2563eb;
   color: #fff;
   border: none;
   padding: 0.6rem 1.2rem;
@@ -74,21 +74,19 @@
   white-space: nowrap;
 
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 22px rgba(181, 18, 27, 0.35);
+    background: #1d4ed8;
+    color: #fff;
   }
 }
 
-// ─── Stat grid ────────────────────────────────────────────────────────────
-
+/* ─── Stat grid ─── */
 .statGrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 1.1rem;
 }
 
-// ─── Mid row: Integrity map + side cards ─────────────────────────────────
-
+/* ─── Mid row ─── */
 .midRow {
   display: grid;
   grid-template-columns: 2fr 1fr;
@@ -96,8 +94,8 @@
 }
 
 .integrityMap {
-  background: #15151A;
-  border: 1px solid #232328;
+  background: #fff;
+  border: 1px solid #e5e7eb;
   border-radius: 16px;
   padding: 1.5rem;
   display: flex;
@@ -107,7 +105,7 @@
 .cardTitle {
   font-size: 1rem;
   font-weight: 700;
-  color: #fff;
+  color: #111;
   margin: 0 0 1rem;
 }
 
@@ -116,7 +114,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #0d0d10;
+  background: #f8f9fb;
   border-radius: 12px;
   min-height: 220px;
   padding: 1rem;
@@ -135,8 +133,8 @@
 }
 
 .smallCard {
-  background: #15151A;
-  border: 1px solid #232328;
+  background: #fff;
+  border: 1px solid #e5e7eb;
   border-radius: 16px;
   padding: 1.25rem 1.5rem;
   flex: 1;
@@ -148,7 +146,7 @@
 .smallCardTitle {
   font-size: 0.85rem;
   font-weight: 700;
-  color: #ccc;
+  color: #333;
   margin: 0 0 0.75rem;
 }
 
@@ -157,7 +155,7 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.82rem;
-  color: #aaa;
+  color: #555;
   margin-bottom: 0.75rem;
 }
 
@@ -165,38 +163,37 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #2ecc71;
-  box-shadow: 0 0 8px rgba(46, 204, 113, 0.6);
+  background: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
   flex-shrink: 0;
 }
 
 .loadValue {
   font-size: 1.4rem;
   font-weight: 800;
-  color: #fff;
+  color: #111;
   margin-bottom: 0.6rem;
 }
 
 .barWrap {
   width: 100%;
   height: 6px;
-  background: #232328;
+  background: #e5e7eb;
   border-radius: 4px;
   overflow: hidden;
 }
 
 .bar {
   height: 100%;
-  background: linear-gradient(90deg, #B5121B, #D8B45A);
+  background: #2563eb;
   border-radius: 4px;
   transition: width 0.4s ease;
 }
 
-// ─── Recent Activity ──────────────────────────────────────────────────────
-
+/* ─── Recent Activity ─── */
 .activityCard {
-  background: #15151A;
-  border: 1px solid #232328;
+  background: #fff;
+  border: 1px solid #e5e7eb;
   border-radius: 16px;
   padding: 1.5rem;
 }
@@ -213,13 +210,13 @@
   align-items: center;
   gap: 0.3rem;
   font-size: 0.8rem;
-  color: #F3C8C3;
+  color: #2563eb;
   text-decoration: none;
   font-weight: 600;
   transition: opacity 0.2s;
 
   &:hover {
-    opacity: 0.8;
+    opacity: 0.75;
   }
 }
 
@@ -236,7 +233,7 @@
   align-items: center;
   gap: 1rem;
   padding: 0.85rem 0;
-  border-bottom: 1px solid #1e1e22;
+  border-bottom: 1px solid #f0f0f0;
 
   &:last-child {
     border-bottom: none;
@@ -248,8 +245,8 @@
   height: 38px;
   min-width: 38px;
   border-radius: 10px;
-  background: rgba(181, 18, 27, 0.12);
-  color: #F3C8C3;
+  background: #eff6ff;
+  color: #2563eb;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -266,7 +263,7 @@
 .activityTitle {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #fff;
+  color: #111;
 }
 
 .activityDesc {
@@ -279,22 +276,20 @@
 
 .activityTime {
   font-size: 0.75rem;
-  color: #666;
+  color: #999;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
-// ─── Footer note ──────────────────────────────────────────────────────────
-
+/* ─── Footer note ─── */
 .footerNote {
   text-align: center;
   font-size: 0.75rem;
-  color: #555;
+  color: #aaa;
   padding-top: 0.5rem;
 }
 
-// ─── Responsive ───────────────────────────────────────────────────────────
-
+/* ─── Responsive ─── */
 @media (max-width: 1200px) {
   .statGrid {
     grid-template-columns: repeat(2, 1fr);
