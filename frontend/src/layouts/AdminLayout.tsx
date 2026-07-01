@@ -76,7 +76,7 @@ const AdminLayout = () => {
         </div>
 
         <div className={styles.topbarRight}>
-          <button type="button" className={styles.iconBtn} aria-label="Notifications">
+          <button type="button" className={styles.iconBtn} aria-label="Notifications" onClick={() => navigate('/admin/notifications')}>
             <FiBell size={18} />
             {unreadNotifications > 0 && (
               <span className={styles.badge}>{unreadNotifications}</span>
