@@ -24,7 +24,8 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Register([FromBody] RegisterDto dto)
     {
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
-        var result = await _authService.RegisterAsync(dto, ip);
+        var ua = HttpContext.Request.Headers["User-Agent"].ToString();
+        var result = await _authService.RegisterAsync(dto, ip, ua);
         if (!result.Success)
         {
             var isConflict = result.Message?.Contains("tồn tại") == true;
@@ -37,7 +38,8 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Login([FromBody] LoginDto dto)
     {
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
-        var result = await _authService.LoginAsync(dto, ip);
+        var ua = HttpContext.Request.Headers["User-Agent"].ToString();
+        var result = await _authService.LoginAsync(dto, ip, ua);
         return result.Success ? Ok(result) : Unauthorized(result);
     }
 
@@ -47,7 +49,8 @@ public class AuthController : ControllerBase
     {
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
-        var result = await _authService.LogoutAsync(userId, ip);
+        var ua = HttpContext.Request.Headers["User-Agent"].ToString();
+        var result = await _authService.LogoutAsync(userId, ip, ua);
         return Ok(result);
     }
 
