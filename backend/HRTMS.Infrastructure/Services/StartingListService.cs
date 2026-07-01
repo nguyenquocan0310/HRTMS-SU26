@@ -100,7 +100,7 @@ public class StartingListService : IStartingListService
                 PostPosition = entry.PostPosition,
                 Status = entry.Status,
                 PreRaceJockeyWeight = entry.PreRaceJockeyWeight,
-                HorseIdentityStatus = entry.HorseIdentityStatus,
+                HorseIdentityStatus = entry.HorseIdentityCheckStatus,
                 ClinicalStatus = entry.ClinicalStatus,
                 IndependenceCheckStatus = entry.IndependenceCheckStatus,
                 RejectionReason = rejectionReason
@@ -156,7 +156,7 @@ public class StartingListService : IStartingListService
             return "Pre-race jockey weight has not been recorded.";
         }
 
-        if (entry.HorseIdentityStatus != "Matched")
+        if (entry.HorseIdentityCheckStatus != "Matched")
         {
             return "Horse identity has not been matched.";
         }

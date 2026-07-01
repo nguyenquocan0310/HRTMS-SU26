@@ -127,6 +127,30 @@ public class NotificationService : INotificationService
             .ToListAsync();
     }
 
+    public async Task<IEnumerable<NotificationDto>> GetAllAsync(int userId, int page = 1, int pageSize = 20)
+    {
+        if (page < 1) page = 1;
+        if (pageSize < 1) pageSize = 20;
+
+        return await _db.Notifications
+            .Where(n => n.RecipientId == userId)
+            .OrderByDescending(n => n.SentAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(n => new NotificationDto
+            {
+                NotificationId = n.NotificationId,
+                Title = n.Title,
+                Message = n.Message,
+                Type = n.Type,
+                IsRead = n.IsRead,
+                RelatedEntityType = n.RelatedEntityType,
+                RelatedEntityId = n.RelatedEntityId,
+                SentAt = n.SentAt
+            })
+            .ToListAsync();
+    }
+
     public async Task MarkReadAsync(int notificationId, int userId)
     {
         var notification = await _db.Notifications

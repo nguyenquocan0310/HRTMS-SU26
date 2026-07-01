@@ -181,7 +181,7 @@ public class MedicalCheckService : IMedicalCheckService
 
         var now = DateTime.UtcNow;
 
-        raceEntry.HorseIdentityStatus = dto.HorseIdentityStatus;
+        raceEntry.HorseIdentityCheckStatus = dto.HorseIdentityStatus;
         raceEntry.HorseIdentityCheckedByDoctorId = doctorId;
         raceEntry.HorseIdentityCheckedAt = now;
         raceEntry.UpdatedAt = now;
