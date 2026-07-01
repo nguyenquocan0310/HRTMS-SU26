@@ -12,7 +12,8 @@ public class AuditLogService : IAuditLogService
 
     public async Task LogAsync(int actorId, string action, string entityName,
         string entityId, string? oldValue = null,
-        string? newValue = null, string? ipAddress = null)
+        string? newValue = null, string? ipAddress = null,
+           string? userAgent = null)
     {
         _context.AuditLogs.Add(new AuditLog
         {
@@ -23,6 +24,7 @@ public class AuditLogService : IAuditLogService
             OldValue = oldValue,
             NewValue = newValue,
             IpAddress = ipAddress,
+            UserAgent = userAgent,
             CreatedAt = DateTime.UtcNow
         });
         await _context.SaveChangesAsync();
@@ -30,7 +32,8 @@ public class AuditLogService : IAuditLogService
 
     public void LogDeferred(int actorId, string action, string entityName,
         string entityId, string? oldValue = null,
-        string? newValue = null, string? ipAddress = null)
+        string? newValue = null, string? ipAddress = null,
+         string? userAgent = null)
     {
         _context.AuditLogs.Add(new AuditLog
         {
@@ -38,8 +41,9 @@ public class AuditLogService : IAuditLogService
             Action = action,
             EntityName = entityName,
             EntityId = entityId,
-            OldValue = oldValue,
+            OldValue = oldValue,         
             NewValue = newValue,
+            UserAgent = userAgent,
             IpAddress = ipAddress,
             CreatedAt = DateTime.UtcNow
         });

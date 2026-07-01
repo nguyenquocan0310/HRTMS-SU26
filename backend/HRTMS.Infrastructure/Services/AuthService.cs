@@ -25,27 +25,22 @@ public class AuthService : IAuthService
     private readonly ITokenBlacklistService _tokenBlacklistService;
     private readonly IEmailService _emailService;
     private readonly IConfiguration _config;
-    private readonly byte[] _encryptionKey; // 32 bytes — AES-256
+    private readonly byte[] _encryptionKey;
 
-    // ACC.1 — các role được phép tự đăng ký
     private static readonly string[] AllowedSelfRegisterRoles =
         ["Spectator", "Owner", "Jockey", "Referee", "Doctor"];
 
-    // ACC.2 — Admin tạo được thêm role Admin
     private static readonly string[] AllAllowedRoles =
         ["Spectator", "Owner", "Jockey", "Referee", "Doctor", "Admin"];
 
-    // ACC.1A — các role bắt buộc có định danh đầy đủ
     private static readonly string[] ProfessionalRoles =
         ["Owner", "Jockey", "Referee", "Doctor"];
 
-    // Role được phép khai báo FRD tại bước Register (EC-18)
     private static readonly string[] RolesRequireFrdAtRegister = ["Jockey", "Referee"];
 
     private const int MaxFailedAttempts = 5;
     private const int LockoutMinutes = 30;
 
-    // ACC.1 CCCD — chỉ chấp nhận đúng 12 số
     private static readonly Regex CccdRegex = new(@"^\d{12}$", RegexOptions.Compiled);
 
     public AuthService(
@@ -65,20 +60,18 @@ public class AuthService : IAuthService
         _emailService = emailService;
         _config = configuration;
 
-        // Đọc key từ config; fallback dev-only key (KHÔNG dùng trong production)
         var keyHex = configuration["Security:IdentityEncryptionKeyHex"];
         if (!string.IsNullOrEmpty(keyHex) && keyHex.Length == 64)
             _encryptionKey = Convert.FromHexString(keyHex);
         else
-            _encryptionKey = new byte[32]; // all-zeros — dev only, override qua appsettings
+            _encryptionKey = new byte[32];
     }
 
     // =========================================================
     // LOGIN
     // =========================================================
-    public async Task<ApiResponse<AuthResponseDto>> LoginAsync(LoginDto dto, string? ipAddress)
+    public async Task<ApiResponse<AuthResponseDto>> LoginAsync(LoginDto dto, string? ipAddress, string? userAgent = null)
     {
-        // normalize email trước khi lookup
         var email = dto.Email.Trim().ToLower();
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
 
@@ -118,7 +111,8 @@ public class AuthService : IAuthService
             action: "Login",
             entityName: "Users",
             entityId: user.UserId.ToString(),
-            ipAddress: ipAddress);
+            ipAddress: ipAddress,
+            userAgent: userAgent);
 
         var token = _jwtService.GenerateToken(user);
         return ApiResponse<AuthResponseDto>.Ok(new AuthResponseDto
@@ -131,9 +125,9 @@ public class AuthService : IAuthService
     }
 
     // =========================================================
-    // REGISTER — tự đăng ký (không bao gồm Admin)
+    // REGISTER
     // =========================================================
-    public async Task<ApiResponse<int>> RegisterAsync(RegisterDto dto, string? ipAddress)
+    public async Task<ApiResponse<int>> RegisterAsync(RegisterDto dto, string? ipAddress, string? userAgent = null)
     {
         if (dto.Role == "Admin")
             return ApiResponse<int>.Fail("Không thể tự đăng ký tài khoản Admin.");
@@ -142,7 +136,6 @@ public class AuthService : IAuthService
             return ApiResponse<int>.Fail(
                 $"Role không hợp lệ. Các role được phép: {string.Join(", ", AllowedSelfRegisterRoles)}.");
 
-        // ACC.1A.1 — bắt buộc định danh đầy đủ cho professional roles
         if (ProfessionalRoles.Contains(dto.Role))
         {
             var identityError = ValidateProfessionalIdentity(
@@ -151,14 +144,12 @@ public class AuthService : IAuthService
                 return ApiResponse<int>.Fail(identityError);
         }
 
-        // normalize email + phone trước khi check duplicate / lưu
         var normalizedEmail = dto.Email.Trim().ToLower();
         var normalizedPhone = dto.PhoneNumber?.Trim();
 
         if (await _context.Users.AnyAsync(u => u.Email == normalizedEmail || u.Username == dto.Username))
             return ApiResponse<int>.Fail("Email hoặc Username đã tồn tại.");
 
-        // validate FRD nếu có
         if (dto.FamilyDeclarations != null && dto.FamilyDeclarations.Count > 0)
         {
             var frdValidation = await _frdValidator.ValidateAsync(
@@ -167,16 +158,13 @@ public class AuthService : IAuthService
                 return ApiResponse<int>.Fail(frdValidation);
         }
 
-        // ACC.1.6 — Owner → Active ngay; Spectator → Active; Jockey/Referee/Doctor → Pending
         string initialStatus = dto.Role is "Spectator" or "Owner" ? "Active" : "Pending";
 
-        // Prepare identity encryption nếu có CCCD
         byte[]? encrypted = null;
         byte[]? hash = null;
         if (!string.IsNullOrEmpty(dto.IdentityNumber))
             (encrypted, hash) = EncryptIdentity(dto.IdentityNumber);
 
-        // Kiểm tra CCCD trùng (identity hash unique)
         if (hash != null && await _context.Users.AnyAsync(u => u.IdentityHash != null && u.IdentityHash == hash))
             return ApiResponse<int>.Fail("Số CCCD đã được đăng ký với tài khoản khác.");
 
@@ -207,7 +195,6 @@ public class AuthService : IAuthService
 
             await CreateRoleProfileAsync(user.UserId, dto.Role, dto, now);
 
-            // FRD
             if (RolesRequireFrdAtRegister.Contains(dto.Role)
                 && dto.FamilyDeclarations != null
                 && dto.FamilyDeclarations.Count > 0)
@@ -233,7 +220,8 @@ public class AuthService : IAuthService
                 action: "Register",
                 entityName: "Users",
                 entityId: user.UserId.ToString(),
-                ipAddress: ipAddress);
+                ipAddress: ipAddress,
+                userAgent: userAgent);
 
             return ApiResponse<int>.Ok(user.UserId, "Tạo tài khoản thành công.");
         }
@@ -245,16 +233,15 @@ public class AuthService : IAuthService
     }
 
     // =========================================================
-    // ACC.2 — Admin tạo tài khoản (bao gồm Admin)
+    // ACC.2 — Admin tạo tài khoản
     // =========================================================
     public async Task<ApiResponse<int>> AdminCreateUserAsync(
-        AdminCreateUserDto dto, int adminId, string? ipAddress)
+        AdminCreateUserDto dto, int adminId, string? ipAddress, string? userAgent = null)
     {
         if (!AllAllowedRoles.Contains(dto.Role))
             return ApiResponse<int>.Fail(
                 $"Role không hợp lệ. Các role được phép: {string.Join(", ", AllAllowedRoles)}.");
 
-        // professional roles bắt buộc định danh đầy đủ
         if (ProfessionalRoles.Contains(dto.Role))
         {
             var identityError = ValidateProfessionalIdentity(
@@ -277,7 +264,6 @@ public class AuthService : IAuthService
         if (hash != null && await _context.Users.AnyAsync(u => u.IdentityHash != null && u.IdentityHash == hash))
             return ApiResponse<int>.Fail("Số CCCD đã được đăng ký với tài khoản khác.");
 
-        // Rule: Admin tạo Jockey/Referee/Doctor vẫn cần Admin duyệt profile → Pending; Admin tạo Admin/Owner/Spectator → Active
         string initialStatus = dto.Role is "Jockey" or "Referee" or "Doctor" ? "Pending" : "Active";
 
         var now = DateTime.UtcNow;
@@ -305,7 +291,6 @@ public class AuthService : IAuthService
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            // Tạo profile bằng RegisterDto-compatible helper (reuse)
             var registerDto = new RegisterDto
             {
                 Role = dto.Role,
@@ -327,7 +312,8 @@ public class AuthService : IAuthService
                 entityName: "Users",
                 entityId: user.UserId.ToString(),
                 newValue: $"Role={dto.Role}, Status={initialStatus}, Email={normalizedEmail}",
-                ipAddress: ipAddress);
+                ipAddress: ipAddress,
+                userAgent: userAgent);
 
             return ApiResponse<int>.Ok(user.UserId, "Tạo tài khoản thành công.");
         }
@@ -341,7 +327,7 @@ public class AuthService : IAuthService
     // =========================================================
     // LOGOUT
     // =========================================================
-    public async Task<ApiResponse<bool>> LogoutAsync(int userId, string? ipAddress)
+    public async Task<ApiResponse<bool>> LogoutAsync(int userId, string? ipAddress, string? userAgent = null)
     {
         await _tokenBlacklistService.BlacklistUserAsync(userId);
 
@@ -350,13 +336,14 @@ public class AuthService : IAuthService
             action: "Logout",
             entityName: "Users",
             entityId: userId.ToString(),
-            ipAddress: ipAddress);
+            ipAddress: ipAddress,
+            userAgent: userAgent);
 
         return ApiResponse<bool>.Ok(true, "Đăng xuất thành công.");
     }
 
     // =========================================================
-    // PWD.1 — Quên mật khẩu: tạo reset token JWT 15 phút + gửi email
+    // PWD.1 — Quên mật khẩu
     // =========================================================
     public async Task<ApiResponse<bool>> ForgotPasswordAsync(ForgotPasswordDto dto)
     {
@@ -365,7 +352,6 @@ public class AuthService : IAuthService
             .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Email == email);
 
-        // Luôn trả về success để tránh email enumeration attack
         if (user is null || user.Status == "Suspended")
             return ApiResponse<bool>.Ok(true, "Nếu email tồn tại, bạn sẽ nhận được hướng dẫn đặt lại mật khẩu.");
 
@@ -386,40 +372,33 @@ public class AuthService : IAuthService
     }
 
     // =========================================================
-    // PWD.2 — Reset mật khẩu: verify token + update DB + blacklist
+    // PWD.2 — Reset mật khẩu
     // =========================================================
     public async Task<ApiResponse<bool>> ResetPasswordAsync(ResetPasswordDto dto)
     {
-        // 1. Validate token
         var principal = ValidateResetToken(dto.Token);
         if (principal is null)
             return ApiResponse<bool>.Fail("Token không hợp lệ hoặc đã hết hạn.");
 
-        // 2. Kiểm tra claim purpose
         var purpose = principal.FindFirst("purpose")?.Value;
         if (purpose != "password-reset")
             return ApiResponse<bool>.Fail("Token không hợp lệ hoặc đã hết hạn.");
 
-        // 3. Lấy userId từ claim
         var userIdStr = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!int.TryParse(userIdStr, out var userId))
             return ApiResponse<bool>.Fail("Token không hợp lệ hoặc đã hết hạn.");
 
-        // 4. Tìm user trong DB
         var user = await _context.Users.FindAsync(userId);
         if (user is null || user.Status == "Suspended")
             return ApiResponse<bool>.Fail("Tài khoản không tồn tại hoặc đã bị khoá.");
 
-        // 5. Validate mật khẩu mới
         if (string.IsNullOrWhiteSpace(dto.NewPassword) || dto.NewPassword.Length < 6)
             return ApiResponse<bool>.Fail("Mật khẩu mới phải có ít nhất 6 ký tự.");
 
-        // 6. Hash + update
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword, workFactor: 12);
         user.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        // 7. Blacklist toàn bộ token cũ (kể cả reset token này)
         await _tokenBlacklistService.BlacklistUserAsync(userId);
 
         return ApiResponse<bool>.Ok(true, "Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.");
@@ -476,7 +455,7 @@ public class AuthService : IAuthService
                 var wallet = new Wallet
                 {
                     SpectatorId = userId,
-                    Balance = 0,
+                    Balance = 1000, // EC-47
                     UpdatedAt = now
                 };
                 _context.SpectatorProfiles.Add(new SpectatorProfile
