@@ -23,6 +23,10 @@ namespace HRTMS.Core.DTOs.Tournament
         public string RaceCategory { get; set; } = string.Empty;
         public int MinJockeyExperienceYears { get; set; }
         public decimal PurseAmount { get; set; }
+        // Tổng PurseAmount đã phân bổ cho các Race (SUM qua mọi Round).
+        public decimal AllocatedPurse { get; set; }
+        // Phần quỹ giải còn lại chưa phân bổ cho Race nào = PurseAmount - AllocatedPurse.
+        public decimal RemainingPurse { get; set; }
         public decimal EntryFeeAmount { get; set; }
         public decimal PreRaceWeightThresholdKg { get; set; }
         public decimal PostRaceWeightDiffThresholdKg { get; set; }
