@@ -157,22 +157,26 @@ export const getOwnerPairings = async (
   }
 };
 
-/**
- * Send an invitation to a jockey
- */
-export const inviteJockey = async (payload: {
-  horseId: string;
-  jockeyId: string;
+export interface InviteJockeyPayload {
+  tournamentId?: number;
+  horseId: number;
+  jockeyId: number;
   requestMessage: string;
-}): Promise<any> => {
-  try {
-    const response = await axiosInstance.post<any>('http://localhost:5222/api/pairings', payload);
-    return response.data;
-  } catch (error) {
-    console.error('Error sending invitation:', error);
-    throw error;
-  }
+}
+
+/**
+ * POST /api/pairings
+ * API trả trực tiếp PairingResponseDto (không có ApiResponse wrapper).
+ * apiFetch sẽ throw nếu HTTP status không phải 2xx — không cần check .success.
+ */
+export const inviteJockey = async (payload: InviteJockeyPayload): Promise<any> => {
+  return apiFetch<any>('/pairings', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 };
+
+
 
 /**
  * Accept/Confirm a pairing invitation

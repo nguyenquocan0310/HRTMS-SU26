@@ -1,45 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import type { JockeyInvitation, Horse } from '../../types/owner.types';
 import { getAvailableJockeys, getMyHorses, getOwnerPairings, inviteJockey, acceptPairing } from '../../services/ownerService';
+import { getMyTournamentParticipations, type ParticipationResponse } from '../../services/tournamentService';
 
-// Mock data
-const mockInvitations: JockeyInvitation[] = [
-  {
-    invitationID: 'inv-001',
-    requestMessage: 'Xin mời tham gia',
-    ownerID: 'owner-001',
-    jockeyID: 'jockey-001',
-    jockeyName: 'Nguyễn Văn A',
-    status: 'Pending',
-    invitedAt: new Date('2024-06-10'),
-    horseID: 'H001',
-  },
-  {
-    invitationID: 'inv-002',
-    requestMessage: 'Xin mời tham gia',
-    ownerID: 'owner-001',
-    jockeyID: 'jockey-002',
-    jockeyName: 'Trần Thị B',
-    status: 'Accepted',
-    invitedAt: new Date('2024-06-08'),
-    respondedAt: new Date('2024-06-09'),
-    horseID: 'H002',
-  },
-  {
-    invitationID: 'inv-003',
-    requestMessage: 'Xin mời tham gia',
-    ownerID: 'owner-001',
-    jockeyID: 'jockey-003',
-    jockeyName: 'Phạm Văn C',
-    status: 'Declined',
-    invitedAt: new Date('2024-06-05'),
-    respondedAt: new Date('2024-06-06'),
-    horseID: 'H003',
-  },
-];
+// Status badge for invitation status
+const INVITE_STATUS: Record<string, { label: string; cls: string; dot: string }> = {
+  Pending:  { label: 'Chờ phản hồi',  cls: 'bg-yellow-50 text-yellow-700 border-yellow-200', dot: 'bg-yellow-500' },
+  Accepted: { label: 'Đã chấp nhận',  cls: 'bg-green-50 text-green-700 border-green-200',    dot: 'bg-green-500'  },
+  Declined: { label: 'Đã từ chối',    cls: 'bg-red-50 text-red-700 border-red-200',          dot: 'bg-red-500'    },
+};
+
+function InviteStatusBadge({ status }: { status: JockeyInvitation['status'] }) {
+  const cfg = INVITE_STATUS[status] ?? { label: status, cls: 'bg-gray-50 text-gray-600 border-gray-200', dot: 'bg-gray-400' };
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium rounded border ${cfg.cls}`}>
+      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
+      {cfg.label}
+    </span>
+  );
+}
+
+// Shared input class
+const inputCls = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all bg-white';
 
 export default function JockeyInvite() {
-  const [invitations, setInvitations] = useState<JockeyInvitation[]>(mockInvitations);
+  const [invitations, setInvitations] = useState<JockeyInvitation[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [jockeyName, setJockeyName] = useState('');
   const [requestMessage, setRequestMessage] = useState('');
@@ -55,6 +40,12 @@ export default function JockeyInvite() {
   const [loadingInvitations, setLoadingInvitations] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [sending, setSending] = useState(false);
+  const [activeTab, setActiveTab] = useState<'available' | 'history'>('available');
+
+  // ── Tournament picker state ──────────────────────────────────────────────────
+  const [approvedTournaments, setApprovedTournaments] = useState<ParticipationResponse[]>([]);
+  const [loadingTournaments, setLoadingTournaments] = useState(false);
+  const [selectedTournamentId, setSelectedTournamentId] = useState<number | null>(null);
 
   const getHorseNameById = (horseID?: string, horseName?: string) => {
     if (!horseID) return 'Chưa gán ngựa';
@@ -70,16 +61,22 @@ export default function JockeyInvite() {
     return matchHorse && matchStatus;
   });
 
+  // ── Fetch approved tournament participations on mount ───────────────────────
   useEffect(() => {
-    const fetchJockeys = async () => {
+    const fetchTournaments = async () => {
       try {
-        setLoadingJockeys(true);
-        const data = await getAvailableJockeys(1, 1, 20); // tournamentId=1, page=1, pageSize=20
-        setAvailableJockeys(data);
+        setLoadingTournaments(true);
+        const list = await getMyTournamentParticipations();
+        const approved = list.filter((p) => p.status === 'Approved');
+        setApprovedTournaments(approved);
+        // Auto-select the first approved tournament so the table populates immediately
+        if (approved.length > 0) {
+          setSelectedTournamentId(approved[0].tournamentId);
+        }
       } catch (err) {
-        console.error('Failed to fetch available jockeys:', err);
+        console.error('Failed to fetch tournament participations:', err);
       } finally {
-        setLoadingJockeys(false);
+        setLoadingTournaments(false);
       }
     };
 
@@ -95,16 +92,37 @@ export default function JockeyInvite() {
       }
     };
 
-    fetchJockeys();
+    fetchTournaments();
     fetchHorses();
   }, []);
+
+  // ── Fetch available jockeys whenever selectedTournamentId changes ────────────
+  useEffect(() => {
+    if (!selectedTournamentId) {
+      setAvailableJockeys([]);
+      return;
+    }
+    const fetchJockeys = async () => {
+      try {
+        setLoadingJockeys(true);
+        const data = await getAvailableJockeys(selectedTournamentId, 1, 20);
+        setAvailableJockeys(data);
+      } catch (err) {
+        console.error('Failed to fetch available jockeys:', err);
+        setAvailableJockeys([]);
+      } finally {
+        setLoadingJockeys(false);
+      }
+    };
+    fetchJockeys();
+  }, [selectedTournamentId]);
 
   useEffect(() => {
     const fetchInvitations = async () => {
       try {
         setLoadingInvitations(true);
         const data = await getOwnerPairings(filterStatus, filterHorseId);
-        
+
         // Map the backend pairings to our UI JockeyInvitation format
         const mapped: JockeyInvitation[] = data.map((item: any) => {
           return {
@@ -131,62 +149,59 @@ export default function JockeyInvite() {
     fetchInvitations();
   }, [filterStatus, filterHorseId, refreshTrigger]);
 
-  const getStatusColor = (status: JockeyInvitation['status']): string => {
-    switch (status) {
-      case 'Pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'Accepted':
-        return 'bg-green-100 text-green-800';
-      case 'Declined':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   const handleSendInvitation = async () => {
     setError('');
 
+    // ── Validation ─────────────────────────────────────────────────────────────
+    if (!selectedTournamentId) {
+      setError('Vui lòng chọn giải đấu trước khi gửi lời mời.');
+      return;
+    }
     if (!selectedJockeyId) {
-      setError('Vui lòng chọn Jockey từ danh sách khả dụng');
+      setError('Vui lòng chọn Jockey từ danh sách khả dụng.');
       return;
     }
-
     if (!selectedHorseId) {
-      setError('Vui lòng chọn ngựa');
+      setError('Vui lòng chọn ngựa.');
+      return;
+    }
+    if (!requestMessage.trim()) {
+      setError('Vui lòng nhập lời nhắn.');
       return;
     }
 
-    if (!requestMessage.trim()) {
-      setError('Vui lòng nhập lời nhắn');
-      return;
-    }
+    // ── Build payload — all IDs as number ──────────────────────────────────────
+    const payload = {
+      tournamentId: selectedTournamentId,
+      horseId: Number(selectedHorseId),
+      jockeyId: Number(selectedJockeyId),
+      requestMessage: requestMessage.trim(),
+    };
+
+    console.debug('POST /api/pairings payload', payload);
 
     try {
       setSending(true);
-      // Call API to send invitation
-      await inviteJockey({
-        horseId: selectedHorseId,
-        jockeyId: selectedJockeyId,
-        requestMessage: requestMessage,
-      });
+      await inviteJockey(payload);
 
-      // Clear form inputs and close modal
+      // ── Success: reset form, close modal, refresh list, switch tab ────────────
       setJockeyName('');
       setSelectedJockeyId('');
       setSelectedHorseId('');
       setRequestMessage('');
       setShowModal(false);
-
-      // Trigger list refresh
       setRefreshTrigger((prev) => prev + 1);
+      setActiveTab('history');
     } catch (err: any) {
-      console.error('Failed to send invitation:', err);
-      setError(err?.response?.data?.message || 'Đã xảy ra lỗi khi gửi lời mời. Vui lòng thử lại.');
+      console.error('POST /api/pairings failed:', err);
+      // Surface real backend message (apiFetch throws Error with BE message)
+      const msg = err?.message || err?.response?.data?.message || 'Đã xảy ra lỗi khi gửi lời mời. Vui lòng thử lại.';
+      setError(msg);
     } finally {
       setSending(false);
     }
   };
+
 
   const handleConfirmPairing = async (invitationID: string) => {
     // try {
@@ -199,348 +214,389 @@ export default function JockeyInvite() {
     // }
   };
 
-
-  const [activeTab, setActiveTab] = useState<'available' | 'history'>('available');
-
   // Main Render
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">
-              Lời mời jockey
-            </h1>
-            <p className="text-gray-600">
-              Quản lý các lời mời gửi cho jockey và tìm kiếm kỵ sĩ khả dụng
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              setSelectedJockeyId('');
-              setJockeyName('');
-              setShowModal(true);
-            }}
-            className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
-          >
-            <span>+</span> Gửi lời mời mới
-          </button>
+    <div>
+      {/* Page header */}
+      <div className="mb-5 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Mời Jockey</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Quản lý lời mời và tìm kỵ sĩ khả dụng</p>
         </div>
+        <button
+          onClick={() => {
+            setSelectedJockeyId('');
+            setJockeyName('');
+            setShowModal(true);
+          }}
+          className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+        >
+          + Gửi lời mời mới
+        </button>
+      </div>
 
-        {/* Tabs */}
-        <div className="mb-6 border-b border-gray-200">
-          <div className="flex gap-6">
+      {/* Tabs */}
+      <div className="mb-4 border-b border-gray-200">
+        <div className="flex gap-1">
+          {[
+            { key: 'available', label: `Kỵ sĩ khả dụng (${availableJockeys.length})` },
+            { key: 'history',   label: `Lịch sử lời mời (${invitations.length})` },
+          ].map((tab) => (
             <button
-              onClick={() => setActiveTab('available')}
-              className={`pb-4 text-sm font-semibold transition-all border-b-2 ${
-                activeTab === 'available'
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key as 'available' | 'history')}
+              className={`px-4 py-2.5 text-sm font-semibold transition-all border-b-2 -mb-px ${
+                activeTab === tab.key
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              Kỵ sĩ khả dụng ({availableJockeys.length})
+              {tab.label}
             </button>
-            <button
-              onClick={() => setActiveTab('history')}
-              className={`pb-4 text-sm font-semibold transition-all border-b-2 ${
-                activeTab === 'history'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Lịch sử lời mời ({invitations.length})
-            </button>
-          </div>
+          ))}
         </div>
+      </div>
 
-        {activeTab === 'available' ? (
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              {loadingJockeys ? (
-                <div className="p-12 text-center text-gray-500">
-                  <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-4"></div>
-                  <p className="text-gray-600">Đang tải danh sách kỵ sĩ khả dụng...</p>
-                </div>
-              ) : availableJockeys.length === 0 ? (
-                <div className="p-8 text-center text-gray-500">
-                  <div className="text-4xl mb-2">👤</div>
-                  Không có kỵ sĩ khả dụng nào
-                </div>
-              ) : (
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Tên kỵ sĩ</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Chứng chỉ</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Kinh nghiệm</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Sức khỏe</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Hành động</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {availableJockeys.map((j) => {
-                      const jId = String(j.jockeyId || j.jockeyID || j.id || '');
-                      return (
-                        <tr key={jId} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-6 py-4 text-sm font-medium text-gray-800">{j.fullName || 'N/A'}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{j.licenseCertificate || 'N/A'}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{j.experienceYears || 0} năm</td>
-                          <td className="px-6 py-4 text-sm">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              j.healthStatus === 'Good' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                            }`}>
-                              {j.healthStatus === 'Good' ? 'Khỏe mạnh' : j.healthStatus || 'N/A'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-sm">
-                            <button
-                              onClick={() => {
-                                setSelectedJockeyId(jId);
-                                setJockeyName(j.fullName || '');
-                                setShowModal(true);
-                              }}
-                              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-md transition-colors"
-                            >
-                              Mời tham gia
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
+      {/* Tab: Available Jockeys */}
+      {activeTab === 'available' ? (
+        <div className="space-y-3">
+          {/* Tournament picker */}
+          <div className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex flex-wrap items-center gap-3">
+            <label className="text-xs font-semibold text-gray-500 whitespace-nowrap">Giải đấu:</label>
+            {loadingTournaments ? (
+              <span className="text-sm text-gray-400 italic">Đang tải giải đấu...</span>
+            ) : approvedTournaments.length === 0 ? (
+              <span className="text-sm text-amber-600 font-medium">
+                Bạn chưa được duyệt vào giải đấu nào — không thể xem kỵ sĩ khả dụng.
+              </span>
+            ) : (
+              <select
+                value={selectedTournamentId ?? ''}
+                onChange={(e) => setSelectedTournamentId(e.target.value ? Number(e.target.value) : null)}
+                className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white"
+              >
+                {approvedTournaments.map((p) => (
+                  <option key={p.tournamentId} value={p.tournamentId}>
+                    {p.tournamentName || `Giải #${p.tournamentId}`}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          {!selectedTournamentId ? (
+            <div className="py-12 text-center text-gray-400 text-sm">
+              Chọn một giải đấu để xem kỵ sĩ khả dụng
             </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Bộ lọc theo Horse ID & Status */}
-            <div className="bg-white p-4 border border-gray-200 rounded-xl shadow-sm flex flex-wrap items-center gap-6">
-              <div className="flex items-center gap-3">
-                <label className="text-sm font-semibold text-gray-700">Lọc theo ngựa:</label>
-                <select
-                  value={filterHorseId}
-                  onChange={(e) => setFilterHorseId(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white text-sm"
-                >
-                  <option value="">-- Tất cả ngựa --</option>
-                  {horses.map((h) => {
-                    const hId = String(h.horseID || (h as any).id || (h as any).horseId || '');
+          ) : loadingJockeys ? (
+            <div className="py-14 text-center">
+              <div className="inline-block animate-spin rounded-full h-7 w-7 border-b-2 border-blue-600 mb-3" />
+              <p className="text-sm text-gray-500">Đang tải danh sách kỵ sĩ...</p>
+            </div>
+          ) : availableJockeys.length === 0 ? (
+            <div className="py-12 text-center text-gray-400 text-sm">
+              Không có kỵ sĩ khả dụng cho giải này
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Tên kỵ sĩ</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Chứng chỉ</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Kinh nghiệm</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Sức khỏe</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Hành động</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {availableJockeys.map((j) => {
+                    const jId = String(j.jockeyId || j.jockeyID || j.id || '');
                     return (
-                      <option key={hId} value={hId}>
-                        {h.name} (ID: {hId})
-                      </option>
+                      <tr key={jId} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3 font-medium text-gray-800">{j.fullName || 'N/A'}</td>
+                        <td className="px-4 py-3 text-gray-600">{j.licenseCertificate || 'N/A'}</td>
+                        <td className="px-4 py-3 text-gray-600">{j.experienceYears || 0} năm</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded border ${
+                            j.healthStatus === 'Good'
+                              ? 'bg-green-50 text-green-700 border-green-200'
+                              : 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${j.healthStatus === 'Good' ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                            {j.healthStatus === 'Good' ? 'Khỏe mạnh' : j.healthStatus || 'N/A'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => {
+                              setSelectedJockeyId(jId);
+                              setJockeyName(j.fullName || '');
+                              setShowModal(true);
+                            }}
+                            className="px-3 py-1.5 text-xs font-semibold text-blue-600 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                          >
+                            Mời tham gia
+                          </button>
+                        </td>
+                      </tr>
                     );
                   })}
-                </select>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <label className="text-sm font-semibold text-gray-700">Lọc theo trạng thái:</label>
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white text-sm"
-                >
-                  <option value="">-- Tất cả trạng thái --</option>
-                  <option value="Pending">Chờ phản hồi (Pending)</option>
-                  <option value="Accepted">Đã chấp nhận (Accepted)</option>
-                  <option value="Declined">Đã từ chối (Declined)</option>
-                </select>
-              </div>
+                </tbody>
+              </table>
+            </div>
+          )}
+          </div>
+        </div>
+      ) : (
+        /* Tab: Invitation History */
+        <div className="space-y-3">
+          {/* Filters */}
+          <div className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold text-gray-500">Ngựa:</label>
+              <select
+                value={filterHorseId}
+                onChange={(e) => setFilterHorseId(e.target.value)}
+                className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white"
+              >
+                <option value="">Tất cả ngựa</option>
+                {horses.map((h) => {
+                  const hId = String(h.horseID || (h as any).id || (h as any).horseId || '');
+                  return (
+                    <option key={hId} value={hId}>
+                      {h.name} (ID: {hId})
+                    </option>
+                  );
+                })}
+              </select>
             </div>
 
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                {loadingInvitations ? (
-                  <div className="p-12 text-center text-gray-500">
-                    <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-4"></div>
-                    <p className="text-gray-600">Đang tải lịch sử lời mời...</p>
-                  </div>
-                ) : filteredInvitations.length === 0 ? (
-                  <div className="p-8 text-center text-gray-500">
-                    <div className="text-4xl mb-2">🤝</div>
-                    Không tìm thấy lời mời nào cho bộ lọc này
-                  </div>
-                ) : (
-                  <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                      <tr>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Tên jockey</th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Ngựa ghép cặp</th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Lời nhắn</th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Trạng thái</th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Ngày mời</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {filteredInvitations.map((invitation) => (
-                        <tr key={invitation.invitationID} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-6 py-4 text-sm text-gray-800 font-medium">{invitation.jockeyName || 'N/A'}</td>
-                          <td className="px-6 py-4 text-sm text-gray-800 font-medium">
-                            <span className="bg-blue-50 text-blue-800 px-2.5 py-1 rounded-md text-xs font-semibold">
-                              {getHorseNameById(invitation.horseID, invitation.horseName)}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-800">{invitation.requestMessage || 'N/A'}</td>
-                          <td className="px-6 py-4">
-                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(invitation.status)}`}>
-                              {invitation.status === 'Pending' && 'Chờ phản hồi'}
-                              {invitation.status === 'Accepted' && 'Đã chấp nhận'}
-                              {invitation.status === 'Declined' && 'Đã từ chối'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-800">{new Date(invitation.invitedAt).toLocaleDateString('vi-VN')}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold text-gray-500">Trạng thái:</label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white"
+              >
+                <option value="">Tất cả</option>
+                <option value="Pending">Chờ phản hồi</option>
+                <option value="Accepted">Đã chấp nhận</option>
+                <option value="Declined">Đã từ chối</option>
+              </select>
             </div>
           </div>
-        )}
 
-        {/* Send Invitation Modal */}
-        {showModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-lg p-8 max-w-xl w-full mx-4">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">
-                Gửi lời mời cho jockey
-              </h3>
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            {loadingInvitations ? (
+              <div className="py-14 text-center">
+                <div className="inline-block animate-spin rounded-full h-7 w-7 border-b-2 border-blue-600 mb-3" />
+                <p className="text-sm text-gray-500">Đang tải lịch sử lời mời...</p>
+              </div>
+            ) : filteredInvitations.length === 0 ? (
+              <div className="py-12 text-center text-gray-400 text-sm">
+                Không tìm thấy lời mời nào
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Jockey</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Ngựa</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Lời nhắn</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Trạng thái</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Ngày mời</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredInvitations.map((invitation) => (
+                      <tr key={invitation.invitationID} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3 font-medium text-gray-800">{invitation.jockeyName || 'N/A'}</td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex px-2 py-0.5 text-xs font-semibold bg-blue-50 text-blue-700 rounded border border-blue-100">
+                            {getHorseNameById(invitation.horseID, invitation.horseName)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 max-w-xs truncate">
+                          {invitation.requestMessage || '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <InviteStatusBadge status={invitation.status} />
+                        </td>
+                        <td className="px-4 py-3 text-gray-500 text-xs">
+                          {new Date(invitation.invitedAt).toLocaleDateString('vi-VN')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
+      {/* Send Invitation Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-lg">
+            {/* Modal header */}
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-base font-bold text-gray-900">Gửi lời mời cho jockey</h3>
+              <button
+                onClick={() => {
+                  setShowModal(false);
+                  setError('');
+                  setJockeyName('');
+                  setSelectedJockeyId('');
+                  setSelectedHorseId('');
+                  setRequestMessage('');
+                }}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
               {error && (
-                <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3">
-                  <p className="text-red-700 text-sm">{error}</p>
+                <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5">
+                  <p className="text-sm text-red-700">{error}</p>
                 </div>
               )}
 
-              <div className="space-y-4 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Chọn Jockey khả dụng (từ hệ thống)
-                  </label>
-                  {loadingJockeys ? (
-                    <div className="text-sm text-gray-500 italic">Đang tải danh sách jockey...</div>
-                  ) : (
-                    <select
-                      value={selectedJockeyId}
-                      onChange={(e) => {
-                        const targetId = e.target.value;
-                        setSelectedJockeyId(targetId);
-                        const jockeyObj = availableJockeys.find(j => 
-                          String(j.jockeyId || j.jockeyID || j.id) === targetId
-                        );
-                        if (jockeyObj) {
-                          setJockeyName(jockeyObj.fullName || jockeyObj.jockeyName || jockeyObj.name || '');
-                        } else {
-                          setJockeyName('');
-                        }
-                      }}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all bg-white"
-                    >
-                      <option value="">-- Chọn Jockey --</option>
-                      {availableJockeys.map((j) => {
-                        const idVal = String(j.jockeyId || j.jockeyID || j.id || '');
-                        const nameVal = j.fullName || j.name || j.jockeyName || 'Jockey không tên';
-                        const licVal = j.licenseCertificate || j.licenseNumber ? ` (GPLX: ${j.licenseCertificate || j.licenseNumber})` : '';
-                        const expVal = j.experienceYears ? ` - ${j.experienceYears} năm KN` : '';
-                        return (
-                          <option key={idVal} value={idVal}>
-                            {nameVal}{licVal}{expVal}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tên jockey (tự động điền hoặc nhập thủ công)
-                  </label>
-                  <input
-                    type="text"
-                    value={jockeyName}
+              {/* Jockey select */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                  Chọn Jockey khả dụng
+                </label>
+                {loadingJockeys ? (
+                  <div className="text-sm text-gray-400 italic">Đang tải danh sách jockey...</div>
+                ) : !selectedTournamentId ? (
+                  <div className="text-sm text-amber-600 italic">Vui lòng chọn giải đấu trong tab "Kỵ sĩ khả dụng" trước khi gửi lời mời.</div>
+                ) : (
+                  <select
+                    value={selectedJockeyId}
                     onChange={(e) => {
-                      setJockeyName(e.target.value);
-                      setSelectedJockeyId('');
+                      const targetId = e.target.value;
+                      setSelectedJockeyId(targetId);
+                      const jockeyObj = availableJockeys.find(j =>
+                        String(j.jockeyId || j.jockeyID || j.id) === targetId
+                      );
+                      if (jockeyObj) {
+                        setJockeyName(jockeyObj.fullName || jockeyObj.jockeyName || jockeyObj.name || '');
+                      } else {
+                        setJockeyName('');
+                      }
                     }}
-                    placeholder="Nhập tên jockey"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Chọn Ngựa (Horse ID)
-                  </label>
-                  {loadingHorses ? (
-                    <div className="text-sm text-gray-500 italic">Đang tải danh sách ngựa...</div>
-                  ) : (
-                    <select
-                      value={selectedHorseId}
-                      onChange={(e) => setSelectedHorseId(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all bg-white"
-                    >
-                      <option value="">-- Chọn Ngựa --</option>
-                      {horses.map((h) => {
-                        const hId = h.horseID || (h as any).id || (h as any).horseId || '';
-                        return (
-                          <option key={hId} value={hId}>
-                            {h.name} (ID: {hId})
-                          </option>
-                        );
-                      })}
-                    </select>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Lời nhắn
-                  </label>
-                  <textarea
-                    value={requestMessage}
-                    onChange={(e) => setRequestMessage(e.target.value)}
-                    placeholder="Nhập lời nhắn gửi đến jockey"
-                    rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all resize-none"
-                  />
-                </div>
+                    className={inputCls}
+                  >
+                    <option value="">— Chọn Jockey —</option>
+                    {availableJockeys.map((j) => {
+                      const idVal = String(j.jockeyId || j.jockeyID || j.id || '');
+                      const nameVal = j.fullName || j.name || j.jockeyName || 'Jockey không tên';
+                      const licVal = j.licenseCertificate || j.licenseNumber ? ` (GPLX: ${j.licenseCertificate || j.licenseNumber})` : '';
+                      const expVal = j.experienceYears ? ` - ${j.experienceYears} năm KN` : '';
+                      return (
+                        <option key={idVal} value={idVal}>
+                          {nameVal}{licVal}{expVal}
+                        </option>
+                      );
+                    })}
+                  </select>
+                )}
               </div>
 
-              <div className="flex gap-3 justify-end">
-                <button
-                  onClick={() => {
-                    setShowModal(false);
-                    setError('');
-                    setJockeyName('');
+              {/* Jockey name manual */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                  Tên jockey (tự động điền hoặc nhập thủ công)
+                </label>
+                <input
+                  type="text"
+                  value={jockeyName}
+                  onChange={(e) => {
+                    setJockeyName(e.target.value);
                     setSelectedJockeyId('');
-                    setSelectedHorseId('');
-                    setRequestMessage('');
                   }}
-                  disabled={sending}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Hủy
-                </button>
-                <button
-                  onClick={handleSendInvitation}
-                  disabled={sending}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {sending && (
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                  )}
-                  <span>{sending ? 'Đang gửi...' : 'Gửi lời mời'}</span>
-                </button>
+                  placeholder="Nhập tên jockey"
+                  className={inputCls}
+                />
+              </div>
+
+              {/* Horse select */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                  Chọn Ngựa
+                </label>
+                {loadingHorses ? (
+                  <div className="text-sm text-gray-400 italic">Đang tải danh sách ngựa...</div>
+                ) : (
+                  <select
+                    value={selectedHorseId}
+                    onChange={(e) => setSelectedHorseId(e.target.value)}
+                    className={inputCls}
+                  >
+                    <option value="">— Chọn Ngựa —</option>
+                    {horses.map((h) => {
+                      const hId = h.horseID || (h as any).id || (h as any).horseId || '';
+                      return (
+                        <option key={hId} value={hId}>
+                          {h.name} (ID: {hId})
+                        </option>
+                      );
+                    })}
+                  </select>
+                )}
+              </div>
+
+              {/* Message */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                  Lời nhắn
+                </label>
+                <textarea
+                  value={requestMessage}
+                  onChange={(e) => setRequestMessage(e.target.value)}
+                  placeholder="Nhập lời nhắn gửi đến jockey"
+                  rows={3}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all resize-none"
+                />
               </div>
             </div>
+
+            {/* Modal footer */}
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3 rounded-b-xl">
+              <button
+                onClick={() => {
+                  setShowModal(false);
+                  setError('');
+                  setJockeyName('');
+                  setSelectedJockeyId('');
+                  setSelectedHorseId('');
+                  setRequestMessage('');
+                }}
+                disabled={sending}
+                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-white transition-colors disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleSendInvitation}
+                disabled={sending}
+                className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                {sending && (
+                  <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" />
+                )}
+                {sending ? 'Đang gửi...' : 'Gửi lời mời'}
+              </button>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
