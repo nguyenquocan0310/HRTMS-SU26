@@ -119,8 +119,11 @@ public class AuthService : IAuthService
         {
             Token = token,
             UserId = user.UserId,
+            Username = user.Username,
+            FullName = user.FullName,
+            Email = user.Email,
             Role = user.Role,
-            FullName = user.FullName
+            Status = user.Status
         });
     }
 
