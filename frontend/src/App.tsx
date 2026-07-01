@@ -112,7 +112,7 @@ export default function App() {
           <Route path="horses/:id" element={<HorseDetail />} />
           <Route path="race-entries" element={<RaceEntries />} />
           <Route path="tournaments" element={<TournamentList />} />
-          <Route path="schedule-confirm" element={<ScheduleConfirm />} />
+          <Route path="schedule-confirm" element={<Navigate to="/owner/race-entries" replace />} />
           <Route path="jockey-invite" element={<JockeyInvite />} />
           <Route path="protest" element={<Protest userRole="HorseOwner" />} />
         </Route>
