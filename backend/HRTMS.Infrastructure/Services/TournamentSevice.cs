@@ -10,6 +10,9 @@ namespace HRTMS.Infrastructure.Services
     {
         private readonly HRTMSDbContext _context;
         private readonly IAuditLogService _auditLog;
+        // Module E (SCH.9) — guard dong bang cau hinh Race dung chung voi RaceEntryService,
+        // tranh viet lai logic freeze inline (EC-48).
+        private readonly IRaceEntryService _raceEntry;
 
         private static readonly string[] ValidBreeds =
             ["Thoroughbred", "Arabian", "Quarter Horse", "Mixed"];
@@ -33,10 +36,11 @@ namespace HRTMS.Infrastructure.Services
         private static readonly string[] RaceLevelStatuses =
             ["Pre-Race", "Live", "In-Progress", "Unofficial", "Official"];
 
-        public TournamentSevice(HRTMSDbContext context, IAuditLogService auditLog)
+        public TournamentSevice(HRTMSDbContext context, IAuditLogService auditLog, IRaceEntryService raceEntry)
         {
             _context = context;
             _auditLog = auditLog;
+            _raceEntry = raceEntry;
         }
 
 
@@ -742,18 +746,16 @@ namespace HRTMS.Infrastructure.Services
             var tournament = race.Round.Tournament;
             ValidateRaceDistanceOverride(dto.RaceDistanceOverride);
 
-            // EC-48 — dong bang khi da boc tham HOAC da co Prediction.
-            var hasPrediction = await _context.Predictions.AnyAsync(p => p.RaceId == raceId);
-            var isFrozen = race.IsPostPositionDrawn || hasPrediction;
-
-            // Cac truong nhay cam khong duoc sua khi da dong bang.
+            // SCH.9 / EC-48 — chi cac truong nhay cam moi bi dong bang sau khi boc tham hoac da co Prediction.
+            // Cho phep sua cac truong khong nhay cam (PurseAmount, cutoff...) ngay ca khi da dong bang.
             var sensitiveChanged =
                 race.ScheduledTime != dto.ScheduledTime ||
                 race.RaceDistanceOverride != dto.RaceDistanceOverride ||
                 race.TrackTypeOverride != dto.TrackTypeOverride;
 
-            if (isFrozen && sensitiveChanged)
-                throw new InvalidOperationException("RACE_CONFIG_FROZEN");
+            // Dung guard chung cua Module E thay vi viet lai logic freeze inline (throw RACE_CONFIG_FROZEN).
+            if (sensitiveChanged)
+                await _raceEntry.EnsureRaceConfigEditableAsync(raceId);
 
             // EC-35 — validate cua so thoi gian (chi khi ScheduledTime thay doi).
             if (race.ScheduledTime != dto.ScheduledTime)

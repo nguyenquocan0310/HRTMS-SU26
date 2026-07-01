@@ -52,7 +52,7 @@ public class SchedulingController : ControllerBase
         }
         catch (InvalidOperationException ex) when (ex.Message == "PAIRING_NOT_CONFIRMED")
         {
-            return UnprocessableEntity(Err("PAIRING_NOT_CONFIRMED", "Only accepted pairings can be allocated."));
+            return UnprocessableEntity(Err("PAIRING_NOT_CONFIRMED", "Only confirmed pairings can be allocated."));
         }
         catch (InvalidOperationException ex) when (ex.Message == "HORSE_NOT_APPROVED")
         {

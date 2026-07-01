@@ -72,7 +72,7 @@ Hành vi: `Cancelled` + `PostPosition=null` (Vacant) + Prediction `Pending→Ref
 
 ---
 
-## Tích hợp còn lại (ngoài phạm vi file mới, cần wire thêm)
-- **SCH.5 (auto-cancel):** `IRaceEntryService.AutoCancelOverdueAsync()` cần đăng ký job nền **Hangfire** (NFR — BR-08) chạy định kỳ.
-- **SCH.9 (freeze config):** `IRaceEntryService.EnsureRaceConfigEditableAsync(raceId)` cần được gọi trong hàm update Race của `TournamentSevice` trước khi sửa `ScheduledTime` / `RaceDistanceOverride` / `TrackTypeOverride` (throw `RACE_CONFIG_FROZEN`).
-- **Refund điểm thực tế:** Module N (`VirtualPointsTransaction` + `Wallet`) — hiện chỉ đánh dấu Prediction = `Refunded`.
+## Tích hợp
+- **SCH.5 (auto-cancel) — ĐÃ WIRE:** `IRaceEntryService.AutoCancelOverdueAsync()` được đăng ký làm recurring job **Hangfire** qua `HangfireExtensions.UseHangfireRecurringJobs()` (gọi trong `Program.cs` sau `app.Build()`, lịch `*/15 * * * *` — BR-08).
+- **SCH.9 (freeze config) — ĐÃ WIRE:** `TournamentSevice.UpdateRace` gọi `IRaceEntryService.EnsureRaceConfigEditableAsync(raceId)` khi phát hiện thay đổi trường nhạy cảm (`ScheduledTime` / `RaceDistanceOverride` / `TrackTypeOverride`) → throw `RACE_CONFIG_FROZEN` nếu đã bốc thăm hoặc đã có Prediction. Trường không nhạy cảm (`PurseAmount`, cutoff…) vẫn sửa được sau khi đóng băng.
+- **Refund điểm thực tế (còn lại):** Module N (`VirtualPointsTransaction` + `Wallet`) — hiện chỉ đánh dấu Prediction = `Refunded`.
