@@ -1,21 +1,11 @@
 import { NavLink } from 'react-router-dom';
 import {
-  FiGrid,
-  FiShield,
-  FiUsers,
-  FiAward,
-  FiFlag,
-  FiCreditCard,
-  FiTrendingUp,
-  FiChevronLeft,
+  FiGrid, FiShield, FiUsers, FiAward, FiFlag, FiCreditCard,
+  FiTrendingUp, FiChevronLeft, FiMonitor, FiBell, FiUser,
 } from 'react-icons/fi';
 import styles from './AdminSidebar.module.scss';
 
-interface NavItem {
-  label: string;
-  path: string;
-  icon: React.ReactNode;
-}
+interface NavItem { label: string; path: string; icon: React.ReactNode; }
 
 const OPERATIONS_ITEMS: NavItem[] = [
   { label: 'Dashboard', path: '/admin', icon: <FiGrid size={18} /> },
@@ -29,11 +19,12 @@ const OPERATIONS_ITEMS: NavItem[] = [
 const SHARED_ITEMS: NavItem[] = [
   { label: 'Tournament Hub', path: '/admin/tournament-hub', icon: <FiAward size={18} /> },
   { label: 'Leaderboard', path: '/admin/leaderboard', icon: <FiTrendingUp size={18} /> },
+  { label: 'Live Race View', path: '/admin/live-race', icon: <FiMonitor size={18} /> },
+  { label: 'Notifications', path: '/admin/notifications', icon: <FiBell size={18} /> },
+  { label: 'My Account', path: '/admin/my-account', icon: <FiUser size={18} /> },
 ];
 
-interface AdminSidebarProps {
-  collapsed?: boolean;
-}
+interface AdminSidebarProps { collapsed?: boolean; }
 
 const AdminSidebar = ({ collapsed = false }: AdminSidebarProps) => {
   const renderItem = (item: NavItem) => (
@@ -41,9 +32,7 @@ const AdminSidebar = ({ collapsed = false }: AdminSidebarProps) => {
       key={item.path}
       to={item.path}
       end={item.path === '/admin'}
-      className={({ isActive }) =>
-        `${styles.navItem} ${isActive ? styles.navItemActive : ''}`
-      }
+      className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navItemActive : ''}`}
     >
       <span className={styles.navIcon}>{item.icon}</span>
       {!collapsed && <span className={styles.navLabel}>{item.label}</span>}
@@ -54,16 +43,10 @@ const AdminSidebar = ({ collapsed = false }: AdminSidebarProps) => {
     <aside className={`${styles.sidebar} ${collapsed ? styles.collapsed : ''}`}>
       <nav className={styles.nav}>
         {!collapsed && <span className={styles.groupLabel}>OPERATIONS</span>}
-        <div className={styles.navGroup}>
-          {OPERATIONS_ITEMS.map(renderItem)}
-        </div>
-
+        <div className={styles.navGroup}>{OPERATIONS_ITEMS.map(renderItem)}</div>
         {!collapsed && <span className={styles.groupLabel}>SHARED</span>}
-        <div className={styles.navGroup}>
-          {SHARED_ITEMS.map(renderItem)}
-        </div>
+        <div className={styles.navGroup}>{SHARED_ITEMS.map(renderItem)}</div>
       </nav>
-
       <div className={styles.bottomBlock}>
         <button type="button" className={styles.collapseBtn}>
           <FiChevronLeft size={15} className={collapsed ? styles.flipped : ''} />

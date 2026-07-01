@@ -9,6 +9,10 @@ import AdminDashboard from './pages/admin/AdminDashboard'
 import ApprovalCenter from './pages/admin/ApprovalCenter'
 import UserManagement from './pages/admin/UserManagement'
 import TournamentBuilder from './components/admin/TournamentBuilder'
+import TournamentHub from './pages/admin/TournamentHub'
+import Leaderboard from './pages/admin/Leaderboard'
+import LiveRaceView from './pages/admin/LiveRaceView'
+import NotificationCenter from './pages/admin/NotificationCenter'
 
 // ── Import các trang Owner ──
 import MyHorses from './pages/owner/MyHorses'
@@ -181,6 +185,10 @@ export default function App() {
           <Route path="tournament-builder/:id" element={<TournamentBuilder />} />
           <Route path="race-operations" element={<RaceOperations />} />
           <Route path="entry-fees" element={<EntryFees />} />
+          <Route path="tournament-hub" element={<TournamentHub />} />
+          <Route path="leaderboard" element={<Leaderboard />} />
+          <Route path="live-race" element={<LiveRaceView />} />
+          <Route path="notifications" element={<NotificationCenter />} />
         </Route>
 
         <Route path="/unauthorized" element={<div>403 — Không có quyền truy cập</div>} />

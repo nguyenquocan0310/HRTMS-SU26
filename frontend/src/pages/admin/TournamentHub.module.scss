@@ -1,0 +1,289 @@
+.container { display: flex; flex-direction: column; gap: 1.5rem; }
+.pageHeader { display: flex; flex-direction: column; gap: 0.2rem; }
+.heading { font-size: 1.65rem; font-weight: 800; color: #111; margin: 0; }
+.subtext { font-size: 0.88rem; color: #888; margin: 0; }
+.sectionHeader { display: flex; flex-direction: column; gap: 0.3rem; }
+.sectionTitle { font-size: 1.3rem; font-weight: 800; color: #111; margin: 0; }
+.sectionDesc { font-size: 0.85rem; color: #888; margin: 0; }
+.loading { color: #999; padding: 2rem 0; text-align: center; }
+
+/* ─── List view ─── */
+.listCard {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.listHeader {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.listTitle { font-size: 1rem; font-weight: 700; color: #111; margin: 0 0 0.2rem; }
+.listSubtext { font-size: 0.82rem; color: #888; margin: 0; }
+
+.tournamentRow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+  gap: 1rem;
+
+  &:last-child { border-bottom: none; }
+  &:hover { background: #f9fafb; }
+}
+
+.tournamentInfo { display: flex; flex-direction: column; gap: 0.2rem; }
+.tournamentName { font-size: 0.95rem; font-weight: 600; color: #111; }
+.tournamentMeta { font-size: 0.78rem; color: #888; }
+.tournamentRight { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
+.chevron { color: #ccc; }
+.empty { text-align: center; color: #aaa; padding: 2rem; font-size: 0.9rem; }
+
+/* ─── Status badge ─── */
+.statusBadge {
+  display: inline-flex;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #16a34a;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ─── Detail view ─── */
+.detailWrap { display: flex; flex-direction: column; gap: 1.5rem; }
+
+.backBtn {
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 0;
+  align-self: flex-start;
+  transition: color 0.2s;
+  &:hover { color: #333; }
+}
+
+.detailHeader { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.detailTitle { font-size: 1.6rem; font-weight: 800; color: #111; margin: 0; }
+.detailDesc { font-size: 0.88rem; color: #888; margin: 0; }
+
+/* ─── Registration card ─── */
+.regCard {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.regCardLeft {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.regIcon { color: #2563eb; flex-shrink: 0; margin-top: 0.2rem; }
+.regTitle { font-size: 1rem; font-weight: 700; color: #111; margin: 0 0 0.2rem; }
+.regDesc { font-size: 0.84rem; color: #888; margin: 0; }
+
+.regActions { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.registerBtn {
+  width: 100%;
+  padding: 0.85rem;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover:not(:disabled) { background: #1d4ed8; }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+.regNote { font-size: 0.8rem; color: #888; margin: 0; }
+.regMsg { font-size: 0.82rem; color: #2563eb; margin: 0; font-weight: 500; }
+
+/* ─── Stats ─── */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.statCard {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.statLabel { font-size: 0.75rem; color: #888; }
+.statValue { font-size: 1rem; font-weight: 700; color: #111; }
+
+/* ─── Rounds ─── */
+.roundCard {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.roundHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.roundName { font-size: 1rem; font-weight: 700; color: #111; margin: 0 0 0.2rem; }
+.roundDate { font-size: 0.78rem; color: #888; margin: 0; }
+
+.upcomingBadge {
+  display: inline-flex;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+/* ─── Race ─── */
+.raceCard {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #f0f0f0;
+  &:last-child { border-bottom: none; }
+}
+
+.raceHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.raceName { font-size: 0.95rem; font-weight: 700; color: #111; margin: 0 0 0.2rem; }
+.raceMeta { font-size: 0.78rem; color: #888; margin: 0; }
+
+/* ─── Start list table ─── */
+.startTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+
+  th {
+    text-align: left;
+    padding: 0.6rem 0.85rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    border-bottom: 1px solid #e5e7eb;
+    background: #f9fafb;
+  }
+
+  td {
+    padding: 0.7rem 0.85rem;
+    color: #444;
+    border-bottom: 1px solid #f5f5f5;
+  }
+
+  tr:last-child td { border-bottom: none; }
+}
+
+.horseName { font-weight: 600; color: #111; }
+.emptyCell { text-align: center; color: #bbb; padding: 1.25rem !important; font-style: italic; }
+
+@media (max-width: 900px) {
+  .statsGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .statsGrid { grid-template-columns: 1fr 1fr; }
+  .detailHeader { flex-direction: column; align-items: flex-start; }
+}
+
+/* ─── Tournament block (scroll-based) ─── */
+.tournamentBlock {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+
+  &:last-child { border-bottom: none; }
+}
+
+.tournamentHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.tournamentInfo { display: flex; flex-direction: column; gap: 0.2rem; }
+.tournamentName { font-size: 1.05rem; font-weight: 700; color: #111; display: block; }
+.tournamentMeta { font-size: 0.78rem; color: #888; }
+
+/* ─── Registration card inline ─── */
+.regCard {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.regLeft {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+}
+
+.regIcon { color: #2563eb; flex-shrink: 0; margin-top: 0.15rem; }
+.regTitle { font-size: 0.95rem; font-weight: 700; color: #111; margin: 0 0 0.15rem; }
+.regDesc { font-size: 0.82rem; color: #888; margin: 0; }
+
+.registerBtn {
+  width: 100%;
+  padding: 0.75rem;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover:not(:disabled) { background: #1d4ed8; }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+.regNote { font-size: 0.78rem; color: #888; margin: 0; }
+.regMsg { font-size: 0.82rem; color: #2563eb; margin: 0; font-weight: 500; }
