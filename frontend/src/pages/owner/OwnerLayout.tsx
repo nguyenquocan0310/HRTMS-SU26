@@ -30,7 +30,6 @@ const navItems = [
   { to: '/owner/race-entries', label: 'Đăng ký cuộc đua', end: false },
   { to: '/owner/tournaments', label: 'Danh sách giải đấu', end: false },
   { to: '/owner/jockey-invite', label: 'Mời Jockey', end: false },
-  { to: '/owner/schedule-confirm', label: 'Xác nhận lịch thi đấu', end: false },
   { to: '/owner/protest', label: 'Khiếu nại giải đấu', end: false },
 ]
 

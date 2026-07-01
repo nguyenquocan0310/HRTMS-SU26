@@ -79,15 +79,24 @@ export const updateHorse = async (
 /**
  * Get all race entries for the current user's horses
  */
-export const getMyRaceEntries = async (): Promise<RaceEntry[]> => {
-  try {
-    const response = await axiosInstance.get<RaceEntry[]>('/api/race-entries/my');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching my race entries:', error);
-    throw error;
-  }
+export const getMyRaceEntries = async (
+  status?: string,
+  entryFeeStatus?: string,
+  page: number = 1,
+  pageSize: number = 20
+): Promise<RaceEntry[]> => {
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (entryFeeStatus) params.set('entryFeeStatus', entryFeeStatus);
+  params.set('page', String(page));
+  params.set('pageSize', String(pageSize));
+
+  interface ApiResponse<T> { success: boolean; message: string; data: T | null }
+  const res = await apiFetch<ApiResponse<RaceEntry[]>>(`/race-entries/my?${params.toString()}`);
+  if (!res.success || !res.data) throw new Error(res.message || 'Không tải được danh sách đăng ký.');
+  return res.data;
 };
+
 
 /**
  * Get all jockey invitations for the current user
@@ -245,3 +254,30 @@ export const createHorseWithTournament = (payload: HorseCreatePayload): Promise<
       throw new Error(res.message || 'Đăng ký ngựa thất bại.');
     return res.data;
   });
+
+/**
+ * PATCH /api/race-entries/{id}/confirm
+ */
+export const confirmRaceEntry = async (id: number): Promise<any> => {
+  interface ApiResponse<T> { success: boolean; message: string; data: T | null }
+  const res = await apiFetch<ApiResponse<any>>(`/race-entries/${id}/confirm`, {
+    method: 'PATCH',
+  });
+  if (!res.success) throw new Error(res.message || 'Xác nhận tham gia thất bại.');
+  return res.data;
+};
+
+/**
+ * DELETE /api/race-entries/{id}?reason={reason}
+ */
+export const withdrawRaceEntry = async (id: number, reason: string): Promise<any> => {
+  interface ApiResponse<T> { success: boolean; message: string; data: T | null }
+  const params = new URLSearchParams();
+  params.set('reason', reason);
+  const res = await apiFetch<ApiResponse<any>>(`/race-entries/${id}?${params.toString()}`, {
+    method: 'DELETE',
+  });
+  if (!res.success) throw new Error(res.message || 'Rút lui thất bại.');
+  return res.data;
+};
+
