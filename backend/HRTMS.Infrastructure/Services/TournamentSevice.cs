@@ -599,11 +599,40 @@ namespace HRTMS.Infrastructure.Services
                 throw new ArgumentException(
                     $"ScheduledDate phải nằm trong [{tournament.StartDate:d}, {tournament.EndDate:d}]");
 
+            var existingRounds = await _context.Rounds
+                .Include(r => r.Races)
+                .Where(r => r.TournamentId == tournamentId)
+                .ToListAsync();
+
             // Bug 7 fix — kiểm tra trùng SequenceOrder trong cùng tournament
-            var isDuplicateOrder = await _context.Rounds
-                .AnyAsync(r => r.TournamentId == tournamentId && r.SequenceOrder == dto.SequenceOrder);
-            if (isDuplicateOrder)
+            if (existingRounds.Any(r => r.SequenceOrder == dto.SequenceOrder))
                 throw new ArgumentException($"SequenceOrder {dto.SequenceOrder} đã tồn tại trong Tournament #{tournamentId}");
+
+            // Validate tính liên tục thời gian giữa các vòng: vòng sau phải diễn ra
+            // sau khi vòng ngay trước nó đã kết thúc (sau race cuối cùng của vòng trước).
+            var previousRound = existingRounds
+                .Where(r => r.SequenceOrder < dto.SequenceOrder)
+                .OrderByDescending(r => r.SequenceOrder)
+                .FirstOrDefault();
+            if (previousRound != null)
+            {
+                var previousBoundary = previousRound.Races.Count > 0
+                    ? previousRound.Races.Max(r => r.ScheduledTime)
+                    : previousRound.ScheduledDate;
+
+                if (dto.ScheduledDate <= previousBoundary)
+                    throw new ArgumentException(
+                        $"ScheduledDate phải sau {(previousRound.Races.Count > 0 ? "cuộc đua cuối" : "ngày")} của vòng trước (Round #{previousRound.RoundId}, {previousBoundary:u})");
+            }
+
+            // Vòng kế tiếp (nếu đã tồn tại) phải bắt đầu sau vòng đang tạo.
+            var nextRound = existingRounds
+                .Where(r => r.SequenceOrder > dto.SequenceOrder)
+                .OrderBy(r => r.SequenceOrder)
+                .FirstOrDefault();
+            if (nextRound != null && dto.ScheduledDate >= nextRound.ScheduledDate)
+                throw new ArgumentException(
+                    $"ScheduledDate phải trước ngày của vòng kế tiếp (Round #{nextRound.RoundId}, {nextRound.ScheduledDate:u})");
 
             var round = new Round
             {
