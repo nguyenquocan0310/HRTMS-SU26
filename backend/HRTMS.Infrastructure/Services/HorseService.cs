@@ -183,7 +183,7 @@ public class HorseService : IHorseService
     }
 
     public async Task<ApiResponse<List<HorseEnrollmentResponseDto>>> GetMyEnrollmentsAsync(
-        int ownerId, int? horseId, int? tournamentId, int page, int pageSize)
+        int ownerId, int? horseId, int? tournamentId, string? adminApprovalStatus, int page, int pageSize)
     {
         var query = _context.HorseTournamentEntries
             .Include(e => e.Horse)
@@ -194,6 +194,8 @@ public class HorseService : IHorseService
             query = query.Where(e => e.HorseId == horseId.Value);
         if (tournamentId.HasValue)
             query = query.Where(e => e.TournamentId == tournamentId.Value);
+        if (!string.IsNullOrEmpty(adminApprovalStatus))
+            query = query.Where(e => e.AdminApprovalStatus == adminApprovalStatus);
 
         var entries = await query
             .OrderByDescending(e => e.CreatedAt)

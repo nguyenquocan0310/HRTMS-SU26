@@ -99,10 +99,11 @@ namespace HRTMS.API.Controllers
         [ProducesResponseType(typeof(ApiResponse<List<HorseEnrollmentResponseDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetHorseEnrollments(
             int horseId,
+            [FromQuery] string? adminApprovalStatus,
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 20)
         {
-            var result = await _horseService.GetMyEnrollmentsAsync(CurrentUserId, horseId, null, page, pageSize);
+            var result = await _horseService.GetMyEnrollmentsAsync(CurrentUserId, horseId, null, adminApprovalStatus, page, pageSize);
             return Ok(result);
         }
 
@@ -111,10 +112,11 @@ namespace HRTMS.API.Controllers
         [ProducesResponseType(typeof(ApiResponse<List<HorseEnrollmentResponseDto>>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetMyEnrollments(
             [FromQuery] int? tournamentId,
+            [FromQuery] string? adminApprovalStatus,
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 20)
         {
-            var result = await _horseService.GetMyEnrollmentsAsync(CurrentUserId, null, tournamentId, page, pageSize);
+            var result = await _horseService.GetMyEnrollmentsAsync(CurrentUserId, null, tournamentId, adminApprovalStatus, page, pageSize);
             return Ok(result);
         }
     }
