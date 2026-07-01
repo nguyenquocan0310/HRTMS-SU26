@@ -24,4 +24,10 @@ public interface IJockeyService
         int page,
         int pageSize);
     
+    Task<PagedResult<JockeyRaceEntryDto>> GetMyRaceEntriesAsync(
+    int jockeyId,
+    string? status,
+    int page,
+    int pageSize);
+    
 }

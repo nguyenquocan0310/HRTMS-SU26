@@ -312,4 +312,101 @@ public class JockeyService : IJockeyService
             TotalCount = total,
         };
     }
+    public async Task<PagedResult<JockeyRaceEntryDto>>
+    GetMyRaceEntriesAsync(
+        int jockeyId,
+        string? status,
+        int page,
+        int pageSize)
+{
+    // Chuan hoa gia tri phan trang
+    page = page < 1 ? 1 : page;
+    pageSize = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
+
+    var validStatuses = new[]
+    {
+        "Pending",
+        "Confirmed",
+        "Cancelled",
+        "Disqualified"
+    };
+
+    // Kiem tra trang thai RaceEntry hop le neu client co filter
+    if (!string.IsNullOrWhiteSpace(status) &&
+        !validStatuses.Contains(status))
+    {
+        throw new ArgumentException(
+            "INVALID_RACE_ENTRY_STATUS");
+    }
+
+    // Lay danh sach race entry cua Jockey dang dang nhap
+    // RaceEntries -> Pairings -> JockeyId = current user id
+    var query = _context.RaceEntries
+        .AsNoTracking()
+        .Where(re => re.Pairing.JockeyId == jockeyId);
+
+    if (!string.IsNullOrWhiteSpace(status))
+    {
+        query = query.Where(re => re.Status == status);
+    }
+
+    var total = await query.CountAsync();
+
+    var data = await query
+        .OrderByDescending(re => re.Race.ScheduledTime)
+        .ThenByDescending(re => re.RaceEntryId)
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .Select(re => new JockeyRaceEntryDto
+        {
+            RaceEntryId = re.RaceEntryId,
+            RaceId = re.RaceId,
+            PairingId = re.PairingId,
+
+            TournamentId = re.Race.Round.TournamentId,
+            TournamentName = re.Race.Round.Tournament.Name,
+
+            RoundId = re.Race.RoundId,
+            RoundName = re.Race.Round.Name,
+
+            RaceNumber = re.Race.RaceNumber,
+            ScheduledTime = re.Race.ScheduledTime,
+            RaceStatus = re.Race.Status,
+            EntryStatus = re.Status,
+            PostPosition = re.PostPosition,
+
+            HorseId = re.Pairing.HorseId,
+            HorseName = re.Pairing.Horse.Name,
+
+            OwnerId = re.Pairing.Horse.OwnerId,
+            OwnerName = re.Pairing.Horse.Owner.Owner.FullName,
+
+            PairingStatus = re.Pairing.Status,
+
+            PreRaceJockeyWeight = re.PreRaceJockeyWeight,
+            HorseIdentityCheckStatus = re.HorseIdentityCheckStatus,
+            ClinicalStatus = re.ClinicalStatus,
+            IndependenceCheckStatus = re.IndependenceCheckStatus,
+            PostRaceJockeyWeight = re.PostRaceJockeyWeight,
+
+            FinishPosition = re.FinishPosition,
+            FinishTime = re.FinishTime,
+            PointsAwarded = re.PointsAwarded,
+            EarningsAwarded = re.EarningsAwarded,
+
+            EntryFeeStatus = re.EntryFeeStatus,
+            IsWithdrawn = re.IsWithdrawn,
+            CreatedAt = re.CreatedAt,
+            UpdatedAt = re.UpdatedAt
+        })
+        .ToListAsync();
+
+    return new PagedResult<JockeyRaceEntryDto>
+    {
+        Items = data,
+        Page = page,
+        PageSize = pageSize,
+        TotalCount = total
+    };
+}
 }
