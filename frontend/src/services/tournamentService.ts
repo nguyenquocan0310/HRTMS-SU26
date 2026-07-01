@@ -1,4 +1,4 @@
-// ─── Cổng dịch vụ Tournament ─────────────────────────────────────────────────
+// ─── Cổng dịch vụ Tournament ───────────────────────────────────────────────
 // Đã nối API thật (BE: localhost:5222). Component LUÔN import từ file này.
 
 import { apiFetch } from './apiClient';
@@ -9,7 +9,7 @@ interface ApiResponse<T> {
   data: T | null;
 }
 
-// ─── Types khớp đúng response thật từ BE ────────────────────────────────────
+// ─── Types khớp đúng response thật từ BE ───────────────────────────────────
 
 export interface RaceResponse {
   raceId: number;
@@ -60,7 +60,7 @@ export interface TournamentResponse {
   prizeDistributions: PrizeDistributionResponse[];
 }
 
-// ─── Payload gửi lên khi tạo/sửa giải ────────────────────────────────────────
+// ─── Payload gửi lên khi tạo/sửa giải ─────────────────────────────────────
 
 export interface CreateTournamentPayload {
   name: string;
@@ -79,7 +79,7 @@ export interface CreateTournamentPayload {
   postRaceWeightDiffThresholdKg?: number;
 }
 
-// ─── API calls ───────────────────────────────────────────────────────────────
+// ─── API calls ──────────────────────────────────────────────────────────────
 
 export const getTournaments = (): Promise<TournamentResponse[]> =>
   apiFetch<ApiResponse<TournamentResponse[]>>('/tournament').then((res) => {
@@ -134,8 +134,6 @@ export const updatePrizeDistributions = (
   id: number,
   prizeDistributions: UpdatePrizeDistributionPayload[]
 ): Promise<TournamentResponse> =>
-  // BE nhận field "distributions" (SetPrizeDistributionDto.Distributions).
-  // Gửi sai key "prizeDistributions" sẽ làm DTO rỗng → ModelState 400 (MinLength 5).
   apiFetch<ApiResponse<TournamentResponse>>(`/tournament/${id}/prize-distributions`, {
     method: 'PUT',
     body: JSON.stringify({ distributions: prizeDistributions }),

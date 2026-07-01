@@ -50,6 +50,8 @@ import SpectatorHome from './pages/spectator/SpectatorHome'
 import PredictionPage from './pages/spectator/PredictionPage'
 import WalletTransactions from './pages/spectator/WalletTransactions'
 import MyPredictions from './pages/spectator/MyPredictions'
+import RaceOperations from './pages/admin/RaceOperation'
+import EntryFees from './pages/admin/EntryFees'
 
 // ── Placeholder Admin ──
 
@@ -181,6 +183,8 @@ export default function App() {
           {/* Wizard tạo mới / chỉnh sửa giải đấu */}
           <Route path="tournament-builder" element={<TournamentBuilder />} />
           <Route path="tournament-builder/:id" element={<TournamentBuilder />} />
+          <Route path="race-operations" element={<RaceOperations />} />
+          <Route path="entry-fees" element={<EntryFees />} />
         </Route>
 
         <Route path="/unauthorized" element={<div>403 — Không có quyền truy cập</div>} />

@@ -24,21 +24,18 @@ const AdminLayout = () => {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  // Lấy từ authStore. Khi reload, user có thể null (chỉ token được khôi phục)
-  // nên có giá trị mặc định an toàn.
   const currentUser = {
-    name: user?.fullName || 'Admin',
-    role: user?.role || 'Administrator',
+    name: user?.fullName || 'Admin Workspace',
+    role: user?.role || 'Admin',
   };
 
   const handleLogout = async () => {
     setLoggingOut(true);
-    await logoutApi();      // báo BE blacklist token (best-effort)
-    clearAuth();            // xóa token + state ở client
+    await logoutApi();
+    clearAuth();
     navigate('/login', { replace: true });
   };
 
-  // TODO: nối API đếm thông báo chưa đọc (NotificationController) — tạm 0.
   const unreadNotifications = 0;
 
   return (
@@ -46,7 +43,6 @@ const AdminLayout = () => {
       {/* ═══ TOPBAR ═══════════════════════════════════════════ */}
       <header className={styles.topbar}>
         <div className={styles.topbarLeft}>
-          {/* Hamburger — chỉ hiện mobile */}
           <button
             type="button"
             className={styles.hamburgerBtn}
@@ -56,14 +52,25 @@ const AdminLayout = () => {
             {mobileOpen ? <FiX size={20} /> : <FiMenu size={20} />}
           </button>
 
-          <span className={styles.logo}>HRTMS</span>
+          <div className={styles.logoBlock}>
+            <div className={styles.logoIconSmall}>H</div>
+            <div className={styles.logoTextBlock}>
+              <span className={styles.logo}>HRTMS</span>
+              <span className={styles.logoCaption}>Admin Workspace</span>
+            </div>
+          </div>
+
+          <div className={styles.workspaceLabel}>
+            <span className={styles.workspaceEyebrow}>WORKSPACE</span>
+            <span className={styles.workspaceName}>Admin Workspace</span>
+          </div>
 
           <div className={styles.searchWrap}>
             <FiSearch className={styles.searchIcon} size={16} />
             <input
               type="text"
               className={styles.searchInput}
-              placeholder="Global system search..."
+              placeholder="Search tournaments, horses, users"
             />
           </div>
         </div>
@@ -113,17 +120,19 @@ const AdminLayout = () => {
               </div>
             )}
           </div>
+
+          <button type="button" className={styles.logoutBtn} onClick={handleLogout} aria-label="Logout" disabled={loggingOut}>
+            <FiLogOut size={18} />
+          </button>
         </div>
       </header>
 
       {/* ═══ BODY ═════════════════════════════════════════════ */}
       <div className={styles.body}>
-        {/* Sidebar desktop/tablet */}
         <div className={styles.sidebarDesktop}>
           <AdminSidebar collapsed={sidebarCollapsed} />
         </div>
 
-        {/* Sidebar mobile overlay */}
         {mobileOpen && (
           <>
             <div
@@ -136,7 +145,6 @@ const AdminLayout = () => {
           </>
         )}
 
-        {/* Collapse toggle (desktop) */}
         <button
           type="button"
           className={styles.collapseToggle}
@@ -146,7 +154,6 @@ const AdminLayout = () => {
           {sidebarCollapsed ? '›' : '‹'}
         </button>
 
-        {/* Main content */}
         <main className={styles.content}>
           <Outlet />
         </main>
