@@ -37,19 +37,37 @@ export interface RaceInvitation {
   requestMessage?: string;
 }
 
-/**
- * Represents a jockey's race entry (confirmation for a race)
- */
 export interface JockeyRaceEntry {
-  entryID: string;
-  raceID: string;
-  horseName: string;
-  ownerName: string;
+  raceEntryId: number;
+  raceId: number;
+  pairingId: number;
+  tournamentId: number;
+  tournamentName: string;
+  roundId: number;
+  roundName: string;
+  raceNumber: number;
   scheduledTime: string;
-  distanceM: number;
-  purse: number;
-  gateNumber?: number;
-  status: 'PendingConf' | 'Confirmed' | 'Cancelled' | 'Disqualified';
+  raceStatus: string;
+  entryStatus: string;
+  postPosition: number | null;
+  horseId: number;
+  horseName: string;
+  ownerId: number;
+  ownerName: string;
+  pairingStatus: string;
+  preRaceJockeyWeight: number | null;
+  horseIdentityCheckStatus: string | null;
+  clinicalStatus: string | null;
+  independenceCheckStatus: string;
+  postRaceJockeyWeight: number | null;
+  finishPosition: number | null;
+  finishTime: string | null;
+  pointsAwarded: number | null;
+  earningsAwarded: number | null;
+  entryFeeStatus: string;
+  isWithdrawn: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**

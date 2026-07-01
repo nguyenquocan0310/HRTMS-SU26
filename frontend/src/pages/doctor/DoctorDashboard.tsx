@@ -1,12 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getMyTournamentParticipations } from '../../services/tournamentService'
-
-interface CoiFormState {
-  fullName: string
-  relationship: string
-  raceRole: string
-}
 
 interface ScheduleItem {
   id: string
@@ -48,16 +42,6 @@ export default function DoctorDashboard() {
       })
   }, [])
 
-  // Trạng thái Form COI
-  const [coiForm, setCoiForm] = useState<CoiFormState>({
-    fullName: '',
-    relationship: 'Không có',
-    raceRole: ''
-  })
-  const [coiSubmitted, setCoiSubmitted] = useState(false)
-  const [coiError, setCoiError] = useState('')
-
-  // Dữ liệu Mock cho lịch phân công hôm nay
   const scheduleData: ScheduleItem[] = [
     {
       id: 'S1',
@@ -84,21 +68,6 @@ export default function DoctorDashboard() {
       status: 'Chưa bắt đầu'
     }
   ]
-
-  const handleCoiSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!coiForm.fullName.trim() || !coiForm.raceRole.trim()) {
-      setCoiError('Vui lòng điền đầy đủ Họ tên và Vai trò giải đua.')
-      return
-    }
-    setCoiError('')
-    setCoiSubmitted(true)
-  }
-
-  const resetCoiForm = () => {
-    setCoiForm({ fullName: '', relationship: 'Không có', raceRole: '' })
-    setCoiSubmitted(false)
-  }
 
   return (
     <div className="space-y-6">
@@ -213,101 +182,28 @@ export default function DoctorDashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Khu vực "Khai báo xung đột lợi ích (COI)" */}
+        {/* Khu vực khai báo COI thật */}
         <div className="lg:col-span-1 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col justify-between">
           <div className="p-6">
-            <h2 className="text-base font-bold text-gray-900 flex items-center gap-2 border-b border-gray-100 pb-3">
-              🛡️ Khai báo xung đột lợi ích (COI)
+            <h2 className="text-base font-bold text-gray-900 border-b border-gray-100 pb-3">
+              Khai báo quan hệ COI
             </h2>
-            <p className="text-xs text-gray-500 mt-2">
-              Khai báo trung thực các mối quan hệ gia đình hoặc lợi ích liên quan đến các vận động viên hoặc trọng tài trong giải đua.
+            <p className="text-xs text-gray-500 mt-3 leading-relaxed">
+              Khai báo người thân hoặc quan hệ có thể ảnh hưởng đến phân công y tế trong giải đấu. Doctor chỉ khai báo dữ liệu, hệ thống sẽ tự kiểm tra COI khi Admin phân công vào Race.
             </p>
-
-            {coiSubmitted ? (
-              <div className="mt-6 p-4 bg-emerald-50 border border-emerald-100 rounded-lg text-emerald-800 text-sm space-y-3">
-                <div className="flex gap-2 font-semibold">
-                  <span>✓</span>
-                  <span>Khai báo thành công</span>
-                </div>
-                <p className="text-xs text-emerald-700">
-                  Hệ thống đã ghi nhận cam kết không có xung đột lợi ích của bác sĩ cho giải đấu hôm nay.
-                </p>
-                <div className="border-t border-emerald-100 pt-2 text-xs space-y-1 text-emerald-600">
-                  <div><strong>Họ tên:</strong> {coiForm.fullName}</div>
-                  <div><strong>Mối quan hệ:</strong> {coiForm.relationship}</div>
-                  <div><strong>Vai trò giải đua:</strong> {coiForm.raceRole}</div>
-                </div>
-                <button
-                  onClick={resetCoiForm}
-                  className="mt-2 w-full bg-white text-emerald-700 hover:bg-emerald-100/50 border border-emerald-200 py-1.5 px-3 rounded-md text-xs font-medium transition-colors"
-                >
-                  Tạo khai báo mới
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleCoiSubmit} className="mt-5 space-y-4">
-                {coiError && (
-                  <p className="text-xs text-red-600 bg-red-50 p-2 border border-red-100 rounded">
-                    {coiError}
-                  </p>
-                )}
-                
-                <div>
-                  <label htmlFor="fullName" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                    Họ và tên
-                  </label>
-                  <input
-                    id="fullName"
-                    type="text"
-                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors"
-                    placeholder="Nhập đầy đủ họ tên bác sĩ"
-                    value={coiForm.fullName}
-                    onChange={(e) => setCoiForm({ ...coiForm, fullName: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="relationship" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                    Quan hệ thân nhân
-                  </label>
-                  <select
-                    id="relationship"
-                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors"
-                    value={coiForm.relationship}
-                    onChange={(e) => setCoiForm({ ...coiForm, relationship: e.target.value })}
-                  >
-                    <option value="Không có">Không có xung đột</option>
-                    <option value="Thân nhân là Chủ ngựa">Thân nhân là Chủ ngựa</option>
-                    <option value="Thân nhân là Trọng tài">Thân nhân là Trọng tài</option>
-                    <option value="Mối liên hệ thương mại khác">Mối liên hệ thương mại khác</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="raceRole" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
-                    Vai trò giải đua
-                  </label>
-                  <input
-                    id="raceRole"
-                    type="text"
-                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors"
-                    placeholder="VD: Giám sát y tế khu vực Paddock"
-                    value={coiForm.raceRole}
-                    onChange={(e) => setCoiForm({ ...coiForm, raceRole: e.target.value })}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-4 rounded-lg text-sm font-semibold transition-all shadow-sm shadow-emerald-600/10 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-500/20 mt-2"
-                >
-                  Xác nhận không có xung đột
-                </button>
-              </form>
-            )}
+            <div className="mt-5 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-3 text-xs text-emerald-800">
+              Dữ liệu khai báo được dùng cho Phase 4: Official Assignment & COI Clearance.
+            </div>
+          </div>
+          <div className="border-t border-gray-100 p-6 pt-4">
+            <button
+              onClick={() => navigate('/doctor/coi')}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-4 rounded-lg text-sm font-semibold transition-all shadow-sm shadow-emerald-600/10 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            >
+              Mở khai báo COI
+            </button>
           </div>
         </div>
-
         {/* Khu vực "Lịch phân công hôm nay" */}
         <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl shadow-sm p-6 flex flex-col justify-between">
           <div>
@@ -368,3 +264,5 @@ export default function DoctorDashboard() {
     </div>
   )
 }
+
+
