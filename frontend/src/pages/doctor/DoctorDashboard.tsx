@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { getMyTournamentParticipations } from '../../services/tournamentService'
 
 interface CoiFormState {
   fullName: string
@@ -18,9 +19,34 @@ interface ScheduleItem {
 
 export default function DoctorDashboard() {
   const navigate = useNavigate()
-  
-  // Trạng thái hiển thị banner cảnh báo
-  const [showBanner, setShowBanner] = useState(true)
+
+  // ── Trạng thái participation từ API ──────────────────────────────────────────
+  const [participationStatus, setParticipationStatus] = useState<
+    'loading' | 'none' | 'pending' | 'approved' | 'rejected'
+  >('loading')
+
+  useEffect(() => {
+    getMyTournamentParticipations()
+      .then((list) => {
+        if (list.length === 0) {
+          setParticipationStatus('none')
+          return
+        }
+        const hasApproved = list.some(
+          (p) => p.status === 'Approved' || p.status === 'AutoEligible'
+        )
+        const hasPending = list.some(
+          (p) => p.status === 'Pending' || p.status === 'ManualReview'
+        )
+        if (hasApproved) setParticipationStatus('approved')
+        else if (hasPending) setParticipationStatus('pending')
+        else setParticipationStatus('rejected')
+      })
+      .catch(() => {
+        // Không chặn dashboard nếu API lỗi — giữ trạng thái loading im lặng
+        setParticipationStatus('none')
+      })
+  }, [])
 
   // Trạng thái Form COI
   const [coiForm, setCoiForm] = useState<CoiFormState>({
@@ -87,24 +113,51 @@ export default function DoctorDashboard() {
         </div>
       </div>
 
-      {/* Banner cảnh báo màu vàng ở trên cùng */}
-      {showBanner && (
-        <div className="bg-yellow-50 text-yellow-800 border border-yellow-200 rounded-lg p-4 flex justify-between items-start shadow-sm transition-all duration-150">
-          <div className="flex gap-3">
-            <span className="text-xl mt-0.5">⚠️</span>
-            <div>
-              <p className="font-semibold text-sm">Yêu cầu xét duyệt tài khoản</p>
-              <p className="text-xs text-yellow-700 mt-1">
-                Hồ sơ của bạn đang chờ Admin xét duyệt. Bạn chưa thể thao tác.
-              </p>
-            </div>
+      {/* ── Banners trạng thái đăng ký giải ── */}
+      {participationStatus === 'none' && (
+        <div className="bg-amber-50 text-amber-800 border border-amber-200 rounded-lg p-4 flex items-start gap-3 shadow-sm">
+          <span className="text-xl mt-0.5 flex-shrink-0">⚠️</span>
+          <div className="flex-1">
+            <p className="font-semibold text-sm">Chưa đăng ký giải đấu nào</p>
+            <p className="text-xs text-amber-700 mt-1">
+              Bạn chưa được duyệt tham gia giải nào. Hãy đăng ký một giải đang mở đăng ký để được phân công nhiệm vụ.
+            </p>
           </div>
-          <button 
-            onClick={() => setShowBanner(false)}
-            className="text-yellow-600 hover:text-yellow-900 text-lg leading-none p-1 rounded hover:bg-yellow-100/50 transition-colors"
-            aria-label="Đóng cảnh báo"
+          <button
+            onClick={() => navigate('/doctor/tournaments')}
+            className="flex-shrink-0 text-xs font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
           >
-            ✕
+            Đăng ký ngay ➔
+          </button>
+        </div>
+      )}
+
+      {participationStatus === 'pending' && (
+        <div className="bg-blue-50 text-blue-800 border border-blue-200 rounded-lg p-4 flex items-start gap-3 shadow-sm">
+          <span className="text-xl mt-0.5 flex-shrink-0">⏳</span>
+          <div>
+            <p className="font-semibold text-sm">Đăng ký giải đang chờ Admin duyệt</p>
+            <p className="text-xs text-blue-700 mt-1">
+              Hồ sơ đăng ký của bạn đang trong quá trình xét duyệt. Bạn sẽ được thông báo khi có kết quả.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {participationStatus === 'rejected' && (
+        <div className="bg-red-50 text-red-800 border border-red-200 rounded-lg p-4 flex items-start gap-3 shadow-sm">
+          <span className="text-xl mt-0.5 flex-shrink-0">❌</span>
+          <div className="flex-1">
+            <p className="font-semibold text-sm">Đăng ký bị từ chối</p>
+            <p className="text-xs text-red-700 mt-1">
+              Đăng ký tham gia giải của bạn đã bị từ chối. Vui lòng liên hệ Admin hoặc thử đăng ký giải khác.
+            </p>
+          </div>
+          <button
+            onClick={() => navigate('/doctor/tournaments')}
+            className="flex-shrink-0 text-xs font-semibold text-red-700 bg-red-100 hover:bg-red-200 border border-red-300 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+          >
+            Xem giải đấu ➔
           </button>
         </div>
       )}
