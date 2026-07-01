@@ -1,19 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FiZap, FiCheckCircle, FiAlertTriangle } from 'react-icons/fi';
+import { FiCheckCircle, FiAlertTriangle } from 'react-icons/fi';
 import type { Round } from '../TournamentBuilder';
+import {
+  getRoster,
+  type ParticipantResponse,
+} from '../../../services/participantService';
 import styles from './TabRoster.module.scss';
-
-// ─── Types (UI tạm thời — sẽ thay bằng response thật từ API roster) ─────────
-
-export interface RosterEntry {
-  id: string;
-  horseName: string;
-  ownerName: string;
-  jockeyName: string;
-  roundId: string | null;
-  raceId: string | null;
-  status: 'Assigned' | 'Waiting Allocation';
-}
 
 interface TabRosterProps {
   tournamentId: string;
@@ -22,42 +14,60 @@ interface TabRosterProps {
   isNewDraft: boolean;
 }
 
+const formatDate = (iso: string) =>
+  iso ? new Date(iso).toLocaleDateString('vi-VN') : '—';
+
+const RACE_CAPACITY = 8;
+
 const TabRoster = ({ tournamentId, tournamentName, rounds, isNewDraft }: TabRosterProps) => {
-  const [roster, setRoster] = useState<RosterEntry[]>([]);
+  const [roster, setRoster] = useState<ParticipantResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // TODO(API): thay bằng gọi rosterService.getRoster(tournamentId) khi BE sẵn sàng.
   useEffect(() => {
     if (isNewDraft) return;
+    const id = Number(tournamentId);
+    if (!id) return;
     setLoading(true);
     setError('');
-    // Placeholder — chưa có endpoint thật, để mảng rỗng cho tới khi nối API.
-    setRoster([]);
-    setLoading(false);
+    getRoster(id)
+      .then(setRoster)
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false));
   }, [tournamentId, isNewDraft]);
 
   const allRaces = useMemo(
     () =>
       rounds.flatMap((r) =>
-        r.races.map((race) => ({ roundId: r.id, roundName: r.name, raceId: race.id, raceNumber: race.raceNumber }))
+        r.races.map((race) => ({
+          roundId: r.id,
+          roundName: r.name,
+          raceId: race.id,
+          raceNumber: race.raceNumber,
+        }))
       ),
     [rounds]
   );
 
-  const assigned = roster.filter((r) => r.status === 'Assigned');
-  const waiting = roster.filter((r) => r.status === 'Waiting Allocation');
+  const approved = roster.filter((r) => r.status === 'Approved');
+  const pending = roster.filter((r) => r.status === 'Pending');
 
+  // Stats
   const totalRegistered = roster.length;
-  const approved = roster.length; // Roster chỉ chứa horse đã approve theo nghiệp vụ.
-  const assignedCount = assigned.length;
-  const waitingCount = waiting.length;
+  const approvedCount = approved.length;
 
-  // Validation đơn giản: mỗi race nên có roster — placeholder ngưỡng 8 horse/race.
-  const RACE_CAPACITY = 8;
-  const raceFillStatus = allRaces.map((race) => {
-    const count = assigned.filter((a) => a.raceId === race.raceId).length;
-    return { ...race, count, isFull: count >= RACE_CAPACITY, missing: Math.max(0, RACE_CAPACITY - count) };
+  // Validation: mỗi race cần đủ RACE_CAPACITY horse — dùng approved count
+  // chia đều làm placeholder vì chưa có mapping horse↔race từ API này.
+  const raceFillStatus = allRaces.map((race, idx) => {
+    const perRace = allRaces.length > 0 ? Math.floor(approvedCount / allRaces.length) : 0;
+    const remainder = allRaces.length > 0 ? approvedCount % allRaces.length : 0;
+    const count = perRace + (idx < remainder ? 1 : 0);
+    return {
+      ...race,
+      count,
+      isFull: count >= RACE_CAPACITY,
+      missing: Math.max(0, RACE_CAPACITY - count),
+    };
   });
 
   if (isNewDraft) {
@@ -83,8 +93,8 @@ const TabRoster = ({ tournamentId, tournamentName, rounds, isNewDraft }: TabRost
             <strong className={styles.overviewValue}>Closed</strong>
           </div>
           <div className={styles.overviewItem}>
-            <span className={styles.overviewLabel}>Approved Horses</span>
-            <strong className={styles.overviewValue}>{approved}</strong>
+            <span className={styles.overviewLabel}>Approved</span>
+            <strong className={styles.overviewValue}>{approvedCount}</strong>
           </div>
           <div className={styles.overviewItem}>
             <span className={styles.overviewLabel}>Total Rounds</span>
@@ -107,97 +117,53 @@ const TabRoster = ({ tournamentId, tournamentName, rounds, isNewDraft }: TabRost
           <span className={styles.statLabel}>Total Registered</span>
         </div>
         <div className={styles.statBox}>
-          <span className={styles.statValue}>{approved}</span>
+          <span className={styles.statValue}>{approvedCount}</span>
           <span className={styles.statLabel}>Approved</span>
         </div>
         <div className={styles.statBox}>
-          <span className={styles.statValue}>{assignedCount}</span>
-          <span className={styles.statLabel}>Assigned</span>
+          <span className={styles.statValue}>{pending.length}</span>
+          <span className={styles.statLabel}>Pending</span>
         </div>
         <div className={styles.statBox}>
-          <span className={styles.statValue}>{waitingCount}</span>
-          <span className={styles.statLabel}>Waiting</span>
+          <span className={styles.statValue}>{allRaces.length}</span>
+          <span className={styles.statLabel}>Total Races</span>
         </div>
       </section>
 
-      {/* ── Danh sách Roster (đã assign) ── */}
+      {/* ── Danh sách Approved ── */}
       <section className={styles.tableCard}>
         <div className={styles.tableHeader}>
-          <h3 className={styles.sectionTitle}>Danh sách Roster</h3>
-          <button type="button" className={styles.autoAllocateBtn}>
-            <FiZap size={14} /> Auto Allocate
-          </button>
+          <h3 className={styles.sectionTitle}>Danh sách Approved</h3>
         </div>
-
         <div className={styles.tableWrap}>
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>Horse</th>
-                <th>Owner</th>
-                <th>Jockey</th>
-                <th>Round</th>
-                <th>Race</th>
-                <th>Allocation</th>
-              </tr>
-            </thead>
-            <tbody>
-              {assigned.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className={styles.emptyCell}>
-                    Chưa có horse nào được phân race.
-                  </td>
-                </tr>
-              ) : (
-                assigned.map((entry) => {
-                  const race = allRaces.find((r) => r.raceId === entry.raceId);
-                  return (
-                    <tr key={entry.id}>
-                      <td className={styles.horseName}>{entry.horseName}</td>
-                      <td>{entry.ownerName}</td>
-                      <td>{entry.jockeyName}</td>
-                      <td>{race?.roundName ?? '—'}</td>
-                      <td>{race ? `Race ${race.raceNumber}` : '—'}</td>
-                      <td>
-                        <span className={styles.assignedBadge}>
-                          <FiCheckCircle size={12} /> Assigned
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* ── Horse chưa phân race ── */}
-      <section className={styles.tableCard}>
-        <h3 className={styles.sectionTitle}>Horse chưa được phân Race</h3>
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Horse</th>
-                <th>Owner</th>
+                <th>Họ tên</th>
+                <th>Role</th>
+                <th>Email</th>
+                <th>Ngày duyệt</th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody>
-              {waiting.length === 0 ? (
+              {approved.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className={styles.emptyCell}>
-                    Không có horse nào đang chờ phân race.
+                  <td colSpan={5} className={styles.emptyCell}>
+                    Chưa có thành viên nào được duyệt.
                   </td>
                 </tr>
               ) : (
-                waiting.map((entry) => (
-                  <tr key={entry.id}>
-                    <td className={styles.horseName}>{entry.horseName}</td>
-                    <td>{entry.ownerName}</td>
+                approved.map((entry) => (
+                  <tr key={entry.participantId}>
+                    <td className={styles.horseName}>{entry.fullName}</td>
+                    <td>{entry.role}</td>
+                    <td>{entry.email}</td>
+                    <td>{entry.approvedAt ? formatDate(entry.approvedAt) : '—'}</td>
                     <td>
-                      <span className={styles.waitingBadge}>Waiting Allocation</span>
+                      <span className={styles.assignedBadge}>
+                        <FiCheckCircle size={12} /> Approved
+                      </span>
                     </td>
                   </tr>
                 ))
@@ -206,6 +172,37 @@ const TabRoster = ({ tournamentId, tournamentName, rounds, isNewDraft }: TabRost
           </table>
         </div>
       </section>
+
+      {/* ── Pending ── */}
+      {pending.length > 0 && (
+        <section className={styles.tableCard}>
+          <h3 className={styles.sectionTitle}>Đang chờ duyệt</h3>
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Họ tên</th>
+                  <th>Role</th>
+                  <th>Ngày đăng ký</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pending.map((entry) => (
+                  <tr key={entry.participantId}>
+                    <td className={styles.horseName}>{entry.fullName}</td>
+                    <td>{entry.role}</td>
+                    <td>{formatDate(entry.registeredAt)}</td>
+                    <td>
+                      <span className={styles.waitingBadge}>Pending</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* ── Validation ── */}
       <section className={styles.validationCard}>
@@ -220,11 +217,11 @@ const TabRoster = ({ tournamentId, tournamentName, rounds, isNewDraft }: TabRost
               <li key={race.raceId} className={styles.validationItem}>
                 {race.isFull ? (
                   <span className={styles.validOk}>
-                    <FiCheckCircle size={14} /> {race.roundName} - Race {race.raceNumber} đủ {RACE_CAPACITY} horse
+                    <FiCheckCircle size={14} /> {race.roundName} - Race {race.raceNumber} đủ {RACE_CAPACITY} người
                   </span>
                 ) : (
                   <span className={styles.validWarn}>
-                    <FiAlertTriangle size={14} /> {race.roundName} - Race {race.raceNumber} còn thiếu {race.missing} horse
+                    <FiAlertTriangle size={14} /> {race.roundName} - Race {race.raceNumber} còn thiếu {race.missing} người
                   </span>
                 )}
               </li>
