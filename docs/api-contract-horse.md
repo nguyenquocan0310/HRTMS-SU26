@@ -233,7 +233,15 @@ Owner "đẩy" một con ngựa **đã có trong kho** vào một giải cụ th
 | 403 | `HORSE_NOT_OWNED` | Ngựa không thuộc Owner |
 | 400 | — | Giải không `Open Registration`, chưa `Approved` roster, hoặc enroll trùng |
 
-> `GET /api/horses/{horseId}/enrollments` và `GET /api/horses/my/enrollments?tournamentId=` trả về danh sách enrollment với cùng cấu trúc `data` (mảng).
+> `GET /api/horses/{horseId}/enrollments` và `GET /api/horses/my/enrollments` trả về danh sách enrollment với cùng cấu trúc `data` (mảng).
+
+### Query params (2 endpoint GET enrollment)
+
+| Tham số | Kiểu | Áp dụng cho | Ghi chú |
+| --- | --- | --- | --- |
+| tournamentId | int | chỉ `GET /api/horses/my/enrollments` | Lọc theo giải |
+| adminApprovalStatus | string | cả 2 endpoint | `Pending` \| `Approved` \| `Rejected` — **bắt buộc dùng `Approved`** khi lấy danh sách ngựa hợp lệ để mời Jockey (JockeyInvite), tránh lẫn enrollment `Rejected`/`Pending` |
+| page, pageSize | int | cả 2 endpoint | Mặc định 1 / 20 |
 
 ---
 
