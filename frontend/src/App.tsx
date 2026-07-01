@@ -36,6 +36,7 @@ import Protest from './pages/shared/Protest'
 import DoctorLayout from './pages/doctor/DoctorLayout'
 import DoctorDashboard from './pages/doctor/DoctorDashboard'
 import PaddockConsole from './pages/doctor/PaddockConsole'
+import DoctorTournamentList from './pages/doctor/DoctorTournamentList'
 
 // ── Import các trang Referee ──
 import RefereeLayout from './pages/referee/RefereeLayout'
@@ -139,6 +140,7 @@ export default function App() {
         }>
           <Route index element={<DoctorDashboard />} />
           <Route path="paddock" element={<PaddockConsole />} />
+          <Route path="tournaments" element={<DoctorTournamentList />} />
         </Route>
 
         {/* ── Cấu trúc Route của TRỌNG TÀI (Referee) ── */}

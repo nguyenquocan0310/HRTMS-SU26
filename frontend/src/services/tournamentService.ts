@@ -185,8 +185,10 @@ export interface ParticipationResponse {
   tournamentId: number;
   tournamentName: string; // trả về ở root object từ BE
   ownerId: number;
-  status: string; // "Pending" | "Approved" | "Rejected" | ...
+  status: string; // "Pending" | "Approved" | "Rejected" | "ManualReview" | "AutoEligible" | "AutoRejected"
   registeredAt: string;
+  screeningReason?: string | null;
+  rejectionReason?: string | null;
 }
 
 /**
