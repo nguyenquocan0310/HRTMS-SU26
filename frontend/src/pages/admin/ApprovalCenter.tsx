@@ -279,6 +279,7 @@ const ApprovalCenter = () => {
       {error && <div className={styles.errorBox}>{error}</div>}
 
       {/* ═══ NỘI DUNG THEO NHÓM ════════════════════════════════ */}
+      <div className={styles.lightTable}>
       {activeGroup === 'roster' ? (
         <RosterApprovalTable />
       ) : loading ? (
@@ -295,6 +296,8 @@ const ApprovalCenter = () => {
           }
         />
       )}
+      </div>
+
 
       {/* ═══ DETAIL PANEL ══════════════════════════════════════ */}
       {selectedItem && (

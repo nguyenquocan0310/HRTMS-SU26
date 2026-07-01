@@ -180,3 +180,39 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ─── Light table override ─── */
+.lightTable {
+  :global(.tableWrap),
+  [class*="tableWrap"] {
+    background: #fff;
+    border-color: #e5e7eb;
+    border-radius: 12px;
+  }
+
+  :global(thead) {
+    background: #f9fafb !important;
+  }
+
+  :global(th) {
+    color: #6b7280 !important;
+    border-bottom-color: #e5e7eb !important;
+    background: #f9fafb !important;
+  }
+
+  :global(tr) {
+    border-bottom-color: #f0f0f0 !important;
+  }
+
+  :global(tr:hover) {
+    background: #f9fafb !important;
+  }
+
+  :global(td) {
+    color: #333 !important;
+  }
+
+  :global(.emptyCell) {
+    color: #aaa !important;
+  }
+}
