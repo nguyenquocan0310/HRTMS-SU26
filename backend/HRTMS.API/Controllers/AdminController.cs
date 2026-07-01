@@ -47,6 +47,9 @@ public class AdminController : ControllerBase
         if (user == null)
             return NotFound(new { message = "User not found." });
 
+        if (id == CurrentAdminId)
+            return BadRequest(new { message = "Admin không thể tự suspend tài khoản của mình." });
+
         if (user.Status == "Suspended")
             return BadRequest(new { message = "User is already suspended." });
 
@@ -454,6 +457,7 @@ public class AdminController : ControllerBase
                 a.OldValue,
                 a.NewValue,
                 a.IpAddress,
+                a.UserAgent,
                 a.CreatedAt
             })
             .ToListAsync();
