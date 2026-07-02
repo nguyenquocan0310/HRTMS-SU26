@@ -11,7 +11,7 @@ namespace HRTMS.API.Controllers;
 [Tags("referee")]
 [ApiController]
 [Route("api/family-declarations")]
-[Authorize(Roles = "Jockey,Referee,Doctor")] // Owner và Spectator không khai báo FRD
+[Authorize(Roles = "Owner,Jockey,Referee,Doctor")] // 4 role bắt buộc khai báo FRD, trừ Admin và Spectator
 public class FamilyDeclarationController : ControllerBase
 {
     private readonly IFamilyDeclarationService _service;

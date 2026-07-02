@@ -22,6 +22,7 @@ public class AuthService : IAuthService
     private readonly JwtService _jwtService;
     private readonly IAuditLogService _auditLog;
     private readonly IFamilyDeclarationValidator _frdValidator;
+    private readonly IIdentityResolveService _identityResolveService;
     private readonly ITokenBlacklistService _tokenBlacklistService;
     private readonly IEmailService _emailService;
     private readonly INotificationService _notificationService;
@@ -37,7 +38,9 @@ public class AuthService : IAuthService
     private static readonly string[] ProfessionalRoles =
         ["Owner", "Jockey", "Referee", "Doctor"];
 
-    private static readonly string[] RolesRequireFrdAtRegister = ["Jockey", "Referee"];
+    // 4 role bắt buộc khai báo người thân (FRD) — trừ Admin và Spectator.
+    private static readonly string[] RolesRequireFrdAtRegister =
+        ["Owner", "Jockey", "Referee", "Doctor"];
 
     private const int MaxFailedAttempts = 5;
     private const int LockoutMinutes = 30;
@@ -49,6 +52,7 @@ public class AuthService : IAuthService
         JwtService jwtService,
         IAuditLogService auditLog,
         IFamilyDeclarationValidator frdValidator,
+        IIdentityResolveService identityResolveService,
         ITokenBlacklistService tokenBlacklistService,
         IEmailService emailService,
         INotificationService notificationService,
@@ -58,6 +62,7 @@ public class AuthService : IAuthService
         _jwtService = jwtService;
         _auditLog = auditLog;
         _frdValidator = frdValidator;
+        _identityResolveService = identityResolveService;
         _tokenBlacklistService = tokenBlacklistService;
         _emailService = emailService;
         _notificationService = notificationService;
@@ -205,17 +210,24 @@ public class AuthService : IAuthService
                 && dto.FamilyDeclarations != null
                 && dto.FamilyDeclarations.Count > 0)
             {
-                _context.FamilyRelationshipDeclarations.AddRange(
-                    dto.FamilyDeclarations.Select(f => new FamilyRelationshipDeclaration
+                // CCCD-only resolve cho tung khai bao - dong bo voi FamilyDeclarationService.
+                foreach (var f in dto.FamilyDeclarations)
+                {
+                    var resolveResult = await _identityResolveService.ResolveAsync(f.RelatedIdentityNumber);
+
+                    _context.FamilyRelationshipDeclarations.Add(new FamilyRelationshipDeclaration
                     {
                         DeclarantUserId = user.UserId,
                         RelatedPersonName = f.RelatedPersonName.Trim(),
-                        RelatedUserId = f.RelatedUserId,
+                        RelatedUserId = resolveResult.RelatedUserId,
                         RelationType = f.RelationType,
                         IndustryRole = f.IndustryRole,
+                        RelatedIdentityHash = resolveResult.RelatedIdentityHash,
+                        MatchConfidence = resolveResult.MatchConfidence,
                         Notes = f.Notes,
                         DeclaredAt = now
-                    }));
+                    });
+                }
                 await _context.SaveChangesAsync();
             }
 
