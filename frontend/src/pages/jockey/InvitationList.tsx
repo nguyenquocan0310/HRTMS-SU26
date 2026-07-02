@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { RaceInvitation } from '../../types/jockey.types';
 import InvitationCard from '../../components/jockey/InvitationCard';
 import { getMyInvitations, acceptPairing, declinePairing } from '../../services/jockeyService';
@@ -127,13 +127,12 @@ export default function InvitationList() {
   const declinedCount  = invitations.filter((inv) => inv.status === 'Declined' || inv.status === 'Cancelled').length;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-6xl mx-auto">
+    <div className="space-y-6">
 
         {/* Tiêu đề */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Lời mời tham gia</h1>
-          <p className="text-gray-600">Quản lý các lời mời tham gia cuộc đua từ các chủ ngựa</p>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Lời mời tham gia</h1>
+          <p className="text-sm text-gray-500 mt-1">Quản lý các lời mời tham gia cuộc đua từ các chủ ngựa.</p>
         </div>
 
         {/* Feedback banner */}
@@ -149,7 +148,7 @@ export default function InvitationList() {
         )}
 
         {/* Tab lọc */}
-        <div className="mb-8 flex gap-4 border-b border-gray-200">
+        <div className="flex flex-wrap gap-2 border-b border-gray-200">
           {([
             { key: 'all',      label: `Tất cả (${invitations.length})` },
             { key: 'pending',  label: `Chờ phản hồi (${pendingCount})` },
@@ -159,7 +158,7 @@ export default function InvitationList() {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`px-4 py-3 font-medium border-b-2 transition-colors ${
+              className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === tab.key
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-600 hover:text-gray-800'
@@ -172,16 +171,16 @@ export default function InvitationList() {
 
         {/* Content */}
         {loading ? (
-          <div className="text-center py-12">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-sm text-center py-10">
             <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-4" />
-            <p className="text-gray-600 text-lg">Đang tải danh sách lời mời...</p>
+            <p className="text-gray-500 text-sm">Đang tải danh sách lời mời...</p>
           </div>
         ) : filteredInvitations.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-600 text-lg">Không có lời mời nào trong mục này.</p>
+          <div className="bg-white border border-gray-200 rounded-lg shadow-sm text-center py-10">
+            <p className="text-gray-500 text-sm">Không có lời mời nào trong mục này.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filteredInvitations.map((invitation) => (
               <InvitationCard
                 key={invitation.invitationID}
@@ -193,12 +192,10 @@ export default function InvitationList() {
             ))}
           </div>
         )}
-      </div>
-
       {/* Decline reason modal */}
       {declineTarget && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-md">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl border border-gray-200 w-full max-w-md">
             <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
               <h3 className="text-base font-bold text-gray-900">Từ chối lời mời</h3>
               <button
@@ -223,7 +220,7 @@ export default function InvitationList() {
                 />
               </div>
             </div>
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3 rounded-b-xl">
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3 rounded-b-lg">
               <button
                 onClick={() => setDeclineTarget(null)}
                 className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-white transition-colors"
@@ -243,3 +240,5 @@ export default function InvitationList() {
     </div>
   );
 }
+
+

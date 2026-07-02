@@ -2,7 +2,6 @@ import axios from 'axios';
 import type  { AxiosInstance } from 'axios';
 import type {
   JockeyProfile,
-  RaceInvitation,
   JockeyRaceEntry,
   JockeyRaceResult,
 } from '../types/jockey.types';
@@ -199,4 +198,5 @@ export const getMyJockeyRaceEntries = async (
     `/jockeys/race-entries/my?page=${page}&pageSize=${pageSize}`
   );
 };
+
 
