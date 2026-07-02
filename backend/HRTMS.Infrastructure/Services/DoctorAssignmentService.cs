@@ -92,8 +92,8 @@ public class DoctorAssignmentService : IDoctorAssignmentService
             throw new InvalidOperationException("DOCTOR_DOUBLE_BOOKED");
         }
 
-        // Lay danh sach Owner co ngua trong Race
-        var ownerIdsInRace = await (
+        // Lay danh sach Owner/Jockey co trong Race
+        var participantUserIdsInRace = await (
             from raceEntry in _context.RaceEntries
             join pairing in _context.Pairings
                 on raceEntry.PairingId equals pairing.PairingId
@@ -101,21 +101,30 @@ public class DoctorAssignmentService : IDoctorAssignmentService
                 on pairing.HorseId equals horse.HorseId
             where raceEntry.RaceId == raceId
                   && raceEntry.Status != "Cancelled"
-            select horse.OwnerId
+            select new
+            {
+                OwnerId = horse.OwnerId,
+                JockeyId = pairing.JockeyId
+            }
         )
-        .Distinct()
         .ToListAsync();
+
+        var relatedUserIdsInRace = participantUserIdsInRace
+            .SelectMany(x => new[] { x.OwnerId, x.JockeyId })
+            .Distinct()
+            .ToList();
 
         var directFamilyRelations = new[]
         {
-            "Spouse",
-            "Parent",
-            "Child"
-        };
+    "Spouse",
+    "Parent",
+    "Child",
+    "Sibling"
+};
 
         // Kiem tra COI 2 chieu:
-        // 1. Doctor khai bao Owner la nguoi than
-        // 2. Owner khai bao Doctor la nguoi than
+        // 1. Doctor khai bao Owner/Jockey la nguoi than
+        // 2. Owner/Jockey khai bao Doctor la nguoi than
         var hasConflictOfInterest = await _context.FamilyRelationshipDeclarations
             .AnyAsync(f =>
                 f.RelatedUserId.HasValue &&
@@ -123,11 +132,11 @@ public class DoctorAssignmentService : IDoctorAssignmentService
                 (
                     (
                         f.DeclarantUserId == dto.DoctorId &&
-                        ownerIdsInRace.Contains(f.RelatedUserId.Value)
+                        relatedUserIdsInRace.Contains(f.RelatedUserId.Value)
                     )
                     ||
                     (
-                        ownerIdsInRace.Contains(f.DeclarantUserId) &&
+                        relatedUserIdsInRace.Contains(f.DeclarantUserId) &&
                         f.RelatedUserId.Value == dto.DoctorId
                     )
                 ));
