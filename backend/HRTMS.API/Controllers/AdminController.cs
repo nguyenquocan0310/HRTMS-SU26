@@ -1,4 +1,5 @@
 ﻿using HRTMS.Core.Common;
+using HRTMS.Core.DTOs.Auth;
 using HRTMS.Core.DTOs.Horse;
 using HRTMS.Core.Interfaces.Services;
 using HRTMS.Infrastructure.Data;
@@ -8,7 +9,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
 using System.Security.Claims;
-using HRTMS.Core.DTOs.Auth;
 
 namespace HRTMS.API.Controllers;
 
@@ -23,19 +23,22 @@ public class AdminController : ControllerBase
     private readonly ITokenBlacklistService _tokenBlacklistService;
     private readonly IHorseService _horseService;
     private readonly IAuthService _authService;
+    private readonly INotificationService _notificationService;
 
     public AdminController(
         HRTMSDbContext context,
         IAuditLogService auditLogService,
         ITokenBlacklistService tokenBlacklistService,
         IHorseService horseService,
-        IAuthService authService)
+        IAuthService authService,
+        INotificationService notificationService)
     {
         _context = context;
         _auditLogService = auditLogService;
         _tokenBlacklistService = tokenBlacklistService;
         _horseService = horseService;
         _authService = authService;
+        _notificationService = notificationService;
     }
 
     private int CurrentAdminId =>
@@ -44,6 +47,7 @@ public class AdminController : ControllerBase
     private string? ClientIp =>
         HttpContext.Connection.RemoteIpAddress?.ToString();
 
+    // REQ-F-ACC.2 — Admin tạo tài khoản cho bất kỳ role nào, kể cả Admin.
     [HttpPost("users")]
     public async Task<IActionResult> CreateUser([FromBody] AdminCreateUserDto dto)
     {
@@ -159,7 +163,64 @@ public class AdminController : ControllerBase
             newValue: $"RefereeProfile.Status={profile.Status}, User.Status={user.Status}",
             ipAddress: ClientIp);
 
+        await _notificationService.SendAsync(
+            user.UserId,
+            "Hồ sơ Trọng tài đã được duyệt",
+            "Hồ sơ đăng ký Trọng tài của bạn đã được Admin phê duyệt. Tài khoản đã được kích hoạt.",
+            type: "Both",
+            relatedEntityType: "RefereeProfile",
+            relatedEntityId: profile.RefereeId);
+
         return Ok(new { message = "Referee approved and activated successfully." });
+    }
+
+    // REQ-F-ACC.7 #4 — Admin reject onboarding chuyên môn: profile -> Rejected, lưu lý do, notify user.
+    [HttpPatch("referees/{id}/reject")]
+    public async Task<IActionResult> RejectReferee(int id, [FromBody] AdminRejectHorseDto dto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        var profile = await _context.RefereeProfiles.FindAsync(id);
+        if (profile == null)
+            return NotFound(new { message = "Referee profile not found." });
+
+        var user = await _context.Users.FindAsync(profile.RefereeId);
+        if (user == null)
+            return NotFound(new { message = "User not found." });
+
+        if (profile.Status == "Active" && user.Status == "Active")
+            return BadRequest(new { message = "Referee đã Active, không thể reject. Hãy dùng Suspend nếu cần vô hiệu hóa." });
+
+        var oldProfileStatus = profile.Status;
+        var oldUserStatus = user.Status;
+
+        profile.Status = "Rejected";
+        profile.RejectionReason = dto.Reason;
+        profile.UpdatedAt = DateTime.UtcNow;
+
+        user.Status = "Rejected";
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        await _auditLogService.LogAsync(
+            actorId: CurrentAdminId,
+            action: "Reject_Referee",
+            entityName: "RefereeProfile",
+            entityId: profile.RefereeId.ToString(),
+            oldValue: $"RefereeProfile.Status={oldProfileStatus}, User.Status={oldUserStatus}",
+            newValue: $"RefereeProfile.Status={profile.Status}, User.Status={user.Status}; Reason={dto.Reason}",
+            ipAddress: ClientIp);
+
+        await _notificationService.SendAsync(
+            user.UserId,
+            "Hồ sơ Trọng tài bị từ chối",
+            $"Hồ sơ đăng ký Trọng tài của bạn bị từ chối. Lý do: {dto.Reason}",
+            type: "Both",
+            relatedEntityType: "RefereeProfile",
+            relatedEntityId: profile.RefereeId);
+
+        return Ok(new { message = "Referee onboarding rejected." });
     }
 
     [HttpPatch("doctors/{id}/approve")]
@@ -197,7 +258,64 @@ public class AdminController : ControllerBase
             newValue: $"DoctorProfile.Status={profile.Status}, User.Status={user.Status}",
             ipAddress: ClientIp);
 
+        await _notificationService.SendAsync(
+            user.UserId,
+            "Hồ sơ Bác sĩ đã được duyệt",
+            "Hồ sơ đăng ký Bác sĩ của bạn đã được Admin phê duyệt. Tài khoản đã được kích hoạt.",
+            type: "Both",
+            relatedEntityType: "DoctorProfile",
+            relatedEntityId: profile.DoctorId);
+
         return Ok(new { message = "Doctor approved and activated successfully." });
+    }
+
+    // REQ-F-ACC.7 #4 — Admin reject onboarding chuyên môn: profile -> Rejected, lưu lý do, notify user.
+    [HttpPatch("doctors/{id}/reject")]
+    public async Task<IActionResult> RejectDoctor(int id, [FromBody] AdminRejectHorseDto dto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        var profile = await _context.DoctorProfiles.FindAsync(id);
+        if (profile == null)
+            return NotFound(new { message = "Doctor profile not found." });
+
+        var user = await _context.Users.FindAsync(profile.DoctorId);
+        if (user == null)
+            return NotFound(new { message = "User not found." });
+
+        if (profile.Status == "Active" && user.Status == "Active")
+            return BadRequest(new { message = "Doctor đã Active, không thể reject. Hãy dùng Suspend nếu cần vô hiệu hóa." });
+
+        var oldProfileStatus = profile.Status;
+        var oldUserStatus = user.Status;
+
+        profile.Status = "Rejected";
+        profile.RejectionReason = dto.Reason;
+        profile.UpdatedAt = DateTime.UtcNow;
+
+        user.Status = "Rejected";
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        await _auditLogService.LogAsync(
+            actorId: CurrentAdminId,
+            action: "Reject_Doctor",
+            entityName: "DoctorProfile",
+            entityId: profile.DoctorId.ToString(),
+            oldValue: $"DoctorProfile.Status={oldProfileStatus}, User.Status={oldUserStatus}",
+            newValue: $"DoctorProfile.Status={profile.Status}, User.Status={user.Status}; Reason={dto.Reason}",
+            ipAddress: ClientIp);
+
+        await _notificationService.SendAsync(
+            user.UserId,
+            "Hồ sơ Bác sĩ bị từ chối",
+            $"Hồ sơ đăng ký Bác sĩ của bạn bị từ chối. Lý do: {dto.Reason}",
+            type: "Both",
+            relatedEntityType: "DoctorProfile",
+            relatedEntityId: profile.DoctorId);
+
+        return Ok(new { message = "Doctor onboarding rejected." });
     }
     [HttpGet("users")]
     public async Task<IActionResult> GetUsers(
@@ -264,7 +382,64 @@ public class AdminController : ControllerBase
             newValue: $"JockeyProfile.Status={profile.Status}, User.Status={user.Status}",
             ipAddress: ClientIp);
 
+        await _notificationService.SendAsync(
+            user.UserId,
+            "Hồ sơ Nài ngựa đã được duyệt",
+            "Hồ sơ đăng ký Nài ngựa của bạn đã được Admin phê duyệt. Tài khoản đã được kích hoạt.",
+            type: "Both",
+            relatedEntityType: "JockeyProfile",
+            relatedEntityId: profile.JockeyId);
+
         return Ok(new { message = "Jockey approved and activated successfully." });
+    }
+
+    // REQ-F-ACC.7 #4 — Admin reject onboarding chuyên môn: profile -> Rejected, lưu lý do, notify user.
+    [HttpPatch("jockeys/{id}/reject")]
+    public async Task<IActionResult> RejectJockey(int id, [FromBody] AdminRejectHorseDto dto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        var profile = await _context.JockeyProfiles.FindAsync(id);
+        if (profile == null)
+            return NotFound(new { message = "Jockey profile not found." });
+
+        var user = await _context.Users.FindAsync(profile.JockeyId);
+        if (user == null)
+            return NotFound(new { message = "User not found." });
+
+        if (profile.Status == "Active" && user.Status == "Active")
+            return BadRequest(new { message = "Jockey đã Active, không thể reject. Hãy dùng Suspend nếu cần vô hiệu hóa." });
+
+        var oldProfileStatus = profile.Status;
+        var oldUserStatus = user.Status;
+
+        profile.Status = "Rejected";
+        profile.RejectionReason = dto.Reason;
+        profile.UpdatedAt = DateTime.UtcNow;
+
+        user.Status = "Rejected";
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        await _auditLogService.LogAsync(
+            actorId: CurrentAdminId,
+            action: "Reject_Jockey",
+            entityName: "JockeyProfile",
+            entityId: profile.JockeyId.ToString(),
+            oldValue: $"JockeyProfile.Status={oldProfileStatus}, User.Status={oldUserStatus}",
+            newValue: $"JockeyProfile.Status={profile.Status}, User.Status={user.Status}; Reason={dto.Reason}",
+            ipAddress: ClientIp);
+
+        await _notificationService.SendAsync(
+            user.UserId,
+            "Hồ sơ Nài ngựa bị từ chối",
+            $"Hồ sơ đăng ký Nài ngựa của bạn bị từ chối. Lý do: {dto.Reason}",
+            type: "Both",
+            relatedEntityType: "JockeyProfile",
+            relatedEntityId: profile.JockeyId);
+
+        return Ok(new { message = "Jockey onboarding rejected." });
     }
 
 
