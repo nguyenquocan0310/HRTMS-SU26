@@ -32,25 +32,32 @@ const mockHorses: Horse[] = [
 
 const getGenderLabel = (gender: Horse['gender']): string => {
   switch (gender) {
-    case 'Male':
-    case 'male':
-      return 'Đực (Male)';
-    case 'Female':
-    case 'female':
-      return 'Cái (Female)';
-    case 'Gelding':
-    case 'gelding':
-      return 'Bị thiến (Gelding)';
-    case 'Stallion':
-      return 'Ngựa đực (trưởng thành)';
-    case 'Colt':
-      return 'Ngựa đực (non)';
-    case 'Mare':
-      return 'Ngựa cái (trưởng thành)';
-    case 'Filly':
-      return 'Ngựa cái (non)';
-    default:
-      return gender;
+    case 'Male': case 'male':       return 'Đực (Male)';
+    case 'Female': case 'female':   return 'Cái (Female)';
+    case 'Gelding': case 'gelding': return 'Bị thiến (Gelding)';
+    case 'Stallion': return 'Ngựa đực (trưởng thành)';
+    case 'Colt':     return 'Ngựa đực (non)';
+    case 'Mare':     return 'Ngựa cái (trưởng thành)';
+    case 'Filly':    return 'Ngựa cái (non)';
+    default:         return gender;
+  }
+};
+
+const getDopingLabel = (result: Horse['dopingTestResult']): string => {
+  switch (result) {
+    case 'Clean':   return 'Âm tính';
+    case 'Pending': return 'Chờ duyệt';
+    case 'Failed':  return 'Dương tính';
+    default:        return result || 'Chưa kiểm tra';
+  }
+};
+
+const getDopingColor = (result: Horse['dopingTestResult']): string => {
+  switch (result) {
+    case 'Clean':   return 'text-green-600';
+    case 'Pending': return 'text-yellow-600';
+    case 'Failed':  return 'text-red-600';
+    default:        return 'text-gray-600';
   }
 };
 
@@ -71,7 +78,6 @@ export default function HorseDetail() {
           const data = await getHorseById(horseIdNum);
           setHorse(data);
         } else {
-          // If ID is a string (e.g. H001 in mock), use fallback
           const mock = mockHorses.find((h) => h.horseID === id);
           if (mock) {
             setHorse(mock);
@@ -96,10 +102,10 @@ export default function HorseDetail() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+      <div className="flex items-center justify-center py-20">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4 animate-duration-500"></div>
-          <p className="text-gray-600 text-lg">Đang tải chi tiết ngựa...</p>
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-3" />
+          <p className="text-sm text-gray-500">Đang tải chi tiết ngựa...</p>
         </div>
       </div>
     );
@@ -107,189 +113,106 @@ export default function HorseDetail() {
 
   if (error || !horse) {
     return (
-      <div className="min-h-screen bg-gray-50 py-12 px-4 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">
-            {error || 'Không tìm thấy ngựa'}
-          </h2>
-          <button
-            onClick={() => navigate('/owner/horses')}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition-colors"
-          >
-            Quay lại danh sách
-          </button>
-        </div>
+      <div className="text-center py-16">
+        <p className="text-sm font-semibold text-gray-700 mb-3">
+          {error || 'Không tìm thấy ngựa'}
+        </p>
+        <button
+          onClick={() => navigate('/owner/horses')}
+          className="px-4 py-2 text-sm font-semibold text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+        >
+          Quay lại danh sách
+        </button>
       </div>
     );
   }
 
   const age = new Date().getFullYear() - horse.birthYear;
 
-  const getDopingTextColor = (result: Horse['dopingTestResult']): string => {
-    switch (result) {
-      case 'Clean':
-        return 'text-green-600';
-      case 'Pending':
-        return 'text-yellow-600';
-      case 'Failed':
-        return 'text-red-600';
-      default:
-        return 'text-gray-600';
-    }
-  };
-
-  const getDopingLabel = (result: Horse['dopingTestResult']): string => {
-    switch (result) {
-      case 'Clean':
-        return 'Âm tính';
-      case 'Pending':
-        return 'Chờ duyệt';
-      case 'Failed':
-        return 'Dương tính';
-      default:
-        return result || 'Chưa kiểm tra';
-    }
-  };
+  const fields: { label: string; value: React.ReactNode }[] = [
+    { label: 'Giống ngựa',      value: horse.breed },
+    { label: 'Giới tính',       value: getGenderLabel(horse.gender) },
+    { label: 'Tuổi',            value: `${age} tuổi` },
+    { label: 'Năm sinh',        value: horse.birthYear },
+    { label: 'Màu sắc',         value: horse.color },
+    {
+      label: 'Kiểm tra doping',
+      value: (
+        <span className={`font-semibold ${getDopingColor(horse.dopingTestResult)}`}>
+          {getDopingLabel(horse.dopingTestResult)}
+        </span>
+      ),
+    },
+    ...(horse.vaccinationRecordRef
+      ? [{ label: 'Hồ sơ tiêm chủng', value: horse.vaccinationRecordRef }]
+      : []),
+    ...(horse.dopingTestDate
+      ? [{ label: 'Ngày xét nghiệm', value: new Date(horse.dopingTestDate).toLocaleDateString('vi-VN') }]
+      : []),
+    { label: 'Ngày đăng ký', value: horse.createdAt ? new Date(horse.createdAt).toLocaleDateString('vi-VN') : 'N/A' },
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Nút quay lại */}
+    <div className="max-w-3xl">
+      {/* Back link */}
+      <button
+        onClick={() => navigate('/owner/horses')}
+        className="text-sm text-blue-600 hover:text-blue-700 font-medium mb-4 flex items-center gap-1"
+      >
+        ← Quay lại danh sách
+      </button>
+
+      {/* Page header */}
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">{horse.name}</h1>
+          {horse.identifyingMarks && (
+            <p className="text-xs text-gray-500 mt-0.5">{horse.identifyingMarks}</p>
+          )}
+        </div>
+        <HorseStatusBadge status={(horse.status as 'Approved' | 'Pending' | 'Rejected') || 'Pending'} />
+      </div>
+
+      {/* Rejection reason */}
+      {horse.status === 'Rejected' && horse.rejectionReason && (
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+          <p className="text-xs font-semibold text-red-700 mb-0.5">Lý do từ chối</p>
+          <p className="text-sm text-red-700">{horse.rejectionReason}</p>
+        </div>
+      )}
+
+      {/* Detail panel */}
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden mb-4">
+        <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Thông tin chi tiết</p>
+        </div>
+        <div className="divide-y divide-gray-100">
+          {fields.map((f) => (
+            <div key={f.label} className="flex items-center px-5 py-3 text-sm">
+              <span className="w-44 text-gray-500 flex-shrink-0">{f.label}</span>
+              <span className="text-gray-800 font-medium">{f.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-3 justify-end">
         <button
           onClick={() => navigate('/owner/horses')}
-          className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium mb-6 transition-colors"
+          className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
         >
-          ← Quay lại
+          Quay lại
         </button>
-
-        {/* Khung thông tin chi tiết */}
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-8">
-          {/* Tiêu đề */}
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-gray-800 mb-4">
-              {horse.name}
-            </h1>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-600 font-medium">Trạng thái:</span>
-              <HorseStatusBadge status={(horse.status as 'Approved' | 'Pending' | 'Rejected') || 'Pending'} />
-            </div>
-          </div>
-
-          {/* Thông báo lý do từ chối */}
-          {horse.status === 'Rejected' && horse.rejectionReason && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-              <h3 className="text-red-800 font-semibold mb-2">Lý do từ chối</h3>
-              <p className="text-red-700">{horse.rejectionReason}</p>
-            </div>
-          )}
-
-          {/* Bảng thông tin ngựa */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            {/* Mã giống */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-sm text-gray-600 font-medium mb-1">Giống ngựa</p>
-              <p className="text-lg font-semibold text-gray-800">
-                {horse.breed}
-              </p>
-            </div>
-
-            {/* Giới tính */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-sm text-gray-600 font-medium mb-1">Giới tính</p>
-              <p className="text-lg font-semibold text-gray-800">
-                {getGenderLabel(horse.gender)}
-              </p>
-            </div>
-
-            {/* Tuổi */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-sm text-gray-600 font-medium mb-1">Tuổi</p>
-              <p className="text-lg font-semibold text-gray-800">{age} tuổi</p>
-            </div>
-
-            {/* Năm sinh */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-sm text-gray-600 font-medium mb-1">Năm sinh</p>
-              <p className="text-lg font-semibold text-gray-800">
-                {horse.birthYear}
-              </p>
-            </div>
-
-            {/* Màu sắc */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-sm text-gray-600 font-medium mb-1">Màu sắc</p>
-              <p className="text-lg font-semibold text-gray-800">
-                {horse.color}
-              </p>
-            </div>
-
-            {/* Kết quả kiểm tra doping */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-sm text-gray-600 font-medium mb-1">
-                Kiểm tra doping
-              </p>
-              <p
-                className={`text-lg font-semibold ${getDopingTextColor(
-                  horse.dopingTestResult
-                )}`}
-              >
-                {getDopingLabel(horse.dopingTestResult)}
-              </p>
-            </div>
-
-            {/* Hồ sơ tiêm chủng */}
-            {horse.vaccinationRecordRef && (
-              <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-sm text-gray-600 font-medium mb-1">
-                  Hồ sơ tiêm chủng
-                </p>
-                <p className="text-lg font-semibold text-gray-800">
-                  {horse.vaccinationRecordRef}
-                </p>
-              </div>
-            )}
-
-            {/* Ngày xét nghiệm */}
-            {horse.dopingTestDate && (
-              <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-sm text-gray-600 font-medium mb-1">
-                  Ngày xét nghiệm
-                </p>
-                <p className="text-lg font-semibold text-gray-800">
-                  {new Date(horse.dopingTestDate).toLocaleDateString('vi-VN')}
-                </p>
-              </div>
-            )}
-
-            {/* Ngày đăng ký */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-sm text-gray-600 font-medium mb-1">
-                Ngày đăng ký
-              </p>
-              <p className="text-lg font-semibold text-gray-800">
-                {horse.createdAt ? new Date(horse.createdAt).toLocaleDateString('vi-VN') : 'N/A'}
-              </p>
-            </div>
-          </div>
-
-          {/* Nút hành động */}
-          <div className="flex gap-4 justify-end">
-            <button
-              onClick={() => navigate('/owner/horses')}
-              className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Quay lại
-            </button>
-            <button
-              onClick={() => navigate(`/owner/horses/edit/${horse.horseID || (horse as any).horseId || id || ''}`)}
-              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
-            >
-              Cập nhật thông tin
-            </button>
-          </div>
-        </div>
+        <button
+          onClick={() =>
+            navigate(`/owner/horses/edit/${horse.horseID || (horse as any).horseId || id || ''}`)
+          }
+          className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+        >
+          Cập nhật thông tin
+        </button>
       </div>
     </div>
   );
 }
-

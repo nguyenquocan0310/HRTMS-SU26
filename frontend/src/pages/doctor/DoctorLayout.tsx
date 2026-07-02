@@ -43,6 +43,20 @@ export default function DoctorLayout() {
           </NavLink>
 
           <NavLink
+            to="/doctor/tournaments"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                isActive
+                  ? 'bg-emerald-100 text-emerald-700 font-semibold shadow-sm shadow-emerald-100/50'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-950'
+              }`
+            }
+          >
+            <span className="text-lg">🏆</span>
+            <span>Đăng ký giải đấu</span>
+          </NavLink>
+
+          <NavLink
             to="/doctor/paddock"
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
@@ -78,3 +92,6 @@ export default function DoctorLayout() {
     </div>
   )
 }
+
+
+

@@ -1,6 +1,7 @@
 import axios from 'axios';
 import type { AxiosInstance } from 'axios';
 import type { Horse, RaceEntry, JockeyInvitation } from '../types/owner.types';
+import { apiFetch } from './apiClient';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -78,15 +79,24 @@ export const updateHorse = async (
 /**
  * Get all race entries for the current user's horses
  */
-export const getMyRaceEntries = async (): Promise<RaceEntry[]> => {
-  try {
-    const response = await axiosInstance.get<RaceEntry[]>('/api/race-entries/my');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching my race entries:', error);
-    throw error;
-  }
+export const getMyRaceEntries = async (
+  status?: string,
+  entryFeeStatus?: string,
+  page: number = 1,
+  pageSize: number = 20
+): Promise<RaceEntry[]> => {
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (entryFeeStatus) params.set('entryFeeStatus', entryFeeStatus);
+  params.set('page', String(page));
+  params.set('pageSize', String(pageSize));
+
+  interface ApiResponse<T> { success: boolean; message: string; data: T | null }
+  const res = await apiFetch<ApiResponse<RaceEntry[]>>(`/race-entries/my?${params.toString()}`);
+  if (!res.success || !res.data) throw new Error(res.message || 'Không tải được danh sách đăng ký.');
+  return res.data;
 };
+
 
 /**
  * Get all jockey invitations for the current user
@@ -156,22 +166,26 @@ export const getOwnerPairings = async (
   }
 };
 
-/**
- * Send an invitation to a jockey
- */
-export const inviteJockey = async (payload: {
-  horseId: string;
-  jockeyId: string;
+export interface InviteJockeyPayload {
+  tournamentId?: number;
+  horseId: number;
+  jockeyId: number;
   requestMessage: string;
-}): Promise<any> => {
-  try {
-    const response = await axiosInstance.post<any>('http://localhost:5222/api/pairings', payload);
-    return response.data;
-  } catch (error) {
-    console.error('Error sending invitation:', error);
-    throw error;
-  }
+}
+
+/**
+ * POST /api/pairings
+ * API trả trực tiếp PairingResponseDto (không có ApiResponse wrapper).
+ * apiFetch sẽ throw nếu HTTP status không phải 2xx — không cần check .success.
+ */
+export const inviteJockey = async (payload: InviteJockeyPayload): Promise<any> => {
+  return apiFetch<any>('/pairings', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 };
+
+
 
 /**
  * Accept/Confirm a pairing invitation
@@ -186,5 +200,84 @@ export const acceptPairing = async (pairingId: string): Promise<any> => {
     console.error(`Error accepting pairing ${pairingId}:`, error);
     throw error;
   }
+};
+
+// ─── Horse + Tournament Registration (dùng apiFetch — không hard-code localhost) ───
+
+interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  data: T | null;
+}
+
+export interface HorseCreatePayload {
+  tournamentId: number;
+  name: string;
+  birthYear: number;
+  gender: string;
+  color: string;
+  pedigree?: string;
+  weight: number;
+  identifyingMarks: string;
+  breed: string;
+  vaccinationRecordRef?: string;
+  dopingTestDate?: string;
+  dopingTestResult?: string;
+  legalConsentAccepted: boolean;
+}
+
+export interface HorseCreateResponse {
+  horseId: number;
+  name: string;
+  breed: string;
+  birthYear: number;
+  gender: string;
+  color: string;
+  weight: number;
+  identifyingMarks: string;
+  screeningStatus: 'AutoEligible' | 'ManualReview' | 'AutoRejected' | string;
+  screeningReason: string | null;
+  adminApprovalStatus: string | null;
+}
+
+/**
+ * POST /api/horses
+ * Gửi kèm tournamentId, lấy Owner từ JWT.
+ * Trả về HorseCreateResponse với screeningStatus.
+ */
+export const createHorseWithTournament = (payload: HorseCreatePayload): Promise<HorseCreateResponse> =>
+  apiFetch<ApiResponse<HorseCreateResponse>>('/horses', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }).then((res) => {
+    if (!res.success || !res.data)
+      throw new Error(res.message || 'Đăng ký ngựa thất bại.');
+    return res.data;
+  });
+
+/**
+ * PATCH /api/race-entries/{id}/confirm
+ */
+export const confirmRaceEntry = async (id: number): Promise<any> => {
+  interface ApiResponse<T> { success: boolean; message: string; data: T | null }
+  const res = await apiFetch<ApiResponse<any>>(`/race-entries/${id}/confirm`, {
+    method: 'PATCH',
+  });
+  if (!res.success) throw new Error(res.message || 'Xác nhận tham gia thất bại.');
+  return res.data;
+};
+
+/**
+ * DELETE /api/race-entries/{id}?reason={reason}
+ */
+export const withdrawRaceEntry = async (id: number, reason: string): Promise<any> => {
+  interface ApiResponse<T> { success: boolean; message: string; data: T | null }
+  const params = new URLSearchParams();
+  params.set('reason', reason);
+  const res = await apiFetch<ApiResponse<any>>(`/race-entries/${id}?${params.toString()}`, {
+    method: 'DELETE',
+  });
+  if (!res.success) throw new Error(res.message || 'Rút lui thất bại.');
+  return res.data;
 };
 

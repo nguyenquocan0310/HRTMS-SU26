@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { getMyTournamentParticipations } from '../../services/tournamentService'
 
 interface JockeyWeightItem {
   id: string
@@ -20,7 +21,24 @@ interface HorseCheckItem {
 
 export default function PaddockConsole() {
   const [activeTab, setActiveTab] = useState<'weigh-in' | 'vet-check' | 'weigh-out'>('weigh-in')
-  
+
+  // ── Kiểm tra Doctor đã được duyệt tham gia giải chưa ─────────────────────
+  const [hasApprovedTournament, setHasApprovedTournament] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    getMyTournamentParticipations()
+      .then((list) => {
+        const approved = list.some(
+          (p) => p.status === 'Approved' || p.status === 'AutoEligible'
+        )
+        setHasApprovedTournament(approved)
+      })
+      .catch(() => {
+        // Nếu API lỗi, không hiển thị note — không chặn Paddock
+        setHasApprovedTournament(true)
+      })
+  }, [])
+
   // Trạng thái cho tab Weigh-In
   const [weighInData, setWeighInData] = useState<JockeyWeightItem[]>([
     { id: 'J1', name: 'Nguyễn Văn Hùng', declaredWeight: 54.0, actualWeight: '', isConfirmed: false },
@@ -144,6 +162,16 @@ export default function PaddockConsole() {
         <div className="fixed top-4 right-4 z-50 bg-gray-900 text-white text-xs font-semibold px-4 py-3 rounded-lg shadow-lg border border-gray-800 animate-fade-in flex items-center gap-2">
           <span>🔔</span>
           <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Note nhẹ: Doctor chưa được duyệt tham gia giải */}
+      {hasApprovedTournament === false && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-center gap-3 text-amber-800">
+          <span className="text-base flex-shrink-0">ℹ️</span>
+          <p className="text-xs font-medium flex-1">
+            Lưu ý: Bạn cần được Admin duyệt tham gia giải trước khi nhận phân công Paddock.
+          </p>
         </div>
       )}
 

@@ -2,14 +2,13 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: #0B0B0D;
-  color: #fff;
-  font-family: 'Segoe UI', sans-serif;
+  background: #f8f9fb;
+  color: #111;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
   overflow: hidden;
 }
 
-// ─── Topbar ───────────────────────────────────────────────────────────────
-
+/* ─── Topbar ─── */
 .topbar {
   height: 64px;
   min-height: 64px;
@@ -17,8 +16,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 1.5rem;
-  background: #101013;
-  border-bottom: 1px solid #232328;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
   z-index: 50;
 }
 
@@ -34,25 +33,74 @@
   display: none;
   background: transparent;
   border: none;
-  color: #ccc;
+  color: #555;
   cursor: pointer;
   padding: 0.4rem;
 }
 
+.logoBlock {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.logoIconSmall {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #2563eb;
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.logoTextBlock {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
 .logo {
-  font-size: 1.2rem;
-  font-weight: 900;
-  background: linear-gradient(135deg, #F3C8C3, #B5121B);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  letter-spacing: 2px;
-  white-space: nowrap;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #111;
+}
+
+.logoCaption {
+  font-size: 0.7rem;
+  color: #888;
+}
+
+.workspaceLabel {
+  display: flex;
+  flex-direction: column;
+  padding-left: 1.5rem;
+  border-left: 1px solid #e5e7eb;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+
+.workspaceEyebrow {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: #999;
+}
+
+.workspaceName {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #111;
 }
 
 .searchWrap {
   position: relative;
-  max-width: 380px;
+  max-width: 420px;
   width: 100%;
   display: flex;
   align-items: center;
@@ -61,28 +109,28 @@
 .searchIcon {
   position: absolute;
   left: 12px;
-  color: #666;
+  color: #999;
   pointer-events: none;
 }
 
 .searchInput {
   width: 100%;
-  background: #1a1a1f;
-  border: 1px solid #2a2a30;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
   padding: 0.5rem 0.75rem 0.5rem 2.2rem;
-  color: #fff;
+  color: #111;
   font-size: 0.85rem;
   outline: none;
   transition: border-color 0.2s;
 
   &::placeholder {
-    color: #555;
+    color: #999;
   }
 
   &:focus {
-    border-color: #B5121B;
-    box-shadow: 0 0 0 3px rgba(181, 18, 27, 0.15);
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
   }
 }
 
@@ -97,7 +145,7 @@
   position: relative;
   background: transparent;
   border: none;
-  color: #aaa;
+  color: #666;
   cursor: pointer;
   padding: 0.5rem;
   border-radius: 8px;
@@ -107,8 +155,8 @@
   transition: all 0.2s;
 
   &:hover {
-    background: #1d1d23;
-    color: #F3C8C3;
+    background: #f3f4f6;
+    color: #111;
   }
 }
 
@@ -116,7 +164,7 @@
   position: absolute;
   top: 2px;
   right: 2px;
-  background: #B5121B;
+  background: #dc2626;
   color: #fff;
   font-size: 0.6rem;
   font-weight: 700;
@@ -146,7 +194,7 @@
   transition: background 0.2s;
 
   &:hover {
-    background: #1d1d23;
+    background: #f3f4f6;
   }
 }
 
@@ -154,12 +202,12 @@
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #B5121B, #8b0d13);
+  background: #2563eb;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: #fff;
   flex-shrink: 0;
 }
@@ -173,7 +221,7 @@
 .accountName {
   font-size: 0.82rem;
   font-weight: 600;
-  color: #fff;
+  color: #111;
 }
 
 .accountRole {
@@ -181,16 +229,33 @@
   color: #888;
 }
 
+.logoutBtn {
+  background: transparent;
+  border: none;
+  color: #dc2626;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+
+  &:hover {
+    background: #fee2e2;
+  }
+}
+
 .accountMenu {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  background: #18181d;
-  border: 1px solid #2a2a30;
+  background: #fff;
+  border: 1px solid #e5e7eb;
   border-radius: 10px;
   min-width: 170px;
   padding: 0.4rem;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
   z-index: 100;
 }
 
@@ -201,7 +266,7 @@
   width: 100%;
   background: transparent;
   border: none;
-  color: #ccc;
+  color: #333;
   font-size: 0.82rem;
   padding: 0.55rem 0.7rem;
   border-radius: 6px;
@@ -210,13 +275,12 @@
   transition: all 0.2s;
 
   &:hover {
-    background: rgba(181, 18, 27, 0.15);
-    color: #F3C8C3;
+    background: #f3f4f6;
+    color: #111;
   }
 }
 
-// ─── Body ─────────────────────────────────────────────────────────────────
-
+/* ─── Body ─── */
 .body {
   flex: 1;
   display: flex;
@@ -236,9 +300,9 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: #1d1d23;
-  border: 1px solid #2a2a30;
-  color: #aaa;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  color: #666;
   font-size: 0.85rem;
   display: flex;
   align-items: center;
@@ -246,10 +310,12 @@
   cursor: pointer;
   z-index: 60;
   transition: all 0.2s;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 
   &:hover {
-    background: #B5121B;
+    background: #2563eb;
     color: #fff;
+    border-color: #2563eb;
   }
 }
 
@@ -267,8 +333,7 @@
   display: none;
 }
 
-// ─── Responsive ───────────────────────────────────────────────────────────
-
+/* ─── Responsive ─── */
 @media (max-width: 1024px) {
   .sidebarDesktop {
     display: none;
@@ -282,7 +347,7 @@
     display: flex;
   }
 
-  .searchWrap {
+  .searchWrap, .workspaceLabel {
     display: none;
   }
 
@@ -299,7 +364,7 @@
     display: block;
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(0, 0, 0, 0.4);
     z-index: 1000;
   }
 }

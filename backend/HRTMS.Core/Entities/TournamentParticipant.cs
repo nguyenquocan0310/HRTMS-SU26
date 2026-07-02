@@ -29,8 +29,6 @@ public partial class TournamentParticipant
 
     public virtual User? ApprovedByNavigation { get; set; }
 
-    public virtual ICollection<Horse> Horses { get; set; } = new List<Horse>();
-
     public virtual ICollection<Pairing> Pairings { get; set; } = new List<Pairing>();
 
     public virtual Tournament Tournament { get; set; } = null!;

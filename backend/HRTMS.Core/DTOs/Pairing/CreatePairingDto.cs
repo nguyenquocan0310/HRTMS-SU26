@@ -1,15 +1,19 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace HRTMS.Core.DTOs.Pairing;
-
-public class CreatePairingDto
+namespace HRTMS.Core.DTOs.Pairing
 {
-    [Range(1, int.MaxValue)]
-    public int HorseId { get; set; }
+    public class CreatePairingDto
+    {
+        [Required]
+        public int TournamentId { get; set; }
 
-    [Range(1, int.MaxValue)]
-    public int JockeyId { get; set; }
+        [Required]
+        public int HorseId { get; set; }
 
-    [MaxLength(255)]
-    public string? RequestMessage { get; set; }
+        [Required]
+        public int JockeyId { get; set; }
+
+        [MaxLength(255)]
+        public string? RequestMessage { get; set; }
+    }
 }

@@ -1,6 +1,7 @@
 using HRTMS.Core.Common;
 using HRTMS.Core.DTOs.Jockey;
 
+
 namespace HRTMS.Core.Interfaces.Services;
 
 public interface IJockeyService
@@ -22,4 +23,11 @@ public interface IJockeyService
         string? status,
         int page,
         int pageSize);
+    
+    Task<PagedResult<JockeyRaceEntryDto>> GetMyRaceEntriesAsync(
+    int jockeyId,
+    string? status,
+    int page,
+    int pageSize);
+    
 }

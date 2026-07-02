@@ -8,6 +8,7 @@ import TabBasicInfo from './tabs/TabBasicInfo';
 import TabPrizeDistribution from './tabs/TabPrizeDistribution';
 import TabRoundsRaces from './tabs/TabRoundsRaces';
 import TabPostPositionDraw from './tabs/TabPostPositionDraw';
+import TabRoster from './tabs/TabRoster';
 import * as tournamentService from '../../services/tournamentService';
 import type { TournamentResponse } from '../../services/tournamentService';
 import styles from './TournamentBuilder.module.scss';
@@ -125,6 +126,7 @@ const TABS = [
   { key: 'basic', label: 'Thông số' },
   { key: 'prize', label: 'Prize Distribution' },
   { key: 'rounds', label: 'Rounds & Races' },
+  { key: 'roster', label: 'Roster'},
   { key: 'draw', label: 'Post Position Draw' },
 ] as const;
 
@@ -580,6 +582,15 @@ const handleSaveDraft = async () => {
             onChange={(rounds) => setDraft((prev) => ({ ...prev, rounds }))}
           />
         )}
+
+        {activeTab === 'roster' && (
+  <TabRoster
+    tournamentId={draft.id}
+    tournamentName={draft.basicInfo.name}
+    rounds={draft.rounds}
+    isNewDraft={isNewDraft}
+  />
+)}
 
         {activeTab === 'draw' && (
           <TabPostPositionDraw

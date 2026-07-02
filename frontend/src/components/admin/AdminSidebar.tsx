@@ -1,179 +1,56 @@
-import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
-  FiHome,
-  FiFlag,
-  FiUsers,
-  FiDollarSign,
-  FiTrendingUp,
-  FiSettings,
-  FiLogOut,
-  FiChevronDown,
-  FiZap,
+  FiGrid, FiShield, FiUsers, FiAward, FiFlag, FiCreditCard,
+  FiTrendingUp, FiChevronLeft, FiMonitor, FiBell, FiUser,
 } from 'react-icons/fi';
-import { GiHorseHead } from 'react-icons/gi';
 import styles from './AdminSidebar.module.scss';
 
-interface NavChild {
-  label: string;
-  path: string;
-}
+interface NavItem { label: string; path: string; icon: React.ReactNode; }
 
-interface NavGroup {
-  key: string;
-  label: string;
-  icon: React.ReactNode;
-  children: NavChild[];
-}
-
-const NAV_GROUPS: NavGroup[] = [
-  {
-    key: 'overview',
-    label: 'Tổng quan',
-    icon: <FiHome size={18} />,
-    children: [
-      { label: 'Admin Dashboard', path: '/admin' },
-    ],
-  },
-  {
-    key: 'tournament',
-    label: 'Vận hành Giải đấu',
-    icon: <FiFlag size={18} />,
-    children: [
-      { label: 'Tournament Builder', path: '/admin/tournaments' },
-      { label: 'Assignment Center', path: '/admin/assignments' },
-      { label: 'Declare Official Console', path: '/admin/declare-official' },
-    ],
-  },
-  {
-    key: 'users',
-    label: 'Người dùng & Duyệt hồ sơ',
-    icon: <FiUsers size={18} />,
-    children: [
-      { label: 'Approval Center', path: '/admin/approvals' },
-      { label: 'User Management', path: '/admin/users' },
-    ],
-  },
-  {
-    key: 'finance',
-    label: 'Tài chính',
-    icon: <FiDollarSign size={18} />,
-    children: [
-      { label: 'Entry Fee Management', path: '/admin/entry-fees' },
-      { label: 'Purse & Payout Management', path: '/admin/payouts' },
-    ],
-  },
-  {
-    key: 'engagement',
-    label: 'Tương tác',
-    icon: <FiTrendingUp size={18} />,
-    children: [
-      { label: 'Prediction Gate & Reward Config', path: '/admin/prediction-config' },
-    ],
-  },
-  {
-    key: 'system',
-    label: 'Hệ thống',
-    icon: <FiSettings size={18} />,
-    children: [
-      { label: 'Audit Log Viewer', path: '/admin/audit-log' },
-      { label: 'Reports & Export', path: '/admin/reports' },
-    ],
-  },
+const OPERATIONS_ITEMS: NavItem[] = [
+  { label: 'Dashboard', path: '/admin', icon: <FiGrid size={18} /> },
+  { label: 'Approval Center', path: '/admin/approval-center', icon: <FiShield size={18} /> },
+  { label: 'Users', path: '/admin/users', icon: <FiUsers size={18} /> },
+  { label: 'Tournaments', path: '/admin/tournaments', icon: <FiAward size={18} /> },
+  { label: 'Race Operations', path: '/admin/race-operations', icon: <FiFlag size={18} /> },
+  { label: 'Entry Fees', path: '/admin/entry-fees', icon: <FiCreditCard size={18} /> },
 ];
 
-interface AdminSidebarProps {
-  collapsed?: boolean;
-}
+const SHARED_ITEMS: NavItem[] = [
+  { label: 'Tournament Hub', path: '/admin/tournament-hub', icon: <FiAward size={18} /> },
+  { label: 'Leaderboard', path: '/admin/leaderboard', icon: <FiTrendingUp size={18} /> },
+  { label: 'Live Race View', path: '/admin/live-race', icon: <FiMonitor size={18} /> },
+  { label: 'Notifications', path: '/admin/notifications', icon: <FiBell size={18} /> },
+  { label: 'My Account', path: '/admin/my-account', icon: <FiUser size={18} /> },
+];
+
+interface AdminSidebarProps { collapsed?: boolean; }
 
 const AdminSidebar = ({ collapsed = false }: AdminSidebarProps) => {
-  // Mặc định mở nhóm đầu tiên
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
-    overview: true,
-  });
-
-  const toggleGroup = (key: string) => {
-    setOpenGroups((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
+  const renderItem = (item: NavItem) => (
+    <NavLink
+      key={item.path}
+      to={item.path}
+      end={item.path === '/admin'}
+      className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navItemActive : ''}`}
+    >
+      <span className={styles.navIcon}>{item.icon}</span>
+      {!collapsed && <span className={styles.navLabel}>{item.label}</span>}
+    </NavLink>
+  );
 
   return (
     <aside className={`${styles.sidebar} ${collapsed ? styles.collapsed : ''}`}>
-      {/* Logo */}
-      <div className={styles.logoBlock}>
-        <div className={styles.logoIcon}>
-          <GiHorseHead />
-        </div>
-        {!collapsed && (
-          <div className={styles.logoText}>
-            <span className={styles.logoMain}>HRTMS</span>
-            <span className={styles.logoSub}>MANAGEMENT SYSTEM</span>
-          </div>
-        )}
-      </div>
-
-      {/* Nav groups */}
       <nav className={styles.nav}>
-        {NAV_GROUPS.map((group) => (
-          <div key={group.key} className={styles.navGroup}>
-            <button
-              type="button"
-              className={styles.navGroupHeader}
-              onClick={() => toggleGroup(group.key)}
-            >
-              <span className={styles.navGroupIcon}>{group.icon}</span>
-              {!collapsed && (
-                <>
-                  <span className={styles.navGroupLabel}>{group.label}</span>
-                  <FiChevronDown
-                    size={14}
-                    className={`${styles.chevron} ${
-                      openGroups[group.key] ? styles.chevronOpen : ''
-                    }`}
-                  />
-                </>
-              )}
-            </button>
-
-            {!collapsed && openGroups[group.key] && (
-              <div className={styles.navChildren}>
-                {group.children.map((child) => (
-                  <NavLink
-                    key={child.path}
-                    to={child.path}
-                    end={child.path === '/admin'}
-                    className={({ isActive }) =>
-                      `${styles.navChild} ${isActive ? styles.navChildActive : ''}`
-                    }
-                  >
-                    {child.label}
-                  </NavLink>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
+        {!collapsed && <span className={styles.groupLabel}>OPERATIONS</span>}
+        <div className={styles.navGroup}>{OPERATIONS_ITEMS.map(renderItem)}</div>
+        {!collapsed && <span className={styles.groupLabel}>SHARED</span>}
+        <div className={styles.navGroup}>{SHARED_ITEMS.map(renderItem)}</div>
       </nav>
-
-      {/* Bottom actions */}
       <div className={styles.bottomBlock}>
-        <button type="button" className={styles.quickActionBtn}>
-          <FiZap size={16} />
-          {!collapsed && <span>Quick Action</span>}
-        </button>
-
-        <NavLink
-          to="/admin/settings"
-          className={({ isActive }) =>
-            `${styles.bottomLink} ${isActive ? styles.bottomLinkActive : ''}`
-          }
-        >
-          <FiSettings size={16} />
-          {!collapsed && <span>Settings</span>}
-        </NavLink>
-
-        <button type="button" className={styles.bottomLink}>
-          <FiLogOut size={16} />
-          {!collapsed && <span>Logout</span>}
+        <button type="button" className={styles.collapseBtn}>
+          <FiChevronLeft size={15} className={collapsed ? styles.flipped : ''} />
+          {!collapsed && <span>Collapse</span>}
         </button>
       </div>
     </aside>

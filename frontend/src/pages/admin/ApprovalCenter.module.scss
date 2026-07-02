@@ -4,8 +4,7 @@
   gap: 1.5rem;
 }
 
-// ─── Header ───────────────────────────────────────────────────────────────
-
+/* ─── Header ─── */
 .header {
   display: flex;
   flex-direction: column;
@@ -15,7 +14,7 @@
 .heading {
   font-size: 1.65rem;
   font-weight: 800;
-  color: #fff;
+  color: #111;
   margin: 0;
 }
 
@@ -25,48 +24,125 @@
   margin: 0;
 }
 
-// ─── Tabs ─────────────────────────────────────────────────────────────────
+.subHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
 
-.tabs {
+.subHeading {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #111;
+  margin: 0 0 0.3rem;
+}
+
+.countBadge {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  padding: 0.5rem 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #111;
+  white-space: nowrap;
+}
+
+/* ─── Group cards ─── */
+.groupGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.groupCard {
+  text-align: left;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: #93c5fd;
+  }
+}
+
+.groupCardActive {
+  border-color: #2563eb;
+  background: #eff6ff;
+  box-shadow: 0 0 0 1px #2563eb inset;
+}
+
+.groupTitle {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #111;
+}
+
+.groupDesc {
+  font-size: 0.8rem;
+  color: #888;
+}
+
+/* ─── Banner ─── */
+.banner {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-left: 4px solid #2563eb;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  font-size: 0.86rem;
+  color: #333;
+  line-height: 1.6;
+}
+
+/* ─── Sub-tabs ─── */
+.subTabs {
   display: flex;
   gap: 0.4rem;
-  border-bottom: 1px solid #232328;
+  border-bottom: 1px solid #e5e7eb;
   flex-wrap: wrap;
 }
 
-.tabBtn {
+.subTabBtn {
   background: transparent;
   border: none;
   color: #888;
   font-size: 0.85rem;
   font-weight: 600;
-  padding: 0.75rem 1.1rem;
+  padding: 0.7rem 1rem;
   cursor: pointer;
   border-bottom: 2px solid transparent;
   transition: all 0.2s;
   white-space: nowrap;
 
   &:hover {
-    color: #ccc;
+    color: #333;
   }
 }
 
-.tabBtnActive {
-  color: #F3C8C3;
-  border-bottom-color: #B5121B;
+.subTabBtnActive {
+  color: #2563eb;
+  border-bottom-color: #2563eb;
 }
 
-// ─── Table cells ──────────────────────────────────────────────────────────
-
+/* ─── Table cells ─── */
 .subjectCell {
   font-weight: 600;
-  color: #fff;
+  color: #111;
 }
 
 .detailBtn {
   background: transparent;
-  border: 1px solid #2a2a30;
-  color: #ccc;
+  border: 1px solid #d1d5db;
+  color: #333;
   padding: 0.4rem 0.8rem;
   border-radius: 6px;
   font-size: 0.78rem;
@@ -76,8 +152,67 @@
   white-space: nowrap;
 
   &:hover {
-    border-color: #B5121B;
-    color: #F3C8C3;
-    background: rgba(181, 18, 27, 0.08);
+    border-color: #2563eb;
+    color: #2563eb;
+    background: #eff6ff;
+  }
+}
+
+/* ─── States ─── */
+.errorBox {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  font-size: 0.85rem;
+}
+
+.loadingText {
+  color: #999;
+  padding: 1rem 0;
+  font-size: 0.9rem;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 900px) {
+  .groupGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── Light table override ─── */
+.lightTable {
+  :global(.tableWrap),
+  [class*="tableWrap"] {
+    background: #fff;
+    border-color: #e5e7eb;
+    border-radius: 12px;
+  }
+
+  :global(thead) {
+    background: #f9fafb !important;
+  }
+
+  :global(th) {
+    color: #6b7280 !important;
+    border-bottom-color: #e5e7eb !important;
+    background: #f9fafb !important;
+  }
+
+  :global(tr) {
+    border-bottom-color: #f0f0f0 !important;
+  }
+
+  :global(tr:hover) {
+    background: #f9fafb !important;
+  }
+
+  :global(td) {
+    color: #333 !important;
+  }
+
+  :global(.emptyCell) {
+    color: #aaa !important;
   }
 }

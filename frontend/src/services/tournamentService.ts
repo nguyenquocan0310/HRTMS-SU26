@@ -1,4 +1,4 @@
-// ─── Cổng dịch vụ Tournament ─────────────────────────────────────────────────
+// ─── Cổng dịch vụ Tournament ───────────────────────────────────────────────
 // Đã nối API thật (BE: localhost:5222). Component LUÔN import từ file này.
 
 import { apiFetch } from './apiClient';
@@ -9,7 +9,7 @@ interface ApiResponse<T> {
   data: T | null;
 }
 
-// ─── Types khớp đúng response thật từ BE ────────────────────────────────────
+// ─── Types khớp đúng response thật từ BE ───────────────────────────────────
 
 export interface RaceResponse {
   raceId: number;
@@ -60,7 +60,7 @@ export interface TournamentResponse {
   prizeDistributions: PrizeDistributionResponse[];
 }
 
-// ─── Payload gửi lên khi tạo/sửa giải ────────────────────────────────────────
+// ─── Payload gửi lên khi tạo/sửa giải ─────────────────────────────────────
 
 export interface CreateTournamentPayload {
   name: string;
@@ -79,7 +79,7 @@ export interface CreateTournamentPayload {
   postRaceWeightDiffThresholdKg?: number;
 }
 
-// ─── API calls ───────────────────────────────────────────────────────────────
+// ─── API calls ──────────────────────────────────────────────────────────────
 
 export const getTournaments = (): Promise<TournamentResponse[]> =>
   apiFetch<ApiResponse<TournamentResponse[]>>('/tournament').then((res) => {
@@ -134,8 +134,6 @@ export const updatePrizeDistributions = (
   id: number,
   prizeDistributions: UpdatePrizeDistributionPayload[]
 ): Promise<TournamentResponse> =>
-  // BE nhận field "distributions" (SetPrizeDistributionDto.Distributions).
-  // Gửi sai key "prizeDistributions" sẽ làm DTO rỗng → ModelState 400 (MinLength 5).
   apiFetch<ApiResponse<TournamentResponse>>(`/tournament/${id}/prize-distributions`, {
     method: 'PUT',
     body: JSON.stringify({ distributions: prizeDistributions }),
@@ -175,5 +173,43 @@ export const createRace = (roundId: number, payload: CreateRacePayload): Promise
     body: JSON.stringify(payload),
   }).then((res) => {
     if (!res.success || !res.data) throw new Error(res.message || 'Tạo Race thất bại.');
+    return res.data;
+  });
+
+// ─── Tournament Participation (Owner) ────────────────────────────────────────
+
+export interface ParticipationResponse {
+  participationId: number;
+  tournamentId: number;
+  tournamentName: string; // trả về ở root object từ BE
+  ownerId: number;
+  status: string; // "Pending" | "Approved" | "Rejected" | "ManualReview" | "AutoEligible" | "AutoRejected"
+  registeredAt: string;
+  screeningReason?: string | null;
+  rejectionReason?: string | null;
+}
+
+/**
+ * POST /api/tournament/{tournamentId}/participants
+ * Không gửi body — BE lấy OwnerId từ JWT claim.
+ * Trả về ParticipationResponse.
+ */
+export const registerForTournament = (tournamentId: number): Promise<ParticipationResponse> =>
+  apiFetch<ApiResponse<ParticipationResponse>>(`/tournament/${tournamentId}/participants`, {
+    method: 'POST',
+  }).then((res) => {
+    if (!res.success || !res.data)
+      throw new Error(res.message || 'Đăng ký tham gia giải thất bại.');
+    return res.data;
+  });
+
+/**
+ * GET /api/my/tournament-participations
+ * Trả về danh sách các giải Owner đã đăng ký.
+ */
+export const getMyTournamentParticipations = (): Promise<ParticipationResponse[]> =>
+  apiFetch<ApiResponse<ParticipationResponse[]>>('/my/tournament-participations').then((res) => {
+    if (!res.success || !res.data)
+      throw new Error(res.message || 'Không tải được danh sách đăng ký.');
     return res.data;
   });

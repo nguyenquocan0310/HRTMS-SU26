@@ -1,4 +1,5 @@
 using HRTMS.Core.Common;
+using HRTMS.Core.DTOs.Jockey;
 using HRTMS.Core.DTOs.Pairing;
 using HRTMS.Core.Entities;
 using HRTMS.Core.Interfaces.Services;
@@ -17,8 +18,8 @@ public class PairingService : IPairingService
     }
 
     public async Task<PairingResponseDto> CreateAsync(
-    int ownerId,
-    CreatePairingDto dto)
+        int ownerId,
+        CreatePairingDto dto)
     {
         // Lay thong tin ngua theo HorseId
         var horse = await _context.Horses
@@ -26,90 +27,106 @@ public class PairingService : IPairingService
 
         if (horse == null)
         {
-            throw new KeyNotFoundException(
-                "HORSE_NOT_FOUND");
+            throw new KeyNotFoundException("HORSE_NOT_FOUND");
         }
 
         // Kiem tra ngua co thuoc Owner dang dang nhap hay khong
         if (horse.OwnerId != ownerId)
         {
-            throw new UnauthorizedAccessException(
-                "HORSE_NOT_OWNED");
+            throw new UnauthorizedAccessException("HORSE_NOT_OWNED");
         }
 
-        // Chi ngua da duoc Admin phe duyet moi duoc gui loi moi ghep cap
-        if (horse.AdminApprovalStatus != "Approved")
+        // Schema v3: ngua phai da enroll (va duoc duyet) trong dung tournament cua request.
+        // Horse khong con gan TournamentId truc tiep — kiem tra qua HorseTournamentEntries.
+        var enrollment = await _context.HorseTournamentEntries
+            .FirstOrDefaultAsync(e =>
+                e.HorseId == dto.HorseId &&
+                e.TournamentId == dto.TournamentId);
+
+        if (enrollment == null || enrollment.Status != "Enrolled")
         {
-            throw new InvalidOperationException(
-                "HORSE_NOT_APPROVED");
+            throw new InvalidOperationException("HORSE_NOT_IN_TOURNAMENT");
+        }
+
+        // Chi ngua da duoc duyet enrollment trong giai nay moi duoc gui loi moi ghep cap
+        if (enrollment.AdminApprovalStatus != "Approved")
+        {
+            throw new InvalidOperationException("HORSE_NOT_APPROVED");
+        }
+
+        // Lay thong tin tournament de check kinh nghiem toi thieu
+        var tournament = await _context.Tournaments
+            .FirstOrDefaultAsync(t => t.TournamentId == dto.TournamentId);
+
+        if (tournament == null)
+        {
+            throw new KeyNotFoundException("TOURNAMENT_NOT_FOUND");
         }
 
         // Lay thong tin Jockey
         var jockey = await _context.JockeyProfiles
             .Include(j => j.Jockey)
-            .FirstOrDefaultAsync(j =>
-                j.JockeyId == dto.JockeyId);
+            .FirstOrDefaultAsync(j => j.JockeyId == dto.JockeyId);
 
         if (jockey == null)
         {
-            throw new KeyNotFoundException(
-                "JOCKEY_NOT_FOUND");
+            throw new KeyNotFoundException("JOCKEY_NOT_FOUND");
         }
 
         // Chi Jockey Active moi duoc nhan loi moi
         if (jockey.Status != "Active")
         {
-            throw new InvalidOperationException(
-                "JOCKEY_NOT_ACTIVE");
+            throw new InvalidOperationException("JOCKEY_NOT_ACTIVE");
         }
 
-        // Kiem tra horse da co cap chinh thuc chua
-        // Neu horse da co pairing Accepted thi owner khong duoc gui them loi moi cho horse nay
-        var horseAlreadyHasAcceptedPairing = await _context.Pairings
-            .AnyAsync(p =>
-                p.HorseId == dto.HorseId &&
-                p.Status == "Accepted");
+        // Check kinh nghiem toi thieu cua giai dau
+        if (jockey.ExperienceYears < tournament.MinJockeyExperienceYears)
+        {
+            throw new InvalidOperationException("JOCKEY_EXPERIENCE_TOO_LOW");
+        }
 
-        if (horseAlreadyHasAcceptedPairing)
+        // Jockey phai dang ky tham gia tournament va da duoc duyet roster
+        var jockeyParticipant = await _context.TournamentParticipants
+            .FirstOrDefaultAsync(tp =>
+                tp.TournamentId == dto.TournamentId &&
+                tp.UserId == dto.JockeyId &&
+                tp.Role == "Jockey");
+
+        if (jockeyParticipant == null)
         {
             throw new InvalidOperationException(
-                "HORSE_ALREADY_HAS_ACCEPTED_JOCKEY");
+                "JOCKEY_NOT_REGISTERED_IN_TOURNAMENT");
         }
 
-        // Kiem tra jockey da co cap chinh thuc chua
-        // Neu jockey da co pairing Accepted thi jockey khong duoc nhan them loi moi moi
-        var jockeyAlreadyHasAcceptedPairing = await _context.Pairings
-            .AnyAsync(p =>
-                p.JockeyId == dto.JockeyId &&
-                p.Status == "Accepted");
-
-        if (jockeyAlreadyHasAcceptedPairing)
+        if (jockeyParticipant.Status != "Approved")
         {
             throw new InvalidOperationException(
-                "JOCKEY_ALREADY_HAS_ACCEPTED_HORSE");
+                "JOCKEY_NOT_APPROVED_IN_TOURNAMENT");
         }
 
-        // Kiem tra trung loi moi cho cung cap horse-jockey
-        // Cho phep horse co nhieu pending voi jockey khac
-        // Cho phep jockey co nhieu pending voi horse khac
-        // Nhung khong cho tao trung cung mot cap horse-jockey
+        // Khong cho tao trung cung mot cap horse-jockey trong cung tournament
+        // neu dang Pending, Accepted hoac Confirmed
         var pairingExists = await _context.Pairings
             .AnyAsync(p =>
+                p.TournamentId == dto.TournamentId &&
                 p.HorseId == dto.HorseId &&
                 p.JockeyId == dto.JockeyId &&
-                (p.Status == "Pending" ||
-                 p.Status == "Accepted"));
+                (
+                    p.Status == "Pending" ||
+                    p.Status == "Accepted" ||
+                    p.Status == "Confirmed"
+                ));
 
         if (pairingExists)
         {
-            throw new InvalidOperationException(
-                "PAIRING_ALREADY_EXISTS");
+            throw new InvalidOperationException("PAIRING_ALREADY_EXISTS");
         }
 
         var now = DateTime.UtcNow;
 
         var pairing = new Pairing
         {
+            TournamentId = dto.TournamentId,
             HorseId = dto.HorseId,
             JockeyId = dto.JockeyId,
             Status = "Pending",
@@ -119,9 +136,10 @@ public class PairingService : IPairingService
         };
 
         _context.Pairings.Add(pairing);
+        await _context.SaveChangesAsync();
 
         // Tao thong bao cho Jockey khi co loi moi moi
-        var notification = new Notification
+        _context.Notifications.Add(new Notification
         {
             RecipientId = dto.JockeyId,
             Title = "New pairing invitation",
@@ -129,21 +147,16 @@ public class PairingService : IPairingService
                 $"You have received a pairing invitation for horse {horse.Name}.",
             Type = "In-app",
             RelatedEntityType = "Pairing",
+            RelatedEntityId = pairing.PairingId,
             SentAt = now
-        };
-
-        _context.Notifications.Add(notification);
-
-        await _context.SaveChangesAsync();
-
-        // Sau khi luu pairing moi co PairingId tu database
-        notification.RelatedEntityId = pairing.PairingId;
+        });
 
         await _context.SaveChangesAsync();
 
         return new PairingResponseDto
         {
             PairingId = pairing.PairingId,
+            TournamentId = pairing.TournamentId,
             HorseId = pairing.HorseId,
             JockeyId = pairing.JockeyId,
             Status = pairing.Status,
@@ -152,12 +165,11 @@ public class PairingService : IPairingService
     }
 
     public async Task<PairingActionResponseDto> AcceptAsync(
-    int jockeyId,
-    int pairingId)
+        int jockeyId,
+        int pairingId)
     {
-        await using var transaction =
-            await _context.Database.BeginTransactionAsync();
-
+        // Jockey accept chi doi Pending -> Accepted
+        // Owner se confirm sau de thanh Confirmed
         var pairing = await _context.Pairings
             .Include(p => p.Horse)
             .FirstOrDefaultAsync(p => p.PairingId == pairingId);
@@ -176,43 +188,127 @@ public class PairingService : IPairingService
         {
             throw new InvalidOperationException("INVALID_STATUS");
         }
+
         if (pairing.Horse.AdminApprovalStatus != "Approved")
         {
             throw new InvalidOperationException("HORSE_NOT_APPROVED");
         }
 
-        var hasAcceptedPairingForHorse = await _context.Pairings
-            .AnyAsync(p =>
-                p.HorseId == pairing.HorseId &&
-                p.PairingId != pairing.PairingId &&
-                p.Status == "Accepted");
-
-        if (hasAcceptedPairingForHorse)
-        {
-            throw new InvalidOperationException("HORSE_ALREADY_ACCEPTED");
-        }
-
-        // Chap nhan loi moi hien tai
         pairing.Status = "Accepted";
         pairing.UpdatedAt = DateTime.UtcNow;
 
-        // Tu dong tu choi cac loi moi pending khac cua cung con ngua
-        var otherPendingPairings = await _context.Pairings
+        // Gui thong bao cho Owner de vao xac nhan cuoi cung
+        _context.Notifications.Add(new Notification
+        {
+            RecipientId = pairing.Horse.OwnerId,
+            Title = "Pairing invitation accepted",
+            Message =
+                $"The jockey accepted the pairing invitation for horse {pairing.Horse.Name}. Please confirm the pairing.",
+            Type = "In-app",
+            RelatedEntityType = "Pairing",
+            RelatedEntityId = pairing.PairingId,
+            SentAt = DateTime.UtcNow
+        });
+
+        await _context.SaveChangesAsync();
+
+        return new PairingActionResponseDto
+        {
+            PairingId = pairing.PairingId,
+            Status = pairing.Status,
+            Message =
+                "Pairing invitation accepted successfully. Waiting for owner confirmation."
+        };
+    }
+
+    public async Task<PairingActionResponseDto> ConfirmAsync(
+     int ownerId,
+     int pairingId)
+    {
+        await using var transaction =
+            await _context.Database.BeginTransactionAsync();
+
+        var pairing = await _context.Pairings
+            .Include(p => p.Horse)
+            .Include(p => p.Jockey)
+            .FirstOrDefaultAsync(p => p.PairingId == pairingId);
+
+        if (pairing == null)
+        {
+            throw new KeyNotFoundException("PAIRING_NOT_FOUND");
+        }
+
+        if (pairing.Horse.OwnerId != ownerId)
+        {
+            throw new UnauthorizedAccessException("FORBIDDEN");
+        }
+
+        if (pairing.Status != "Accepted")
+        {
+            throw new InvalidOperationException("INVALID_STATUS");
+        }
+
+        if (pairing.Horse.AdminApprovalStatus != "Approved")
+        {
+            throw new InvalidOperationException("HORSE_NOT_APPROVED");
+        }
+
+        if (pairing.Jockey.Status != "Active")
+        {
+            throw new InvalidOperationException("JOCKEY_NOT_ACTIVE");
+        }
+
+        var jockeyParticipant = await _context.TournamentParticipants
+            .FirstOrDefaultAsync(tp =>
+                tp.TournamentId == pairing.TournamentId &&
+                tp.UserId == pairing.JockeyId &&
+                tp.Role == "Jockey");
+
+        if (jockeyParticipant == null)
+        {
+            throw new InvalidOperationException(
+                "JOCKEY_NOT_REGISTERED_IN_TOURNAMENT");
+        }
+
+        if (jockeyParticipant.Status != "Approved")
+        {
+            throw new InvalidOperationException(
+                "JOCKEY_NOT_APPROVED_IN_TOURNAMENT");
+        }
+
+        pairing.Status = "Confirmed";
+        pairing.UpdatedAt = DateTime.UtcNow;
+
+        var otherPairings = await _context.Pairings
             .Where(p =>
+                p.TournamentId == pairing.TournamentId &&
                 p.HorseId == pairing.HorseId &&
                 p.PairingId != pairing.PairingId &&
-                p.Status == "Pending")
+                (
+                    p.Status == "Pending" ||
+                    p.Status == "Accepted"
+                ))
             .ToListAsync();
 
-        foreach (var otherPairing in otherPendingPairings)
+        foreach (var otherPairing in otherPairings)
         {
-            otherPairing.Status = "Declined";
+            otherPairing.Status = "Cancelled";
             otherPairing.ResponseReason =
-                "Another jockey has already accepted this horse invitation.";
+                "Owner confirmed another pairing for this horse.";
             otherPairing.UpdatedAt = DateTime.UtcNow;
         }
 
-
+        _context.Notifications.Add(new Notification
+        {
+            RecipientId = pairing.JockeyId,
+            Title = "Pairing confirmed",
+            Message =
+                $"Owner confirmed your pairing with horse {pairing.Horse.Name}.",
+            Type = "In-app",
+            RelatedEntityType = "Pairing",
+            RelatedEntityId = pairing.PairingId,
+            SentAt = DateTime.UtcNow
+        });
 
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
@@ -221,7 +317,7 @@ public class PairingService : IPairingService
         {
             PairingId = pairing.PairingId,
             Status = pairing.Status,
-            Message = "Pairing invitation accepted successfully."
+            Message = "Pairing confirmed successfully."
         };
     }
 
@@ -238,22 +334,19 @@ public class PairingService : IPairingService
 
         if (pairing == null)
         {
-            throw new KeyNotFoundException(
-                "PAIRING_NOT_FOUND");
+            throw new KeyNotFoundException("PAIRING_NOT_FOUND");
         }
 
         // Chi dung Jockey trong Pairing moi duoc tu choi
         if (pairing.JockeyId != jockeyId)
         {
-            throw new UnauthorizedAccessException(
-                "FORBIDDEN");
+            throw new UnauthorizedAccessException("FORBIDDEN");
         }
 
         // Chi Pairing Pending moi duoc tu choi
         if (pairing.Status != "Pending")
         {
-            throw new InvalidOperationException(
-                "INVALID_STATUS");
+            throw new InvalidOperationException("INVALID_STATUS");
         }
 
         pairing.Status = "Declined";
@@ -299,15 +392,16 @@ public class PairingService : IPairingService
         {
             "Pending",
             "Accepted",
-            "Declined"
+            "Declined",
+            "Confirmed",
+            "Cancelled"
         };
 
         // Kiem tra trang thai Pairing hop le
         if (!string.IsNullOrWhiteSpace(status) &&
             !validStatuses.Contains(status))
         {
-            throw new ArgumentException(
-                "INVALID_PAIRING_STATUS");
+            throw new ArgumentException("INVALID_PAIRING_STATUS");
         }
 
         // Lay danh sach Pairing cua Owner dang dang nhap
@@ -335,6 +429,7 @@ public class PairingService : IPairingService
             .Select(p => new OwnerPairingDto
             {
                 PairingId = p.PairingId,
+                TournamentId = p.TournamentId,
 
                 Horse = new OwnerPairingHorseDto
                 {
@@ -363,7 +458,68 @@ public class PairingService : IPairingService
             Items = data,
             Page = page,
             PageSize = pageSize,
-            TotalCount = total,
+            TotalCount = total
+        };
+    }
+    public async Task<PagedResult<JockeyInvitationDto>> GetJockeyInvitationsAsync(
+    int jockeyId,
+    int page,
+    int pageSize)
+    {
+        if (page < 1 || pageSize < 1 || pageSize > 100)
+        {
+            throw new ArgumentException("INVALID_PAGING");
+        }
+        // Chuan hoa gia tri phan trang
+        page = page < 1 ? 1 : page;
+        pageSize = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
+
+        // Lay danh sach loi moi Pending cua Jockey dang dang nhap
+        // Dung join truc tiep de tranh phu thuoc navigation property cua Entity
+        var query =
+            from pairing in _context.Pairings.AsNoTracking()
+            join horse in _context.Horses.AsNoTracking()
+                on pairing.HorseId equals horse.HorseId
+            join owner in _context.Users.AsNoTracking()
+                on horse.OwnerId equals owner.UserId
+            where pairing.JockeyId == jockeyId
+                  && pairing.Status == "Pending"
+            select new JockeyInvitationDto
+            {
+                PairingId = pairing.PairingId,
+
+                Horse = new InvitationHorseDto
+                {
+                    HorseId = horse.HorseId,
+                    Name = horse.Name,
+                    Breed = horse.Breed
+                },
+
+                Owner = new InvitationOwnerDto
+                {
+                    OwnerId = owner.UserId,
+                    FullName = owner.FullName
+                },
+
+                RequestMessage = pairing.RequestMessage,
+                Status = pairing.Status,
+                CreatedAt = pairing.CreatedAt
+            };
+
+        var total = await query.CountAsync();
+
+        var data = await query
+            .OrderByDescending(i => i.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return new PagedResult<JockeyInvitationDto>
+        {
+            Items = data,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = total
         };
     }
 }

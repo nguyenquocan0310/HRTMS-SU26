@@ -104,54 +104,62 @@ namespace HRTMS.Infrastructure.Services
                 throw new ArgumentException($"Total race purse ({allocatedPurse}) exceeds tournament purse ({tournament.PurseAmount})");
         }
 
-        private static TournamentResponseDto MapToResponseDto(Tournament t) => new()
+        private static TournamentResponseDto MapToResponseDto(Tournament t)
         {
-            TournamentId = t.TournamentId,
-            Name = t.Name,
-            Description = t.Description,
-            StartDate = t.StartDate,
-            EndDate = t.EndDate,
-            MaxHorses = t.MaxHorses,
-            AllowedBreed = t.AllowedBreed,
-            TrackType = t.TrackType,
-            RaceDistance = t.RaceDistance,
-            RaceCategory = t.RaceCategory,
-            MinJockeyExperienceYears = t.MinJockeyExperienceYears,
-            PurseAmount = t.PurseAmount,
-            EntryFeeAmount = t.EntryFeeAmount,
-            PreRaceWeightThresholdKg = t.PreRaceWeightThresholdKg,
-            PostRaceWeightDiffThresholdKg = t.PostRaceWeightDiffThresholdKg,
-            Status = t.Status,
-            CreatedAt = t.CreatedAt,
-            Rounds = t.Rounds.Select(r => new RoundResponseDto
+            var allocatedPurse = t.Rounds.SelectMany(r => r.Races).Sum(race => race.PurseAmount);
+
+            return new TournamentResponseDto
             {
-                RoundId = r.RoundId,
-                Name = r.Name,
-                SequenceOrder = r.SequenceOrder,
-                ScheduledDate = r.ScheduledDate,
-                Status = r.Status,
-                Races = r.Races.Select(race => new RaceResponseDto
+                TournamentId = t.TournamentId,
+                Name = t.Name,
+                Description = t.Description,
+                StartDate = t.StartDate,
+                EndDate = t.EndDate,
+                MaxHorses = t.MaxHorses,
+                AllowedBreed = t.AllowedBreed,
+                TrackType = t.TrackType,
+                RaceDistance = t.RaceDistance,
+                RaceCategory = t.RaceCategory,
+                MinJockeyExperienceYears = t.MinJockeyExperienceYears,
+                PurseAmount = t.PurseAmount,
+                AllocatedPurse = allocatedPurse,
+                RemainingPurse = t.PurseAmount - allocatedPurse,
+                EntryFeeAmount = t.EntryFeeAmount,
+                PreRaceWeightThresholdKg = t.PreRaceWeightThresholdKg,
+                PostRaceWeightDiffThresholdKg = t.PostRaceWeightDiffThresholdKg,
+                Status = t.Status,
+                CreatedAt = t.CreatedAt,
+                Rounds = t.Rounds.Select(r => new RoundResponseDto
                 {
-                    RaceId = race.RaceId,
-                    RoundId = race.RoundId,
-                    RaceNumber = race.RaceNumber,
-                    ScheduledTime = race.ScheduledTime,
-                    PurseAmount = race.PurseAmount,
-                    TrackTypeOverride = race.TrackTypeOverride,
-                    RaceDistanceOverride = race.RaceDistanceOverride,
-                    Status = race.Status,
-                    ConfirmationCutoffHours = race.ConfirmationCutoffHours,
-                    ProtestDeadlineMinutes = race.ProtestDeadlineMinutes,
+                    RoundId = r.RoundId,
+                    Name = r.Name,
+                    SequenceOrder = r.SequenceOrder,
+                    ScheduledDate = r.ScheduledDate,
+                    Status = r.Status,
+                    AllocatedPurse = r.Races.Sum(race => race.PurseAmount),
+                    Races = r.Races.Select(race => new RaceResponseDto
+                    {
+                        RaceId = race.RaceId,
+                        RoundId = race.RoundId,
+                        RaceNumber = race.RaceNumber,
+                        ScheduledTime = race.ScheduledTime,
+                        PurseAmount = race.PurseAmount,
+                        TrackTypeOverride = race.TrackTypeOverride,
+                        RaceDistanceOverride = race.RaceDistanceOverride,
+                        Status = race.Status,
+                        ConfirmationCutoffHours = race.ConfirmationCutoffHours,
+                        ProtestDeadlineMinutes = race.ProtestDeadlineMinutes,
+                    }).ToList(),
                 }).ToList(),
-            }).ToList(),
-            PrizeDistributions = t.PrizeDistributions
-                .OrderBy(p => p.Position)
-                .Select(p => new PrizeDistributionResponseDto
-                {
-                    Position = p.Position,
-                    Percentage = p.Percentage
-                }).ToList()
-        };
+                PrizeDistributions = t.PrizeDistributions
+                    .OrderBy(p => p.Position)
+                    .Select(p => new PrizeDistributionResponseDto
+                    {
+                        Position = p.Position,
+                        Percentage = p.Percentage
+                    }).ToList()
+            };
+        }
 
         public async Task<TournamentResponseDto> CreateTournamentAsync(CreateTournamentDto dto, int createdByUserId)
         {
@@ -591,11 +599,40 @@ namespace HRTMS.Infrastructure.Services
                 throw new ArgumentException(
                     $"ScheduledDate phải nằm trong [{tournament.StartDate:d}, {tournament.EndDate:d}]");
 
+            var existingRounds = await _context.Rounds
+                .Include(r => r.Races)
+                .Where(r => r.TournamentId == tournamentId)
+                .ToListAsync();
+
             // Bug 7 fix — kiểm tra trùng SequenceOrder trong cùng tournament
-            var isDuplicateOrder = await _context.Rounds
-                .AnyAsync(r => r.TournamentId == tournamentId && r.SequenceOrder == dto.SequenceOrder);
-            if (isDuplicateOrder)
+            if (existingRounds.Any(r => r.SequenceOrder == dto.SequenceOrder))
                 throw new ArgumentException($"SequenceOrder {dto.SequenceOrder} đã tồn tại trong Tournament #{tournamentId}");
+
+            // Validate tính liên tục thời gian giữa các vòng: vòng sau phải diễn ra
+            // sau khi vòng ngay trước nó đã kết thúc (sau race cuối cùng của vòng trước).
+            var previousRound = existingRounds
+                .Where(r => r.SequenceOrder < dto.SequenceOrder)
+                .OrderByDescending(r => r.SequenceOrder)
+                .FirstOrDefault();
+            if (previousRound != null)
+            {
+                var previousBoundary = previousRound.Races.Count > 0
+                    ? previousRound.Races.Max(r => r.ScheduledTime)
+                    : previousRound.ScheduledDate;
+
+                if (dto.ScheduledDate <= previousBoundary)
+                    throw new ArgumentException(
+                        $"ScheduledDate phải sau {(previousRound.Races.Count > 0 ? "cuộc đua cuối" : "ngày")} của vòng trước (Round #{previousRound.RoundId}, {previousBoundary:u})");
+            }
+
+            // Vòng kế tiếp (nếu đã tồn tại) phải bắt đầu sau vòng đang tạo.
+            var nextRound = existingRounds
+                .Where(r => r.SequenceOrder > dto.SequenceOrder)
+                .OrderBy(r => r.SequenceOrder)
+                .FirstOrDefault();
+            if (nextRound != null && dto.ScheduledDate >= nextRound.ScheduledDate)
+                throw new ArgumentException(
+                    $"ScheduledDate phải trước ngày của vòng kế tiếp (Round #{nextRound.RoundId}, {nextRound.ScheduledDate:u})");
 
             var round = new Round
             {
@@ -617,6 +654,7 @@ namespace HRTMS.Infrastructure.Services
                 SequenceOrder = round.SequenceOrder,
                 ScheduledDate = round.ScheduledDate,
                 Status = round.Status,
+                AllocatedPurse = 0,
                 Races = []
             };
         }

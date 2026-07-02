@@ -24,7 +24,8 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Register([FromBody] RegisterDto dto)
     {
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
-        var result = await _authService.RegisterAsync(dto, ip);
+        var ua = HttpContext.Request.Headers["User-Agent"].ToString();
+        var result = await _authService.RegisterAsync(dto, ip, ua);
         if (!result.Success)
         {
             var isConflict = result.Message?.Contains("tồn tại") == true;
@@ -37,7 +38,8 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Login([FromBody] LoginDto dto)
     {
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
-        var result = await _authService.LoginAsync(dto, ip);
+        var ua = HttpContext.Request.Headers["User-Agent"].ToString();
+        var result = await _authService.LoginAsync(dto, ip, ua);
         return result.Success ? Ok(result) : Unauthorized(result);
     }
 
@@ -47,7 +49,8 @@ public class AuthController : ControllerBase
     {
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
-        var result = await _authService.LogoutAsync(userId, ip);
+        var ua = HttpContext.Request.Headers["User-Agent"].ToString();
+        var result = await _authService.LogoutAsync(userId, ip, ua);
         return Ok(result);
     }
 
@@ -68,5 +71,27 @@ public class AuthController : ControllerBase
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
         var result = await _profileService.GetProfileAsync(userId);
         return result.Success ? Ok(result) : NotFound(result);
+    }
+
+    /// <summary>PWD.1 — Gửi email đặt lại mật khẩu</summary>
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Email))
+            return BadRequest("Email không được để trống.");
+
+        var result = await _authService.ForgotPasswordAsync(dto);
+        return Ok(result); // Luôn 200 để tránh email enumeration
+    }
+
+    /// <summary>PWD.2 — Xác nhận token và đặt mật khẩu mới</summary>
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Token) || string.IsNullOrWhiteSpace(dto.NewPassword))
+            return BadRequest("Token và mật khẩu mới không được để trống.");
+
+        var result = await _authService.ResetPasswordAsync(dto);
+        return result.Success ? Ok(result) : BadRequest(result);
     }
 }

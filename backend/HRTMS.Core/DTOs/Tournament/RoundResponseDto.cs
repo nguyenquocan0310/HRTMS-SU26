@@ -14,6 +14,8 @@ namespace HRTMS.Core.DTOs.Tournament
         public int SequenceOrder { get; set; }
         public DateTime ScheduledDate { get; set; }
         public string Status { get; set; } = string.Empty;
-        public List<RaceResponseDto> Races { get; set; } = new(); 
+        // Tổng PurseAmount của các Race thuộc vòng này (SUM(Races.PurseAmount)).
+        public decimal AllocatedPurse { get; set; }
+        public List<RaceResponseDto> Races { get; set; } = new();
     }
 }

@@ -6,6 +6,7 @@ import type {
   JockeyRaceEntry,
   JockeyRaceResult,
 } from '../types/jockey.types';
+import { apiFetch } from './apiClient';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -168,3 +169,24 @@ export const acceptPairing = async (pairingId: string): Promise<any> => {
     throw error;
   }
 };
+
+export interface PagedResult<T> {
+  items: T[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+/**
+ * Get all race entries for the current jockey
+ */
+export const getMyJockeyRaceEntries = async (
+  page: number = 1,
+  pageSize: number = 20
+): Promise<PagedResult<JockeyRaceEntry>> => {
+  return apiFetch<PagedResult<JockeyRaceEntry>>(
+    `/jockeys/race-entries/my?page=${page}&pageSize=${pageSize}`
+  );
+};
+

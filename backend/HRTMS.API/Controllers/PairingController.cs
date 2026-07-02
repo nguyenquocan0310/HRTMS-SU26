@@ -289,7 +289,90 @@ public class PairingController : ControllerBase
             return BadRequest(new
             {
                 error = "VALIDATION_ERROR",
-                message = "Status must be Pending, Accepted, or Declined."
+                message = "Status must be Pending, Accepted, Declined, Confirmed, or Cancelled."
+            });
+        }
+    }
+
+    [HttpPatch("pairings/{id:int}/confirm")]
+    [Authorize(Roles = "Owner")]
+    public async Task<IActionResult> Confirm(int id)
+    {
+        // Lay OwnerId tu JWT token
+        var userIdValue = User.FindFirstValue(
+            ClaimTypes.NameIdentifier);
+
+        if (!int.TryParse(userIdValue, out var ownerId))
+        {
+            return Unauthorized(new
+            {
+                error = "UNAUTHORIZED",
+                message = "Token khong hop le"
+            });
+        }
+
+        try
+        {
+            var result = await _pairingService.ConfirmAsync(
+                ownerId,
+                id);
+
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+            when (ex.Message == "PAIRING_NOT_FOUND")
+        {
+            return NotFound(new
+            {
+                error = "PAIRING_NOT_FOUND",
+                message = "Pairing was not found."
+            });
+        }
+        catch (UnauthorizedAccessException ex)
+            when (ex.Message == "HORSE_NOT_OWNED")
+        {
+            return StatusCode(
+                StatusCodes.Status403Forbidden,
+                new
+                {
+                    error = "HORSE_NOT_OWNED",
+                    message = "The horse does not belong to the current owner."
+                });
+        }
+        catch (InvalidOperationException ex)
+            when (ex.Message == "INVALID_STATUS")
+        {
+            return Conflict(new
+            {
+                error = "INVALID_STATUS",
+                message = "Only accepted pairings can be confirmed."
+            });
+        }
+        catch (InvalidOperationException ex)
+            when (ex.Message == "HORSE_NOT_APPROVED")
+        {
+            return UnprocessableEntity(new
+            {
+                error = "HORSE_NOT_APPROVED",
+                message = "Horse is still waiting for admin approval."
+            });
+        }
+        catch (InvalidOperationException ex)
+            when (ex.Message == "JOCKEY_NOT_ACTIVE")
+        {
+            return UnprocessableEntity(new
+            {
+                error = "JOCKEY_NOT_ACTIVE",
+                message = "The jockey is not active."
+            });
+        }
+        catch (InvalidOperationException ex)
+            when (ex.Message == "JOCKEY_NOT_APPROVED_FOR_TOURNAMENT")
+        {
+            return UnprocessableEntity(new
+            {
+                error = "JOCKEY_NOT_APPROVED_FOR_TOURNAMENT",
+                message = "The jockey has not been approved for this tournament."
             });
         }
     }

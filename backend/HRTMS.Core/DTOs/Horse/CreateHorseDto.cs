@@ -4,10 +4,7 @@ namespace HRTMS.Core.DTOs.Horse
 {
     public class CreateHorseDto
     {
-        [Required]
-        [Range(1, int.MaxValue, ErrorMessage = "Phải chọn giải đấu để đăng ký ngựa vào.")]
-        public int TournamentId { get; set; }
-
+        // Schema v3: tạo hồ sơ ngựa vào kho — KHÔNG gắn giải. Đẩy vào giải dùng EnrollHorseDto.
         [Required]
         [MaxLength(100)]
         public string Name { get; set; } = null!;

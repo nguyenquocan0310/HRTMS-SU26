@@ -100,7 +100,7 @@ public class StartingListService : IStartingListService
                 PostPosition = entry.PostPosition,
                 Status = entry.Status,
                 PreRaceJockeyWeight = entry.PreRaceJockeyWeight,
-                HorseIdentityStatus = entry.HorseIdentityCheckStatus,
+                HorseIdentityCheckStatus = entry.HorseIdentityCheckStatus,
                 ClinicalStatus = entry.ClinicalStatus,
                 IndependenceCheckStatus = entry.IndependenceCheckStatus,
                 RejectionReason = rejectionReason

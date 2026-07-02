@@ -47,6 +47,9 @@ public class AdminController : ControllerBase
         if (user == null)
             return NotFound(new { message = "User not found." });
 
+        if (id == CurrentAdminId)
+            return BadRequest(new { message = "Admin không thể tự suspend tài khoản của mình." });
+
         if (user.Status == "Suspended")
             return BadRequest(new { message = "User is already suspended." });
 
@@ -340,15 +343,15 @@ public class AdminController : ControllerBase
             }
         });
     }
-    // ── MODULE C: Horse Approval ──────────────────────────────────────────────
+    // ── MODULE C: Horse Enrollment Approval (duyệt ngựa theo từng giải) ────────
 
-    [HttpGet("horses/pending")]
-    [ProducesResponseType(typeof(ApiResponse<List<HorseResponseDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetPendingHorses(
+    [HttpGet("horse-entries/pending")]
+    [ProducesResponseType(typeof(ApiResponse<List<HorseEnrollmentResponseDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPendingEnrollments(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        var result = await _horseService.GetPendingHorsesAsync(page, pageSize);
+        var result = await _horseService.GetPendingEnrollmentsAsync(page, pageSize);
         return Ok(result);
     }
 
@@ -362,22 +365,22 @@ public class AdminController : ControllerBase
         return Ok(result);
     }
 
-    [HttpPatch("horses/{id:int}/approve")]
+    [HttpPatch("horse-entries/{id:int}/approve")]
     [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> ApproveHorse(int id)
+    public async Task<IActionResult> ApproveEnrollment(int id)
     {
-        var result = await _horseService.ApproveHorseAsync(CurrentAdminId, id);
+        var result = await _horseService.ApproveEnrollmentAsync(CurrentAdminId, id);
         if (!result.Success) return BadRequest(result);
         return Ok(result);
     }
 
-    [HttpPatch("horses/{id:int}/reject")]
+    [HttpPatch("horse-entries/{id:int}/reject")]
     [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> RejectHorse(int id, [FromBody] AdminRejectHorseDto dto)
+    public async Task<IActionResult> RejectEnrollment(int id, [FromBody] AdminRejectHorseDto dto)
     {
-        var result = await _horseService.RejectHorseAsync(CurrentAdminId, id, dto);
+        var result = await _horseService.RejectEnrollmentAsync(CurrentAdminId, id, dto);
         if (!result.Success) return BadRequest(result);
         return Ok(result);
     }
@@ -454,6 +457,7 @@ public class AdminController : ControllerBase
                 a.OldValue,
                 a.NewValue,
                 a.IpAddress,
+                a.UserAgent,
                 a.CreatedAt
             })
             .ToListAsync();

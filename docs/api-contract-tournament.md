@@ -1,6 +1,6 @@
 # API Contract — Module B: Quản lý Giải đấu
 
-**Phiên bản:** 3.0 — đồng bộ SRS v2 (TRN.8 state machine cấp giải, TRN.10 cancellation flow, TRN.11 roster screening)
+**Phiên bản:** 3.1 — đồng bộ SRS v2 (TRN.8 state machine cấp giải, TRN.10 cancellation flow, TRN.11 roster screening) + validate tính liên tục thời gian giữa các Round và field tính toán quỹ thưởng
 **Base URL:** `http://localhost:5000/api`
 **Auth header:** `Authorization: Bearer <jwt_token>`
 
@@ -8,6 +8,10 @@
 > - State machine giải đấu **bỏ `Pre-Race` và `In-Progress`** — đây là trạng thái cấp **Race**, không còn ở Tournament. Tournament chỉ còn `Draft → Open Registration → Closed Registration → Completed` (+ `Cancelled`).
 > - Endpoint cập nhật giải (PUT) chỉ cho sửa khi `Draft` hoặc `Open Registration`.
 > - Bổ sung nhóm endpoint **Tournament Participants (roster)** — TRN.11.
+>
+> **Thay đổi mới trong v3.1:**
+> - `TournamentResponseDto` có thêm `allocatedPurse` (tổng quỹ đã phân bổ cho Race) và `remainingPurse` (`purseAmount - allocatedPurse`); `RoundResponseDto` có thêm `allocatedPurse` cấp vòng. Áp dụng cho endpoint 1, 3, 5, 6, 7, 8.
+> - Tạo vòng đấu (endpoint 3) giờ validate thêm **tính liên tục thời gian giữa các Round**: vòng sau phải diễn ra sau race cuối của vòng trước và trước ngày của vòng kế tiếp (nếu đã tồn tại).
 
 ---
 
@@ -135,6 +139,8 @@ POST /api/tournament
     "raceDistance":                  1600,
     "raceCategory":                  "Open",
     "purseAmount":                   300000000,
+    "allocatedPurse":                0,
+    "remainingPurse":                300000000,
     "entryFeeAmount":                5000000,
     "preRaceWeightThresholdKg":      2.0,
     "postRaceWeightDiffThresholdKg": 1.0,
@@ -145,6 +151,8 @@ POST /api/tournament
   }
 }
 ```
+
+> `allocatedPurse` = tổng `purseAmount` của mọi Race trong giải (`SUM` qua mọi Round); `remainingPurse = purseAmount - allocatedPurse`. Giải mới tạo chưa có Race nào nên `allocatedPurse = 0`. Hai field này xuất hiện ở **mọi** response trả về `TournamentResponseDto` (endpoint 1, 5, 6, 7, 8).
 
 ---
 
@@ -269,7 +277,11 @@ POST /api/tournament/{id}/rounds
 
 - `scheduledDate` phải nằm trong khoảng `[tournament.startDate, tournament.endDate]`.
 - `sequenceOrder` không được trùng trong cùng một tournament.
-- Round được tạo với `status = "Upcoming"`, `races = []`.
+- **Tính liên tục thời gian giữa các vòng** (validate mỗi khi tạo Round mới, không phụ thuộc thứ tự tạo):
+  - `scheduledDate` phải **sau** race cuối cùng (`MAX(race.scheduledTime)`) của vòng ngay trước đó (theo `sequenceOrder`); nếu vòng trước chưa có race nào thì so sánh với `scheduledDate` của vòng đó.
+  - `scheduledDate` phải **trước** `scheduledDate` của vòng kế tiếp (nếu vòng đó đã tồn tại).
+  - Đảm bảo các vòng không chồng chéo thời gian dù Admin tạo Round không theo đúng thứ tự `sequenceOrder`.
+- Round được tạo với `status = "Upcoming"`, `allocatedPurse = 0`, `races = []`.
 
 ---
 
@@ -279,15 +291,18 @@ POST /api/tournament/{id}/rounds
 {
   "success": true,
   "data": {
-    "roundId":       1,
-    "name":          "Vòng loại",
-    "sequenceOrder": 1,
-    "scheduledDate": "2026-07-03T08:00:00Z",
-    "status":        "Upcoming",
-    "races":         []
+    "roundId":         1,
+    "name":            "Vòng loại",
+    "sequenceOrder":   1,
+    "scheduledDate":   "2026-07-03T08:00:00Z",
+    "status":          "Upcoming",
+    "allocatedPurse":  0,
+    "races":           []
   }
 }
 ```
+
+> `allocatedPurse` = tổng `purseAmount` của các Race thuộc vòng này (`SUM(Races.purseAmount)`). Round mới tạo luôn = 0 vì chưa có Race nào.
 
 ---
 
@@ -296,11 +311,13 @@ POST /api/tournament/{id}/rounds
 | # | Request body | Expected |
 |---|-------------|----------|
 | ✅ Round 1 hợp lệ | `name="Vòng loại"`, `sequenceOrder=1`, `scheduledDate` trong khoảng giải | 200 |
-| ✅ Round 2 hợp lệ | `name="Chung kết"`, `sequenceOrder=2`, `scheduledDate` trong khoảng giải | 200 |
-| ✅ Round 3 hợp lệ | `name="Bán kết"`, `sequenceOrder=3`, `scheduledDate` trong khoảng giải | 200 |
+| ✅ Round 2 hợp lệ | `name="Chung kết"`, `sequenceOrder=2`, `scheduledDate` sau race cuối Round 1 | 200 |
+| ✅ Round 3 hợp lệ | `name="Bán kết"`, `sequenceOrder=3`, `scheduledDate` sau race cuối Round 2 | 200 |
 | ❌ sequenceOrder trùng | `sequenceOrder=1` lần 2 | 400 — đã tồn tại |
 | ❌ scheduledDate trước startDate giải | `"scheduledDate": "2026-06-01T00:00:00Z"` | 400 — ngoài khoảng |
 | ❌ scheduledDate sau endDate giải | `"scheduledDate": "2026-08-01T00:00:00Z"` | 400 — ngoài khoảng |
+| ❌ scheduledDate trùng/trước race cuối vòng trước | Round 2 có `scheduledDate` ≤ `MAX(race.scheduledTime)` của Round 1 | 400 — phải sau race cuối vòng trước |
+| ❌ scheduledDate sau vòng kế tiếp | Tạo Round có `sequenceOrder` xen giữa 2 round đã tồn tại nhưng `scheduledDate` ≥ vòng kế tiếp | 400 — phải trước ngày vòng kế tiếp |
 | ❌ name rỗng | `"name": ""` | 400 — Required |
 | ❌ tournamentId không tồn tại | `POST /api/tournament/99999/rounds` | 404 |
 
@@ -315,6 +332,8 @@ POST /api/tournament/{id}/rounds
 | 400 | `sequenceOrder` ngoài 1–100 | 🟡 Data Annotation |
 | 400 | `scheduledDate` ngoài khoảng tournament | 🔴 Business logic |
 | 400 | `sequenceOrder` đã tồn tại trong tournament | 🔴 Business logic |
+| 400 | `scheduledDate` không sau race cuối của vòng trước | 🔴 Business logic |
+| 400 | `scheduledDate` không trước `scheduledDate` của vòng kế tiếp | 🔴 Business logic |
 | 404 | `id` không tồn tại | 🔴 Business logic |
 
 ---
@@ -455,6 +474,8 @@ GET /api/tournament
       "raceDistance":  1600,
       "raceCategory":  "Open",
       "purseAmount":   300000000,
+      "allocatedPurse": 0,
+      "remainingPurse": 300000000,
       "status":        "Draft"
     }
   ]
@@ -493,6 +514,8 @@ Trả về đầy đủ nested: tournament → rounds → races + prizeDistribut
     "raceDistance":                  1600,
     "raceCategory":                  "Open",
     "purseAmount":                   300000000,
+    "allocatedPurse":                270000000,
+    "remainingPurse":                30000000,
     "entryFeeAmount":                5000000,
     "preRaceWeightThresholdKg":      2.0,
     "postRaceWeightDiffThresholdKg": 1.0,
@@ -507,11 +530,12 @@ Trả về đầy đủ nested: tournament → rounds → races + prizeDistribut
     ],
     "rounds": [
       {
-        "roundId":       1,
-        "name":          "Vòng loại",
-        "sequenceOrder": 1,
-        "scheduledDate": "2026-07-03T08:00:00Z",
-        "status":        "Upcoming",
+        "roundId":         1,
+        "name":            "Vòng loại",
+        "sequenceOrder":   1,
+        "scheduledDate":   "2026-07-03T08:00:00Z",
+        "status":          "Upcoming",
+        "allocatedPurse":  90000000,
         "races": [
           {
             "raceId":                  1,
@@ -546,11 +570,12 @@ Trả về đầy đủ nested: tournament → rounds → races + prizeDistribut
         ]
       },
       {
-        "roundId":       2,
-        "name":          "Chung kết",
-        "sequenceOrder": 2,
-        "scheduledDate": "2026-07-10T08:00:00Z",
-        "status":        "Upcoming",
+        "roundId":         2,
+        "name":            "Chung kết",
+        "sequenceOrder":   2,
+        "scheduledDate":   "2026-07-10T08:00:00Z",
+        "status":          "Upcoming",
+        "allocatedPurse":  180000000,
         "races": [
           { "raceId": 4, "raceNumber": 1, "purseAmount": 50000000, "status": "Upcoming" },
           { "raceId": 5, "raceNumber": 2, "purseAmount": 50000000, "status": "Upcoming" },

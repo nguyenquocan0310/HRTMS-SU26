@@ -12,7 +12,7 @@ public class HorseIdentityResultDto
 
     public string HorseName { get; set; } = null!;
 
-    public string HorseIdentityStatus { get; set; } = null!;
+    public string HorseIdentityCheckStatus { get; set; } = null!;
 
     public bool IsEmergencyDisqualified { get; set; }
 

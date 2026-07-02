@@ -16,7 +16,7 @@ SET NUMERIC_ROUNDABORT OFF;
 SET NOCOUNT ON;
 
 DECLARE @Now DATETIME2 = SYSUTCDATETIME();
-DECLARE @PasswordHash NVARCHAR(255) = N'$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';
+DECLARE @PasswordHash NVARCHAR(255) = N'$2a$12$h5ACuyerc5Y4nYStAGnYlOJVNBMkbMzRfnHCMGQZuk0LApe0xrO5y';
 
 BEGIN TRY
     BEGIN TRANSACTION;
@@ -184,6 +184,93 @@ BEGIN TRY
         SET IDENTITY_INSERT dbo.Races OFF;
     END
 
+    -- Roster: Owner + Jockey + Referee + Doctor đã Approved trong giải 9001
+    IF NOT EXISTS (SELECT 1 FROM dbo.TournamentParticipants WHERE ParticipantId IN (9401, 9402, 9403, 9404))
+    BEGIN
+        SET IDENTITY_INSERT dbo.TournamentParticipants ON;
+
+        INSERT INTO dbo.TournamentParticipants
+            (ParticipantId, TournamentId, UserId, [Role], [Status], ScreeningStatus,
+             ScreeningReason, RejectionReason, RegisteredAt, ApprovedBy, ApprovedAt)
+        VALUES
+            (9401, 9001, 9002, N'Owner',   N'Approved', N'AutoEligible', N'Owner active va dinh danh day du.', NULL, @Now, 9001, @Now),
+            (9402, 9001, 9003, N'Jockey',  N'Approved', N'AutoEligible', N'Jockey du kinh nghiem toi thieu.', NULL, @Now, 9001, @Now),
+            (9403, 9001, 9004, N'Referee', N'Approved', N'AutoEligible', N'Trong tai da active.', NULL, @Now, 9001, @Now),
+            (9404, 9001, 9005, N'Doctor',  N'Approved', N'AutoEligible', N'Bac si da active.', NULL, @Now, 9001, @Now);
+
+        SET IDENTITY_INSERT dbo.TournamentParticipants OFF;
+    END
+
+    -- Kho ngua (schema v3): ho so vinh vien cua Owner 9002, KHONG gan giai
+    IF NOT EXISTS (SELECT 1 FROM dbo.Horses WHERE HorseId IN (9501, 9502))
+    BEGIN
+        SET IDENTITY_INSERT dbo.Horses ON;
+
+        INSERT INTO dbo.Horses
+            (HorseId, OwnerId, [Name], BirthYear, Gender, Color, Pedigree, Weight,
+             IdentifyingMarks, Breed, VaccinationRecordRef, DopingTestDate, DopingTestResult,
+             LegalConsentAccepted, [Status], ScreeningStatus, ScreeningReason, AdminApprovalStatus,
+             RejectionReason, CreatedAt, UpdatedAt)
+        VALUES
+            (9501, 9002, N'Hong Linh', 2020, N'Male', N'Nau sam', N'Sire A x Dam A', 472.50,
+             N'Vet trang nho o tran', N'Thoroughbred', N'VAC-HL-2026', '2026-06-20', N'Clean',
+             1, N'Active', N'AutoEligible', NULL, N'Approved', NULL, @Now, @Now),
+            (9502, 9002, N'Bach Ma Son', 2019, N'Gelding', N'Xam', N'Sire B x Dam B', 468.00,
+             N'Chan sau trai co khoang trang', N'Thoroughbred', N'VAC-BMS-2026', '2026-06-20', N'Clean',
+             1, N'Active', N'AutoEligible', NULL, N'Approved', NULL, @Now, @Now);
+
+        SET IDENTITY_INSERT dbo.Horses OFF;
+    END
+
+    -- Enrollment (HorseTournamentEntries): day 2 con ngua vao giai 9001, screening theo giai
+    IF OBJECT_ID(N'dbo.HorseTournamentEntries', N'U') IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM dbo.HorseTournamentEntries WHERE EnrollmentId IN (9551, 9552))
+    BEGIN
+        SET IDENTITY_INSERT dbo.HorseTournamentEntries ON;
+
+        INSERT INTO dbo.HorseTournamentEntries
+            (EnrollmentId, HorseId, TournamentId, OwnerId, [Status],
+             ScreeningStatus, ScreeningReason, AdminApprovalStatus, RejectionReason, CreatedAt, UpdatedAt)
+        VALUES
+            (9551, 9501, 9001, 9002, N'Enrolled', N'AutoEligible', N'Khop dieu kien giai.', N'Approved', NULL, @Now, @Now),
+            (9552, 9502, 9001, 9002, N'Enrolled', N'AutoEligible', N'Khop dieu kien giai.', N'Approved', NULL, @Now, @Now);
+
+        SET IDENTITY_INSERT dbo.HorseTournamentEntries OFF;
+    END
+
+    -- Pairings: ghep ngua da enroll voi Jockey 9003 trong giai 9001
+    IF NOT EXISTS (SELECT 1 FROM dbo.Pairings WHERE PairingId IN (9601, 9602))
+    BEGIN
+        SET IDENTITY_INSERT dbo.Pairings ON;
+
+        INSERT INTO dbo.Pairings
+            (PairingId, TournamentId, HorseId, JockeyId, [Status], RequestMessage, ResponseReason, CreatedAt, UpdatedAt)
+        VALUES
+            (9601, 9001, 9501, 9003, N'Accepted', N'Moi tham gia race vong loai.', N'Da nhan loi.', @Now, @Now),
+            (9602, 9001, 9502, 9003, N'Pending',  N'Moi du bi cho ban ket.', NULL, @Now, @Now);
+
+        SET IDENTITY_INSERT dbo.Pairings OFF;
+    END
+
+    -- RaceEntry mau: pairing 9601 da Confirmed + Paid trong Race 9001
+    IF NOT EXISTS (SELECT 1 FROM dbo.RaceEntries WHERE RaceEntryId = 9701)
+    BEGIN
+        SET IDENTITY_INSERT dbo.RaceEntries ON;
+
+        INSERT INTO dbo.RaceEntries
+            (RaceEntryId, RaceId, PairingId, PostPosition, [Status], PreRaceJockeyWeight,
+             PreRaceWeightByDoctorId, HorseIdentityCheckStatus, HorseIdentityCheckedByDoctorId,
+             HorseIdentityCheckedAt, ClinicalStatus, ClinicalCheckedByDoctorId, ClinicalCheckedAt,
+             IndependenceCheckStatus, IndependenceCheckedByRefereeId, IndependenceCheckedAt,
+             IndependenceViolationReason, EntryFeeStatus, EntryFeeConfirmedBy, EntryFeeConfirmedAt,
+             CreatedAt, UpdatedAt)
+        VALUES
+            (9701, 9001, 9601, 1, N'Confirmed', 53.60, 9005, N'Matched', 9005, @Now,
+             N'Fit', 9005, @Now, N'Passed', 9004, @Now, NULL, N'Paid', 9001, @Now, @Now, @Now);
+
+        SET IDENTITY_INSERT dbo.RaceEntries OFF;
+    END
+
     COMMIT TRANSACTION;
 END TRY
 BEGIN CATCH
@@ -202,6 +289,16 @@ BEGIN CATCH
         BEGIN TRY SET IDENTITY_INSERT dbo.Rounds OFF; END TRY BEGIN CATCH PRINT N'Identity cleanup skipped for Rounds.'; END CATCH;
     IF OBJECTPROPERTY(OBJECT_ID(N'dbo.Races'), 'TableHasIdentity') = 1
         BEGIN TRY SET IDENTITY_INSERT dbo.Races OFF; END TRY BEGIN CATCH PRINT N'Identity cleanup skipped for Races.'; END CATCH;
+    IF OBJECTPROPERTY(OBJECT_ID(N'dbo.TournamentParticipants'), 'TableHasIdentity') = 1
+        BEGIN TRY SET IDENTITY_INSERT dbo.TournamentParticipants OFF; END TRY BEGIN CATCH PRINT N'Identity cleanup skipped for TournamentParticipants.'; END CATCH;
+    IF OBJECTPROPERTY(OBJECT_ID(N'dbo.Horses'), 'TableHasIdentity') = 1
+        BEGIN TRY SET IDENTITY_INSERT dbo.Horses OFF; END TRY BEGIN CATCH PRINT N'Identity cleanup skipped for Horses.'; END CATCH;
+    IF OBJECT_ID(N'dbo.HorseTournamentEntries', N'U') IS NOT NULL
+        BEGIN TRY SET IDENTITY_INSERT dbo.HorseTournamentEntries OFF; END TRY BEGIN CATCH PRINT N'Identity cleanup skipped for HorseTournamentEntries.'; END CATCH;
+    IF OBJECTPROPERTY(OBJECT_ID(N'dbo.Pairings'), 'TableHasIdentity') = 1
+        BEGIN TRY SET IDENTITY_INSERT dbo.Pairings OFF; END TRY BEGIN CATCH PRINT N'Identity cleanup skipped for Pairings.'; END CATCH;
+    IF OBJECTPROPERTY(OBJECT_ID(N'dbo.RaceEntries'), 'TableHasIdentity') = 1
+        BEGIN TRY SET IDENTITY_INSERT dbo.RaceEntries OFF; END TRY BEGIN CATCH PRINT N'Identity cleanup skipped for RaceEntries.'; END CATCH;
 
     THROW;
 END CATCH;
