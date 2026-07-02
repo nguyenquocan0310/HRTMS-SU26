@@ -33,6 +33,8 @@ Errors: `404 RACE_NOT_FOUND` · `404 PAIRING_NOT_FOUND` · `409 RACE_ALREADY_DRA
 
 > `entryFeeStatus` được set tự động khi tạo: `Paid` nếu `Tournament.EntryFeeAmount == 0`, ngược lại `Unpaid`.
 
+> Sau khi allocate thành công, gửi Notification đến Owner **(in-app + email)**: `title = "Ngựa đã được xếp vào cuộc đua"`, nhắc xác nhận trước cut-off.
+
 ## 2. Bốc thăm vị trí xuất phát — SCH.2
 `POST /api/admin/races/{raceId}/draw` · Role: **Admin**
 
@@ -68,7 +70,7 @@ Errors: `404 ENTRY_NOT_FOUND` · `403 FORBIDDEN` · `409 INVALID_STATUS` · `422
 ```
 Errors: `404 ENTRY_NOT_FOUND` · `403 FORBIDDEN`.
 Idempotent (BR-36): gọi lại khi đã `Cancelled` → `alreadyWithdrawn=true`, không tác động phụ.
-Hành vi: `Cancelled` + `PostPosition=null` (Vacant) + Prediction `Pending→Refunded` + entry `Paid→Refund Pending` + URGENT cho Admin + AuditLog, tất cả trong 1 transaction.
+Hành vi: `Cancelled` + `PostPosition=null` (Vacant) + Prediction `Pending→Refunded` + entry `Paid→Refund Pending` + URGENT cho Admin **(in-app + email)** + Notification cho Owner & Jockey **(in-app + email)** + AuditLog, tất cả trong 1 transaction.
 
 ---
 
