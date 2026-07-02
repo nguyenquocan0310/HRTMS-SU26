@@ -23,10 +23,10 @@ export const getPendingHorses = async (): Promise<HorsePending[]> => {
 };
 
 export const approveHorse = (id: number): Promise<unknown> =>
-  apiFetch(`/admin/horses/${id}/approve`, { method: 'PATCH' });
+  apiFetch(`/admin/horses-entries/${id}/approve`, { method: 'PATCH' });
 
 export const rejectHorse = (id: number, reason: string): Promise<unknown> =>
-  apiFetch(`/admin/horses/${id}/reject`, {
+  apiFetch(`/admin/horses-entries/${id}/reject`, {
     method: 'PATCH',
     body: JSON.stringify({ reason }),
   });
