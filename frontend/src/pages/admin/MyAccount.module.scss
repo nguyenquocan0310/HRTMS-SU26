@@ -1,0 +1,75 @@
+.container { display: flex; flex-direction: column; gap: 1.5rem; }
+.pageHeader { display: flex; flex-direction: column; gap: 0.2rem; }
+.heading { font-size: 1.65rem; font-weight: 800; color: #111; margin: 0; }
+.subtext { font-size: 0.88rem; color: #888; margin: 0; }
+.sectionHeader { display: flex; flex-direction: column; gap: 0.4rem; }
+.statusBadge { display: inline-flex; width: fit-content; padding: 0.25rem 0.75rem; border-radius: 999px; background: #dcfce7; color: #16a34a; font-size: 0.72rem; font-weight: 700; }
+.sectionTitle { font-size: 1.3rem; font-weight: 800; color: #111; margin: 0; }
+.sectionDesc { font-size: 0.85rem; color: #888; margin: 0; }
+.loading { color: #999; padding: 2rem; text-align: center; }
+
+/* ─── Info grid ─── */
+.infoGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.infoCard {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cardIcon { color: #2563eb; }
+.cardLabel { font-size: 0.8rem; color: #888; }
+.cardValue { font-size: 1.05rem; font-weight: 700; color: #111; }
+
+/* ─── Section ─── */
+.section { display: flex; flex-direction: column; gap: 0.75rem; }
+.sectionSubTitle { font-size: 1rem; font-weight: 700; color: #111; margin: 0; }
+.sectionSubDesc { font-size: 0.82rem; color: #888; margin: 0; }
+
+/* ─── Role card ─── */
+.roleCard {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  overflow: hidden;
+  min-height: 120px;
+}
+
+.roleGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0; }
+.roleItem {
+  display: flex; flex-direction: column; gap: 0.3rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #f0f0f0;
+  border-right: 1px solid #f0f0f0;
+  &:nth-child(even) { border-right: none; }
+}
+.roleLabel { font-size: 0.75rem; color: #888; }
+.roleValue { font-size: 0.95rem; font-weight: 600; color: #111; }
+
+/* ─── Empty ─── */
+.empty { display: flex; flex-direction: column; align-items: center; gap: 0.65rem; padding: 2.5rem 1.5rem; text-align: center; }
+.emptyIcon { width: 48px; height: 48px; border-radius: 50%; background: #f3f4f6; display: flex; align-items: center; justify-content: center; color: #9ca3af; }
+.emptyTitle { font-size: 0.95rem; font-weight: 700; color: #111; margin: 0; }
+.emptyDesc { font-size: 0.82rem; color: #888; margin: 0; }
+
+/* ─── Security ─── */
+.secGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.secCard {
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+  padding: 1.25rem; font-size: 0.82rem; color: #555; line-height: 1.6;
+  code { background: #f3f4f6; padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.78rem; color: #333; }
+}
+
+@media (max-width: 900px) {
+  .infoGrid { grid-template-columns: 1fr; }
+  .secGrid { grid-template-columns: 1fr; }
+  .roleGrid { grid-template-columns: 1fr; }
+}

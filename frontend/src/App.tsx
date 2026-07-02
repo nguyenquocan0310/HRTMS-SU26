@@ -13,6 +13,8 @@ import TournamentHub from './pages/admin/TournamentHub'
 import Leaderboard from './pages/admin/Leaderboard'
 import LiveRaceView from './pages/admin/LiveRaceView'
 import NotificationCenter from './pages/admin/NotificationCenter'
+import MyAccount from './pages/admin/MyAccount'
+
 
 // ── Import các trang Owner ──
 import MyHorses from './pages/owner/MyHorses'
@@ -195,6 +197,7 @@ export default function App() {
           <Route path="leaderboard" element={<Leaderboard />} />
           <Route path="live-race" element={<LiveRaceView />} />
           <Route path="notifications" element={<NotificationCenter />} />
+          <Route path="my-account" element={<MyAccount />} />
         </Route>
 
         <Route path="/unauthorized" element={<div>403 — Không có quyền truy cập</div>} />

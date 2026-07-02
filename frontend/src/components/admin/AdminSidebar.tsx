@@ -1,7 +1,8 @@
 import { NavLink } from 'react-router-dom';
 import {
-  FiGrid, FiShield, FiUsers, FiAward, FiFlag, FiCreditCard,
-  FiTrendingUp, FiChevronLeft, FiMonitor, FiBell, FiUser,
+  FiGrid, FiShield, FiUsers, FiList, FiPlusCircle,
+  FiFlag, FiCreditCard, FiTrendingUp, FiChevronLeft,
+  FiMonitor, FiBell, FiUser, FiAward,
 } from 'react-icons/fi';
 import styles from './AdminSidebar.module.scss';
 
@@ -11,7 +12,8 @@ const OPERATIONS_ITEMS: NavItem[] = [
   { label: 'Dashboard', path: '/admin', icon: <FiGrid size={18} /> },
   { label: 'Approval Center', path: '/admin/approval-center', icon: <FiShield size={18} /> },
   { label: 'Users', path: '/admin/users', icon: <FiUsers size={18} /> },
-  { label: 'Tournaments', path: '/admin/tournaments', icon: <FiAward size={18} /> },
+  { label: 'Tournaments', path: '/admin/tournaments', icon: <FiList size={18} /> },
+  { label: 'Tournament Builder', path: '/admin/tournament-builder', icon: <FiPlusCircle size={18} /> },
   { label: 'Race Operations', path: '/admin/race-operations', icon: <FiFlag size={18} /> },
   { label: 'Entry Fees', path: '/admin/entry-fees', icon: <FiCreditCard size={18} /> },
 ];
