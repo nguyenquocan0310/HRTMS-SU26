@@ -207,6 +207,56 @@ public class HorseService : IHorseService
         return ApiResponse<List<HorseEnrollmentResponseDto>>.Ok(result);
     }
 
+    /// <summary>
+    /// Owner rút một con ngựa khỏi một giải (soft-withdraw enrollment) — CHỈ khi chưa có pairing
+    /// active trong giải đó. Không hard-delete vì FK_Pairings_HorseTournament trỏ vào row này.
+    /// </summary>
+    public async Task<ApiResponse<string>> WithdrawEnrollmentAsync(int ownerId, int horseId, int enrollmentId)
+    {
+        var entry = await _context.HorseTournamentEntries
+            .Include(e => e.Horse)
+            .Include(e => e.Tournament)
+            .FirstOrDefaultAsync(e => e.EnrollmentId == enrollmentId);
+
+        if (entry == null || entry.HorseId != horseId)
+            return ApiResponse<string>.Fail("ENROLLMENT_NOT_FOUND");
+        if (entry.OwnerId != ownerId)
+            return ApiResponse<string>.Fail("ENROLLMENT_NOT_OWNED");
+        if (entry.Status == "Withdrawn")
+            return ApiResponse<string>.Fail("ALREADY_WITHDRAWN");
+
+        // "Trước khi pairing": chặn rút nếu ngựa đã có pairing active trong đúng giải này.
+        var hasActivePairing = await _context.Pairings.AnyAsync(p =>
+            p.HorseId == horseId &&
+            p.TournamentId == entry.TournamentId &&
+            (p.Status == "Pending" || p.Status == "Accepted" || p.Status == "Confirmed"));
+        if (hasActivePairing)
+            return ApiResponse<string>.Fail(
+                "PAIRING_EXISTS: ngựa đã có ghép cặp trong giải này. Hãy hủy pairing trước khi rút ngựa khỏi giải.");
+
+        entry.Status = "Withdrawn";
+        entry.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        await _auditLog.LogAsync(ownerId, "Withdraw_Enrollment", "HorseTournamentEntry",
+            enrollmentId.ToString(), "Enrolled", "Withdrawn", null);
+
+        _context.Notifications.Add(new Notification
+        {
+            RecipientId = ownerId,
+            Title = "Đã rút ngựa khỏi giải",
+            Message = $"Ngựa '{entry.Horse.Name}' đã được rút khỏi giải '{entry.Tournament.Name}'.",
+            Type = "In-app",
+            IsRead = false,
+            RelatedEntityType = "HorseTournamentEntry",
+            RelatedEntityId = enrollmentId,
+            SentAt = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+
+        return ApiResponse<string>.Ok("Đã rút ngựa khỏi giải.");
+    }
+
     public async Task<ApiResponse<List<HorseResponseDto>>> GetMyHorsesAsync(
         int ownerId, string? approvalStatus, int page, int pageSize)
     {

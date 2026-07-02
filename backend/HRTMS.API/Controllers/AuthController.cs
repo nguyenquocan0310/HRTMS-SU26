@@ -74,6 +74,36 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>PWD.1 — Gửi email đặt lại mật khẩu</summary>
+    /// <summary>ACC.3 — Cập nhật FullName/Email chung cho mọi role</summary>
+    [HttpPatch("me")]
+    [Authorize]
+    public async Task<IActionResult> UpdateMe([FromBody] UpdateBasicInfoDto dto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var result = await _profileService.UpdateBasicInfoAsync(userId, dto, ip);
+        if (!result.Success)
+        {
+            var isConflict = result.Message?.Contains("sử dụng") == true;
+            return isConflict ? Conflict(result) : BadRequest(result);
+        }
+        return Ok(result);
+    }
+
+    /// <summary>ACC.3 — Đổi mật khẩu (yêu cầu xác thực mật khẩu hiện tại)</summary>
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var result = await _profileService.ChangePasswordAsync(userId, dto, ip);
+        return result.Success ? Ok(result) : BadRequest(result);
+    }
     [HttpPost("forgot-password")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
     {

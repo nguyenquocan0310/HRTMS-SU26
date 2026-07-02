@@ -1,4 +1,5 @@
 ﻿using HRTMS.Core.DTOs.Referee;
+using HRTMS.Core.DTOs.Assignment;
 using HRTMS.Core.Entities;
 using HRTMS.Core.Interfaces.Services;
 using HRTMS.Infrastructure.Data;
@@ -225,4 +226,35 @@ public class RefereeAssignmentService : IRefereeAssignmentService
         _context.RefereeAssignments.Remove(assignment);
         await _context.SaveChangesAsync();
     }
+    public async Task<List<MyRaceAssignmentDto>> GetMyAssignmentsAsync(
+    int refereeId)
+{
+    // Lay danh sach Race ma Referee duoc phan cong
+    var assignments = await _context.RefereeAssignments
+        .AsNoTracking()
+        .Include(a => a.Race)
+            .ThenInclude(r => r.Round)
+                .ThenInclude(round => round.Tournament)
+        .Where(a => a.RefereeId == refereeId)
+        .OrderBy(a => a.Race.ScheduledTime)
+        .Select(a => new MyRaceAssignmentDto
+        {
+            RaceId = a.RaceId,
+            RaceNumber = a.Race.RaceNumber,
+            ScheduledTime = a.Race.ScheduledTime,
+            RaceStatus = a.Race.Status,
+            RoundId = a.Race.RoundId,
+            RoundName = a.Race.Round.Name,
+            TournamentId = a.Race.Round.TournamentId,
+            TournamentName = a.Race.Round.Tournament.Name,
+
+            // RefereeAssignment co Role
+            AssignmentRole = a.Role,
+
+            AssignedAt = a.AssignedAt
+        })
+        .ToListAsync();
+
+    return assignments;
+}
 }

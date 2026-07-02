@@ -119,5 +119,23 @@ namespace HRTMS.API.Controllers
             var result = await _horseService.GetMyEnrollmentsAsync(CurrentUserId, null, tournamentId, adminApprovalStatus, page, pageSize);
             return Ok(result);
         }
+
+        // Owner rút ngựa khỏi giải (trước khi pairing) — soft-withdraw enrollment.
+        [HttpDelete("{horseId:int}/enrollments/{enrollmentId:int}")]
+        [Authorize(Roles = "Owner")]
+        [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> WithdrawEnrollment(int horseId, int enrollmentId)
+        {
+            var result = await _horseService.WithdrawEnrollmentAsync(CurrentUserId, horseId, enrollmentId);
+            if (!result.Success)
+            {
+                if (result.Message.Contains("NOT_FOUND")) return NotFound(result);
+                if (result.Message.Contains("NOT_OWNED")) return Forbid();
+                return BadRequest(result);
+            }
+            return Ok(result);
+        }
     }
 }

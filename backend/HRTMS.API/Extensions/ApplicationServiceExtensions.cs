@@ -7,7 +7,7 @@ namespace HRTMS.API.Extensions;
 
 public static class ApplicationServiceExtensions
 {
-    // NOTI.2: nhận IConfiguration để bind SmtpSettings — fix lỗi compile "configuration" undefined
+ 
     public static IServiceCollection AddApplicationServices(
         this IServiceCollection services,
         IConfiguration configuration)
@@ -16,6 +16,7 @@ public static class ApplicationServiceExtensions
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IFamilyDeclarationValidator, FamilyDeclarationValidator>();
         services.AddScoped<IFamilyDeclarationService, FamilyDeclarationService>();
+        services.AddScoped<IIdentityResolveService, IdentityResolveService>();
         services.AddScoped<IAuditLogService, AuditLogService>();
         services.AddScoped<ITournamentServices, TournamentSevice>();
         services.AddScoped<ITournamentParticipantService, TournamentParticipantService>();

@@ -20,5 +20,16 @@ public class FamilyDeclarationItemDto
     public string RelationType { get; set; } = string.Empty; // Spouse/Parent/Child/Sibling
 
     public string? IndustryRole { get; set; } // Owner/Jockey/Referee/Doctor (tùy chọn)
+
+    /// <summary>
+    /// CCCD (12 số) của người thân được khai báo — BẮT BUỘC.
+    /// Đây là cơ chế match DUY NHẤT để resolve RelatedUserId + MatchConfidence.
+    /// Không lưu plaintext: chỉ dùng để tính hash (SHA256) so khớp với User.IdentityHash,
+    /// không phải lưu trực tiếp vào entity.
+    /// </summary>
+    [Required(ErrorMessage = "CCCD của người thân là bắt buộc để đối chiếu xung đột lợi ích.")]
+    [RegularExpression(@"^\d{12}$", ErrorMessage = "CCCD phải gồm đúng 12 chữ số.")]
+    public string RelatedIdentityNumber { get; set; } = string.Empty;
+
     public string? Notes { get; set; }
 }

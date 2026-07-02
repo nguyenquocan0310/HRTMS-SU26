@@ -22,8 +22,10 @@ public class AuthService : IAuthService
     private readonly JwtService _jwtService;
     private readonly IAuditLogService _auditLog;
     private readonly IFamilyDeclarationValidator _frdValidator;
+    private readonly IIdentityResolveService _identityResolveService;
     private readonly ITokenBlacklistService _tokenBlacklistService;
     private readonly IEmailService _emailService;
+    private readonly INotificationService _notificationService;
     private readonly IConfiguration _config;
     private readonly byte[] _encryptionKey;
 
@@ -36,7 +38,9 @@ public class AuthService : IAuthService
     private static readonly string[] ProfessionalRoles =
         ["Owner", "Jockey", "Referee", "Doctor"];
 
-    private static readonly string[] RolesRequireFrdAtRegister = ["Jockey", "Referee"];
+    // 4 role bắt buộc khai báo người thân (FRD) — trừ Admin và Spectator.
+    private static readonly string[] RolesRequireFrdAtRegister =
+        ["Owner", "Jockey", "Referee", "Doctor"];
 
     private const int MaxFailedAttempts = 5;
     private const int LockoutMinutes = 30;
@@ -48,16 +52,20 @@ public class AuthService : IAuthService
         JwtService jwtService,
         IAuditLogService auditLog,
         IFamilyDeclarationValidator frdValidator,
+        IIdentityResolveService identityResolveService,
         ITokenBlacklistService tokenBlacklistService,
         IEmailService emailService,
+        INotificationService notificationService,
         IConfiguration configuration)
     {
         _context = context;
         _jwtService = jwtService;
         _auditLog = auditLog;
         _frdValidator = frdValidator;
+        _identityResolveService = identityResolveService;
         _tokenBlacklistService = tokenBlacklistService;
         _emailService = emailService;
+        _notificationService = notificationService;
         _config = configuration;
 
         var keyHex = configuration["Security:IdentityEncryptionKeyHex"];
@@ -202,17 +210,24 @@ public class AuthService : IAuthService
                 && dto.FamilyDeclarations != null
                 && dto.FamilyDeclarations.Count > 0)
             {
-                _context.FamilyRelationshipDeclarations.AddRange(
-                    dto.FamilyDeclarations.Select(f => new FamilyRelationshipDeclaration
+                // CCCD-only resolve cho tung khai bao - dong bo voi FamilyDeclarationService.
+                foreach (var f in dto.FamilyDeclarations)
+                {
+                    var resolveResult = await _identityResolveService.ResolveAsync(f.RelatedIdentityNumber);
+
+                    _context.FamilyRelationshipDeclarations.Add(new FamilyRelationshipDeclaration
                     {
                         DeclarantUserId = user.UserId,
                         RelatedPersonName = f.RelatedPersonName.Trim(),
-                        RelatedUserId = f.RelatedUserId,
+                        RelatedUserId = resolveResult.RelatedUserId,
                         RelationType = f.RelationType,
                         IndustryRole = f.IndustryRole,
+                        RelatedIdentityHash = resolveResult.RelatedIdentityHash,
+                        MatchConfidence = resolveResult.MatchConfidence,
                         Notes = f.Notes,
                         DeclaredAt = now
-                    }));
+                    });
+                }
                 await _context.SaveChangesAsync();
             }
 
@@ -225,6 +240,21 @@ public class AuthService : IAuthService
                 entityId: user.UserId.ToString(),
                 ipAddress: ipAddress,
                 userAgent: userAgent);
+
+            // Welcome notify — gửi SAU khi transaction đã commit, không để lỗi email
+            // (đã tự catch trong NotificationService/EmailService) ảnh hưởng tới đăng ký.
+            var welcomeMessage = initialStatus == "Active"
+                ? $"Chào mừng {user.FullName} đến với HRTMS! Tài khoản của bạn đã sẵn sàng sử dụng."
+                : $"Chào mừng {user.FullName} đến với HRTMS! Hồ sơ {dto.Role} của bạn đang chờ Admin duyệt, " +
+                  "chúng tôi sẽ thông báo ngay khi có kết quả.";
+
+            await _notificationService.SendAsync(
+                user.UserId,
+                "Chào mừng bạn đến với HRTMS",
+                welcomeMessage,
+                type: "Both",
+                relatedEntityType: "Users",
+                relatedEntityId: user.UserId);
 
             return ApiResponse<int>.Ok(user.UserId, "Tạo tài khoản thành công.");
         }

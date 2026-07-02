@@ -48,6 +48,11 @@ app.UseMiddleware<TokenBlacklistMiddleware>();
 
 app.UseAuthorization();
 app.MapControllers();
+
+// Module E (SCH.5 / BR-08) — dang ky recurring job auto-cancel cac RaceEntry qua Confirmation Cut-off.
+// Phai goi sau app.Build(): resolve IRecurringJobManager tu DI da cau hinh o AddHangfireJobs.
+app.UseHangfireRecurringJobs();
+
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;

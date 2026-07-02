@@ -60,8 +60,9 @@ public class RaceEntryService : IRaceEntryService
             .FirstOrDefaultAsync(p => p.PairingId == dto.PairingId)
             ?? throw new KeyNotFoundException("PAIRING_NOT_FOUND");
 
-        // Chi cap da Accepted moi duoc dua vao dua.
-        if (pairing.Status != "Accepted")
+        // SRS SCH.1 — chi cap da Confirmed (jockey accept + owner confirm) moi duoc dua vao dua.
+        // "Accepted" moi chi la jockey dong y, owner chua confirm -> chua du dieu kien.
+        if (pairing.Status != "Confirmed")
             throw new InvalidOperationException("PAIRING_NOT_CONFIRMED");
 
         // Ngua phai da duoc Admin duyet.
