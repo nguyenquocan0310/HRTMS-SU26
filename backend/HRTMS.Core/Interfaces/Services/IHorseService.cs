@@ -19,6 +19,7 @@ namespace HRTMS.Core.Interfaces.Services
         // Owner — Enrollment (đẩy ngựa vào giải)
         Task<ApiResponse<HorseEnrollmentResponseDto>> EnrollHorseAsync(int ownerId, int horseId, EnrollHorseDto dto);
         Task<ApiResponse<List<HorseEnrollmentResponseDto>>> GetMyEnrollmentsAsync(int ownerId, int? horseId, int? tournamentId, string? adminApprovalStatus, int page, int pageSize);
+        Task<ApiResponse<string>> WithdrawEnrollmentAsync(int ownerId, int horseId, int enrollmentId);
 
         // Admin — duyệt enrollment theo từng giải
         Task<ApiResponse<List<HorseEnrollmentResponseDto>>> GetPendingEnrollmentsAsync(int page, int pageSize);
