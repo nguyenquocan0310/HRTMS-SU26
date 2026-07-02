@@ -6,6 +6,17 @@ interface Props {
   onChange: (data: TournamentBasicInfo) => void;
 }
 
+const RACE_DISTANCES = [1000, 1200, 1400, 1600, 1800, 2000];
+
+const formatVND = (n: number | '') =>
+  n === '' ? '' : Number(n).toLocaleString('vi-VN');
+
+const parseVND = (s: string): number | '' => {
+  const cleaned = s.replace(/\./g, '').replace(/,/g, '');
+  const n = Number(cleaned);
+  return isNaN(n) || cleaned === '' ? '' : n;
+};
+
 const TabBasicInfo = ({ data, onChange }: Props) => {
   const update = <K extends keyof TournamentBasicInfo>(field: K, value: TournamentBasicInfo[K]) => {
     onChange({ ...data, [field]: value });
@@ -16,19 +27,20 @@ const TabBasicInfo = ({ data, onChange }: Props) => {
   return (
     <div className={styles.container}>
       <div className={styles.grid}>
-        {/* ─── Name ───────────────────────────────────────────── */}
+
+        {/* Name */}
         <div className={`${styles.field} ${styles.fieldFull}`}>
           <label className={styles.label}>Tên giải đấu</label>
           <input
             type="text"
             className={styles.input}
-            placeholder="Ví dụ: Royal Stakes — Ascot Cup 2026"
+            placeholder="Ví dụ: Royal Stakes – Ascot Cup 2026"
             value={data.name}
             onChange={(e) => update('name', e.target.value)}
           />
         </div>
 
-        {/* ─── Dates ──────────────────────────────────────────── */}
+        {/* Dates */}
         <div className={styles.field}>
           <label className={styles.label}>Ngày bắt đầu</label>
           <input
@@ -52,7 +64,7 @@ const TabBasicInfo = ({ data, onChange }: Props) => {
           )}
         </div>
 
-        {/* ─── Allowed Breed ──────────────────────────────────── */}
+        {/* Allowed Breed */}
         <div className={styles.field}>
           <label className={styles.label}>Allowed Breed (bắt buộc)</label>
           <select
@@ -68,7 +80,7 @@ const TabBasicInfo = ({ data, onChange }: Props) => {
           </select>
         </div>
 
-        {/* ─── Track Type ─────────────────────────────────────── */}
+        {/* Track Type */}
         <div className={styles.field}>
           <label className={styles.label}>Track Type</label>
           <select
@@ -83,19 +95,37 @@ const TabBasicInfo = ({ data, onChange }: Props) => {
           </select>
         </div>
 
-        {/* ─── Race Distance ──────────────────────────────────── */}
+        {/* Race Distance với datalist gợi ý */}
         <div className={styles.field}>
           <label className={styles.label}>Race Distance (mét)</label>
           <input
             type="number"
             className={styles.input}
-            placeholder="Ví dụ: 1600"
+            placeholder="Ví dụ: 1.600"
+            list="race-distance-options"
             value={data.raceDistance}
             onChange={(e) => update('raceDistance', e.target.value ? Number(e.target.value) : '')}
           />
+          <datalist id="race-distance-options">
+            {RACE_DISTANCES.map((d) => (
+              <option key={d} value={d}>{d.toLocaleString('vi-VN')} m</option>
+            ))}
+          </datalist>
+          <div className={styles.suggestions}>
+            {RACE_DISTANCES.map((d) => (
+              <button
+                key={d}
+                type="button"
+                className={`${styles.suggestionBtn} ${data.raceDistance === d ? styles.suggestionBtnActive : ''}`}
+                onClick={() => update('raceDistance', d)}
+              >
+                {d.toLocaleString('vi-VN')}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* ─── Race Category ──────────────────────────────────── */}
+        {/* Race Category */}
         <div className={styles.field}>
           <label className={styles.label}>Race Category</label>
           <select
@@ -110,19 +140,19 @@ const TabBasicInfo = ({ data, onChange }: Props) => {
           </select>
         </div>
 
-        {/* ─── Max Horses ─────────────────────────────────────── */}
+        {/* Max Horses */}
         <div className={styles.field}>
           <label className={styles.label}>Max Horses</label>
           <input
             type="number"
             className={styles.input}
-            placeholder="Ví dụ: 20"
+            placeholder="Ví dụ: 12"
             value={data.maxHorses}
             onChange={(e) => update('maxHorses', e.target.value ? Number(e.target.value) : '')}
           />
         </div>
 
-        {/* ─── Min Jockey Experience ──────────────────────────── */}
+        {/* Min Jockey Experience */}
         <div className={styles.field}>
           <label className={styles.label}>Min Jockey Experience (năm)</label>
           <input
@@ -134,36 +164,35 @@ const TabBasicInfo = ({ data, onChange }: Props) => {
           />
         </div>
 
-        {/* ─── Purse Amount ───────────────────────────────────── */}
+        {/* Purse Amount — format VND */}
         <div className={styles.field}>
           <label className={styles.label}>Purse Amount (quỹ thưởng toàn giải)</label>
           <input
-            type="number"
+            type="text"
             className={styles.input}
-            placeholder="VNĐ"
-            value={data.purseAmount}
-            onChange={(e) => update('purseAmount', e.target.value ? Number(e.target.value) : '')}
+            placeholder="Ví dụ: 500.000.000"
+            value={formatVND(data.purseAmount)}
+            onChange={(e) => update('purseAmount', parseVND(e.target.value))}
           />
         </div>
 
-        {/* ─── Entry Fee ───────────────────────────────────────── */}
+        {/* Entry Fee Amount — format VND, không tự thêm số 0 */}
         <div className={styles.field}>
           <label className={styles.label}>Entry Fee Amount</label>
           <input
-            type="number"
+            type="text"
             className={styles.input}
-            placeholder="0 = miễn phí"
-            value={data.entryFeeAmount}
-            onChange={(e) => update('entryFeeAmount', Number(e.target.value) || 0)}
+            placeholder="Ví dụ: 500.000"
+            value={data.entryFeeAmount === 0 ? '' : formatVND(data.entryFeeAmount)}
+            onChange={(e) => {
+              const val = parseVND(e.target.value);
+              update('entryFeeAmount', val === '' ? 0 : val);
+            }}
           />
-          {data.entryFeeAmount === 0 && (
-            <span className={styles.hintText}>
-              Nếu = 0, hệ thống tự bỏ qua luồng xác nhận phí.
-            </span>
-          )}
+          <span className={styles.hintText}>VND — qua luồng xác nhận phí.</span>
         </div>
 
-        {/* ─── Weight thresholds ──────────────────────────────── */}
+        {/* Weight thresholds */}
         <div className={styles.field}>
           <label className={styles.label}>Pre-Race Weight Threshold (kg)</label>
           <input
@@ -185,6 +214,7 @@ const TabBasicInfo = ({ data, onChange }: Props) => {
             onChange={(e) => update('postRaceWeightDiffThresholdKg', Number(e.target.value) || 0)}
           />
         </div>
+
       </div>
     </div>
   );
