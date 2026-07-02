@@ -123,7 +123,10 @@ const ApprovalCenter = () => {
   const [error, setError] = useState('');
 
   const loadData = useCallback(async () => {
-    if (activeGroup === 'roster') return; // Roster tự load trong RosterApprovalTable.
+    if (activeGroup === 'roster') {
+      setError('');
+      return;
+    } // Roster tự load trong RosterApprovalTable.
     setLoading(true);
     setError('');
     try {

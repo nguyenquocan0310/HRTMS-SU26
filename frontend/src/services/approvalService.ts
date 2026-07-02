@@ -16,17 +16,21 @@ export interface HorsePending {
 }
 
 export const getPendingHorses = async (): Promise<HorsePending[]> => {
-  const res = await apiFetch<{ success: boolean; data: HorsePending[] }>(
-    '/admin/horses/pending?page=1&pageSize=50'
-  );
-  return res.data ?? [];
+  try {
+    const res = await apiFetch<{ success: boolean; data: HorsePending[] }>(
+      '/admin/horses/pending?page=1&pageSize=50'
+    );
+    return res.data ?? [];
+  } catch {
+    return []; 
+  }
 };
 
 export const approveHorse = (id: number): Promise<unknown> =>
-  apiFetch(`/admin/horses/${id}/approve`, { method: 'PATCH' });
+  apiFetch(`/admin/horses-entries/${id}/approve`, { method: 'PATCH' });
 
 export const rejectHorse = (id: number, reason: string): Promise<unknown> =>
-  apiFetch(`/admin/horses/${id}/reject`, {
+  apiFetch(`/admin/horses-entries/${id}/reject`, {
     method: 'PATCH',
     body: JSON.stringify({ reason }),
   });

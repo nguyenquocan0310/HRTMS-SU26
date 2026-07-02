@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FiCheckCircle } from 'react-icons/fi';
+import { FiCheckCircle, FiXCircle, FiCheck } from 'react-icons/fi';
 import { apiFetch } from '../../services/apiClient';
 import styles from './EntryFees.module.scss';
 
@@ -13,12 +13,18 @@ interface FeeEntry {
   createdAt: string;
 }
 
+interface RejectModalState {
+  entryId: number;
+  reason: string;
+}
+
 const EntryFees = () => {
   const [entries, setEntries] = useState<FeeEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [confirmingId, setConfirmingId] = useState<number | null>(null);
   const [msg, setMsg] = useState('');
+  const [actionId, setActionId] = useState<number | null>(null);
+  const [rejectModal, setRejectModal] = useState<RejectModalState | null>(null);
 
   const loadEntries = () => {
     setLoading(true);
@@ -32,18 +38,44 @@ const EntryFees = () => {
   useEffect(() => { loadEntries(); }, []);
 
   const handleConfirmFee = async (id: number) => {
-    setConfirmingId(id);
-    setMsg('');
-    setError('');
+    setActionId(id);
+    setMsg(''); setError('');
     try {
       await apiFetch(`/admin/entries/${id}/fee-status`, { method: 'PATCH' });
       setMsg(`Entry #${id} đã xác nhận phí thành công.`);
       loadEntries();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Xác nhận phí thất bại.');
-    } finally {
-      setConfirmingId(null);
-    }
+    } finally { setActionId(null); }
+  };
+
+  const handleApprove = async (id: number) => {
+    setActionId(id);
+    setMsg(''); setError('');
+    try {
+      await apiFetch(`/admin/entries/${id}/approve`, { method: 'PATCH' });
+      setMsg(`Entry #${id} đã được approve.`);
+      loadEntries();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Approve thất bại.');
+    } finally { setActionId(null); }
+  };
+
+  const handleRejectConfirm = async () => {
+    if (!rejectModal || rejectModal.reason.trim().length < 10) return;
+    setActionId(rejectModal.entryId);
+    setMsg(''); setError('');
+    try {
+      await apiFetch(`/admin/entries/${rejectModal.entryId}/reject`, {
+        method: 'PATCH',
+        body: JSON.stringify({ reason: rejectModal.reason.trim() }),
+      });
+      setMsg(`Entry #${rejectModal.entryId} đã bị reject.`);
+      setRejectModal(null);
+      loadEntries();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Reject thất bại.');
+    } finally { setActionId(null); }
   };
 
   return (
@@ -55,7 +87,7 @@ const EntryFees = () => {
 
       <div className={styles.sectionHeader}>
         <h2 className={styles.sectionTitle}>Entry Fee Management</h2>
-        <p className={styles.sectionDesc}>Xác nhận lệ phí thủ công và khóa approve khi entry chưa Paid.</p>
+        <p className={styles.sectionDesc}>Xác nhận lệ phí thủ công, approve hoặc reject entry tham gia race.</p>
       </div>
 
       {msg && <p className={styles.successMsg}>{msg}</p>}
@@ -81,7 +113,9 @@ const EntryFees = () => {
               ) : (
                 entries.map((entry) => (
                   <tr key={entry.raceEntryId}>
-                    <td className={styles.name}>{entry.horseName} <span className={styles.muted}>#{entry.raceEntryId}</span></td>
+                    <td className={styles.name}>
+                      {entry.horseName} <span className={styles.muted}>#{entry.raceEntryId}</span>
+                    </td>
                     <td>{entry.jockeyName}</td>
                     <td>
                       <span className={`${styles.badge} ${entry.status === 'Confirmed' ? styles.confirmed : styles.pending}`}>
@@ -94,17 +128,40 @@ const EntryFees = () => {
                       </span>
                     </td>
                     <td>
-                      {entry.entryFeeStatus !== 'Paid' && (
+                      <div className={styles.actionBtns}>
+                        {/* Confirm Fee */}
+                        {entry.entryFeeStatus !== 'Paid' && (
+                          <button
+                            type="button"
+                            className={styles.feeBtn}
+                            onClick={() => handleConfirmFee(entry.raceEntryId)}
+                            disabled={actionId === entry.raceEntryId}
+                            title="Xác nhận đã thu phí"
+                          >
+                            <FiCheck size={13} /> Fee
+                          </button>
+                        )}
+                        {/* Approve Entry */}
                         <button
                           type="button"
-                          className={styles.confirmBtn}
-                          onClick={() => handleConfirmFee(entry.raceEntryId)}
-                          disabled={confirmingId === entry.raceEntryId}
+                          className={styles.approveBtn}
+                          onClick={() => handleApprove(entry.raceEntryId)}
+                          disabled={actionId === entry.raceEntryId}
+                          title="Approve entry vào race"
                         >
-                          <FiCheckCircle size={13} />
-                          {confirmingId === entry.raceEntryId ? 'Đang xử lý...' : 'Confirm Fee'}
+                          <FiCheckCircle size={13} /> Approve
                         </button>
-                      )}
+                        {/* Reject Entry */}
+                        <button
+                          type="button"
+                          className={styles.rejectBtn}
+                          onClick={() => setRejectModal({ entryId: entry.raceEntryId, reason: '' })}
+                          disabled={actionId === entry.raceEntryId}
+                          title="Reject entry"
+                        >
+                          <FiXCircle size={13} /> Reject
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -113,6 +170,37 @@ const EntryFees = () => {
           </table>
         </div>
       </div>
+
+      {/* Reject modal */}
+      {rejectModal && (
+        <>
+          <div className={styles.overlay} onClick={() => setRejectModal(null)} />
+          <div className={styles.modal}>
+            <h3 className={styles.modalTitle}>Lý do reject Entry #{rejectModal.entryId}</h3>
+            <textarea
+              className={styles.textarea}
+              rows={4}
+              placeholder="Nhập lý do từ chối (tối thiểu 10 ký tự)..."
+              value={rejectModal.reason}
+              onChange={(e) => setRejectModal({ ...rejectModal, reason: e.target.value })}
+            />
+            {rejectModal.reason.length > 0 && rejectModal.reason.trim().length < 10 && (
+              <p className={styles.errorMsg}>Cần ít nhất 10 ký tự.</p>
+            )}
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.cancelBtn} onClick={() => setRejectModal(null)}>Hủy</button>
+              <button
+                type="button"
+                className={styles.rejectConfirmBtn}
+                onClick={handleRejectConfirm}
+                disabled={rejectModal.reason.trim().length < 10 || actionId !== null}
+              >
+                Xác nhận reject
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
