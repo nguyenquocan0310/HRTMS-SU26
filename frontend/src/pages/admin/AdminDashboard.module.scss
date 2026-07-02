@@ -328,3 +328,56 @@
     margin-left: 3.5rem;
   }
 }
+
+/* ─── Open Tournaments List (thay Integrity Map) ─── */
+.openTourHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.openTourSub {
+  font-size: 0.75rem;
+  color: #999;
+  font-style: italic;
+}
+
+.tourList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tourRow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s;
+  gap: 1rem;
+
+  &:hover {
+    border-color: #2563eb;
+    background: #eff6ff;
+  }
+}
+
+.tourInfo { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; min-width: 0; }
+.tourName { font-size: 0.9rem; font-weight: 600; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tourMeta { font-size: 0.75rem; color: #888; }
+.tourRight { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+.tourStatus {
+  font-size: 0.7rem; font-weight: 700; padding: 0.2rem 0.6rem;
+  border-radius: 999px; background: #dcfce7; color: #16a34a; white-space: nowrap;
+}
+.tourArrow { color: #aaa; }
+.emptyText { color: #aaa; font-size: 0.85rem; padding: 1rem 0; text-align: center; }
+.subtext { font-size: 0.85rem; color: #888; margin: 0.25rem 0 0; }
+.activitySubtext { font-size: 0.82rem; color: #888; margin: 0.2rem 0 0; }

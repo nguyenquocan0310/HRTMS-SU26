@@ -33,7 +33,8 @@ export const getRoster = (
   const query = params.toString() ? `?${params}` : '';
   return apiFetch<ApiResponse<ParticipantResponse[]>>(
     `/tournament/${tournamentId}/participants${query}`
-  ).then((res) => res.data ?? []);
+  ).then((res) => res.data ?? [])
+  .catch(() => []);
 };
 
 export const approveParticipant = (participantId: number): Promise<ParticipantResponse> =>
