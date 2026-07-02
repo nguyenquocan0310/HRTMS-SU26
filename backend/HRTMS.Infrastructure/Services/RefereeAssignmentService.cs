@@ -105,9 +105,9 @@ public class RefereeAssignmentService : IRefereeAssignmentService
                 throw new InvalidOperationException("LEAD_REFEREE_ALREADY_EXISTS");
             }
         }
-        // Kiem tra COI cua Referee voi Owner co ngua trong Race
-        // Referee khong duoc la Spouse, Parent, Child, Sibling cua bat ky Owner nao trong Race
-        var ownerIdsInRace = await (
+        // Kiem tra COI cua Referee voi Owner/Jockey trong Race
+        // Referee khong duoc co quan he gia dinh voi bat ky Owner hoac Jockey nao trong Race
+        var participantUserIdsInRace = await (
             from raceEntry in _context.RaceEntries
             join pairing in _context.Pairings
                 on raceEntry.PairingId equals pairing.PairingId
@@ -115,34 +115,45 @@ public class RefereeAssignmentService : IRefereeAssignmentService
                 on pairing.HorseId equals horse.HorseId
             where raceEntry.RaceId == raceId
                   && raceEntry.Status != "Cancelled"
-            select horse.OwnerId
+            select new
+            {
+                OwnerId = horse.OwnerId,
+                JockeyId = pairing.JockeyId
+            }
         )
-                .Distinct()
-                .ToListAsync();
+        .ToListAsync();
+
+        var relatedUserIdsInRace = participantUserIdsInRace
+            .SelectMany(x => new[] { x.OwnerId, x.JockeyId })
+            .Distinct()
+            .ToList();
 
         var directFamilyRelations = new[]
         {
-                "Spouse",
-                "Parent",
-                "Child",
-                "Sibling"
+            "Spouse",
+            "Parent",
+            "Child",
+            "Sibling"
 };
 
+        // Kiem tra COI 2 chieu:
+        // 1. Referee khai bao Owner/Jockey la nguoi than
+        // 2. Owner/Jockey khai bao Referee la nguoi than
         var hasConflictOfInterest = await _context.FamilyRelationshipDeclarations
-                .AnyAsync(f =>
+            .AnyAsync(f =>
                 f.RelatedUserId.HasValue &&
                 directFamilyRelations.Contains(f.RelationType) &&
                 (
-            (
-                f.DeclarantUserId == dto.RefereeId &&
-                ownerIdsInRace.Contains(f.RelatedUserId.Value)
-            )
-            ||
-            (
-                ownerIdsInRace.Contains(f.DeclarantUserId) &&
-                f.RelatedUserId.Value == dto.RefereeId
-            )
-        ));
+                    (
+                        f.DeclarantUserId == dto.RefereeId &&
+                        relatedUserIdsInRace.Contains(f.RelatedUserId.Value)
+                    )
+                    ||
+                    (
+                        relatedUserIdsInRace.Contains(f.DeclarantUserId) &&
+                        f.RelatedUserId.Value == dto.RefereeId
+                    )
+                ));
 
         if (hasConflictOfInterest)
         {
