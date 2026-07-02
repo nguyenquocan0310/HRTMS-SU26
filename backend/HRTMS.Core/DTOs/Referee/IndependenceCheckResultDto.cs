@@ -18,7 +18,9 @@ public class IndependenceCheckResultDto
 
     public string IndependenceCheckStatus { get; set; } = null!;
 
-    public bool IsEmergencyDisqualified { get; set; }
+    // MED.6 (revised): khong con auto-DQ. True = phat hien COI, chi la canh bao
+    // cho Trong tai xem xet thu cong; RaceEntry van active, Jockey van duoc dua.
+    public bool HasWarning { get; set; }
 
     public string? ViolationReason { get; set; }
 

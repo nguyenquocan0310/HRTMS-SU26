@@ -8,13 +8,13 @@ namespace HRTMS.Infrastructure.Services;
 public class IndependenceCheckService : IIndependenceCheckService
 {
     private readonly HRTMSDbContext _context;
-    private readonly IEmergencyDisqualificationService _emergencyDisqualificationService;
-    public IndependenceCheckService(
-        HRTMSDbContext context,
-        IEmergencyDisqualificationService emergencyDisqualificationService)
+
+    // MED.6 (revised): Jockey-Owner COI khong con auto-DQ.
+    // Chi hien canh bao cho Trong tai, Jockey van duoc dua binh thuong.
+    // => Khong con phu thuoc IEmergencyDisqualificationService o day nua.
+    public IndependenceCheckService(HRTMSDbContext context)
     {
         _context = context;
-        _emergencyDisqualificationService = emergencyDisqualificationService;
     }
 
     public async Task<IndependenceCheckResultDto> CheckJockeyIndependenceAsync(
@@ -128,20 +128,18 @@ public class IndependenceCheckService : IIndependenceCheckService
         raceEntry.IndependenceCheckedAt = now;
         raceEntry.UpdatedAt = now;
 
-        var isFailed = conflict != null;
+        var hasWarning = conflict != null;
 
-        if (isFailed)
+        if (hasWarning)
         {
             var violationReason =
                 $"Jockey has direct family relationship with an opposing owner. RelationType: {conflict!.RelationType}.";
 
+            // MED.6 (revised): khong con auto-DQ khi phat hien COI.
+            // Chi ghi nhan "Failed" nhu mot canh bao cho Trong tai xem xet thu cong.
+            // RaceEntry.Status KHONG bi doi -> Jockey van duoc dua binh thuong.
             raceEntry.IndependenceCheckStatus = "Failed";
             raceEntry.IndependenceViolationReason = violationReason;
-
-            // MED.6: Vi pham se kich hoat Emergency DQ
-            // Ban hien tai xu ly DQ toi thieu: cap nhat RaceEntry thanh Disqualified
-            // Phan ACID refund + notification + audit se lam o MED.7
-            
         }
         else
         {
@@ -151,15 +149,8 @@ public class IndependenceCheckService : IIndependenceCheckService
 
         await _context.SaveChangesAsync();
 
-        if (isFailed)
-        {
-            await _emergencyDisqualificationService.DisqualifyAsync(
-                refereeId,
-                raceEntry.RaceEntryId,
-                raceEntry.IndependenceViolationReason
-                    ?? "Jockey has direct family relationship with an opposing owner.",
-                "MED.6_INDEPENDENCE_CHECK");
-        }
+        // Khong goi EmergencyDisqualificationService nua - MED.6 chi la canh bao,
+        // quyet dinh DQ (neu can) thuoc ve Trong tai, xu ly thu cong o luong rieng.
 
         return new IndependenceCheckResultDto
         {
@@ -171,11 +162,11 @@ public class IndependenceCheckService : IIndependenceCheckService
             JockeyId = jockeyId,
             JockeyName = raceEntry.Pairing.Jockey.Jockey.FullName,
             IndependenceCheckStatus = raceEntry.IndependenceCheckStatus!,
-            IsEmergencyDisqualified = isFailed,
+            HasWarning = hasWarning,
             ViolationReason = raceEntry.IndependenceViolationReason,
             RaceEntryStatus = raceEntry.Status,
-            Message = isFailed
-                ? "Jockey independence check failed. Race entry has been disqualified."
+            Message = hasWarning
+                ? "Jockey independence check found a potential conflict of interest. This is a warning only — the race entry remains active and the jockey may still race. Please review manually."
                 : "Jockey independence check passed."
         };
     }
