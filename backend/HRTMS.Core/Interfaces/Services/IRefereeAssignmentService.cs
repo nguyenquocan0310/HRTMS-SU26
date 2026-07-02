@@ -1,4 +1,5 @@
 ﻿using HRTMS.Core.DTOs.Referee;
+using HRTMS.Core.DTOs.Assignment;
 
 namespace HRTMS.Core.Interfaces.Services;
 
@@ -16,5 +17,9 @@ public interface IRefereeAssignmentService
     // Admin go Referee khoi mot Race
     Task RemoveAsync(
         int raceId,
+        int refereeId);
+
+    // Referee xem cac Race minh duoc phan cong
+    Task<List<MyRaceAssignmentDto>> GetMyAssignmentsAsync(
         int refereeId);
 }

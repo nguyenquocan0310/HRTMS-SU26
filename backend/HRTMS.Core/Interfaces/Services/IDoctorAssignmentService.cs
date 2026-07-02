@@ -1,4 +1,5 @@
 ﻿using HRTMS.Core.DTOs.Doctor;
+using HRTMS.Core.DTOs.Assignment;
 
 namespace HRTMS.Core.Interfaces.Services;
 
@@ -13,5 +14,8 @@ public interface IDoctorAssignmentService
 
     Task RemoveAsync(
         int raceId,
+        int doctorId);
+
+    Task<List<MyRaceAssignmentDto>> GetMyAssignmentsAsync(
         int doctorId);
 }
