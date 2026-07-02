@@ -138,11 +138,12 @@ public class RaceEntryService : IRaceEntryService
             entry.RaceEntryId.ToString(), null,
             $"RaceId={raceId};PairingId={dto.PairingId}");
 
-        // Bao Owner: ngua da duoc xep vao cuoc dua, can xac nhan tham gia truoc cut-off.
+        // Bao Owner: ngua da duoc xep vao cuoc dua, can xac nhan tham gia truoc cut-off (email + in-app).
         await _notification.SendAsync(
             pairing.Horse.OwnerId,
             "Ngựa đã được xếp vào cuộc đua",
             $"Ngựa '{pairing.Horse.Name}' đã được xếp vào cuộc đua #{raceId}. Vui lòng xác nhận tham gia trước hạn chốt.",
+            type: "Both",
             relatedEntityType: "RaceEntry",
             relatedEntityId: entry.RaceEntryId);
 
@@ -411,6 +412,7 @@ public class RaceEntryService : IRaceEntryService
                 entry.Pairing.Horse.OwnerId,
                 "Đăng ký cuộc đua đã bị hủy",
                 $"Ngựa '{entry.Pairing.Horse.Name}' đã rút khỏi cuộc đua #{entry.RaceId}. Lý do: {reason}.",
+                type: "Both",
                 relatedEntityType: "RaceEntry",
                 relatedEntityId: raceEntryId);
 
@@ -418,6 +420,7 @@ public class RaceEntryService : IRaceEntryService
                 entry.Pairing.JockeyId,
                 "Đăng ký cuộc đua đã bị hủy",
                 $"Cặp đấu với ngựa '{entry.Pairing.Horse.Name}' ở cuộc đua #{entry.RaceId} đã bị hủy. Lý do: {reason}.",
+                type: "Both",
                 relatedEntityType: "RaceEntry",
                 relatedEntityId: raceEntryId);
 

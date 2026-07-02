@@ -11,10 +11,12 @@ namespace HRTMS.Infrastructure.Services;
 public class PairingService : IPairingService
 {
     private readonly HRTMSDbContext _context;
+    private readonly INotificationService _notification;
 
-    public PairingService(HRTMSDbContext context)
+    public PairingService(HRTMSDbContext context, INotificationService notification)
     {
         _context = context;
+        _notification = notification;
     }
 
     public async Task<PairingResponseDto> CreateAsync(
@@ -138,20 +140,14 @@ public class PairingService : IPairingService
         _context.Pairings.Add(pairing);
         await _context.SaveChangesAsync();
 
-        // Tao thong bao cho Jockey khi co loi moi moi
-        _context.Notifications.Add(new Notification
-        {
-            RecipientId = dto.JockeyId,
-            Title = "New pairing invitation",
-            Message =
-                $"You have received a pairing invitation for horse {horse.Name}.",
-            Type = "In-app",
-            RelatedEntityType = "Pairing",
-            RelatedEntityId = pairing.PairingId,
-            SentAt = now
-        });
-
-        await _context.SaveChangesAsync();
+        // Tao thong bao cho Jockey khi co loi moi moi (email + in-app — SRS Module O)
+        await _notification.SendAsync(
+            dto.JockeyId,
+            "New pairing invitation",
+            $"You have received a pairing invitation for horse {horse.Name}.",
+            type: "Both",
+            relatedEntityType: "Pairing",
+            relatedEntityId: pairing.PairingId);
 
         return new PairingResponseDto
         {
@@ -196,21 +192,16 @@ public class PairingService : IPairingService
 
         pairing.Status = "Accepted";
         pairing.UpdatedAt = DateTime.UtcNow;
-
-        // Gui thong bao cho Owner de vao xac nhan cuoi cung
-        _context.Notifications.Add(new Notification
-        {
-            RecipientId = pairing.Horse.OwnerId,
-            Title = "Pairing invitation accepted",
-            Message =
-                $"The jockey accepted the pairing invitation for horse {pairing.Horse.Name}. Please confirm the pairing.",
-            Type = "In-app",
-            RelatedEntityType = "Pairing",
-            RelatedEntityId = pairing.PairingId,
-            SentAt = DateTime.UtcNow
-        });
-
         await _context.SaveChangesAsync();
+
+        // Gui thong bao cho Owner de vao xac nhan cuoi cung (email + in-app)
+        await _notification.SendAsync(
+            pairing.Horse.OwnerId,
+            "Pairing invitation accepted",
+            $"The jockey accepted the pairing invitation for horse {pairing.Horse.Name}. Please confirm the pairing.",
+            type: "Both",
+            relatedEntityType: "Pairing",
+            relatedEntityId: pairing.PairingId);
 
         return new PairingActionResponseDto
         {
@@ -298,20 +289,17 @@ public class PairingService : IPairingService
             otherPairing.UpdatedAt = DateTime.UtcNow;
         }
 
-        _context.Notifications.Add(new Notification
-        {
-            RecipientId = pairing.JockeyId,
-            Title = "Pairing confirmed",
-            Message =
-                $"Owner confirmed your pairing with horse {pairing.Horse.Name}.",
-            Type = "In-app",
-            RelatedEntityType = "Pairing",
-            RelatedEntityId = pairing.PairingId,
-            SentAt = DateTime.UtcNow
-        });
-
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
+
+        // Gui thong bao cho Jockey sau khi commit (email + in-app)
+        await _notification.SendAsync(
+            pairing.JockeyId,
+            "Pairing confirmed",
+            $"Owner confirmed your pairing with horse {pairing.Horse.Name}.",
+            type: "Both",
+            relatedEntityType: "Pairing",
+            relatedEntityId: pairing.PairingId);
 
         return new PairingActionResponseDto
         {
@@ -352,21 +340,16 @@ public class PairingService : IPairingService
         pairing.Status = "Declined";
         pairing.ResponseReason = dto.ResponseReason;
         pairing.UpdatedAt = DateTime.UtcNow;
-
-        // Gui thong bao cho Owner
-        _context.Notifications.Add(new Notification
-        {
-            RecipientId = pairing.Horse.OwnerId,
-            Title = "Pairing invitation declined",
-            Message =
-                $"The jockey declined the pairing invitation for horse {pairing.Horse.Name}.",
-            Type = "In-app",
-            RelatedEntityType = "Pairing",
-            RelatedEntityId = pairing.PairingId,
-            SentAt = DateTime.UtcNow
-        });
-
         await _context.SaveChangesAsync();
+
+        // Gui thong bao cho Owner (email + in-app)
+        await _notification.SendAsync(
+            pairing.Horse.OwnerId,
+            "Pairing invitation declined",
+            $"The jockey declined the pairing invitation for horse {pairing.Horse.Name}.",
+            type: "Both",
+            relatedEntityType: "Pairing",
+            relatedEntityId: pairing.PairingId);
 
         return new PairingActionResponseDto
         {
