@@ -4,9 +4,14 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5222/api';
 
 export interface ApiErrorResponse {
-  success: boolean;
-  message: string;
-  data: null;
+  success?: boolean;
+  message?: string;
+  data?: null;
+  // ASP.NET tự động trả format này khi lỗi validate ở tầng DataAnnotations
+  // (vd MinLength, Required trên FamilyDeclarationItemDto), khác với format
+  // {success,message} tùy chỉnh của tầng business logic.
+  title?: string;
+  errors?: Record<string, string[]>;
 }
 
 /**
@@ -42,13 +47,27 @@ export async function apiFetch<T>(
       throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
     }
 
-    let errorBody: ApiErrorResponse | null = null;
+let errorBody: ApiErrorResponse | null = null;
     try {
       errorBody = await response.json();
     } catch {
       // response không có JSON body
     }
-    throw new Error(errorBody?.message ?? `API error: ${response.status}`);
+
+    // Ưu tiên message tùy chỉnh của BE (tầng business logic).
+    if (errorBody?.message) {
+      throw new Error(errorBody.message);
+    }
+
+    // Fallback: lỗi validate tự động của ASP.NET (dạng { title, errors: {...} }).
+    if (errorBody?.errors) {
+      const detailMessages = Object.values(errorBody.errors).flat();
+      if (detailMessages.length > 0) {
+        throw new Error(detailMessages.join(' '));
+      }
+    }
+
+    throw new Error(errorBody?.title ?? `API error: ${response.status}`);
   }
 
   // Một số API trả về 204 No Content
