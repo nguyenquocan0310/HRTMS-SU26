@@ -231,6 +231,23 @@ export const acceptPairing = async (pairingId: string): Promise<any> => {
   }
 };
 
+/**
+ * PATCH /api/pairings/{id}/confirm
+ * Owner xác nhận ghép cặp sau khi Jockey đã accept.
+ * Pairing chuyển từ Accepted → Confirmed.
+ */
+export const confirmPairing = async (pairingId: string | number): Promise<any> => {
+  interface ApiResponse<T> { success: boolean; message: string; data: T | null }
+  const res = await apiFetch<ApiResponse<any>>(`/pairings/${pairingId}/confirm`, {
+    method: 'PATCH',
+  });
+  // Backend trả success:false với message chi tiết khi nghiệp vụ không hợp lệ
+  if (res && res.success === false) {
+    throw new Error(res.message || 'Xác nhận ghép cặp thất bại.');
+  }
+  return res?.data ?? res;
+};
+
 // ─── Horse + Tournament Registration (dùng apiFetch — không hard-code localhost) ───
 
 interface ApiResponse<T> {
