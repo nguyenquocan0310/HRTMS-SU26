@@ -46,7 +46,8 @@ public class EmailService : IEmailService
             var list = recipients.ToList();
             if (list.Count == 0) return;
 
-            var message = BuildMessage(list, subject, htmlBody);
+            // Bulk: mỗi người nhận không được thấy email của người khác -> dùng Bcc.
+            var message = BuildBulkMessage(list, subject, htmlBody);
             await SendMessageAsync(message);
         }
         catch (Exception ex)
@@ -64,6 +65,24 @@ public class EmailService : IEmailService
 
         foreach (var (email, name) in recipients)
             message.To.Add(new MailboxAddress(name, email));
+
+        message.Subject = subject;
+        message.Body = new BodyBuilder { HtmlBody = htmlBody }.ToMessageBody();
+        return message;
+    }
+
+    // Bulk: người nhận nằm ở Bcc, To chỉ chứa chính người gửi (nhiều SMTP server yêu cầu
+    // có ít nhất 1 địa chỉ To hợp lệ) — không ai trong danh sách thấy email người khác.
+    private MimeMessage BuildBulkMessage(
+        IEnumerable<(string Email, string Name)> recipients,
+        string subject, string htmlBody)
+    {
+        var message = new MimeMessage();
+        message.From.Add(new MailboxAddress(_smtp.FromName, _smtp.FromEmail));
+        message.To.Add(new MailboxAddress(_smtp.FromName, _smtp.FromEmail));
+
+        foreach (var (email, name) in recipients)
+            message.Bcc.Add(new MailboxAddress(name, email));
 
         message.Subject = subject;
         message.Body = new BodyBuilder { HtmlBody = htmlBody }.ToMessageBody();
