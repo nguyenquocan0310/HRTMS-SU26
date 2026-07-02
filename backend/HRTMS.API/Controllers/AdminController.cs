@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Linq;
 using System.Security.Claims;
+using HRTMS.Core.DTOs.Auth;
 
 namespace HRTMS.API.Controllers;
 
@@ -21,17 +22,20 @@ public class AdminController : ControllerBase
     private readonly IAuditLogService _auditLogService;
     private readonly ITokenBlacklistService _tokenBlacklistService;
     private readonly IHorseService _horseService;
+    private readonly IAuthService _authService;
 
     public AdminController(
         HRTMSDbContext context,
         IAuditLogService auditLogService,
         ITokenBlacklistService tokenBlacklistService,
-        IHorseService horseService)
+        IHorseService horseService,
+        IAuthService authService)
     {
         _context = context;
         _auditLogService = auditLogService;
         _tokenBlacklistService = tokenBlacklistService;
         _horseService = horseService;
+        _authService = authService;
     }
 
     private int CurrentAdminId =>
@@ -39,6 +43,22 @@ public class AdminController : ControllerBase
 
     private string? ClientIp =>
         HttpContext.Connection.RemoteIpAddress?.ToString();
+
+    [HttpPost("users")]
+    public async Task<IActionResult> CreateUser([FromBody] AdminCreateUserDto dto)
+    {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        var ip = ClientIp;
+        var ua = HttpContext.Request.Headers["User-Agent"].ToString();
+        var result = await _authService.AdminCreateUserAsync(dto, CurrentAdminId, ip, ua);
+        if (!result.Success)
+        {
+            var isConflict = result.Message?.Contains("tồn tại") == true;
+            return isConflict ? Conflict(result) : BadRequest(result);
+        }
+        return CreatedAtAction(nameof(GetUserById), new { id = result.Data }, result);
+    }
 
     [HttpPatch("users/{id}/suspend")]
     public async Task<IActionResult> SuspendUser(int id)
