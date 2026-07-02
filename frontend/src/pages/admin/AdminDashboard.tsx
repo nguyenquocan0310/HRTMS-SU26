@@ -1,24 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
-  FiFlag,
-  FiUserCheck,
-  FiCalendar,
-  FiAlertTriangle,
-  FiArrowRight,
-  FiPlus,
-  FiCheckCircle,
-  FiAward,
-  FiShuffle,
-  FiFileText,
-  FiUser,
+  FiFlag, FiUserCheck, FiCalendar, FiAlertTriangle,
+  FiArrowRight, FiPlus, FiCheckCircle, FiAward,
+  FiShuffle, FiFileText, FiUser,
 } from 'react-icons/fi';
 import StatTile from '../../components/common/StatTile';
 import * as tournamentService from '../../services/tournamentService';
+import type { TournamentResponse } from '../../services/tournamentService';
 import { getPendingApprovalsCount, getRecentAuditLogs, type AuditLogItem } from '../../services/adminService';
 import styles from './AdminDashboard.module.scss';
 
-// ─── Map audit log (BE) → item hiển thị trong Recent Activity ────────────────
 const relativeTime = (iso: string): string => {
   const diffMs = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diffMs / 60000);
@@ -40,11 +32,7 @@ const actionMeta = (action: string): { icon: React.ReactNode; title: string } =>
 };
 
 interface ActivityItem {
-  id: number;
-  icon: React.ReactNode;
-  title: string;
-  desc: string;
-  time: string;
+  id: number; icon: React.ReactNode; title: string; desc: string; time: string;
 }
 
 const mapAuditToActivity = (log: AuditLogItem): ActivityItem => {
@@ -54,23 +42,36 @@ const mapAuditToActivity = (log: AuditLogItem): ActivityItem => {
   return { id: log.auditLogId, icon, title, desc: `${entity}${change}`, time: relativeTime(log.createdAt) };
 };
 
+const formatDate = (iso: string) => {
+  const d = new Date(iso);
+  return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+};
+
+const statusLabel = (s: string) => {
+  const map: Record<string,string> = {
+    OpenRegistration: 'Open Registration', 'Open Registration': 'Open Registration',
+    Draft: 'Draft', Completed: 'Completed', Cancelled: 'Cancelled',
+    'Closed Registration': 'Closed', 'Pre-Race': 'Pre-Race', 'In-Progress': 'In Progress',
+  };
+  return map[s] ?? s;
+};
+
 const AdminDashboard = () => {
+  const navigate = useNavigate();
+  const [tournaments, setTournaments] = useState<TournamentResponse[]>([]);
   const [openTournaments, setOpenTournaments] = useState<number | null>(null);
   const [pendingApprovals, setPendingApprovals] = useState<number | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [activityLoaded, setActivityLoaded] = useState(false);
 
   useEffect(() => {
-    // Giải đang mở = đếm tournament có status "Open Registration".
-    tournamentService
-      .getTournaments()
-      .then((list) => setOpenTournaments(list.filter((t) => t.status === 'Open Registration').length))
-      .catch(() => setOpenTournaments(0));
+    tournamentService.getTournaments().then((list) => {
+      setTournaments(list);
+      setOpenTournaments(list.filter((t) => t.status === 'Open Registration' || t.status === 'OpenRegistration').length);
+    }).catch(() => setOpenTournaments(0));
 
-    // Hồ sơ chờ duyệt.
     getPendingApprovalsCount().then(setPendingApprovals).catch(() => setPendingApprovals(0));
 
-    // Recent Activity từ audit log.
     getRecentAuditLogs(5)
       .then((logs) => setActivity(logs.map(mapAuditToActivity)))
       .catch(() => setActivity([]))
@@ -84,68 +85,57 @@ const AdminDashboard = () => {
         <div>
           <span className={styles.eyebrow}>SYSTEM OVERVIEW</span>
           <h1 className={styles.heading}>Admin Dashboard</h1>
+          <p className={styles.subtext}>Monitor approvals, tournaments and operational audit activity.</p>
         </div>
-
         <div className={styles.headerActions}>
-          <Link to="/admin/approval-center" className={styles.btnOutline}>
-            Review Applicants
-          </Link>
+          <Link to="/admin/approval-center" className={styles.btnOutline}>Review applicants</Link>
           <Link to="/admin/tournament-builder" className={styles.btnPrimary}>
-            <FiPlus size={16} />
-            Create Tournament
+            <FiPlus size={16} /> Create tournament
           </Link>
         </div>
       </div>
 
       {/* ═══ STAT TILES ═══════════════════════════════════════ */}
       <div className={styles.statGrid}>
-        <StatTile
-          label="Giải đang mở"
-          value={openTournaments ?? '—'}
-          icon={<FiFlag />}
-          linkTo="/admin/tournaments"
-        />
-        <StatTile
-          label="Hồ sơ chờ duyệt"
-          value={pendingApprovals ?? '—'}
-          icon={<FiUserCheck />}
-          linkTo="/admin/approval-center"
-        />
-        {/* TODO(BE): chưa có API "race sắp diễn ra" — tạm placeholder. */}
-        <StatTile
-          label="Race sắp diễn ra"
-          value="—"
-          icon={<FiCalendar />}
-        />
-        {/* TODO(BE): chưa có API cảnh báo (Withdrawal + Disqualification) — placeholder. */}
-        <StatTile
-          label="Cảnh báo URGENT"
-          value="—"
-          icon={<FiAlertTriangle />}
-          variant="urgent"
-        />
+        <StatTile label="Open tourna..." value={openTournaments ?? '—'} icon={<FiFlag />} linkTo="/admin/tournaments" />
+        <StatTile label="Pending appr..." value={pendingApprovals ?? '—'} icon={<FiUserCheck />} linkTo="/admin/approval-center" />
+        <StatTile label="Upcoming races" value="Pending API" icon={<FiCalendar />} />
+        <StatTile label="Urgent alerts" value="Pending API" icon={<FiAlertTriangle />} variant="urgent" />
       </div>
 
-      {/* ═══ INTEGRITY MAP + SIDE CARDS ══════════════════════ */}
+      {/* ═══ OPEN TOURNAMENTS LIST ════════════════════════════ */}
       <div className={styles.midRow}>
         <div className={styles.integrityMap}>
-          <h3 className={styles.cardTitle}>Tournament Integrity Map</h3>
-          <div className={styles.mapPlaceholder}>
-            {/* Placeholder trực quan — chưa có yêu cầu nghiệp vụ cụ thể từ SRS */}
-            <svg viewBox="0 0 400 200" className={styles.mapSvg}>
-              <line x1="60" y1="50" x2="160" y2="100" stroke="#2a2a30" strokeWidth="1" />
-              <line x1="160" y1="100" x2="260" y2="60" stroke="#2a2a30" strokeWidth="1" />
-              <line x1="160" y1="100" x2="220" y2="160" stroke="#2a2a30" strokeWidth="1" />
-              <line x1="260" y1="60" x2="340" y2="90" stroke="#2a2a30" strokeWidth="1" />
-              <line x1="220" y1="160" x2="320" y2="150" stroke="#2a2a30" strokeWidth="1" />
-              <circle cx="60" cy="50" r="5" fill="#B5121B" />
-              <circle cx="160" cy="100" r="7" fill="#F3C8C3" />
-              <circle cx="260" cy="60" r="5" fill="#B5121B" />
-              <circle cx="340" cy="90" r="4" fill="#666" />
-              <circle cx="220" cy="160" r="5" fill="#B5121B" />
-              <circle cx="320" cy="150" r="4" fill="#666" />
-            </svg>
+          <div className={styles.openTourHeader}>
+            <h3 className={styles.cardTitle}>Giải đấu đang mở</h3>
+            <span className={styles.openTourSub}>Operational preview</span>
           </div>
+
+          {tournaments.length === 0 ? (
+            <p className={styles.emptyText}>Chưa có giải đấu nào.</p>
+          ) : (
+            <div className={styles.tourList}>
+              {tournaments.map((t) => (
+                <button
+                  key={t.tournamentId}
+                  type="button"
+                  className={styles.tourRow}
+                  onClick={() => navigate(`/admin/tournament-builder/${t.tournamentId}`)}
+                >
+                  <div className={styles.tourInfo}>
+                    <span className={styles.tourName}>{t.name}</span>
+                    <span className={styles.tourMeta}>
+                      {t.allowedBreed} · {formatDate(t.startDate)} – {formatDate(t.endDate)}
+                    </span>
+                  </div>
+                  <div className={styles.tourRight}>
+                    <span className={styles.tourStatus}>{statusLabel(t.status)}</span>
+                    <FiArrowRight size={14} className={styles.tourArrow} />
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className={styles.sideCards}>
@@ -153,19 +143,14 @@ const AdminDashboard = () => {
             <h4 className={styles.smallCardTitle}>System Status</h4>
             <div className={styles.statusRow}>
               <span className={styles.statusDot} />
-              <span>All systems operational</span>
+              <span>Core workspace online</span>
             </div>
-            <div className={styles.barWrap}>
-              <div className={styles.bar} style={{ width: '92%' }} />
-            </div>
+            <div className={styles.barWrap}><div className={styles.bar} style={{ width: '92%' }} /></div>
           </div>
-
           <div className={styles.smallCard}>
             <h4 className={styles.smallCardTitle}>Network Load</h4>
             <div className={styles.loadValue}>34%</div>
-            <div className={styles.barWrap}>
-              <div className={styles.bar} style={{ width: '34%' }} />
-            </div>
+            <div className={styles.barWrap}><div className={styles.bar} style={{ width: '34%' }} /></div>
           </div>
         </div>
       </div>
@@ -173,12 +158,14 @@ const AdminDashboard = () => {
       {/* ═══ RECENT ACTIVITY ══════════════════════════════════ */}
       <div className={styles.activityCard}>
         <div className={styles.activityHeader}>
-          <h3 className={styles.cardTitle}>Recent Activity</h3>
+          <div>
+            <h3 className={styles.cardTitle}>Recent Activity</h3>
+            <p className={styles.activitySubtext}>Latest audit events from the backend audit log.</p>
+          </div>
           <Link to="/admin/audit-log-viewer" className={styles.viewAllLink}>
-            View Full History <FiArrowRight size={14} />
+            Full audit route pending
           </Link>
         </div>
-
         <ul className={styles.activityList}>
           {activity.map((item) => (
             <li key={item.id} className={styles.activityItem}>
