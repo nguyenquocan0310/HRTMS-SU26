@@ -12,34 +12,50 @@ export interface CredentialsData {
   confirmPassword: string;
 }
 
+// ─── Khai báo xung đột lợi ích (gia đình) — dùng chung cho Jockey & Referee ──
+// BE bắt buộc RelatedIdentityNumber (CCCD người thân, 12 số) để đối chiếu xung đột lợi ích.
+export interface FamilyDeclarationItem {
+  relatedPersonName: string;
+  relationType: string;
+  relatedIdentityNumber: string;
+  industryRole: string;
+  notes: string;
+}
+
 // ─── Step 4: Verification (theo từng role) ───────────────────────────────────
+// Owner/Jockey/Referee/Doctor đều bắt buộc PhoneNumber + DateOfBirth + IdentityNumber (ACC.1A).
 export interface OwnerVerification {
   phoneNumber: string;
   identityNumber: string;
+  dateOfBirth: string;
 }
 
 export interface JockeyVerification {
+  phoneNumber: string;
+  identityNumber: string;
+  dateOfBirth: string;
   licenseCertificate: string;
   experienceYears: number | '';
   selfDeclaredWeight: number | '';
   bloodType: string;
   healthStatus: string;
-  familyDeclaration: string; // giữ lại cho backward compat
-  // Mảng khai báo gia đình có cấu trúc đúng
-  familyDeclarations: {
-    relatedPersonName: string;
-    relationType: string;
-    industryRole: string;
-    notes: string;
-  }[];
+  familyDeclaration: string; // giữ lại cho backward compat, KHÔNG dùng để submit nữa
+  familyDeclarations: FamilyDeclarationItem[];
 }
 
 export interface RefereeVerification {
+  phoneNumber: string;
+  identityNumber: string;
+  dateOfBirth: string;
   certificationLevel: 'Level1' | 'Level2' | 'Level3' | '';
-  familyDeclaration: string;             // Family / Conflict of Interest
+  familyDeclaration: string; // giữ lại cho backward compat, KHÔNG dùng để submit nữa
+  familyDeclarations: FamilyDeclarationItem[];
 }
 
 export interface DoctorVerification {
+  phoneNumber: string;
+  identityNumber: string;
+  dateOfBirth: string;
   medicalLicenseNumber: string;
   // NOTE: Doctor khai báo COI tại Doctor Dashboard UI-S30, không phải lúc Register
 }
@@ -79,21 +95,32 @@ export const initialFormData: RegisterFormData = {
   ownerVerification: {
     phoneNumber: '',
     identityNumber: '',
+    dateOfBirth: '',
   },
   jockeyVerification: {
-  licenseCertificate: '',
-  experienceYears: '',
-  selfDeclaredWeight: '',
-  bloodType: '',
-  healthStatus: '',
-  familyDeclaration: '',
-  familyDeclarations: [],
-},
+    phoneNumber: '',
+    identityNumber: '',
+    dateOfBirth: '',
+    licenseCertificate: '',
+    experienceYears: '',
+    selfDeclaredWeight: '',
+    bloodType: '',
+    healthStatus: '',
+    familyDeclaration: '',
+    familyDeclarations: [],
+  },
   refereeVerification: {
+    phoneNumber: '',
+    identityNumber: '',
+    dateOfBirth: '',
     certificationLevel: '',
     familyDeclaration: '',
+    familyDeclarations: [],
   },
   doctorVerification: {
+    phoneNumber: '',
+    identityNumber: '',
+    dateOfBirth: '',
     medicalLicenseNumber: '',
   },
 };

@@ -37,9 +37,6 @@ export const login = async (payload: LoginPayload): Promise<LoginResult> => {
     throw new Error(res.message || 'Đăng nhập thất bại.');
   }
 
-  // BE hiện chưa trả username/email/status trong response login —
-  // tạm điền username = email (trước dấu @), status = Active.
-  // TODO: nếu BE bổ sung GET /api/auth/me trả đủ field, gọi thêm để có User đầy đủ.
   const user: User = {
     userId: res.data.userId,
     username: payload.email.split('@')[0],
@@ -55,8 +52,6 @@ export const login = async (payload: LoginPayload): Promise<LoginResult> => {
   };
 };
 
-// Gọi BE để blacklist token (EC-29). Best-effort: nếu lỗi vẫn cho đăng xuất
-// phía client (xóa token) để không kẹt người dùng.
 export const logout = async (): Promise<void> => {
   try {
     await apiFetch<ApiResponse<unknown>>('/auth/logout', { method: 'POST' });
@@ -80,15 +75,13 @@ export interface RegisterResult {
   walletBonus?: number;
 }
 
-// BE dùng tên role NGẮN (Owner/Referee), khác RegRole enum của FE
-// (HorseOwner/RaceReferee) — map tường minh để tránh sai lệch.
 const mapRoleToApiRole = (role: Role): string => {
   const mapping: Record<Role, string> = {
     Admin: 'Admin',
-    HorseOwner: 'Owner',       // FE → BE
+    HorseOwner: 'Owner',
     Owner: 'Owner',
     Jockey: 'Jockey',
-    RaceReferee: 'Referee',    // FE → BE
+    RaceReferee: 'Referee',
     Referee: 'Referee',
     Doctor: 'Doctor',
     Spectator: 'Spectator',
@@ -99,10 +92,10 @@ const mapRoleToApiRole = (role: Role): string => {
 const mapApiRoleToRole = (apiRole: string): Role => {
   const mapping: Record<string, Role> = {
     Admin: 'Admin',
-    Owner: 'HorseOwner',       // BE → FE
+    Owner: 'HorseOwner',
     HorseOwner: 'HorseOwner',
     Jockey: 'Jockey',
-    Referee: 'RaceReferee',    // BE → FE
+    Referee: 'RaceReferee',
     RaceReferee: 'RaceReferee',
     Doctor: 'Doctor',
     Spectator: 'Spectator',
@@ -118,25 +111,25 @@ interface RegisterApiPayload {
   role: string;
   phoneNumber?: string;
   identityNumber?: string;
+  dateOfBirth?: string;
   licenseCertificate?: string;
   experienceYears?: number;
   selfDeclaredWeight?: number;
   certificationLevel?: string;
   medicalLicenseNumber?: string;
-  bloodType?: string;      
+  bloodType?: string;
   healthStatus?: string;
   familyDeclarations?: {
     relatedPersonName: string;
     relatedUserId?: number;
     relationType: string;
+    relatedIdentityNumber: string;
     industryRole?: string;
     notes?: string;
   }[];
 }
 
 export const register = async (payload: RegisterPayload): Promise<RegisterResult> => {
-  // Gộp verificationData (đang lồng theo role ở FE) thành flat object đúng
-  // chuẩn RegisterDto của BE.
   const v = payload.verificationData ?? {};
 
   const apiPayload: RegisterApiPayload = {
@@ -147,38 +140,30 @@ export const register = async (payload: RegisterPayload): Promise<RegisterResult
     role: mapRoleToApiRole(payload.role),
     phoneNumber: v.phoneNumber as string | undefined,
     identityNumber: v.identityNumber as string | undefined,
+    dateOfBirth: v.dateOfBirth as string | undefined,
     licenseCertificate: v.licenseCertificate as string | undefined,
     experienceYears: v.experienceYears as number | undefined,
     selfDeclaredWeight: v.selfDeclaredWeight as number | undefined,
     certificationLevel: v.certificationLevel as string | undefined,
     medicalLicenseNumber: v.medicalLicenseNumber as string | undefined,
-  bloodType: (v.bloodType as string) || undefined,
-  healthStatus: (v.healthStatus as string) || undefined,
+    bloodType: (v.bloodType as string) || undefined,
+    healthStatus: (v.healthStatus as string) || undefined,
   };
 
-  // familyDeclaration ở FE là 1 chuỗi text tự do, BE cần mảng object có cấu
-  // trúc — nếu có nội dung, gói lại thành 1 item đơn giản.
-  // familyDeclarations: nếu có mảng thật (từ Jockey form mới) thì dùng luôn,
-  // nếu chỉ có text tự do (legacy) thì wrap lại.
+  // familyDeclarations giờ luôn là mảng có cấu trúc (Jockey & Referee dùng
+  // chung form StepVerification), field familyDeclaration (string) cũ chỉ
+  // còn giữ lại ở type cho tương thích ngược, không dùng để submit nữa.
   const familyDeclarations = v.familyDeclarations as {
     relatedPersonName: string;
     relatedUserId?: number;
     relationType: string;
+    relatedIdentityNumber: string;
     industryRole?: string;
     notes?: string;
   }[] | undefined;
 
-  const familyText = v.familyDeclaration as string | undefined;
-
   if (familyDeclarations && familyDeclarations.length > 0) {
     apiPayload.familyDeclarations = familyDeclarations;
-  } else if (familyText && familyText.trim() !== '' && familyText.trim().toLowerCase() !== 'none') {
-    apiPayload.familyDeclarations = [
-      {
-        relatedPersonName: 'N/A',
-        relationType: familyText,
-      },
-    ];
   }
 
   const res = await apiFetch<ApiResponse<unknown>>('/auth/register', {
