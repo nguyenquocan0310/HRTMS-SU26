@@ -866,6 +866,8 @@ PATCH /api/admin/tournament-participants/{participantId}/approve
 
 **Auth:** Admin · **Body:** không có → set `status = "Approved"`, `approvedBy`, `approvedAt`.
 
+- Gửi Notification đến người đăng ký **(in-app + email)**: `title = "Đăng ký tham gia giải được duyệt"`, `relatedEntityType = "TournamentParticipant"`.
+
 | HTTP | Khi nào xảy ra |
 |------|----------------|
 | 400 | Đã `Approved` trước đó |
@@ -886,6 +888,7 @@ PATCH /api/admin/tournament-participants/{participantId}/reject
 ```
 
 - `reason` bắt buộc, **≥ 10 ký tự** → set `status = "Rejected"`, `rejectionReason`.
+- Gửi Notification đến người đăng ký **(in-app + email)** kèm lý do: `title = "Đăng ký tham gia giải bị từ chối"`, `relatedEntityType = "TournamentParticipant"`.
 
 | HTTP | Khi nào xảy ra |
 |------|----------------|

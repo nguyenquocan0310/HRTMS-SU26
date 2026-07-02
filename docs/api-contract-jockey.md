@@ -238,7 +238,7 @@ POST /api/pairings
 - Ngựa (`horseId`) phải thuộc Owner đang gọi.
 - Jockey phải `Active` — Jockey `Pending` hoặc `Suspended` không thể nhận lời mời.
 - Không cho phép tạo Pairing trùng (cùng `horseId` + `jockeyId`) nếu đã có Pairing `Pending` hoặc `Accepted`.
-- Ghi notification đến Jockey qua `INotificationService`.
+- Gửi notification đến Jockey qua `INotificationService` **(in-app + email)** — lời mời ghép cặp (SRS Module O).
 
 ---
 
@@ -290,7 +290,7 @@ PATCH /api/pairings/{id}/accept
 
 - Pairing phải đang ở trạng thái `Pending`.
 - Chỉ Jockey trong pairing đó mới được accept.
-- Khi accept: `Status → Accepted`, ghi notification đến Owner.
+- Khi accept: `Status → Accepted`, gửi notification đến Owner **(in-app + email)** để vào xác nhận cuối.
 
 ---
 
@@ -347,7 +347,7 @@ PATCH /api/pairings/{id}/decline
 
 - Pairing phải đang ở trạng thái `Pending`.
 - Chỉ Jockey trong pairing đó mới được decline.
-- Khi decline: `Status → Declined`, ghi notification đến Owner.
+- Khi decline: `Status → Declined`, gửi notification đến Owner **(in-app + email)**.
 
 ---
 

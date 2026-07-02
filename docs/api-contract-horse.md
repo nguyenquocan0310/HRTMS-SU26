@@ -642,7 +642,7 @@ Thực hiện theo thứ tự, dừng lại và trả lỗi ngay nếu bước n
 3. **Re-screen:** chạy lại screening theo giải (breed khớp `Tournament.AllowedBreed` + doping). Nếu kết quả `AutoRejected` → set enrollment `Rejected` + trả 422.
 4. Set enrollment `AdminApprovalStatus = "Approved"`.
 5. Ghi `AuditLog`: `action = "Approve_Enrollment"`, `entityName = "HorseTournamentEntry"`, `entityId = enrollmentId`.
-6. Gửi Notification đến Owner: `title = "Ngựa được phê duyệt vào giải"`, `relatedEntityType = "HorseTournamentEntry"`, `relatedEntityId = enrollmentId`.
+6. Gửi Notification đến Owner **(in-app + email)**: `title = "Ngựa được phê duyệt vào giải"`, `relatedEntityType = "HorseTournamentEntry"`, `relatedEntityId = enrollmentId`.
 
 > **Breed check dùng `Tournament.AllowedBreed` của giải enrollment** (schema v3: hồ sơ ngựa không gắn giải; screening theo từng enrollment).
 
@@ -703,7 +703,7 @@ PATCH /api/admin/horse-entries/{id}/reject
 1. Kiểm tra `AdminApprovalStatus` — nếu đã là `"Rejected"` → trả 409.
 2. Set `Horse.AdminApprovalStatus = "Rejected"`, `Horse.RejectionReason = reason`.
 3. Ghi `AuditLog`: `action = "Reject_Horse"`.
-4. Gửi Notification đến Owner: `title = "Hồ sơ ngựa bị từ chối"`, `message` kèm lý do, `type = "HorseRejected"`.
+4. Gửi Notification đến Owner **(in-app + email)**: `title = "Hồ sơ ngựa bị từ chối"`, `message` kèm lý do.
 
 ---
 
@@ -900,7 +900,7 @@ Admin xác nhận đã nhận tiền lệ phí ngoài hệ thống, cập nhật
 1. Load RaceEntry, kiểm tra `EntryFeeStatus = "Unpaid"` — nếu đã `"Paid"` → 409.
 2. Set `EntryFeeStatus = "Paid"`, `EntryFeeConfirmedBy = currentAdminId`, `EntryFeeConfirmedAt = UTC now`.
 3. Ghi `AuditLog`: `action = "Update_Entry_Fee_Status"`, `oldValue = "Unpaid"`, `newValue = "Paid"`.
-4. Gửi Notification đến Owner: `title = "Lệ phí đã được xác nhận"`, `type = "EntryFeeConfirmed"`.
+4. Gửi Notification đến Owner **(in-app + email)**: `title = "Lệ phí tham gia đã được xác nhận"`.
 
 ---
 
@@ -957,7 +957,7 @@ Thực hiện theo thứ tự:
 3. Kiểm tra `RaceEntry.Status = "Pending"` — nếu đã `"Confirmed"` → 409.
 4. Set `RaceEntry.Status = "Confirmed"`.
 5. Ghi `AuditLog`: `action = "Approve_RaceEntry"`.
-6. Gửi Notification đến Owner (in-app): `title = "Đăng ký race được xác nhận"`.
+6. Gửi Notification đến Owner **(in-app + email)**: `title = "Đăng ký race được xác nhận"`.
 
 ---
 
@@ -1018,7 +1018,7 @@ Admin từ chối một RaceEntry. Entry chuyển `Cancelled` (DB chỉ cho phé
 2. Nếu `RaceEntry.Status` đã là `"Cancelled"` → 409 `ALREADY_CANCELLED`.
 3. Set `RaceEntry.Status = "Cancelled"`.
 4. Ghi `AuditLog`: `action = "Reject_RaceEntry"`, `newValue = "Cancelled: <reason>"`.
-5. Gửi Notification đến Owner (in-app) kèm lý do.
+5. Gửi Notification đến Owner **(in-app + email)** kèm lý do.
 
 ---
 

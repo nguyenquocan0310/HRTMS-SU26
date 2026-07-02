@@ -11,15 +11,17 @@ public class HorseService : IHorseService
 {
     private readonly HRTMSDbContext _context;
     private readonly IAuditLogService _auditLog;
+    private readonly INotificationService _notification;
 
     // 4 trường nhạy cảm — sửa bất kỳ trường nào → trigger re-validate (EC-23)
     private static readonly string[] SensitiveFields =
         ["Breed", "VaccinationRecordRef", "DopingTestDate", "DopingTestResult"];
 
-    public HorseService(HRTMSDbContext context, IAuditLogService auditLog)
+    public HorseService(HRTMSDbContext context, IAuditLogService auditLog, INotificationService notification)
     {
         _context = context;
         _auditLog = auditLog;
+        _notification = notification;
     }
 
     // -------------------------------------------------------------------------
@@ -78,8 +80,12 @@ public class HorseService : IHorseService
         {
             await _auditLog.LogAsync(ownerId, "AutoReject_Horse", "Horse",
                 horse.HorseId.ToString(), "NotScreened", $"AutoRejected: {horse.ScreeningReason}");
-            NotifyOwnerHorseRejected(horse);
-            await _context.SaveChangesAsync();
+            await _notification.SendAsync(
+                horse.OwnerId,
+                "Hồ sơ ngựa bị từ chối",
+                $"Hồ sơ ngựa '{horse.Name}' bị từ chối. Lý do: {horse.RejectionReason}",
+                type: "Both",
+                relatedEntityType: "Horse", relatedEntityId: horse.HorseId);
             return ApiResponse<HorseResponseDto>.Ok(MapToDto(horse),
                 $"Hồ sơ ngựa bị tự động từ chối: {horse.ScreeningReason}");
         }
@@ -163,16 +169,24 @@ public class HorseService : IHorseService
             case "AutoRejected":
                 await _auditLog.LogAsync(ownerId, "AutoReject_Enrollment", "HorseTournamentEntry",
                     entry.EnrollmentId.ToString(), "NotScreened", $"AutoRejected: {entry.ScreeningReason}");
-                NotifyOwnerEnrollment(horse, entry, approved: false);
-                await _context.SaveChangesAsync();
+                await _notification.SendAsync(
+                    horse.OwnerId,
+                    "Ngựa bị từ chối tham gia giải",
+                    $"Ngựa '{horse.Name}' bị từ chối tham gia giải '{tournament.Name}'. Lý do: {entry.ScreeningReason}",
+                    type: "Both",
+                    relatedEntityType: "HorseTournamentEntry", relatedEntityId: entry.EnrollmentId);
                 return ApiResponse<HorseEnrollmentResponseDto>.Ok(MapToEnrollmentDto(entry, horse, tournament),
                     $"Đẩy ngựa vào giải bị tự động từ chối: {entry.ScreeningReason}");
 
             case "AutoEligible":
                 await _auditLog.LogAsync(ownerId, "AutoApprove_Enrollment", "HorseTournamentEntry",
                     entry.EnrollmentId.ToString(), "NotScreened", "Approved (AutoEligible)");
-                NotifyOwnerEnrollment(horse, entry, approved: true);
-                await _context.SaveChangesAsync();
+                await _notification.SendAsync(
+                    horse.OwnerId,
+                    "Ngựa được phê duyệt vào giải",
+                    $"Ngựa '{horse.Name}' đã được tự động phê duyệt vào giải '{tournament.Name}' (enrollment #{entry.EnrollmentId}).",
+                    type: "Both",
+                    relatedEntityType: "HorseTournamentEntry", relatedEntityId: entry.EnrollmentId);
                 return ApiResponse<HorseEnrollmentResponseDto>.Ok(MapToEnrollmentDto(entry, horse, tournament),
                     "Ngựa hợp lệ và đã được hệ thống tự động phê duyệt vào giải.");
 
@@ -455,18 +469,12 @@ public class HorseService : IHorseService
             newValue: "Approved",
             ipAddress: null);
 
-        _context.Notifications.Add(new Notification
-        {
-            RecipientId = entry.Horse.OwnerId,
-            Title = "Ngựa được phê duyệt vào giải",
-            Message = $"Ngựa '{entry.Horse.Name}' đã được Admin phê duyệt tham gia giải '{entry.Tournament.Name}'.",
-            Type = "In-app",
-            IsRead = false,
-            RelatedEntityType = "HorseTournamentEntry",
-            RelatedEntityId = enrollmentId,
-            SentAt = DateTime.UtcNow
-        });
-        await _context.SaveChangesAsync();
+        await _notification.SendAsync(
+            entry.Horse.OwnerId,
+            "Ngựa được phê duyệt vào giải",
+            $"Ngựa '{entry.Horse.Name}' đã được Admin phê duyệt tham gia giải '{entry.Tournament.Name}'.",
+            type: "Both",
+            relatedEntityType: "HorseTournamentEntry", relatedEntityId: enrollmentId);
 
         return ApiResponse<string>.Ok("Đã phê duyệt ngựa tham gia giải.");
     }
@@ -501,18 +509,12 @@ public class HorseService : IHorseService
             newValue: "Rejected",
             ipAddress: null);
 
-        _context.Notifications.Add(new Notification
-        {
-            RecipientId = entry.Horse.OwnerId,
-            Title = "Ngựa bị từ chối tham gia giải",
-            Message = $"Ngựa '{entry.Horse.Name}' bị từ chối tham gia giải '{entry.Tournament.Name}'. Lý do: {dto.Reason}",
-            Type = "In-app",
-            IsRead = false,
-            RelatedEntityType = "HorseTournamentEntry",
-            RelatedEntityId = enrollmentId,
-            SentAt = DateTime.UtcNow
-        });
-        await _context.SaveChangesAsync();
+        await _notification.SendAsync(
+            entry.Horse.OwnerId,
+            "Ngựa bị từ chối tham gia giải",
+            $"Ngựa '{entry.Horse.Name}' bị từ chối tham gia giải '{entry.Tournament.Name}'. Lý do: {dto.Reason}",
+            type: "Both",
+            relatedEntityType: "HorseTournamentEntry", relatedEntityId: enrollmentId);
 
         return ApiResponse<string>.Ok("Đã từ chối ngựa tham gia giải.");
     }
@@ -617,34 +619,6 @@ public class HorseService : IHorseService
             SentAt = DateTime.UtcNow
         });
 
-    private void NotifyOwnerHorseRejected(Horse horse) =>
-        _context.Notifications.Add(new Notification
-        {
-            RecipientId = horse.OwnerId,
-            Title = "Hồ sơ ngựa bị từ chối",
-            Message = $"Hồ sơ ngựa '{horse.Name}' bị từ chối. Lý do: {horse.RejectionReason}",
-            Type = "In-app",
-            IsRead = false,
-            RelatedEntityType = "Horse",
-            RelatedEntityId = horse.HorseId,
-            SentAt = DateTime.UtcNow
-        });
-
-    private void NotifyOwnerEnrollment(Horse horse, HorseTournamentEntry entry, bool approved) =>
-        _context.Notifications.Add(new Notification
-        {
-            RecipientId = horse.OwnerId,
-            Title = approved ? "Ngựa được phê duyệt vào giải" : "Ngựa bị từ chối tham gia giải",
-            Message = approved
-                ? $"Ngựa '{horse.Name}' đã được tự động phê duyệt vào giải (enrollment #{entry.EnrollmentId})."
-                : $"Ngựa '{horse.Name}' bị từ chối tham gia giải. Lý do: {entry.ScreeningReason}",
-            Type = "In-app",
-            IsRead = false,
-            RelatedEntityType = "HorseTournamentEntry",
-            RelatedEntityId = entry.EnrollmentId,
-            SentAt = DateTime.UtcNow
-        });
-
     private static HorseEnrollmentResponseDto MapToEnrollmentDto(
         HorseTournamentEntry e, Horse horse, Tournament? tournament) => new()
     {
@@ -745,19 +719,13 @@ public class HorseService : IHorseService
         await _auditLog.LogAsync(adminId, "Update_Entry_Fee_Status", "RaceEntry",
             raceEntryId.ToString(), "Unpaid", "Paid", null);
 
-        // Bao Owner: le phi da duoc xac nhan (Type phai la In-app/Email/Both).
-        _context.Notifications.Add(new Notification
-        {
-            RecipientId = entry.Pairing.Horse.OwnerId,
-            Title = "Lệ phí tham gia đã được xác nhận",
-            Message = $"Lệ phí cho ngựa '{entry.Pairing.Horse.Name}' (đăng ký #{raceEntryId}) đã được xác nhận (Paid).",
-            Type = "In-app",
-            IsRead = false,
-            RelatedEntityType = "RaceEntry",
-            RelatedEntityId = raceEntryId,
-            SentAt = DateTime.UtcNow
-        });
-        await _context.SaveChangesAsync();
+        // Bao Owner: le phi da duoc xac nhan (email + in-app).
+        await _notification.SendAsync(
+            entry.Pairing.Horse.OwnerId,
+            "Lệ phí tham gia đã được xác nhận",
+            $"Lệ phí cho ngựa '{entry.Pairing.Horse.Name}' (đăng ký #{raceEntryId}) đã được xác nhận (Paid).",
+            type: "Both",
+            relatedEntityType: "RaceEntry", relatedEntityId: raceEntryId);
 
         return ApiResponse<string>.Ok("Lệ phí đã được xác nhận.");
     }
@@ -794,18 +762,12 @@ public class HorseService : IHorseService
         await _auditLog.LogAsync(adminId, "Approve_RaceEntry", "RaceEntry",
             raceEntryId.ToString(), "Pending", "Confirmed", null);
 
-        _context.Notifications.Add(new Notification
-        {
-            RecipientId = entry.Pairing.Horse.OwnerId,
-            Title = "Đăng ký race được xác nhận",
-            Message = $"Đăng ký #{raceEntryId} cho ngựa '{entry.Pairing.Horse.Name}' đã được Admin xác nhận tham gia cuộc đua.",
-            Type = "In-app",
-            IsRead = false,
-            RelatedEntityType = "RaceEntry",
-            RelatedEntityId = raceEntryId,
-            SentAt = DateTime.UtcNow
-        });
-        await _context.SaveChangesAsync();
+        await _notification.SendAsync(
+            entry.Pairing.Horse.OwnerId,
+            "Đăng ký race được xác nhận",
+            $"Đăng ký #{raceEntryId} cho ngựa '{entry.Pairing.Horse.Name}' đã được Admin xác nhận tham gia cuộc đua.",
+            type: "Both",
+            relatedEntityType: "RaceEntry", relatedEntityId: raceEntryId);
 
         return ApiResponse<string>.Ok("Đăng ký tham gia cuộc đua đã được xác nhận.");
     }
@@ -831,18 +793,12 @@ public class HorseService : IHorseService
         await _auditLog.LogAsync(adminId, "Reject_RaceEntry", "RaceEntry",
             raceEntryId.ToString(), oldStatus, $"Cancelled: {reason}", null);
 
-        _context.Notifications.Add(new Notification
-        {
-            RecipientId = entry.Pairing.Horse.OwnerId,
-            Title = "Đăng ký race bị từ chối",
-            Message = $"Đăng ký #{raceEntryId} cho ngựa '{entry.Pairing.Horse.Name}' bị từ chối. Lý do: {reason}",
-            Type = "In-app",
-            IsRead = false,
-            RelatedEntityType = "RaceEntry",
-            RelatedEntityId = raceEntryId,
-            SentAt = DateTime.UtcNow
-        });
-        await _context.SaveChangesAsync();
+        await _notification.SendAsync(
+            entry.Pairing.Horse.OwnerId,
+            "Đăng ký race bị từ chối",
+            $"Đăng ký #{raceEntryId} cho ngựa '{entry.Pairing.Horse.Name}' bị từ chối. Lý do: {reason}",
+            type: "Both",
+            relatedEntityType: "RaceEntry", relatedEntityId: raceEntryId);
 
         return ApiResponse<string>.Ok("Đã từ chối đăng ký.");
     }
