@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { getMyTournamentParticipations } from '../../services/tournamentService'
+import { getMyDoctorRaceAssignments, type DoctorRaceAssignment } from '../../services/doctorService'
 
 interface JockeyWeightItem {
   id: string
@@ -20,7 +22,29 @@ interface HorseCheckItem {
 }
 
 export default function PaddockConsole() {
+  const location = useLocation()
   const [activeTab, setActiveTab] = useState<'weigh-in' | 'vet-check' | 'weigh-out'>('weigh-in')
+
+  // ── Đọc raceId từ query string (?raceId=...) ────────────────────────────────
+  const searchParams = new URLSearchParams(location.search)
+  const raceIdParam = searchParams.get('raceId')
+  const selectedRaceId = raceIdParam ? Number(raceIdParam) : null
+
+  // ── Lấy assignment được chọn từ API ─────────────────────────────────────────
+  const [selectedRace, setSelectedRace] = useState<DoctorRaceAssignment | null>(null)
+  const [raceLoading, setRaceLoading] = useState(false)
+
+  useEffect(() => {
+    if (!selectedRaceId) return
+    setRaceLoading(true)
+    getMyDoctorRaceAssignments()
+      .then((list) => {
+        const found = list.find((a) => a.raceId === selectedRaceId) ?? null
+        setSelectedRace(found)
+      })
+      .catch(() => setSelectedRace(null))
+      .finally(() => setRaceLoading(false))
+  }, [selectedRaceId])
 
   // ── Kiểm tra Doctor đã được duyệt tham gia giải chưa ─────────────────────
   const [hasApprovedTournament, setHasApprovedTournament] = useState<boolean | null>(null)
@@ -175,15 +199,41 @@ export default function PaddockConsole() {
         </div>
       )}
 
-      {/* Header với hiệu ứng nhấp nháy cho badge ĐANG DIỄN RA */}
+      {/* Header với thông tin race được chọn */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-gray-200 gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
             ⏱️ Bàn điều khiển Paddock
           </h1>
-          <p className="text-xs sm:text-sm text-gray-500 mt-1">
-            Giao diện kiểm tra nhanh dành cho máy tính bảng tại khu vực Paddock
-          </p>
+          {raceLoading && (
+            <p className="text-xs text-gray-400 mt-1">Đang tải thông tin race...</p>
+          )}
+          {!raceLoading && selectedRace && (
+            <div className="mt-1.5 space-y-0.5">
+              <p className="text-xs text-gray-500">
+                <span className="font-semibold text-gray-700">{selectedRace.tournamentName}</span>
+                {' — '}{selectedRace.roundName}
+                {' — '}
+                <span className="font-mono font-bold text-emerald-700">Race #{selectedRace.raceNumber}</span>
+              </p>
+              <p className="text-xs text-gray-400">
+                {new Date(selectedRace.scheduledTime).toLocaleString('vi-VN', {
+                  day: '2-digit', month: '2-digit', year: 'numeric',
+                  hour: '2-digit', minute: '2-digit',
+                })}
+              </p>
+            </div>
+          )}
+          {!raceLoading && !selectedRace && !selectedRaceId && (
+            <p className="text-xs sm:text-sm text-gray-500 mt-1">
+              Giao diện kiểm tra nhanh dành cho máy tính bảng tại khu vực Paddock
+            </p>
+          )}
+          {!raceLoading && !selectedRace && selectedRaceId && (
+            <p className="text-xs text-amber-600 mt-1">
+              Không tìm thấy race #{selectedRaceId} trong danh sách phân công.
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2 bg-red-50 border border-red-100 rounded-lg py-1.5 px-3 self-start sm:self-center">
           <span className="relative flex h-2 w-2">

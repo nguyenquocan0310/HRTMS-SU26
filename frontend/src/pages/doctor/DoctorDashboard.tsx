@@ -1,15 +1,31 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getMyTournamentParticipations } from '../../services/tournamentService'
+import { getMyDoctorRaceAssignments, type DoctorRaceAssignment } from '../../services/doctorService'
 
-interface ScheduleItem {
-  id: string
-  raceRun: string
-  checkTime: string
-  checkType: 'Weigh-In' | 'Vet Check' | 'Weigh-Out'
-  subject: string
-  status: 'Đã hoàn thành' | 'Đang chờ' | 'Chưa bắt đầu'
+// ─── Status badge helper ──────────────────────────────────────────────────────
+
+const RACE_STATUS_MAP: Record<string, { label: string; cls: string }> = {
+  Upcoming:  { label: 'Sắp diễn ra',    cls: 'bg-blue-50 text-blue-700 border border-blue-100'     },
+  Active:    { label: 'Đang diễn ra',    cls: 'bg-emerald-50 text-emerald-700 border border-emerald-100' },
+  Running:   { label: 'Đang diễn ra',    cls: 'bg-emerald-50 text-emerald-700 border border-emerald-100' },
+  Completed: { label: 'Đã hoàn thành',   cls: 'bg-gray-50 text-gray-600 border border-gray-100'    },
+  Cancelled: { label: 'Đã hủy',          cls: 'bg-red-50 text-red-600 border border-red-100'        },
 }
+
+function RaceStatusBadge({ status }: { status: string }) {
+  const cfg = RACE_STATUS_MAP[status] ?? {
+    label: status,
+    cls: 'bg-gray-50 text-gray-500 border border-gray-100',
+  }
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${cfg.cls}`}>
+      {cfg.label}
+    </span>
+  )
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function DoctorDashboard() {
   const navigate = useNavigate()
@@ -37,37 +53,32 @@ export default function DoctorDashboard() {
         else setParticipationStatus('rejected')
       })
       .catch(() => {
-        // Không chặn dashboard nếu API lỗi — giữ trạng thái loading im lặng
         setParticipationStatus('none')
       })
   }, [])
 
-  const scheduleData: ScheduleItem[] = [
-    {
-      id: 'S1',
-      raceRun: 'Lượt 1 - Chung kết Nam',
-      checkTime: '08:30',
-      checkType: 'Weigh-In',
-      subject: 'Nguyễn Văn Hùng (Kỵ sĩ)',
-      status: 'Đã hoàn thành'
-    },
-    {
-      id: 'S2',
-      raceRun: 'Lượt 2 - Vòng loại A',
-      checkTime: '10:15',
-      checkType: 'Vet Check',
-      subject: 'Kim Long - Mã số #V102 (Ngựa)',
-      status: 'Đang chờ'
-    },
-    {
-      id: 'S3',
-      raceRun: 'Lượt 3 - Vòng loại B',
-      checkTime: '14:00',
-      checkType: 'Weigh-Out',
-      subject: 'Lê Hoàng Nam (Kỵ sĩ)',
-      status: 'Chưa bắt đầu'
-    }
-  ]
+  // ── Danh sách race assignments từ API thật ────────────────────────────────────
+  const [assignments, setAssignments] = useState<DoctorRaceAssignment[]>([])
+  const [assignmentsLoading, setAssignmentsLoading] = useState(true)
+  const [assignmentsError, setAssignmentsError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setAssignmentsLoading(true)
+    setAssignmentsError(null)
+    getMyDoctorRaceAssignments()
+      .then((data) => {
+        setAssignments(data)
+      })
+      .catch((err: any) => {
+        console.error('Failed to load race assignments:', err)
+        setAssignmentsError(err?.message || 'Không tải được danh sách phân công.')
+      })
+      .finally(() => setAssignmentsLoading(false))
+  }, [])
+
+  const openPaddock = (raceId: number) => {
+    navigate(`/doctor/paddock?raceId=${raceId}`)
+  }
 
   return (
     <div className="space-y-6">
@@ -133,11 +144,13 @@ export default function DoctorDashboard() {
 
       {/* Hệ thống 4 thẻ chỉ số (Stats Cards) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Thẻ 1: Phiên khám hôm nay */}
+        {/* Thẻ 1: Race được phân công */}
         <div className="bg-white border border-emerald-100 rounded-xl p-5 flex items-center justify-between shadow-sm transition-all duration-200 hover:shadow-md">
           <div>
-            <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Phiên khám hôm nay</p>
-            <p className="text-3xl font-bold text-gray-900 mt-2">8</p>
+            <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Race được phân công</p>
+            <p className="text-3xl font-bold text-gray-900 mt-2">
+              {assignmentsLoading ? '…' : assignments.length}
+            </p>
           </div>
           <div className="w-12 h-12 bg-emerald-50 text-emerald-600 flex items-center justify-center rounded-xl text-2xl font-semibold shadow-inner">
             🏥
@@ -150,33 +163,39 @@ export default function DoctorDashboard() {
           className="bg-white border border-yellow-100 rounded-xl p-5 flex items-center justify-between shadow-sm transition-all duration-200 hover:shadow-md hover:border-yellow-200 text-left focus:outline-none focus:ring-2 focus:ring-yellow-200"
         >
           <div>
-            <p className="text-xs font-semibold text-yellow-600 uppercase tracking-wider">Chờ kiểm tra</p>
-            <p className="text-3xl font-bold text-gray-900 mt-2">3</p>
+            <p className="text-xs font-semibold text-yellow-600 uppercase tracking-wider">Sắp diễn ra</p>
+            <p className="text-3xl font-bold text-gray-900 mt-2">
+              {assignmentsLoading ? '…' : assignments.filter(a => a.raceStatus === 'Upcoming').length}
+            </p>
           </div>
           <div className="w-12 h-12 bg-yellow-50 text-yellow-600 flex items-center justify-center rounded-xl text-2xl font-semibold shadow-inner">
             ⏳
           </div>
         </button>
 
-        {/* Thẻ 3: Đã thông qua */}
+        {/* Thẻ 3: Đang diễn ra */}
         <div className="bg-white border border-green-100 rounded-xl p-5 flex items-center justify-between shadow-sm transition-all duration-200 hover:shadow-md">
           <div>
-            <p className="text-xs font-semibold text-green-600 uppercase tracking-wider">Đã thông qua</p>
-            <p className="text-3xl font-bold text-gray-900 mt-2">5</p>
+            <p className="text-xs font-semibold text-green-600 uppercase tracking-wider">Đang diễn ra</p>
+            <p className="text-3xl font-bold text-gray-900 mt-2">
+              {assignmentsLoading ? '…' : assignments.filter(a => a.raceStatus === 'Active' || a.raceStatus === 'Running').length}
+            </p>
           </div>
           <div className="w-12 h-12 bg-green-50 text-green-600 flex items-center justify-center rounded-xl text-2xl font-semibold shadow-inner">
             ✅
           </div>
         </div>
 
-        {/* Thẻ 4: Không đạt điều kiện */}
-        <div className="bg-white border border-red-100 rounded-xl p-5 flex items-center justify-between shadow-sm transition-all duration-200 hover:shadow-md">
+        {/* Thẻ 4: Đã hoàn thành */}
+        <div className="bg-white border border-gray-100 rounded-xl p-5 flex items-center justify-between shadow-sm transition-all duration-200 hover:shadow-md">
           <div>
-            <p className="text-xs font-semibold text-red-600 uppercase tracking-wider">Không đạt điều kiện</p>
-            <p className="text-3xl font-bold text-gray-900 mt-2">0</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Đã hoàn thành</p>
+            <p className="text-3xl font-bold text-gray-900 mt-2">
+              {assignmentsLoading ? '…' : assignments.filter(a => a.raceStatus === 'Completed').length}
+            </p>
           </div>
-          <div className="w-12 h-12 bg-red-50 text-red-600 flex items-center justify-center rounded-xl text-2xl font-semibold shadow-inner">
-            ❌
+          <div className="w-12 h-12 bg-gray-50 text-gray-500 flex items-center justify-center rounded-xl text-2xl font-semibold shadow-inner">
+            🏁
           </div>
         </div>
       </div>
@@ -204,59 +223,90 @@ export default function DoctorDashboard() {
             </button>
           </div>
         </div>
-        {/* Khu vực "Lịch phân công hôm nay" */}
-        <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl shadow-sm p-6 flex flex-col justify-between">
-          <div>
-            <h2 className="text-base font-bold text-gray-900 flex items-center gap-2 border-b border-gray-100 pb-3">
-              📅 Lịch phân công hôm nay
-            </h2>
-            <div className="overflow-x-auto mt-4">
+
+        {/* ── Khu vực "Race được phân công" ── thay mock bằng API thật */}
+        <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl shadow-sm p-6 flex flex-col">
+          <h2 className="text-base font-bold text-gray-900 flex items-center gap-2 border-b border-gray-100 pb-3">
+            🏁 Race được phân công
+          </h2>
+
+          {/* Loading */}
+          {assignmentsLoading && (
+            <div className="flex-1 flex items-center justify-center py-10">
+              <div className="inline-block animate-spin rounded-full h-7 w-7 border-b-2 border-emerald-600 mr-3" />
+              <p className="text-sm text-gray-500">Đang tải danh sách phân công...</p>
+            </div>
+          )}
+
+          {/* Error */}
+          {!assignmentsLoading && assignmentsError && (
+            <div className="mt-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+              <p className="text-sm text-red-700">{assignmentsError}</p>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!assignmentsLoading && !assignmentsError && assignments.length === 0 && (
+            <div className="flex-1 flex flex-col items-center justify-center py-10 text-center">
+              <p className="text-3xl mb-2">📋</p>
+              <p className="text-sm font-semibold text-gray-600">Chưa có race nào được phân công</p>
+              <p className="text-xs text-gray-400 mt-1">Admin sẽ phân công khi giải bắt đầu</p>
+            </div>
+          )}
+
+          {/* Assignment table */}
+          {!assignmentsLoading && !assignmentsError && assignments.length > 0 && (
+            <div className="overflow-x-auto mt-4 flex-1">
               <table className="w-full text-left text-sm text-gray-700">
                 <thead>
                   <tr className="border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    <th className="py-3 px-4">Lượt đua</th>
-                    <th className="py-3 px-4">Giờ khám</th>
-                    <th className="py-3 px-4">Loại kiểm tra</th>
-                    <th className="py-3 px-4">Đối tượng kiểm tra</th>
-                    <th className="py-3 px-4 text-right">Trạng thái</th>
+                    <th className="py-3 px-3">Giải đấu / Vòng</th>
+                    <th className="py-3 px-3">Race #</th>
+                    <th className="py-3 px-3">Thời gian đua</th>
+                    <th className="py-3 px-3">Trạng thái</th>
+                    <th className="py-3 px-3 text-right">Hành động</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {scheduleData.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="py-3.5 px-4 font-medium text-gray-900 text-xs">{item.raceRun}</td>
-                      <td className="py-3.5 px-4 font-mono text-xs">{item.checkTime}</td>
-                      <td className="py-3.5 px-4">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
-                          {item.checkType}
-                        </span>
+                  {assignments.map((item) => (
+                    <tr key={item.raceId} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="py-3.5 px-3">
+                        <p className="font-medium text-gray-900 text-xs leading-tight">{item.tournamentName}</p>
+                        <p className="text-gray-400 text-xs mt-0.5">{item.roundName}</p>
                       </td>
-                      <td className="py-3.5 px-4 text-xs font-medium text-gray-600">{item.subject}</td>
-                      <td className="py-3.5 px-4 text-right">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                            item.status === 'Đã hoàn thành'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                              : item.status === 'Đang chờ'
-                              ? 'bg-yellow-50 text-yellow-700 border border-yellow-100'
-                              : 'bg-gray-50 text-gray-500 border border-gray-100'
-                          }`}
+                      <td className="py-3.5 px-3 font-mono text-xs font-bold text-gray-700">
+                        #{item.raceNumber}
+                      </td>
+                      <td className="py-3.5 px-3 text-xs text-gray-600 whitespace-nowrap">
+                        {new Date(item.scheduledTime).toLocaleString('vi-VN', {
+                          day: '2-digit', month: '2-digit', year: 'numeric',
+                          hour: '2-digit', minute: '2-digit',
+                        })}
+                      </td>
+                      <td className="py-3.5 px-3">
+                        <RaceStatusBadge status={item.raceStatus} />
+                      </td>
+                      <td className="py-3.5 px-3 text-right">
+                        <button
+                          onClick={() => openPaddock(item.raceId)}
+                          className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors whitespace-nowrap"
                         >
-                          {item.status}
-                        </span>
+                          Mở Paddock ➔
+                        </button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </div>
-          <div className="mt-6 pt-4 border-t border-gray-100 flex justify-end">
+          )}
+
+          <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
             <button
               onClick={() => navigate('/doctor/paddock')}
               className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 hover:underline flex items-center gap-1 focus:outline-none"
             >
-              Xem chi tiết bàn điều khiển Paddock ➔
+              Xem bàn điều khiển Paddock ➔
             </button>
           </div>
         </div>
@@ -264,5 +314,3 @@ export default function DoctorDashboard() {
     </div>
   )
 }
-
-
