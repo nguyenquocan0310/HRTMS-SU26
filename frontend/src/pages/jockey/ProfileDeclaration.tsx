@@ -32,7 +32,7 @@ function ReadOnlyField({ label, value }: { label: string; value: string }) {
     <div>
       <label className="block text-sm font-medium text-gray-500 mb-1.5">{label}</label>
       <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-sm flex items-center gap-2">
-        <span className="text-gray-400 text-xs">🔒</span>
+        <span className="text-gray-400 text-xs"></span>
         {value}
       </div>
       <p className="mt-1 text-xs text-gray-400">Thông tin chỉ đọc, không thể chỉnh sửa</p>
@@ -128,7 +128,7 @@ export default function ProfileDeclaration() {
         healthStatus: editForm.healthStatus,
         selfDeclaredWeight: editForm.selfDeclaredWeight,
       };
-      const result = await updateMyProfile(payload);
+      await updateMyProfile(payload);
       setSaveSuccessMsg('Cập nhật hồ sơ thành công.');
       setEditSaved(true);
       setEditChanged(false);
@@ -207,7 +207,7 @@ export default function ProfileDeclaration() {
   // Render
   // ──────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50 py-10 px-4">
+    <div className="space-y-6">
       <div className="max-w-4xl mx-auto">
 
         {/* ── Tiêu đề trang ── */}
@@ -238,7 +238,7 @@ export default function ProfileDeclaration() {
             </div>
           ) : profileError ? (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
-              ⚠️ {profileError}
+               {profileError}
             </div>
           ) : profile ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -259,7 +259,7 @@ export default function ProfileDeclaration() {
             </span>
             Thông tin chuyên môn
             <span className="ml-2 text-xs font-normal text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-              ✏️ Có thể chỉnh sửa
+               Có thể chỉnh sửa
             </span>
           </h2>
 
@@ -397,7 +397,7 @@ export default function ProfileDeclaration() {
                 {/* Toast thành công — hiển thị message từ API */}
                 {saveSuccessMsg && (
                   <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-green-700 text-sm font-medium">
-                    <span className="text-base">✅</span>
+                    <span className="text-base"></span>
                     {saveSuccessMsg}
                   </div>
                 )}
@@ -405,7 +405,7 @@ export default function ProfileDeclaration() {
                 {/* Toast lỗi */}
                 {saveErrorMsg && (
                   <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-red-700 text-sm">
-                    <span className="text-base">⚠️</span>
+                    <span className="text-base"></span>
                     {saveErrorMsg}
                   </div>
                 )}
@@ -434,7 +434,7 @@ export default function ProfileDeclaration() {
 
             {memberFormError && (
               <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3">
-                <p className="text-red-700 text-sm">⚠️ {memberFormError}</p>
+                <p className="text-red-700 text-sm"> {memberFormError}</p>
               </div>
             )}
 
@@ -539,7 +539,7 @@ export default function ProfileDeclaration() {
                             onClick={() => setDeleteConfirmID(member.id)}
                             className="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-medium rounded-lg transition-colors"
                           >
-                            🗑 Xóa
+                            Xóa
                           </button>
                         </td>
                       </tr>
@@ -566,7 +566,7 @@ export default function ProfileDeclaration() {
             </label>
             {noConflict && (
               <div className="mt-3 ml-7 text-xs text-green-600 font-medium flex items-center gap-1">
-                ✅ Đã xác nhận không có xung đột lợi ích khác.
+                 Đã xác nhận không có xung đột lợi ích khác.
               </div>
             )}
           </div>
@@ -576,9 +576,9 @@ export default function ProfileDeclaration() {
       {/* ── Dialog xác nhận xóa ── */}
       {deleteConfirmID && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4">
+          <div className="bg-white rounded-lg shadow-2xl p-8 max-w-sm w-full mx-4">
             <div className="text-center mb-6">
-              <div className="text-4xl mb-3">🗑️</div>
+              <div className="text-4xl mb-3"></div>
               <h2 className="text-xl font-bold text-gray-800 mb-2">Xác nhận xóa khai báo</h2>
               <p className="text-gray-600 text-sm">
                 Bạn có chắc muốn xóa khai báo thành viên này? Thao tác này không thể hoàn tác.
@@ -604,3 +604,6 @@ export default function ProfileDeclaration() {
     </div>
   );
 }
+
+
+

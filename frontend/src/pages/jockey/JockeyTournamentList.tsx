@@ -39,20 +39,20 @@ function formatCurrency(n: number) {
 // Dùng Record<string> thay vì union type — BE có thể trả bất kỳ status nào.
 const REG_STATUS: Record<string, { label: string; cls: string }> = {
   // Legacy statuses
-  Pending:      { label: '⏳ Đang chờ duyệt',  cls: 'bg-yellow-50 border-yellow-300 text-yellow-700 cursor-not-allowed' },
-  Approved:     { label: '✅ Đã được duyệt', cls: 'bg-emerald-50 border-emerald-300 text-emerald-700 cursor-not-allowed' },
-  Rejected:     { label: '❌ Bị từ chối',    cls: 'bg-red-50 border-red-300 text-red-700 cursor-not-allowed' },
+  Pending:      { label: 'Đang chờ duyệt',  cls: 'bg-yellow-50 border-yellow-300 text-yellow-700 cursor-not-allowed' },
+  Approved:     { label: ' Đã được duyệt', cls: 'bg-emerald-50 border-emerald-300 text-emerald-700 cursor-not-allowed' },
+  Rejected:     { label: ' Bị từ chối',    cls: 'bg-red-50 border-red-300 text-red-700 cursor-not-allowed' },
   // Screening statuses từ BE
-  ManualReview: { label: '⏳ Đang chờ duyệt',  cls: 'bg-yellow-50 border-yellow-300 text-yellow-700 cursor-not-allowed' },
-  AutoEligible: { label: '✅ Đã được duyệt', cls: 'bg-emerald-50 border-emerald-300 text-emerald-700 cursor-not-allowed' },
-  AutoRejected: { label: '❌ Bị từ chối',    cls: 'bg-red-50 border-red-300 text-red-700 cursor-not-allowed' },
+  ManualReview: { label: 'Đang chờ duyệt',  cls: 'bg-yellow-50 border-yellow-300 text-yellow-700 cursor-not-allowed' },
+  AutoEligible: { label: ' Đã được duyệt', cls: 'bg-emerald-50 border-emerald-300 text-emerald-700 cursor-not-allowed' },
+  AutoRejected: { label: ' Bị từ chối',    cls: 'bg-red-50 border-red-300 text-red-700 cursor-not-allowed' },
 }
 
 /** Trả về config cho status bất kỳ — fallback an toàn, không bao giờ undefined. */
 function getRegStatus(status: string) {
   return (
     REG_STATUS[status] ?? {
-      label: `ℹ️ ${status}`,
+      label: `${status}`,
       cls: 'bg-gray-50 border-gray-300 text-gray-700 cursor-not-allowed',
     }
   )
@@ -66,14 +66,14 @@ function isRejectedStatus(status: string) {
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 function SkeletonCard() {
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-5 animate-pulse">
+    <div className="bg-white border border-gray-200 rounded-lg p-5 animate-pulse">
       <div className="flex justify-between items-start mb-3">
         <div className="h-5 bg-gray-200 rounded w-2/3" />
         <div className="h-5 bg-gray-100 rounded-full w-20" />
       </div>
       <div className="h-3 bg-gray-100 rounded w-1/2 mb-4" />
       <div className="grid grid-cols-2 gap-2 mb-4">
-        {[...Array(4)].map((_, i) => <div key={i} className="h-12 bg-gray-100 rounded-xl" />)}
+        {[...Array(4)].map((_, i) => <div key={i} className="h-12 bg-gray-100 rounded-lg" />)}
       </div>
       <div className="h-9 bg-gray-100 rounded-lg" />
     </div>
@@ -118,18 +118,18 @@ function TournamentDetailModal({ tournament, participation, onClose, onRegister 
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-lg shadow-xl border border-gray-200 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-2xl flex justify-between items-start">
+        <div className="sticky top-0 bg-white border-b border-gray-200 p-5 rounded-t-lg flex justify-between items-start">
           <div>
-            <p className="text-blue-200 text-xs font-medium uppercase tracking-widest mb-1">Chi tiết giải đấu</p>
-            <h2 className="text-xl font-bold leading-tight">{tournament.name}</h2>
+            <p className="text-gray-400 text-xs font-semibold uppercase tracking-widest mb-1">Chi tiết giải đấu</p>
+            <h2 className="text-xl font-bold leading-tight text-gray-900">{tournament.name}</h2>
           </div>
           <button
             onClick={onClose}
-            className="text-blue-200 hover:text-white transition-colors text-2xl leading-none font-light ml-4"
+            className="text-gray-400 hover:text-gray-600 transition-colors text-2xl leading-none font-light ml-4"
             aria-label="Đóng"
           >
             ×
@@ -141,13 +141,13 @@ function TournamentDetailModal({ tournament, participation, onClose, onRegister 
           <div className="flex flex-wrap gap-3 items-center">
             <StatusBadge status={tournament.status} />
             <span className="text-sm text-gray-500">
-              📅 {formatDate(tournament.startDate)} — {formatDate(tournament.endDate)}
+              {formatDate(tournament.startDate)} — {formatDate(tournament.endDate)}
             </span>
           </div>
 
           {/* Description */}
           {tournament.description && (
-            <p className="text-gray-600 text-sm leading-relaxed bg-gray-50 rounded-xl p-4 border border-gray-100">
+            <p className="text-gray-600 text-sm leading-relaxed bg-gray-50 rounded-lg p-4 border border-gray-200">
               {tournament.description}
             </p>
           )}
@@ -155,16 +155,16 @@ function TournamentDetailModal({ tournament, participation, onClose, onRegister 
           {/* Info grid */}
           <div className="grid grid-cols-2 gap-3">
             {[
-              { icon: '🐴', label: 'Giống ngựa cho phép', value: tournament.allowedBreed },
-              { icon: '🏟️', label: 'Loại đường đua',      value: tournament.trackType },
-              { icon: '📏', label: 'Khoảng cách đua',     value: `${tournament.raceDistance} m` },
-              { icon: '🏆', label: 'Hạng mục',            value: tournament.raceCategory },
-              { icon: '👤', label: 'Kinh nghiệm tối thiểu', value: `${tournament.minJockeyExperienceYears} năm` },
-              { icon: '🐎', label: 'Số ngựa tối đa',      value: String(tournament.maxHorses) },
-              { icon: '💰', label: 'Tổng giải thưởng',    value: formatCurrency(tournament.purseAmount) },
-              { icon: '🎫', label: 'Phí tham dự',         value: formatCurrency(tournament.entryFeeAmount) },
+              { icon: '', label: 'Giống ngựa cho phép', value: tournament.allowedBreed },
+              { icon: '', label: 'Loại đường đua',      value: tournament.trackType },
+              { icon: '', label: 'Khoảng cách đua',     value: `${tournament.raceDistance} m` },
+              { icon: '', label: 'Hạng mục',            value: tournament.raceCategory },
+              { icon: '', label: 'Kinh nghiệm tối thiểu', value: `${tournament.minJockeyExperienceYears} năm` },
+              { icon: '', label: 'Số ngựa tối đa',      value: String(tournament.maxHorses) },
+              { icon: '', label: 'Tổng giải thưởng',    value: formatCurrency(tournament.purseAmount) },
+              { icon: '', label: 'Phí tham dự',         value: formatCurrency(tournament.entryFeeAmount) },
             ].map(({ icon, label, value }) => (
-              <div key={label} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+              <div key={label} className="bg-gray-50 rounded-md p-3 border border-gray-200">
                 <p className="text-xs text-gray-500 mb-0.5">{icon} {label}</p>
                 <p className="font-semibold text-gray-800 text-sm">{value}</p>
               </div>
@@ -175,17 +175,17 @@ function TournamentDetailModal({ tournament, participation, onClose, onRegister 
           {tournament.rounds.length > 0 && (
             <div>
               <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <span className="text-blue-600">🔄</span> Các vòng đấu ({tournament.rounds.length})
+                <span className="text-blue-600"></span> Các vòng đấu ({tournament.rounds.length})
               </h3>
               <div className="space-y-2">
                 {tournament.rounds.map(round => (
-                  <div key={round.roundId} className="border border-gray-100 rounded-xl p-3 bg-gray-50">
+                  <div key={round.roundId} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
                     <div className="flex justify-between items-center">
                       <span className="font-medium text-gray-800 text-sm">{round.name}</span>
                       <StatusBadge status={round.status} />
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      📅 {formatDate(round.scheduledDate)} · {round.races.length} cuộc đua
+                      {formatDate(round.scheduledDate)} · {round.races.length} cuộc đua
                     </p>
                   </div>
                 ))}
@@ -197,13 +197,13 @@ function TournamentDetailModal({ tournament, participation, onClose, onRegister 
           {tournament.prizeDistributions.length > 0 && (
             <div>
               <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <span className="text-yellow-500">🏅</span> Phân chia giải thưởng
+                <span className="text-yellow-500"></span> Phân chia giải thưởng
               </h3>
               <div className="flex flex-wrap gap-2">
                 {tournament.prizeDistributions
                   .sort((a, b) => a.position - b.position)
                   .map(prize => (
-                    <div key={prize.position} className="bg-yellow-50 border border-yellow-100 rounded-xl px-4 py-2 text-center min-w-[80px]">
+                    <div key={prize.position} className="bg-yellow-50 border border-yellow-100 rounded-lg px-4 py-2 text-center min-w-[80px]">
                       <p className="text-yellow-700 font-bold text-lg">#{prize.position}</p>
                       <p className="text-yellow-600 text-sm font-medium">{prize.percentage}%</p>
                     </div>
@@ -214,10 +214,10 @@ function TournamentDetailModal({ tournament, participation, onClose, onRegister 
 
           {/* ── Khu vực đăng ký (chỉ khi Open Registration) ── */}
           {isOpen && (
-            <div className="border-t border-gray-100 pt-4 space-y-3">
+            <div className="border-t border-gray-200 pt-4 space-y-3">
               {/* Rejection / ManualReview reason */}
               {partStatus && isRejectedStatus(partStatus) && (
-                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3">
                   <p className="text-red-700 text-xs font-medium uppercase tracking-wide mb-1">Lý do từ chối</p>
                   <p className="text-red-800 text-sm">
                     {
@@ -231,7 +231,7 @@ function TournamentDetailModal({ tournament, participation, onClose, onRegister 
 
               {/* ManualReview info */}
               {partStatus === 'ManualReview' && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3">
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">
                   <p className="text-yellow-700 text-xs font-medium uppercase tracking-wide mb-1">Ghi chú</p>
                   <p className="text-yellow-800 text-sm">
                     {
@@ -244,15 +244,15 @@ function TournamentDetailModal({ tournament, participation, onClose, onRegister 
 
               {/* Success message */}
               {successMsg && (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
-                  <p className="text-emerald-800 text-sm font-medium">✅ {successMsg}</p>
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+                  <p className="text-emerald-800 text-sm font-medium"> {successMsg}</p>
                 </div>
               )}
 
               {/* Error message */}
               {errorMsg && (
-                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-                  <p className="text-red-800 text-sm font-medium">❌ {errorMsg}</p>
+                <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+                  <p className="text-red-800 text-sm font-medium"> {errorMsg}</p>
                 </div>
               )}
 
@@ -261,7 +261,7 @@ function TournamentDetailModal({ tournament, participation, onClose, onRegister 
                 // Đã đăng ký — hiện trạng thái, disabled
                 <button
                   disabled
-                  className={`w-full flex items-center justify-center gap-2 border font-semibold py-2.5 rounded-xl text-sm ${getRegStatus(partStatus).cls}`}
+                  className={`w-full flex items-center justify-center gap-2 border font-semibold py-2.5 rounded-lg text-sm ${getRegStatus(partStatus).cls}`}
                 >
                   {getRegStatus(partStatus).label}
                 </button>
@@ -270,7 +270,7 @@ function TournamentDetailModal({ tournament, participation, onClose, onRegister 
                 <button
                   onClick={handleRegister}
                   disabled={registering}
-                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-blue-300 disabled:to-indigo-300 text-white font-semibold py-2.5 rounded-xl text-sm transition-all duration-200 shadow-sm hover:shadow-md disabled:cursor-not-allowed"
+                  className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold py-2.5 rounded-md text-sm transition-colors disabled:cursor-not-allowed"
                 >
                   {registering ? (
                     <>
@@ -281,14 +281,14 @@ function TournamentDetailModal({ tournament, participation, onClose, onRegister 
                       Đang đăng ký...
                     </>
                   ) : (
-                    '🏁 Đăng ký tham gia'
+                    'Đăng ký tham gia'
                   )}
                 </button>
               ) : (
                 // Đã đăng ký xong trong phiên này — hiện Pending
                 <button
                   disabled
-                  className={`w-full flex items-center justify-center gap-2 border font-semibold py-2.5 rounded-xl text-sm ${getRegStatus('Pending').cls}`}
+                  className={`w-full flex items-center justify-center gap-2 border font-semibold py-2.5 rounded-lg text-sm ${getRegStatus('Pending').cls}`}
                 >
                   {getRegStatus('Pending').label}
                 </button>
@@ -313,7 +313,7 @@ function TournamentCard({ tournament: t, participation, onOpenDetail }: CardProp
   const partStatus = participation?.status ?? null
 
   return (
-    <div className="group bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-200 flex flex-col">
+    <div className="group bg-white border border-gray-200 rounded-lg p-5 shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-200 flex flex-col">
       {/* Header */}
       <div className="flex justify-between items-start gap-2 mb-2">
         <h3 className="font-bold text-gray-900 text-base leading-tight group-hover:text-blue-700 transition-colors line-clamp-2">
@@ -324,25 +324,25 @@ function TournamentCard({ tournament: t, participation, onOpenDetail }: CardProp
 
       {/* Date */}
       <p className="text-xs text-gray-400 mb-4">
-        📅 {formatDate(t.startDate)} — {formatDate(t.endDate)}
+        {formatDate(t.startDate)} — {formatDate(t.endDate)}
       </p>
 
       {/* Quick info */}
       <div className="grid grid-cols-2 gap-2 mb-4 flex-1">
-        <div className="bg-gray-50 rounded-xl p-2.5 border border-gray-100">
-          <p className="text-xs text-gray-400 mb-0.5">🐴 Giống ngựa</p>
+        <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-200">
+          <p className="text-xs text-gray-400 mb-0.5"> Giống ngựa</p>
           <p className="text-xs font-semibold text-gray-700 truncate">{t.allowedBreed}</p>
         </div>
-        <div className="bg-gray-50 rounded-xl p-2.5 border border-gray-100">
-          <p className="text-xs text-gray-400 mb-0.5">📏 Khoảng cách</p>
+        <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-200">
+          <p className="text-xs text-gray-400 mb-0.5"> Khoảng cách</p>
           <p className="text-xs font-semibold text-gray-700">{t.raceDistance} m</p>
         </div>
-        <div className="bg-blue-50 rounded-xl p-2.5 border border-blue-100">
-          <p className="text-xs text-blue-400 mb-0.5">💰 Giải thưởng</p>
+        <div className="bg-blue-50 rounded-lg p-2.5 border border-blue-100">
+          <p className="text-xs text-blue-400 mb-0.5"> Giải thưởng</p>
           <p className="text-xs font-bold text-blue-700 truncate">{formatCurrency(t.purseAmount)}</p>
         </div>
-        <div className="bg-purple-50 rounded-xl p-2.5 border border-purple-100">
-          <p className="text-xs text-purple-400 mb-0.5">👤 KN tối thiểu</p>
+        <div className="bg-purple-50 rounded-lg p-2.5 border border-purple-100">
+          <p className="text-xs text-purple-400 mb-0.5"> KN tối thiểu</p>
           <p className="text-xs font-bold text-purple-700">{t.minJockeyExperienceYears} năm</p>
         </div>
       </div>
@@ -357,7 +357,7 @@ function TournamentCard({ tournament: t, participation, onOpenDetail }: CardProp
       {/* CTA */}
       <button
         onClick={() => onOpenDetail(t)}
-        className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-semibold py-2.5 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md"
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2.5 rounded-md transition-colors"
       >
         Xem chi tiết →
       </button>
@@ -426,14 +426,14 @@ const JockeyTournamentList: React.FC = () => {
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            🏆 Đăng ký Giải đấu
+             Đăng ký Giải đấu
           </h1>
           <p className="text-gray-500 text-sm mt-0.5">
             Xem và đăng ký các giải đấu đang mở đăng ký
           </p>
         </div>
         {!loading && (
-          <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2">
+          <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-lg px-4 py-2">
             <span className="text-emerald-600 font-bold text-lg">{openTournaments.length}</span>
             <span className="text-emerald-600 text-sm">giải mở đăng ký</span>
           </div>
@@ -449,12 +449,12 @@ const JockeyTournamentList: React.FC = () => {
             placeholder="Tìm kiếm giải đấu..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
           />
         </div>
         <button
           onClick={() => setShowAll(v => !v)}
-          className={`px-4 py-2.5 rounded-xl text-sm font-medium border transition-all ${
+          className={`px-4 py-2.5 rounded-lg text-sm font-medium border transition-all ${
             showAll
               ? 'bg-blue-600 text-white border-blue-600'
               : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300'
@@ -466,11 +466,11 @@ const JockeyTournamentList: React.FC = () => {
 
       {/* ── My registrations banner ── */}
       {participations.length > 0 && (
-        <div className="mb-5 bg-blue-50 border border-blue-100 rounded-2xl p-4">
-          <p className="text-blue-700 text-sm font-semibold mb-2">📋 Đăng ký của bạn</p>
+        <div className="mb-5 bg-blue-50 border border-blue-100 rounded-lg p-4">
+          <p className="text-blue-700 text-sm font-semibold mb-2">Đăng ký của bạn</p>
           <div className="flex flex-wrap gap-2">
             {participations.map(p => {
-              const st = p.status as ParticipationStatus
+              const st = p.status
               const cfg = REG_STATUS[st] ?? { label: p.status, cls: 'bg-gray-50 border-gray-300 text-gray-700' }
               return (
                 <span
@@ -493,19 +493,19 @@ const JockeyTournamentList: React.FC = () => {
         </div>
       ) : error ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="text-6xl mb-4">⚠️</div>
+          
           <h2 className="text-xl font-semibold text-gray-800 mb-2">Không thể tải dữ liệu</h2>
           <p className="text-gray-500 text-sm mb-6 max-w-xs">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-6 rounded-xl transition-colors text-sm"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-6 rounded-lg transition-colors text-sm"
           >
             Thử lại
           </button>
         </div>
       ) : displayed.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="text-6xl mb-4">🏆</div>
+          
           <h2 className="text-xl font-semibold text-gray-800 mb-2">Không có giải đấu nào</h2>
           <p className="text-gray-500 text-sm">
             {showAll ? 'Thử thay đổi từ khóa tìm kiếm.' : 'Hiện không có giải đấu nào đang mở đăng ký.'}
@@ -526,8 +526,8 @@ const JockeyTournamentList: React.FC = () => {
 
       {/* ── Toast ── */}
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white px-5 py-3.5 rounded-2xl shadow-2xl text-sm font-medium flex items-center gap-2">
-          ✅ {toastMsg}
+        <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white px-5 py-3.5 rounded-lg shadow-2xl text-sm font-medium flex items-center gap-2">
+           {toastMsg}
         </div>
       )}
 
@@ -545,3 +545,6 @@ const JockeyTournamentList: React.FC = () => {
 }
 
 export default JockeyTournamentList
+
+
+
