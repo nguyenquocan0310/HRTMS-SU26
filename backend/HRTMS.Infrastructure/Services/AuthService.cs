@@ -24,6 +24,7 @@ public class AuthService : IAuthService
     private readonly IFamilyDeclarationValidator _frdValidator;
     private readonly ITokenBlacklistService _tokenBlacklistService;
     private readonly IEmailService _emailService;
+    private readonly INotificationService _notificationService;
     private readonly IConfiguration _config;
     private readonly byte[] _encryptionKey;
 
@@ -50,6 +51,7 @@ public class AuthService : IAuthService
         IFamilyDeclarationValidator frdValidator,
         ITokenBlacklistService tokenBlacklistService,
         IEmailService emailService,
+        INotificationService notificationService,
         IConfiguration configuration)
     {
         _context = context;
@@ -58,6 +60,7 @@ public class AuthService : IAuthService
         _frdValidator = frdValidator;
         _tokenBlacklistService = tokenBlacklistService;
         _emailService = emailService;
+        _notificationService = notificationService;
         _config = configuration;
 
         var keyHex = configuration["Security:IdentityEncryptionKeyHex"];
@@ -225,6 +228,21 @@ public class AuthService : IAuthService
                 entityId: user.UserId.ToString(),
                 ipAddress: ipAddress,
                 userAgent: userAgent);
+
+            // Welcome notify — gửi SAU khi transaction đã commit, không để lỗi email
+            // (đã tự catch trong NotificationService/EmailService) ảnh hưởng tới đăng ký.
+            var welcomeMessage = initialStatus == "Active"
+                ? $"Chào mừng {user.FullName} đến với HRTMS! Tài khoản của bạn đã sẵn sàng sử dụng."
+                : $"Chào mừng {user.FullName} đến với HRTMS! Hồ sơ {dto.Role} của bạn đang chờ Admin duyệt, " +
+                  "chúng tôi sẽ thông báo ngay khi có kết quả.";
+
+            await _notificationService.SendAsync(
+                user.UserId,
+                "Chào mừng bạn đến với HRTMS",
+                welcomeMessage,
+                type: "Both",
+                relatedEntityType: "Users",
+                relatedEntityId: user.UserId);
 
             return ApiResponse<int>.Ok(user.UserId, "Tạo tài khoản thành công.");
         }
