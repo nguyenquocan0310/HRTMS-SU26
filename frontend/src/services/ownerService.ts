@@ -5,7 +5,7 @@ import { apiFetch } from './apiClient';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
-// Create axios instance
+// Create axios instance (dùng cho các hàm chưa được migrate sang apiFetch)
 const axiosInstance: AxiosInstance = axios.create({
   baseURL: API_URL,
 });
@@ -24,11 +24,13 @@ axiosInstance.interceptors.request.use(
   }
 );
 
+// ─── Horse CRUD (dùng apiFetch — không hard-code localhost) ──────────────────
+
 export const getMyHorses = async (): Promise<Horse[]> => {
   try {
-    const response = await axiosInstance.get<any>('http://localhost:5222/api/horses/my');
-    // Trích xuất mảng ngựa từ thuộc tính .data của ApiResponse nếu có
-    return response.data?.data || response.data || [];
+    const res = await apiFetch<any>('/horses/my');
+    // Backend trả ApiResponse<T> hoặc thẳng array
+    return res?.data || (Array.isArray(res) ? res : []);
   } catch (error) {
     console.error('Error fetching my horses:', error);
     throw error;
@@ -37,8 +39,8 @@ export const getMyHorses = async (): Promise<Horse[]> => {
 
 export const getHorseById = async (id: number): Promise<Horse> => {
   try {
-    const response = await axiosInstance.get<any>(`http://localhost:5222/api/horses/${id}`);
-    return response.data?.data || response.data;
+    const res = await apiFetch<any>(`/horses/${id}`);
+    return res?.data || res;
   } catch (error) {
     console.error(`Error fetching horse with ID ${id}:`, error);
     throw error;
@@ -52,8 +54,11 @@ export const createHorse = async (
   data: Omit<Horse, 'horseID' | 'ownerID' | 'createdAt'>
 ): Promise<Horse> => {
   try {
-    const response = await axiosInstance.post<Horse>('http://localhost:5222/api/horses', data);
-    return response.data;
+    const res = await apiFetch<any>('/horses', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return res?.data || res;
   } catch (error) {
     console.error('Error creating horse:', error);
     throw error;
@@ -73,6 +78,30 @@ export const updateHorse = async (
   } catch (error) {
     console.error(`Error updating horse with ID ${id}:`, error);
     throw error;
+  }
+};
+
+/**
+ * GET /api/horses/{horseId}/enrollments
+ * Trả về danh sách enrollment của ngựa theo từng giải.
+ * Trả về null nếu lỗi mạng — caller sẽ hiển thị fallback thay vì crash.
+ * Trả về [] nếu thành công nhưng không có enrollment nào.
+ */
+export const getHorseEnrollments = async (
+  horseId: number | string
+): Promise<HorseEnrollmentResponse[] | null> => {
+  try {
+    const res = await apiFetch<any>(`/horses/${horseId}/enrollments`);
+    // Backend có thể trả ApiResponse<list> hoặc thẳng array
+    if (Array.isArray(res)) return res;
+    if (Array.isArray(res?.data)) return res.data;
+    if (Array.isArray(res?.data?.items)) return res.data.items;
+    // Single enrollment wrapped in data
+    if (res?.data && typeof res.data === 'object' && !Array.isArray(res.data)) return [res.data];
+    return [];
+  } catch (error) {
+    console.error(`Error fetching enrollments for horse ${horseId}:`, error);
+    return null; // null = network error; [] = no enrollments
   }
 };
 
@@ -238,22 +267,76 @@ export interface HorseCreateResponse {
   screeningStatus: 'AutoEligible' | 'ManualReview' | 'AutoRejected' | string;
   screeningReason: string | null;
   adminApprovalStatus: string | null;
+  enrollmentId?: number;
+  tournamentId?: number;
+  tournamentName?: string | null;
+  enrollmentStatus?: string;
+}
+
+export interface HorseEnrollmentResponse {
+  enrollmentId: number;
+  horseId: number;
+  horseName: string;
+  tournamentId: number;
+  tournamentName: string | null;
+  status: string;
+  screeningStatus: 'AutoEligible' | 'ManualReview' | 'AutoRejected' | string;
+  screeningReason: string | null;
+  adminApprovalStatus: string;
+  rejectionReason: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
- * POST /api/horses
- * Gửi kèm tournamentId, lấy Owner từ JWT.
- * Trả về HorseCreateResponse với screeningStatus.
+ * Schema v3: tạo hồ sơ ngựa vào kho trước, sau đó enroll vào giải để screening theo giải.
  */
-export const createHorseWithTournament = (payload: HorseCreatePayload): Promise<HorseCreateResponse> =>
-  apiFetch<ApiResponse<HorseCreateResponse>>('/horses', {
+export const createHorseWithTournament = async (
+  payload: HorseCreatePayload
+): Promise<HorseCreateResponse> => {
+  const { tournamentId, ...horsePayload } = payload;
+
+  const horseRes = await apiFetch<ApiResponse<HorseCreateResponse>>('/horses', {
     method: 'POST',
-    body: JSON.stringify(payload),
-  }).then((res) => {
-    if (!res.success || !res.data)
-      throw new Error(res.message || 'Đăng ký ngựa thất bại.');
-    return res.data;
+    body: JSON.stringify(horsePayload),
   });
+
+  if (!horseRes.success || !horseRes.data) {
+    throw new Error(horseRes.message || 'Tạo hồ sơ ngựa thất bại.');
+  }
+
+  let enrollmentRes: ApiResponse<HorseEnrollmentResponse>;
+  try {
+    enrollmentRes = await apiFetch<ApiResponse<HorseEnrollmentResponse>>(
+      `/horses/${horseRes.data.horseId}/enrollments`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ tournamentId }),
+      }
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Đẩy ngựa vào giải thất bại.';
+    throw new Error(`Tạo hồ sơ ngựa thành công nhưng đẩy ngựa vào giải thất bại: ${message}`);
+  }
+
+  if (!enrollmentRes.success || !enrollmentRes.data) {
+    throw new Error(
+      `Tạo hồ sơ ngựa thành công nhưng đẩy ngựa vào giải thất bại: ${enrollmentRes.message || 'Không có dữ liệu enrollment.'}`
+    );
+  }
+
+  const enrollment = enrollmentRes.data;
+  return {
+    ...horseRes.data,
+    screeningStatus: enrollment.screeningStatus,
+    screeningReason: enrollment.screeningReason,
+    adminApprovalStatus: enrollment.adminApprovalStatus,
+    enrollmentId: enrollment.enrollmentId,
+    tournamentId: enrollment.tournamentId,
+    tournamentName: enrollment.tournamentName,
+    enrollmentStatus: enrollment.status,
+  };
+};
 
 /**
  * PATCH /api/race-entries/{id}/confirm
@@ -280,4 +363,3 @@ export const withdrawRaceEntry = async (id: number, reason: string): Promise<any
   if (!res.success) throw new Error(res.message || 'Rút lui thất bại.');
   return res.data;
 };
-
