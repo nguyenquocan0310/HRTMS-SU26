@@ -2,7 +2,6 @@ import axios from 'axios';
 import type  { AxiosInstance } from 'axios';
 import type {
   JockeyProfile,
-  RaceInvitation,
   JockeyRaceEntry,
   JockeyRaceResult,
 } from '../types/jockey.types';
@@ -105,24 +104,14 @@ export const getMyInvitations = async (
 };
 
 /**
- * Respond to a race invitation
+ * Respond to a race invitation — DEPRECATED, kept for safety.
+ * Use acceptPairing / declinePairing instead.
  */
 export const respondToInvitation = async (
-  invitationID: string,
-  status: 'Accepted' | 'Declined'
+  _invitationID: string,
+  _status: 'Accepted' | 'Declined'
 ): Promise<void> => {
-  try {
-    await axiosInstance.put(
-      `/api/jockey-invitations/${invitationID}/respond`,
-      { status }
-    );
-  } catch (error) {
-    console.error(
-      `Error responding to invitation ${invitationID}:`,
-      error
-    );
-    throw error;
-  }
+  console.warn('respondToInvitation is deprecated. Use acceptPairing or declinePairing.');
 };
 
 /**
@@ -156,18 +145,38 @@ export const getMyRaceHistory = async (): Promise<JockeyRaceResult[]> => {
 };
 
 /**
- * Accept a pairing invitation
+ * PATCH /api/pairings/{id}/accept
+ * Jockey chấp nhận lời mời của Owner.
  */
 export const acceptPairing = async (pairingId: string): Promise<any> => {
-  try {
-    const response = await axiosInstance.patch<any>(
-      `http://localhost:5222/api/pairings/${pairingId}/accept`
-    );
-    return response.data;
-  } catch (error) {
-    console.error(`Error accepting pairing ${pairingId}:`, error);
-    throw error;
+  interface ApiResp<T> { success: boolean; message: string; data: T | null }
+  const res = await apiFetch<ApiResp<any>>(`/pairings/${pairingId}/accept`, {
+    method: 'PATCH',
+  });
+  if (res && res.success === false) {
+    throw new Error(res.message || 'Chấp nhận lời mời thất bại.');
   }
+  return res?.data ?? res;
+};
+
+/**
+ * PATCH /api/pairings/{id}/decline
+ * Jockey từ chối lời mời của Owner.
+ * @param responseReason - Lý do từ chối (tuyện chọn, có giá trị mặc định)
+ */
+export const declinePairing = async (
+  pairingId: string,
+  responseReason: string = 'Jockey từ chối lời mời.'
+): Promise<any> => {
+  interface ApiResp<T> { success: boolean; message: string; data: T | null }
+  const res = await apiFetch<ApiResp<any>>(`/pairings/${pairingId}/decline`, {
+    method: 'PATCH',
+    body: JSON.stringify({ responseReason }),
+  });
+  if (res && res.success === false) {
+    throw new Error(res.message || 'Từ chối lời mời thất bại.');
+  }
+  return res?.data ?? res;
 };
 
 export interface PagedResult<T> {
@@ -189,4 +198,5 @@ export const getMyJockeyRaceEntries = async (
     `/jockeys/race-entries/my?page=${page}&pageSize=${pageSize}`
   );
 };
+
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import type { JockeyRaceResult } from '../../types/jockey.types';
 
 // Dữ liệu mẫu
@@ -81,19 +81,6 @@ export default function RaceHistory() {
     }
   };
 
-  const getPositionIcon = (position: number): string => {
-    switch (position) {
-      case 1:
-        return '🥇';
-      case 2:
-        return '🥈';
-      case 3:
-        return '🥉';
-      default:
-        return '🏅';
-    }
-  };
-
   const getPositionText = (position: number): string => {
     switch (position) {
       case 1:
@@ -113,7 +100,7 @@ export default function RaceHistory() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-          <p className="text-gray-600 text-lg">Đang tải...</p>
+          <p className="text-gray-500 text-lg">Đang tải...</p>
         </div>
       </div>
     );
@@ -124,11 +111,11 @@ export default function RaceHistory() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="text-6xl mb-4">📊</div>
+          
           <h2 className="text-2xl font-bold text-gray-800 mb-4">
             Chưa có lịch sử thi đấu
           </h2>
-          <p className="text-gray-600">
+          <p className="text-gray-500">
             Lịch sử thi đấu của bạn sẽ được hiển thị tại đây sau khi hoàn thành cuộc đua.
           </p>
         </div>
@@ -138,14 +125,14 @@ export default function RaceHistory() {
 
   // Danh sách lịch sử
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-7xl mx-auto">
+    <div className="space-y-6">
+      <div>
         {/* Tiêu đề */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+          <h1 className="text-2xl font-bold text-gray-900">
             Lịch sử thi đấu
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-500">
             Xem các kết quả và thống kê thi đấu của bạn
           </p>
         </div>
@@ -153,24 +140,24 @@ export default function RaceHistory() {
         {/* Thẻ thống kê tổng hợp */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           {/* Tổng số trận */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-            <p className="text-gray-600 text-sm font-medium mb-2">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+            <p className="text-gray-500 text-sm font-medium mb-2">
               Tổng số trận
             </p>
-            <p className="text-4xl font-bold text-blue-600">{totalRaces}</p>
+            <p className="text-3xl font-bold text-blue-600">{totalRaces}</p>
           </div>
 
           {/* Số lần thắng */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-            <p className="text-gray-600 text-sm font-medium mb-2">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+            <p className="text-gray-500 text-sm font-medium mb-2">
               Số lần thắng
             </p>
-            <p className="text-4xl font-bold text-yellow-600">{winCount}</p>
+            <p className="text-3xl font-bold text-yellow-600">{winCount}</p>
           </div>
 
           {/* Tổng tiền thưởng */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-            <p className="text-gray-600 text-sm font-medium mb-2">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+            <p className="text-gray-500 text-sm font-medium mb-2">
               Tổng tiền thưởng
             </p>
             <p className="text-2xl font-bold text-green-600">
@@ -179,16 +166,16 @@ export default function RaceHistory() {
           </div>
 
           {/* Tỉ lệ thắng */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-            <p className="text-gray-600 text-sm font-medium mb-2">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+            <p className="text-gray-500 text-sm font-medium mb-2">
               Tỉ lệ thắng
             </p>
-            <p className="text-4xl font-bold text-purple-600">{winRate}%</p>
+            <p className="text-3xl font-bold text-purple-600">{winRate}%</p>
           </div>
         </div>
 
         {/* Bảng lịch sử */}
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               {/* Tiêu đề bảng */}
@@ -239,7 +226,6 @@ export default function RaceHistory() {
                           result.finishPosition
                         )}`}
                       >
-                        <span>{getPositionIcon(result.finishPosition)}</span>
                         {getPositionText(result.finishPosition)}
                       </span>
                     </td>
@@ -289,3 +275,5 @@ export default function RaceHistory() {
     </div>
   );
 }
+
+

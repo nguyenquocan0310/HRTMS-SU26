@@ -31,7 +31,7 @@ export interface RaceInvitation {
   horseName: string;
   breedCode: string;
   raceScheduledTime?: string;
-  status: 'Pending' | 'Accepted' | 'Declined';
+  status: 'Pending' | 'Accepted' | 'Confirmed' | 'Declined' | 'Cancelled';
   invitedAt: string;
   respondedAt?: string;
   requestMessage?: string;

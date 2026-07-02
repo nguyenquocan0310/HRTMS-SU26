@@ -1,116 +1,103 @@
-import React from 'react';
 import type { RaceInvitation } from '../../types/jockey.types';
 
 interface InvitationCardProps {
   invitation: RaceInvitation;
+  actionLoading?: boolean;
   onAccept: (invitationID: string) => void;
   onDecline: (invitationID: string) => void;
 }
 
-const InvitationCard: React.FC<InvitationCardProps> = ({
+const STATUS_CFG: Record<string, { label: string; cls: string }> = {
+  Pending: { label: 'Chờ phản hồi', cls: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
+  Accepted: { label: 'Đã chấp nhận', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+  Confirmed: { label: 'Đã xác nhận ghép cặp', cls: 'bg-green-50 text-green-700 border-green-200' },
+  Declined: { label: 'Đã từ chối', cls: 'bg-red-50 text-red-700 border-red-200' },
+  Cancelled: { label: 'Đã hủy', cls: 'bg-gray-50 text-gray-600 border-gray-200' },
+};
+
+export default function InvitationCard({
   invitation,
+  actionLoading = false,
   onAccept,
   onDecline,
-}) => {
-  const getStatusBadgeColor = (status: RaceInvitation['status']): string => {
-    switch (status) {
-      case 'Pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'Accepted':
-        return 'bg-green-100 text-green-800';
-      case 'Declined':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+}: InvitationCardProps) {
+  const cfg = STATUS_CFG[invitation.status] ?? {
+    label: invitation.status,
+    cls: 'bg-gray-50 text-gray-700 border-gray-200',
   };
 
-  const getStatusLabel = (status: RaceInvitation['status']): string => {
-    switch (status) {
-      case 'Pending':
-        return 'Chờ phản hồi';
-      case 'Accepted':
-        return 'Đã chấp nhận';
-      case 'Declined':
-        return 'Đã từ chối';
-      default:
-        return status;
-    }
-  };
+  const showResponseTime = ['Accepted', 'Confirmed', 'Declined', 'Cancelled'].includes(invitation.status);
 
   return (
-    <div className="border border-gray-200 rounded-lg shadow-sm p-4 bg-white hover:shadow-md transition-shadow">
-      {/* Tên ngựa */}
-      <h3 className="font-bold text-lg mb-3">{invitation.horseName}</h3>
-
-      {/* Thông tin chi tiết */}
-      <div className="text-sm text-gray-700 mb-4 space-y-2">
-        <p>
-          <span className="font-medium">Chủ ngựa:</span> {invitation.ownerName}
-        </p>
-        <p>
-          <span className="font-medium">Giống ngựa:</span> {invitation.breedCode}
-        </p>
-        {invitation.raceScheduledTime && (
-          <p>
-            <span className="font-medium">Giờ dự kiến:</span>{' '}
-            {new Date(invitation.raceScheduledTime).toLocaleString('vi-VN')}
-          </p>
-        )}
-        {invitation.raceID && (
-          <p>
-            <span className="font-medium">Mã cuộc đua:</span> {invitation.raceID}
-          </p>
-        )}
-        {invitation.requestMessage && (
-          <p>
-            <span className="font-medium">Lời nhắn:</span> {invitation.requestMessage}
-          </p>
-        )}
-      </div>
-
-      {/* Badge trạng thái */}
-      <div className="mb-4">
-        <span
-          className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(
-            invitation.status
-          )}`}
-        >
-          {getStatusLabel(invitation.status)}
+    <div className="border border-gray-200 rounded-lg shadow-sm p-4 bg-white hover:border-blue-100 transition-colors">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <h3 className="font-semibold text-gray-900 text-base">{invitation.horseName}</h3>
+          <p className="text-xs text-gray-500 mt-1">{invitation.breedCode}</p>
+        </div>
+        <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${cfg.cls}`}>
+          {cfg.label}
         </span>
       </div>
 
-      {/* Nút hành động — chỉ hiển thị khi Chờ phản hồi */}
+      <dl className="text-sm text-gray-700 space-y-2 mb-4">
+        <div className="flex justify-between gap-3">
+          <dt className="text-gray-500">Chủ ngựa</dt>
+          <dd className="font-medium text-gray-900 text-right">{invitation.ownerName}</dd>
+        </div>
+        {invitation.raceScheduledTime && (
+          <div className="flex justify-between gap-3">
+            <dt className="text-gray-500">Giờ dự kiến</dt>
+            <dd className="font-medium text-gray-900 text-right">
+              {new Date(invitation.raceScheduledTime).toLocaleString('vi-VN')}
+            </dd>
+          </div>
+        )}
+        {invitation.raceID && invitation.raceID !== 'N/A' && (
+          <div className="flex justify-between gap-3">
+            <dt className="text-gray-500">Mã cuộc đua</dt>
+            <dd className="font-medium text-gray-900 text-right">{invitation.raceID}</dd>
+          </div>
+        )}
+        {invitation.requestMessage && (
+          <div>
+            <dt className="text-gray-500 mb-1">Lời nhắn</dt>
+            <dd className="text-gray-800 bg-gray-50 border border-gray-100 rounded-md px-3 py-2">
+              {invitation.requestMessage}
+            </dd>
+          </div>
+        )}
+      </dl>
+
       {invitation.status === 'Pending' && (
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <button
             onClick={() => onAccept(invitation.invitationID)}
-            className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+            disabled={actionLoading}
+            className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 px-3 rounded-md transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
+            {actionLoading && <span className="inline-block animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" />}
             Chấp nhận
           </button>
           <button
             onClick={() => onDecline(invitation.invitationID)}
-            className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+            disabled={actionLoading}
+            className="flex-1 flex items-center justify-center gap-1.5 bg-white hover:bg-red-50 text-red-600 border border-red-200 text-sm font-semibold py-2 px-3 rounded-md transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
+            {actionLoading && <span className="inline-block animate-spin rounded-full h-3.5 w-3.5 border-2 border-red-500 border-t-transparent" />}
             Từ chối
           </button>
         </div>
       )}
 
-      {/* Hiển thị thời gian phản hồi cho Accepted/Declined */}
-      {(invitation.status === 'Accepted' || invitation.status === 'Declined') && (
-        <div className="text-sm text-gray-600">
-          <p>
-            <span className="font-medium">Phản hồi lúc:</span>{' '}
-            {invitation.respondedAt
-              ? new Date(invitation.respondedAt).toLocaleString('vi-VN')
-              : 'Chưa có'}
-          </p>
-        </div>
+      {showResponseTime && (
+        <p className="text-xs text-gray-500 border-t border-gray-100 pt-3">
+          Phản hồi lúc:{' '}
+          <span className="font-medium text-gray-700">
+            {invitation.respondedAt ? new Date(invitation.respondedAt).toLocaleString('vi-VN') : 'Chưa có'}
+          </span>
+        </p>
       )}
     </div>
   );
-};
-
-export default InvitationCard;
+}
