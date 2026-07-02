@@ -48,6 +48,7 @@
 | 5 | POST | `/api/horses/{horseId}/enrollments` | Owner | **Đẩy ngựa vào một giải** (screening theo giải) |
 | 6 | GET | `/api/horses/{horseId}/enrollments` | Owner | Danh sách enrollment của một con ngựa |
 | 7 | GET | `/api/horses/my/enrollments` | Owner | Tất cả enrollment của Owner (lọc theo `tournamentId`) |
+| 7b | DELETE | `/api/horses/{horseId}/enrollments/{id}` | Owner | **Rút ngựa khỏi giải** (soft-withdraw, chỉ khi chưa pairing) |
 | 8 | GET | `/api/admin/horse-entries/pending` | Admin | Danh sách enrollment chờ duyệt |
 | 9 | GET | `/api/admin/horses/{id}` | Admin | Chi tiết hồ sơ ngựa (Admin view) |
 | 10 | PATCH | `/api/admin/horse-entries/{id}/approve` | Admin | Phê duyệt enrollment (ngựa vào giải) |
@@ -242,6 +243,40 @@ Owner "đẩy" một con ngựa **đã có trong kho** vào một giải cụ th
 | tournamentId | int | chỉ `GET /api/horses/my/enrollments` | Lọc theo giải |
 | adminApprovalStatus | string | cả 2 endpoint | `Pending` \| `Approved` \| `Rejected` — **bắt buộc dùng `Approved`** khi lấy danh sách ngựa hợp lệ để mời Jockey (JockeyInvite), tránh lẫn enrollment `Rejected`/`Pending` |
 | page, pageSize | int | cả 2 endpoint | Mặc định 1 / 20 |
+
+---
+
+## 1c. Rút ngựa khỏi giải — Withdraw enrollment
+
+```
+DELETE /api/horses/{horseId}/enrollments/{enrollmentId}
+```
+
+Owner rút một con ngựa khỏi một giải **trước khi pairing**. Soft-withdraw: `enrollment.Status` `Enrolled` → `Withdrawn` (không xóa cứng, vì `FK_Pairings_HorseTournament` trỏ vào row này). Ngựa quay về kho, có thể enroll giải khác.
+
+**Auth:** Owner
+
+### Business rules
+
+- Enrollment phải tồn tại và `horseId` khớp (`ENROLLMENT_NOT_FOUND`).
+- Enrollment phải thuộc Owner đang đăng nhập (`ENROLLMENT_NOT_OWNED` → 403).
+- Đã `Withdrawn` rồi → `ALREADY_WITHDRAWN`.
+- **Chặn nếu đã có pairing active** (`Pending`/`Accepted`/`Confirmed`) của ngựa trong đúng giải đó → `PAIRING_EXISTS`; phải hủy pairing trước.
+- Ghi `AuditLog` `Withdraw_Enrollment` + Notification cho Owner.
+
+### Response — 200 OK
+
+```json
+{ "success": true, "message": "Đã rút ngựa khỏi giải." }
+```
+
+### Lỗi
+
+| HTTP | error | Khi nào |
+| --- | --- | --- |
+| 404 | `ENROLLMENT_NOT_FOUND` | Không thấy enrollment hoặc `horseId` không khớp |
+| 403 | `ENROLLMENT_NOT_OWNED` | Enrollment không thuộc Owner |
+| 400 | `ALREADY_WITHDRAWN` / `PAIRING_EXISTS` | Đã rút rồi, hoặc còn pairing active |
 
 ---
 
