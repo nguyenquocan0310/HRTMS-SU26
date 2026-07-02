@@ -11,6 +11,7 @@ public class TournamentParticipantService : ITournamentParticipantService
 {
     private readonly HRTMSDbContext _context;
     private readonly IAuditLogService _auditLog;
+    private readonly INotificationService _notification;
 
     private static readonly string[] AllowedRoles = ["Owner", "Jockey", "Doctor", "Referee"];
 
@@ -22,10 +23,11 @@ public class TournamentParticipantService : ITournamentParticipantService
         bool ApprovedImmediately,
         string SuccessMessage);
 
-    public TournamentParticipantService(HRTMSDbContext context, IAuditLogService auditLog)
+    public TournamentParticipantService(HRTMSDbContext context, IAuditLogService auditLog, INotificationService notification)
     {
         _context = context;
         _auditLog = auditLog;
+        _notification = notification;
     }
 
     public async Task<ApiResponse<ParticipantResponseDto>> RegisterAsync(int userId, string role, int tournamentId)
@@ -75,18 +77,13 @@ public class TournamentParticipantService : ITournamentParticipantService
 
         if (participant.Status == "Rejected")
         {
-            _context.Notifications.Add(new Notification
-            {
-                RecipientId = userId,
-                Title = "Đăng ký giải bị từ chối tự động",
-                Message = participant.RejectionReason ?? participant.ScreeningReason,
-                Type = "In-app",
-                IsRead = false,
-                RelatedEntityType = "TournamentParticipant",
-                RelatedEntityId = participant.ParticipantId,
-                SentAt = now
-            });
-            await _context.SaveChangesAsync();
+            await _notification.SendAsync(
+                userId,
+                "Đăng ký giải bị từ chối tự động",
+                participant.RejectionReason ?? participant.ScreeningReason,
+                type: "Both",
+                relatedEntityType: "TournamentParticipant",
+                relatedEntityId: participant.ParticipantId);
         }
 
         await _auditLog.LogAsync(userId, "Register_TournamentParticipant", "TournamentParticipant",
@@ -150,6 +147,14 @@ public class TournamentParticipantService : ITournamentParticipantService
         await _auditLog.LogAsync(adminId, "Approve_TournamentParticipant", "TournamentParticipant",
             participantId.ToString(), oldStatus, "Approved");
 
+        await _notification.SendAsync(
+            participant.UserId,
+            "Đăng ký tham gia giải được duyệt",
+            $"Đăng ký tham gia giải (vai trò {participant.Role}) của bạn đã được Admin phê duyệt.",
+            type: "Both",
+            relatedEntityType: "TournamentParticipant",
+            relatedEntityId: participantId);
+
         return ApiResponse<ParticipantResponseDto>.Ok(
             await MapByIdAsync(participantId), "Đã duyệt tham gia giải.");
     }
@@ -174,6 +179,14 @@ public class TournamentParticipantService : ITournamentParticipantService
 
         await _auditLog.LogAsync(adminId, "Reject_TournamentParticipant", "TournamentParticipant",
             participantId.ToString(), oldStatus, $"Rejected: {reason.Trim()}");
+
+        await _notification.SendAsync(
+            participant.UserId,
+            "Đăng ký tham gia giải bị từ chối",
+            $"Đăng ký tham gia giải (vai trò {participant.Role}) của bạn đã bị từ chối. Lý do: {reason.Trim()}",
+            type: "Both",
+            relatedEntityType: "TournamentParticipant",
+            relatedEntityId: participantId);
 
         return ApiResponse<ParticipantResponseDto>.Ok(
             await MapByIdAsync(participantId), "Đã từ chối tham gia giải.");
