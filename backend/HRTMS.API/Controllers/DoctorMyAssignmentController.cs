@@ -5,7 +5,7 @@ using System.Security.Claims;
 
 namespace HRTMS.API.Controllers;
 
-[Tags("doctor")]
+[Tags("prerace")]
 [ApiController]
 [Route("api/doctors/race-assignments")]
 [Authorize(Roles = "Doctor")]
