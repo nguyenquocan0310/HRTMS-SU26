@@ -505,4 +505,42 @@ public class PairingService : IPairingService
             TotalCount = total
         };
     }
+    public async Task<PairingActionResponseDto> CancelAsync(
+    int ownerId,
+    int pairingId)
+{
+    var pairing = await _context.Pairings
+        .Include(p => p.Horse)
+        .FirstOrDefaultAsync(p => p.PairingId == pairingId);
+
+    if (pairing == null)
+    {
+        throw new KeyNotFoundException("PAIRING_NOT_FOUND");
+    }
+
+    // Chi Owner cua ngua moi duoc cancel loi moi
+    if (pairing.Horse.OwnerId != ownerId)
+    {
+        throw new UnauthorizedAccessException("HORSE_NOT_OWNED");
+    }
+
+    // Chi cho cancel khi loi moi dang Pending hoac da Accepted nhung chua Confirmed
+    if (pairing.Status != "Pending" &&
+        pairing.Status != "Accepted")
+    {
+        throw new InvalidOperationException("INVALID_STATUS");
+    }
+
+    pairing.Status = "Cancelled";
+    pairing.UpdatedAt = DateTime.UtcNow;
+
+    await _context.SaveChangesAsync();
+
+    return new PairingActionResponseDto
+    {
+        PairingId = pairing.PairingId,
+        Status = pairing.Status,
+        Message = "Pairing invitation cancelled successfully."
+    };
+}
 }
