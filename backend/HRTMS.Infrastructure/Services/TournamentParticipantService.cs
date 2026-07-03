@@ -41,7 +41,7 @@ public class TournamentParticipantService : ITournamentParticipantService
 
         // Chỉ nhận đăng ký khi giải đang mở đăng ký
         if (tournament.Status != "Open Registration")
-            return ApiResponse<ParticipantResponseDto>.Fail("Giải không ở trạng thái mở đăng ký.");
+            return ApiResponse<ParticipantResponseDto>.Fail("Giải hiện không mở đăng ký.");
 
         // Chặn đăng ký trùng (UNIQUE TournamentId + UserId)
         var existing = await _context.TournamentParticipants
