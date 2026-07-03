@@ -87,11 +87,11 @@ public class HorseService : IHorseService
                 type: "Both",
                 relatedEntityType: "Horse", relatedEntityId: horse.HorseId);
             return ApiResponse<HorseResponseDto>.Ok(MapToDto(horse),
-                $"Hồ sơ ngựa bị tự động từ chối: {horse.ScreeningReason}");
+                $"Hồ sơ ngựa bị từ chối. Lý do: {horse.ScreeningReason}");
         }
 
         return ApiResponse<HorseResponseDto>.Ok(MapToDto(horse),
-            "Đã tạo hồ sơ ngựa vào kho. Hãy đẩy ngựa vào một giải để đăng ký thi đấu.");
+            "Đã lưu hồ sơ ngựa. Bạn có thể đăng ký ngựa vào giải để thi đấu.");
     }
 
     /// <summary>
@@ -112,7 +112,7 @@ public class HorseService : IHorseService
         if (tournament == null)
             return ApiResponse<HorseEnrollmentResponseDto>.Fail("TOURNAMENT_NOT_FOUND");
         if (tournament.Status != "Open Registration")
-            return ApiResponse<HorseEnrollmentResponseDto>.Fail("Giải không ở trạng thái mở đăng ký.");
+            return ApiResponse<HorseEnrollmentResponseDto>.Fail("Giải hiện không mở đăng ký.");
 
         // Owner phải đã được Admin duyệt tham gia giải (roster Approved)
         var ownerApproved = await _context.TournamentParticipants.AnyAsync(p =>
@@ -122,13 +122,13 @@ public class HorseService : IHorseService
             p.Status == "Approved");
         if (!ownerApproved)
             return ApiResponse<HorseEnrollmentResponseDto>.Fail(
-                "Bạn chưa được duyệt tham gia giải này. Hãy đăng ký tham gia giải và chờ Admin duyệt trước khi đẩy ngựa vào.");
+                "Bạn chưa được duyệt tham gia giải này. Vui lòng đăng ký tham gia và chờ được duyệt trước khi thêm ngựa vào giải.");
 
         // Không cho enroll trùng một con ngựa vào cùng một giải
         var already = await _context.HorseTournamentEntries.AnyAsync(e =>
             e.HorseId == horseId && e.TournamentId == dto.TournamentId);
         if (already)
-            return ApiResponse<HorseEnrollmentResponseDto>.Fail("Con ngựa này đã được đẩy vào giải này rồi.");
+            return ApiResponse<HorseEnrollmentResponseDto>.Fail("Ngựa này đã được đăng ký vào giải rồi.");
 
         // Mỗi con ngựa chỉ tham gia 1 giải CHƯA kết thúc tại một thời điểm.
         // Giải 'Open Registration'/'Closed Registration' = đang diễn ra; 'Completed'/'Cancelled' = đã xong.
@@ -143,7 +143,7 @@ public class HorseService : IHorseService
                  e.Tournament.Status == "Closed Registration"));
         if (activeElsewhere)
             return ApiResponse<HorseEnrollmentResponseDto>.Fail(
-                "Con ngựa này đang tham gia một giải chưa kết thúc. Hãy đợi giải đó hoàn tất (Completed/Cancelled) trước khi đẩy vào giải mới.");
+                "Ngựa này đang tham gia một giải chưa kết thúc. Vui lòng đợi giải đó kết thúc trước khi đăng ký ngựa vào giải mới.");
 
         var entry = new HorseTournamentEntry
         {
@@ -176,7 +176,7 @@ public class HorseService : IHorseService
                     type: "Both",
                     relatedEntityType: "HorseTournamentEntry", relatedEntityId: entry.EnrollmentId);
                 return ApiResponse<HorseEnrollmentResponseDto>.Ok(MapToEnrollmentDto(entry, horse, tournament),
-                    $"Đẩy ngựa vào giải bị tự động từ chối: {entry.ScreeningReason}");
+                    $"Ngựa không đủ điều kiện dự giải. Lý do: {entry.ScreeningReason}");
 
             case "AutoEligible":
                 await _auditLog.LogAsync(ownerId, "AutoApprove_Enrollment", "HorseTournamentEntry",
@@ -192,7 +192,7 @@ public class HorseService : IHorseService
 
             default: // ManualReview
                 return ApiResponse<HorseEnrollmentResponseDto>.Ok(MapToEnrollmentDto(entry, horse, tournament),
-                    $"Đã đẩy ngựa vào giải, chờ Admin duyệt. Lý do cần xem xét: {entry.ScreeningReason}");
+                    $"Đã gửi đăng ký ngựa vào giải, đang chờ duyệt. Lý do cần xem xét thêm: {entry.ScreeningReason}");
         }
     }
 
@@ -246,7 +246,7 @@ public class HorseService : IHorseService
             (p.Status == "Pending" || p.Status == "Accepted" || p.Status == "Confirmed"));
         if (hasActivePairing)
             return ApiResponse<string>.Fail(
-                "PAIRING_EXISTS: ngựa đã có ghép cặp trong giải này. Hãy hủy pairing trước khi rút ngựa khỏi giải.");
+                "Ngựa này đang có cặp thi đấu trong giải. Vui lòng hủy cặp trước khi rút ngựa khỏi giải.");
 
         entry.Status = "Withdrawn";
         entry.UpdatedAt = DateTime.UtcNow;
@@ -378,7 +378,7 @@ public class HorseService : IHorseService
                             pairing.Status is "Pending" or "Accepted" or "Confirmed")
                         {
                             pairing.Status = "Cancelled";
-                            pairing.ResponseReason = "Hồ sơ ngựa được sửa thông tin nhạy cảm, cần duyệt lại (EC-23).";
+                            pairing.ResponseReason = "Hồ sơ ngựa vừa thay đổi thông tin quan trọng nên cần được duyệt lại.";
                             pairing.UpdatedAt = DateTime.UtcNow;
                         }
                     }
@@ -390,7 +390,7 @@ public class HorseService : IHorseService
 
         string message = !revalidated
             ? "Cập nhật hồ sơ thành công."
-            : "Cập nhật thành công. Các enrollment liên quan đã được screen lại theo từng giải.";
+            : "Cập nhật thành công. Các đăng ký dự giải liên quan đã được kiểm tra lại.";
 
         return ApiResponse<HorseResponseDto>.Ok(MapToDto(horse), message);
     }
@@ -440,7 +440,7 @@ public class HorseService : IHorseService
         // HRS.4: Admin KHÔNG được override auto-reject cứng (doping Failed / breed mismatch).
         if (entry.ScreeningStatus == "AutoRejected")
             return ApiResponse<string>.Fail(
-                $"AUTO_REJECTED: không thể override. Lý do: {entry.ScreeningReason}");
+                $"Ngựa bị hệ thống tự động từ chối, không thể duyệt lại. Lý do: {entry.ScreeningReason}");
 
         // Re-screen tại thời điểm duyệt để bắt dữ liệu vi phạm cứng phát sinh sau khi đẩy vào giải.
         string category = ScreenEnrollment(entry.Horse, entry.Tournament, entry);
@@ -450,7 +450,7 @@ public class HorseService : IHorseService
             entry.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
             return ApiResponse<string>.Fail(
-                $"AUTO_REJECTED: không thể override. Lý do: {entry.ScreeningReason}");
+                $"Ngựa bị hệ thống tự động từ chối, không thể duyệt lại. Lý do: {entry.ScreeningReason}");
         }
 
         // ManualReview/AutoEligible → Admin chốt Approved.
