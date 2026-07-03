@@ -183,18 +183,31 @@ public class JockeyService : IJockeyService
             throw new KeyNotFoundException("TOURNAMENT_NOT_FOUND");
         }
 
-        // Lay danh sach HorseId cua Owner dang dang nhap
-        var ownerHorseIds = await _context.Horses
-            .Where(h => h.OwnerId == ownerId)
-            .Select(h => h.HorseId)
+        // Lay danh sach Tournament trung thoi gian voi Tournament hien tai
+        // Neu khac ngay thi Jockey van co the tham gia giai khac
+        var overlappingTournamentIds = await _context.Tournaments
+            .AsNoTracking()
+            .Where(t =>
+                t.TournamentId == tournamentId ||
+                (
+                    t.StartDate <= tournament.EndDate &&
+                    t.EndDate >= tournament.StartDate
+                ))
+            .Select(t => t.TournamentId)
             .ToListAsync();
 
-        // Lay danh sach Jockey da co pending invite tu Owner nay
-        var pendingJockeyIds = await _context.Pairings
+        // Chi loai Jockey neu da Accepted hoac Confirmed o Tournament trung thoi gian
+        // Pending khong loai vi Jockey chua chap nhan loi moi
+        var unavailableJockeyIds = await _context.Pairings
+            .AsNoTracking()
             .Where(p =>
-                ownerHorseIds.Contains(p.HorseId) &&
-                p.Status == "Pending")
+                overlappingTournamentIds.Contains(p.TournamentId) &&
+                (
+                    p.Status == "Accepted" ||
+                    p.Status == "Confirmed"
+                ))
             .Select(p => p.JockeyId)
+            .Distinct()
             .ToListAsync();
 
         // Chi jockey co trong roster Approved cua giai moi duoc hien thi
@@ -210,9 +223,10 @@ public class JockeyService : IJockeyService
             .Include(j => j.Jockey)
             .Where(j =>
                 j.Status == "Active" &&
+                j.Jockey.Status == "Active" &&
                 j.ExperienceYears >= tournament.MinJockeyExperienceYears &&
                 rosterJockeyIds.Contains(j.JockeyId) &&
-                !pendingJockeyIds.Contains(j.JockeyId));
+                !unavailableJockeyIds.Contains(j.JockeyId));
 
         var total = await query.CountAsync();
 
@@ -318,95 +332,95 @@ public class JockeyService : IJockeyService
         string? status,
         int page,
         int pageSize)
-{
-    // Chuan hoa gia tri phan trang
-    page = page < 1 ? 1 : page;
-    pageSize = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
-
-    var validStatuses = new[]
     {
+        // Chuan hoa gia tri phan trang
+        page = page < 1 ? 1 : page;
+        pageSize = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
+
+        var validStatuses = new[]
+        {
         "Pending",
         "Confirmed",
         "Cancelled",
         "Disqualified"
     };
 
-    // Kiem tra trang thai RaceEntry hop le neu client co filter
-    if (!string.IsNullOrWhiteSpace(status) &&
-        !validStatuses.Contains(status))
-    {
-        throw new ArgumentException(
-            "INVALID_RACE_ENTRY_STATUS");
-    }
-
-    // Lay danh sach race entry cua Jockey dang dang nhap
-    // RaceEntries -> Pairings -> JockeyId = current user id
-    var query = _context.RaceEntries
-        .AsNoTracking()
-        .Where(re => re.Pairing.JockeyId == jockeyId);
-
-    if (!string.IsNullOrWhiteSpace(status))
-    {
-        query = query.Where(re => re.Status == status);
-    }
-
-    var total = await query.CountAsync();
-
-    var data = await query
-        .OrderByDescending(re => re.Race.ScheduledTime)
-        .ThenByDescending(re => re.RaceEntryId)
-        .Skip((page - 1) * pageSize)
-        .Take(pageSize)
-        .Select(re => new JockeyRaceEntryDto
+        // Kiem tra trang thai RaceEntry hop le neu client co filter
+        if (!string.IsNullOrWhiteSpace(status) &&
+            !validStatuses.Contains(status))
         {
-            RaceEntryId = re.RaceEntryId,
-            RaceId = re.RaceId,
-            PairingId = re.PairingId,
+            throw new ArgumentException(
+                "INVALID_RACE_ENTRY_STATUS");
+        }
 
-            TournamentId = re.Race.Round.TournamentId,
-            TournamentName = re.Race.Round.Tournament.Name,
+        // Lay danh sach race entry cua Jockey dang dang nhap
+        // RaceEntries -> Pairings -> JockeyId = current user id
+        var query = _context.RaceEntries
+            .AsNoTracking()
+            .Where(re => re.Pairing.JockeyId == jockeyId);
 
-            RoundId = re.Race.RoundId,
-            RoundName = re.Race.Round.Name,
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            query = query.Where(re => re.Status == status);
+        }
 
-            RaceNumber = re.Race.RaceNumber,
-            ScheduledTime = re.Race.ScheduledTime,
-            RaceStatus = re.Race.Status,
-            EntryStatus = re.Status,
-            PostPosition = re.PostPosition,
+        var total = await query.CountAsync();
 
-            HorseId = re.Pairing.HorseId,
-            HorseName = re.Pairing.Horse.Name,
+        var data = await query
+            .OrderByDescending(re => re.Race.ScheduledTime)
+            .ThenByDescending(re => re.RaceEntryId)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(re => new JockeyRaceEntryDto
+            {
+                RaceEntryId = re.RaceEntryId,
+                RaceId = re.RaceId,
+                PairingId = re.PairingId,
 
-            OwnerId = re.Pairing.Horse.OwnerId,
-            OwnerName = re.Pairing.Horse.Owner.Owner.FullName,
+                TournamentId = re.Race.Round.TournamentId,
+                TournamentName = re.Race.Round.Tournament.Name,
 
-            PairingStatus = re.Pairing.Status,
+                RoundId = re.Race.RoundId,
+                RoundName = re.Race.Round.Name,
 
-            PreRaceJockeyWeight = re.PreRaceJockeyWeight,
-            HorseIdentityCheckStatus = re.HorseIdentityCheckStatus,
-            ClinicalStatus = re.ClinicalStatus,
-            IndependenceCheckStatus = re.IndependenceCheckStatus,
-            PostRaceJockeyWeight = re.PostRaceJockeyWeight,
+                RaceNumber = re.Race.RaceNumber,
+                ScheduledTime = re.Race.ScheduledTime,
+                RaceStatus = re.Race.Status,
+                EntryStatus = re.Status,
+                PostPosition = re.PostPosition,
 
-            FinishPosition = re.FinishPosition,
-            FinishTime = re.FinishTime,
-            PointsAwarded = re.PointsAwarded,
-            EarningsAwarded = re.EarningsAwarded,
+                HorseId = re.Pairing.HorseId,
+                HorseName = re.Pairing.Horse.Name,
 
-            EntryFeeStatus = re.EntryFeeStatus,
-            IsWithdrawn = re.IsWithdrawn,
-            CreatedAt = re.CreatedAt,
-            UpdatedAt = re.UpdatedAt
-        })
-        .ToListAsync();
+                OwnerId = re.Pairing.Horse.OwnerId,
+                OwnerName = re.Pairing.Horse.Owner.Owner.FullName,
 
-    return new PagedResult<JockeyRaceEntryDto>
-    {
-        Items = data,
-        Page = page,
-        PageSize = pageSize,
-        TotalCount = total
-    };
-}
+                PairingStatus = re.Pairing.Status,
+
+                PreRaceJockeyWeight = re.PreRaceJockeyWeight,
+                HorseIdentityCheckStatus = re.HorseIdentityCheckStatus,
+                ClinicalStatus = re.ClinicalStatus,
+                IndependenceCheckStatus = re.IndependenceCheckStatus,
+                PostRaceJockeyWeight = re.PostRaceJockeyWeight,
+
+                FinishPosition = re.FinishPosition,
+                FinishTime = re.FinishTime,
+                PointsAwarded = re.PointsAwarded,
+                EarningsAwarded = re.EarningsAwarded,
+
+                EntryFeeStatus = re.EntryFeeStatus,
+                IsWithdrawn = re.IsWithdrawn,
+                CreatedAt = re.CreatedAt,
+                UpdatedAt = re.UpdatedAt
+            })
+            .ToListAsync();
+
+        return new PagedResult<JockeyRaceEntryDto>
+        {
+            Items = data,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = total
+        };
+    }
 }
