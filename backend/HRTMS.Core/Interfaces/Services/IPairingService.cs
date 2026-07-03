@@ -42,4 +42,7 @@ public interface IPairingService
         bool unallocatedOnly,
         int page,
         int pageSize);
+    Task<PairingActionResponseDto> CancelAsync(
+        int ownerId,
+        int pairingId);
 }
