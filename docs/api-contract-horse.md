@@ -58,6 +58,8 @@
 | 14 | PATCH | `/api/admin/entries/{id}/fee-status` | Admin | Xác nhận đã nhận lệ phí (Unpaid → Paid) |
 | 15 | PATCH | `/api/admin/entries/{id}/approve` | Admin | Phê duyệt entry tham gia race (gate EntryFeeStatus + enrollment Approved) |
 | 16 | PATCH | `/api/admin/entries/{id}/reject` | Admin | Từ chối entry (→ Cancelled) |
+| 17 | GET | `/api/admin/entries` | Admin | Danh sách MỌI race entry theo filter `status`/`feeStatus`/`tournamentId`/`raceId` (không khóa Unpaid như #13) |
+| 18 | PATCH | `/api/admin/entries/{id}/refund-complete` | Admin | Đóng vòng hoàn phí: `Refund Pending` → `Refunded` (in-app + email) |
 
 > **Tạo RaceEntry KHÔNG thuộc Module C.** RaceEntry do **Admin allocate** Pairing `Confirmed` vào Race qua **Module E (SCH.1)** — không có endpoint `POST /api/race-entries` cho Owner. Owner chỉ **xem** entry của mình (#9).
 

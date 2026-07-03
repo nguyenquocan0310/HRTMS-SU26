@@ -72,6 +72,12 @@ Errors: `404 ENTRY_NOT_FOUND` · `403 FORBIDDEN`.
 Idempotent (BR-36): gọi lại khi đã `Cancelled` → `alreadyWithdrawn=true`, không tác động phụ.
 Hành vi: `Cancelled` + `PostPosition=null` (Vacant) + Prediction `Pending→Refunded` + entry `Paid→Refund Pending` + URGENT cho Admin **(in-app + email)** + Notification cho Owner & Jockey **(in-app + email)** + AuditLog, tất cả trong 1 transaction.
 
+### 5b. Admin hủy entry (thay mặt Owner) — SCH.5
+`DELETE /api/admin/race-entries/{id}` · Role: **Admin** · lý do (tùy chọn) qua query: `?reason=...` (mặc định `Cancelled by admin`).
+
+`200 OK` → `WithdrawResultDto` (giống #5). Dùng lại `WithdrawAsync(isSystem:true)` để bỏ qua check quyền sở hữu Owner.
+Errors: `404 ENTRY_NOT_FOUND`.
+
 ---
 
 ## Tích hợp
