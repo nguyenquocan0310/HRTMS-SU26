@@ -105,6 +105,33 @@ public class PairingService : IPairingService
             throw new InvalidOperationException(
                 "JOCKEY_NOT_APPROVED_IN_TOURNAMENT");
         }
+        // Kiem tra Jockey da co cap Accepted/Confirmed trong cung giai
+        // hoac trong tournament khac bi trung thoi gian voi giai hien tai hay chua
+        var overlappingTournamentIds = await _context.Tournaments
+            .AsNoTracking()
+            .Where(t =>
+                t.TournamentId == dto.TournamentId ||
+                (
+                    t.StartDate <= tournament.EndDate &&
+                    t.EndDate >= tournament.StartDate
+                ))
+            .Select(t => t.TournamentId)
+            .ToListAsync();
+
+        var jockeyAlreadyHasActivePairing = await _context.Pairings
+            .AsNoTracking()
+            .AnyAsync(p =>
+                p.JockeyId == dto.JockeyId &&
+                overlappingTournamentIds.Contains(p.TournamentId) &&
+                (
+                    p.Status == "Accepted" ||
+                    p.Status == "Confirmed"
+                ));
+
+        if (jockeyAlreadyHasActivePairing)
+        {
+            throw new InvalidOperationException("JOCKEY_ALREADY_HAS_ACTIVE_PAIRING");
+        }
 
         // Khong cho tao trung cung mot cap horse-jockey trong cung tournament
         // neu dang Pending, Accepted hoac Confirmed
@@ -158,6 +185,7 @@ public class PairingService : IPairingService
             Status = pairing.Status,
             CreatedAt = pairing.CreatedAt
         };
+
     }
 
     public async Task<PairingActionResponseDto> AcceptAsync(
@@ -508,39 +536,39 @@ public class PairingService : IPairingService
     public async Task<PairingActionResponseDto> CancelAsync(
     int ownerId,
     int pairingId)
-{
-    var pairing = await _context.Pairings
-        .Include(p => p.Horse)
-        .FirstOrDefaultAsync(p => p.PairingId == pairingId);
-
-    if (pairing == null)
     {
-        throw new KeyNotFoundException("PAIRING_NOT_FOUND");
+        var pairing = await _context.Pairings
+            .Include(p => p.Horse)
+            .FirstOrDefaultAsync(p => p.PairingId == pairingId);
+
+        if (pairing == null)
+        {
+            throw new KeyNotFoundException("PAIRING_NOT_FOUND");
+        }
+
+        // Chi Owner cua ngua moi duoc cancel loi moi
+        if (pairing.Horse.OwnerId != ownerId)
+        {
+            throw new UnauthorizedAccessException("HORSE_NOT_OWNED");
+        }
+
+        // Chi cho cancel khi loi moi dang Pending hoac da Accepted nhung chua Confirmed
+        if (pairing.Status != "Pending" &&
+            pairing.Status != "Accepted")
+        {
+            throw new InvalidOperationException("INVALID_STATUS");
+        }
+
+        pairing.Status = "Cancelled";
+        pairing.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return new PairingActionResponseDto
+        {
+            PairingId = pairing.PairingId,
+            Status = pairing.Status,
+            Message = "Pairing invitation cancelled successfully."
+        };
     }
-
-    // Chi Owner cua ngua moi duoc cancel loi moi
-    if (pairing.Horse.OwnerId != ownerId)
-    {
-        throw new UnauthorizedAccessException("HORSE_NOT_OWNED");
-    }
-
-    // Chi cho cancel khi loi moi dang Pending hoac da Accepted nhung chua Confirmed
-    if (pairing.Status != "Pending" &&
-        pairing.Status != "Accepted")
-    {
-        throw new InvalidOperationException("INVALID_STATUS");
-    }
-
-    pairing.Status = "Cancelled";
-    pairing.UpdatedAt = DateTime.UtcNow;
-
-    await _context.SaveChangesAsync();
-
-    return new PairingActionResponseDto
-    {
-        PairingId = pairing.PairingId,
-        Status = pairing.Status,
-        Message = "Pairing invitation cancelled successfully."
-    };
-}
 }
