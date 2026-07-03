@@ -702,6 +702,34 @@ public class HorseService : IHorseService
         return ApiResponse<List<RaceEntryResponseDto>>.Ok(entries.Select(MapToRaceEntryDto).ToList());
     }
 
+    // Module E — Admin liet ke MOI RaceEntry theo filter (khac pending-fee: khong khoa Unpaid).
+    public async Task<ApiResponse<List<RaceEntryResponseDto>>> GetAdminRaceEntriesAsync(
+        string? status, string? feeStatus, int? tournamentId, int? raceId, int page, int pageSize)
+    {
+        var query = _context.RaceEntries
+            .Include(e => e.Pairing).ThenInclude(p => p.Horse)
+            .Include(e => e.Pairing).ThenInclude(p => p.Jockey).ThenInclude(j => j.Jockey)
+            .Include(e => e.Race).ThenInclude(r => r.Round).ThenInclude(r => r.Tournament)
+            .AsQueryable();
+
+        if (!string.IsNullOrEmpty(status))
+            query = query.Where(e => e.Status == status);
+        if (!string.IsNullOrEmpty(feeStatus))
+            query = query.Where(e => e.EntryFeeStatus == feeStatus);
+        if (tournamentId.HasValue)
+            query = query.Where(e => e.Race.Round.TournamentId == tournamentId.Value);
+        if (raceId.HasValue)
+            query = query.Where(e => e.RaceId == raceId.Value);
+
+        var entries = await query
+            .OrderByDescending(e => e.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return ApiResponse<List<RaceEntryResponseDto>>.Ok(entries.Select(MapToRaceEntryDto).ToList());
+    }
+
     public async Task<ApiResponse<string>> ConfirmEntryFeeAsync(int adminId, int raceEntryId)
     {
         var entry = await _context.RaceEntries
@@ -728,6 +756,32 @@ public class HorseService : IHorseService
             relatedEntityType: "RaceEntry", relatedEntityId: raceEntryId);
 
         return ApiResponse<string>.Ok("Lệ phí đã được xác nhận.");
+    }
+
+    // Module E — dong vong hoan phi: Refund Pending -> Refunded (sau khi Owner rut entry da Paid).
+    public async Task<ApiResponse<string>> CompleteRefundAsync(int adminId, int raceEntryId)
+    {
+        var entry = await _context.RaceEntries
+            .Include(e => e.Pairing).ThenInclude(p => p.Horse)
+            .FirstOrDefaultAsync(e => e.RaceEntryId == raceEntryId);
+        if (entry == null) return ApiResponse<string>.Fail("RACE_ENTRY_NOT_FOUND");
+        if (entry.EntryFeeStatus != "Refund Pending") return ApiResponse<string>.Fail("NOT_REFUND_PENDING");
+
+        entry.EntryFeeStatus = "Refunded";
+        entry.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        await _auditLog.LogAsync(adminId, "Complete_Refund", "RaceEntry",
+            raceEntryId.ToString(), "Refund Pending", "Refunded", null);
+
+        await _notification.SendAsync(
+            entry.Pairing.Horse.OwnerId,
+            "Đã hoàn phí tham gia",
+            $"Lệ phí cho ngựa '{entry.Pairing.Horse.Name}' (đăng ký #{raceEntryId}) đã được hoàn (Refunded).",
+            type: "Both",
+            relatedEntityType: "RaceEntry", relatedEntityId: raceEntryId);
+
+        return ApiResponse<string>.Ok("Đã hoàn phí tham gia.");
     }
 
     public async Task<ApiResponse<string>> ApproveRaceEntryAsync(int adminId, int raceEntryId)
