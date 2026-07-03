@@ -173,6 +173,30 @@ public class SchedulingController : ControllerBase
         }
     }
 
+    // SCH.5 (Admin) — Admin huy race entry thay mat Owner (dieu phoi khan cap).
+    // Dung lai WithdrawAsync voi isSystem:true de bo qua check quyen so huu Owner.
+    [HttpDelete("admin/race-entries/{id:int}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> AdminCancel(int id, [FromQuery] string? reason)
+    {
+        if (!TryGetUserId(out var adminId))
+            return UnauthorizedResult();
+
+        try
+        {
+            var dto = new WithdrawEntryDto
+            {
+                Reason = string.IsNullOrWhiteSpace(reason) ? "Cancelled by admin" : reason
+            };
+            var result = await _service.WithdrawAsync(adminId, id, dto, isSystem: true);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex) when (ex.Message == "ENTRY_NOT_FOUND")
+        {
+            return NotFound(Err("ENTRY_NOT_FOUND", "Race entry was not found."));
+        }
+    }
+
     // ---------------- helpers ----------------
 
     private bool TryGetUserId(out int userId)

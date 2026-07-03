@@ -533,6 +533,82 @@ public class PairingService : IPairingService
             TotalCount = total
         };
     }
+
+    public async Task<PagedResult<AdminPairingDto>> GetAdminPairingsAsync(
+        int? tournamentId,
+        string? status,
+        bool unallocatedOnly,
+        int page,
+        int pageSize)
+    {
+        page = page < 1 ? 1 : page;
+        pageSize = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
+
+        // Mac dinh "Confirmed" — trang thai duy nhat duoc phep allocate (SCH.1).
+        var effectiveStatus = string.IsNullOrWhiteSpace(status) ? "Confirmed" : status;
+
+        var validStatuses = new[]
+        {
+            "Pending",
+            "Accepted",
+            "Declined",
+            "Confirmed",
+            "Cancelled"
+        };
+
+        if (!validStatuses.Contains(effectiveStatus))
+        {
+            throw new ArgumentException("INVALID_PAIRING_STATUS");
+        }
+
+        var query = _context.Pairings
+            .AsNoTracking()
+            .Where(p => p.Status == effectiveStatus);
+
+        if (tournamentId.HasValue)
+        {
+            query = query.Where(p => p.TournamentId == tournamentId.Value);
+        }
+
+        // Chi giu pairing CHUA co RaceEntry active (Pending/Confirmed) gan voi no.
+        if (unallocatedOnly)
+        {
+            query = query.Where(p =>
+                !p.RaceEntries.Any(re =>
+                    re.Status == "Pending" || re.Status == "Confirmed"));
+        }
+
+        var total = await query.CountAsync();
+
+        var data = await query
+            .OrderByDescending(p => p.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(p => new AdminPairingDto
+            {
+                PairingId = p.PairingId,
+                TournamentId = p.TournamentId,
+                TournamentName = p.Tournament.Name,
+                HorseId = p.HorseId,
+                HorseName = p.Horse.Name,
+                HorseBreed = p.Horse.Breed,
+                JockeyId = p.JockeyId,
+                JockeyName = p.Jockey.Jockey.FullName,
+                OwnerId = p.Horse.OwnerId,
+                OwnerName = p.Horse.Owner.Owner.FullName,
+                Status = p.Status,
+                IsAllocated = p.RaceEntries.Any(re =>
+                    re.Status == "Pending" || re.Status == "Confirmed"),
+                CreatedAt = p.CreatedAt
+            })
+            .ToListAsync();
+
+        return new PagedResult<AdminPairingDto>
+        {
+            Items = data,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = total
     public async Task<PairingActionResponseDto> CancelAsync(
     int ownerId,
     int pairingId)
