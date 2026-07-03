@@ -88,7 +88,7 @@ namespace HRTMS.Infrastructure.Services
                 .Include(r => r.RaceEntries).ThenInclude(re => re.Pairing).ThenInclude(p => p.Jockey)
                 .Include(r => r.Predictions)
                 .FirstOrDefaultAsync(r => r.RaceId == raceId)
-                ?? throw new KeyNotFoundException($"Không tìm thấy Race #{raceId}");
+                ?? throw new KeyNotFoundException($"Không tìm thấy cuộc đua #{raceId}.");
 
             // ---------------------------------------------------------------
             // VALIDATION TIỀN ĐIỀU KIỆN
@@ -97,11 +97,11 @@ namespace HRTMS.Infrastructure.Services
             // BR-34/EC-01 — idempotent guard chống double-click
             if (race.Status != "Unofficial")
                 throw new InvalidOperationException(
-                    $"Không thể công bố kết quả: Race đang ở trạng thái '{race.Status}', " +
-                    "không phải 'Unofficial' (có thể đã được Declare Official ở request khác)");
+                    $"Không thể công bố kết quả: cuộc đua đang ở trạng thái '{race.Status}', " +
+                    "không phải trạng thái chờ công bố. Có thể kết quả đã được công bố ở thao tác khác.");
 
             if (race.RaceReport == null)
-                throw new InvalidOperationException("Cuộc đua chưa có biên bản thi đấu (RaceReport)");
+                throw new InvalidOperationException("Cuộc đua chưa có biên bản thi đấu.");
 
             if (race.RaceReport.IsLocked)
                 throw new InvalidOperationException("Biên bản thi đấu đã bị khóa từ trước");
@@ -110,20 +110,20 @@ namespace HRTMS.Infrastructure.Services
                 .AnyAsync(p => p.RaceId == raceId && p.Status == "Pending");
             if (hasPendingProtests)
                 throw new InvalidOperationException(
-                    "Còn khiếu nại (Protest) chưa xử lý xong. Không thể công bố kết quả chính thức");
+                    "Còn khiếu nại chưa xử lý xong nên chưa thể công bố kết quả chính thức.");
 
             if (!await IsPrizeDistributionsValidAsync(race.Round.TournamentId))
                 throw new InvalidOperationException(
-                    "Giải đấu chưa cấu hình đầy đủ tỷ lệ chia thưởng (PrizeDistributions phải = 100%)");
+                    "Giải chưa cấu hình đủ tỷ lệ chia thưởng (tổng phải đạt 100%).");
 
             if (!IsRankingIntegrityValid(race.RaceEntries))
                 throw new InvalidOperationException(
-                    "Tập thứ hạng không hợp lệ (chưa chuẩn hóa sau điều chỉnh Protest). " +
-                    "Vui lòng kiểm tra lại FinishPosition trước khi công bố");
+                    "Thứ hạng chưa hợp lệ sau khi điều chỉnh khiếu nại. " +
+                    "Vui lòng kiểm tra lại thứ hạng về đích trước khi công bố.");
 
             if (!IsPostRaceWeighInComplete(race.RaceEntries))
                 throw new InvalidOperationException(
-                    "Còn cặp đấu hợp lệ chưa được cân sau đua (Post-Race Weigh-Out)");
+                    "Còn cặp đấu chưa được cân sau đua.");
 
             // ---------------------------------------------------------------
             // ACID TRANSACTION — 6 BƯỚC
@@ -257,7 +257,7 @@ namespace HRTMS.Infrastructure.Services
                 await _notificationService.SendBulkAsync(
                     recipientIds: winnerIds,
                     title: "Dự đoán thắng! 🎉",
-                    message: $"Bạn dự đoán đúng kết quả Race #{race.RaceNumber}. +{rewardPoints} điểm đã được cộng vào ví.",
+                    message: $"Bạn dự đoán đúng kết quả cuộc đua #{race.RaceNumber}. Bạn được cộng {rewardPoints} điểm vào ví.",
                     type: "In-app",
                     relatedEntityType: "Race",
                     relatedEntityId: race.RaceId);
@@ -266,7 +266,7 @@ namespace HRTMS.Infrastructure.Services
                 await _notificationService.SendBulkAsync(
                     recipientIds: loserIds,
                     title: "Kết quả dự đoán",
-                    message: $"Race #{race.RaceNumber} đã công bố kết quả chính thức. Dự đoán của bạn không trúng lần này.",
+                    message: $"Cuộc đua #{race.RaceNumber} đã công bố kết quả chính thức. Dự đoán của bạn chưa trúng lần này.",
                     type: "In-app",
                     relatedEntityType: "Race",
                     relatedEntityId: race.RaceId);
@@ -275,7 +275,7 @@ namespace HRTMS.Infrastructure.Services
                 await _notificationService.SendBulkAsync(
                     recipientIds: refundIds,
                     title: "Hoàn điểm dự đoán",
-                    message: $"Ngựa bạn dự đoán trong Race #{race.RaceNumber} đã bị hủy/truất quyền. Điểm đặt cược đã được hoàn về ví.",
+                    message: $"Ngựa bạn dự đoán ở cuộc đua #{race.RaceNumber} đã bị hủy hoặc truất quyền. Điểm dự đoán đã được hoàn về ví.",
                     type: "In-app",
                     relatedEntityType: "Race",
                     relatedEntityId: race.RaceId);
