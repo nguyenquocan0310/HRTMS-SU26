@@ -376,4 +376,59 @@ public class PairingController : ControllerBase
             });
         }
     }
+    [HttpPatch("pairings/{id:int}/cancel")]
+[Authorize(Roles = "Owner")]
+public async Task<IActionResult> CancelPairing(int id)
+{
+    // Lay OwnerId tu JWT token
+    var userIdValue = User.FindFirstValue(
+        ClaimTypes.NameIdentifier);
+
+    if (!int.TryParse(userIdValue, out var ownerId))
+    {
+        return Unauthorized(new
+        {
+            error = "UNAUTHORIZED",
+            message = "Token khong hop le"
+        });
+    }
+
+    try
+    {
+        var result = await _pairingService.CancelAsync(
+            ownerId,
+            id);
+
+        return Ok(result);
+    }
+    catch (KeyNotFoundException ex)
+        when (ex.Message == "PAIRING_NOT_FOUND")
+    {
+        return NotFound(new
+        {
+            error = "PAIRING_NOT_FOUND",
+            message = "Pairing was not found."
+        });
+    }
+    catch (UnauthorizedAccessException ex)
+        when (ex.Message == "HORSE_NOT_OWNED")
+    {
+        return StatusCode(
+            StatusCodes.Status403Forbidden,
+            new
+            {
+                error = "HORSE_NOT_OWNED",
+                message = "The horse does not belong to the current owner."
+            });
+    }
+    catch (InvalidOperationException ex)
+        when (ex.Message == "INVALID_STATUS")
+    {
+        return Conflict(new
+        {
+            error = "INVALID_STATUS",
+            message = "Only pending or accepted pairings can be cancelled."
+        });
+    }
+}
 }

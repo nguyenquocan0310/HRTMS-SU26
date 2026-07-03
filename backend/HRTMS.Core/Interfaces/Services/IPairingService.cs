@@ -34,4 +34,8 @@ public interface IPairingService
     Task<PairingActionResponseDto> ConfirmAsync(
         int ownerId,
         int pairingId);
+
+    Task<PairingActionResponseDto> CancelAsync(
+        int ownerId,
+        int pairingId);
 }
