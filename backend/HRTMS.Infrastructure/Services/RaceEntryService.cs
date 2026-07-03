@@ -335,7 +335,7 @@ public class RaceEntryService : IRaceEntryService
                 Status = "Cancelled",
                 RefundedPredictions = 0,
                 AlreadyWithdrawn = true,
-                Message = "Entry was already cancelled."
+                Message = "Đăng ký này đã bị hủy trước đó."
             };
         }
 
@@ -370,7 +370,7 @@ public class RaceEntryService : IRaceEntryService
                     Status = "Cancelled",
                     RefundedPredictions = 0,
                     AlreadyWithdrawn = true,
-                    Message = "Entry already processed by another operation."
+                    Message = "Đăng ký đã được xử lý bởi một thao tác khác."
                 };
             }
 
@@ -398,9 +398,9 @@ public class RaceEntryService : IRaceEntryService
             {
                 await _notification.SendBulkAsync(
                     adminIds,
-                    "URGENT: Race entry withdrawn",
-                    $"RaceEntry #{raceEntryId} (Race #{entry.RaceId}) đã bị hủy. Lý do: {reason}. " +
-                    $"Vị trí xuất phát đã được giải phóng (Vacant).",
+                    "Khẩn: Có ngựa rút khỏi cuộc đua",
+                    $"Đăng ký #{raceEntryId} ở cuộc đua #{entry.RaceId} đã bị hủy. Lý do: {reason}. " +
+                    $"Vị trí xuất phát đã được giải phóng.",
                     type: "Both",
                     relatedEntityType: "RaceEntry",
                     relatedEntityId: raceEntryId);
@@ -437,7 +437,7 @@ public class RaceEntryService : IRaceEntryService
                 Status = "Cancelled",
                 RefundedPredictions = refunded,
                 AlreadyWithdrawn = false,
-                Message = "Entry cancelled, post position released, predictions refunded."
+                Message = "Đã hủy đăng ký, giải phóng vị trí xuất phát và hoàn điểm dự đoán."
             };
         }
         catch

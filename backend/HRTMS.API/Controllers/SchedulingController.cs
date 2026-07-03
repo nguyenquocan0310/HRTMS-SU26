@@ -36,48 +36,48 @@ public class SchedulingController : ControllerBase
         }
         catch (KeyNotFoundException ex) when (ex.Message == "RACE_NOT_FOUND")
         {
-            return NotFound(Err("RACE_NOT_FOUND", "Race was not found."));
+            return NotFound(Err("RACE_NOT_FOUND", "Không tìm thấy cuộc đua."));
         }
         catch (KeyNotFoundException ex) when (ex.Message == "PAIRING_NOT_FOUND")
         {
-            return NotFound(Err("PAIRING_NOT_FOUND", "Pairing was not found."));
+            return NotFound(Err("PAIRING_NOT_FOUND", "Không tìm thấy cặp đấu."));
         }
         catch (InvalidOperationException ex) when (ex.Message == "RACE_ALREADY_DRAWN")
         {
-            return Conflict(Err("RACE_ALREADY_DRAWN", "Post positions already drawn; cannot add entries."));
+            return Conflict(Err("RACE_ALREADY_DRAWN", "Cuộc đua đã bốc thăm vị trí xuất phát nên không thể thêm ngựa."));
         }
         catch (InvalidOperationException ex) when (ex.Message == "INVALID_RACE_STATE")
         {
-            return UnprocessableEntity(Err("INVALID_RACE_STATE", "Race is not in a state that allows allocation."));
+            return UnprocessableEntity(Err("INVALID_RACE_STATE", "Cuộc đua hiện không cho phép xếp ngựa vào."));
         }
         catch (InvalidOperationException ex) when (ex.Message == "PAIRING_NOT_CONFIRMED")
         {
-            return UnprocessableEntity(Err("PAIRING_NOT_CONFIRMED", "Only confirmed pairings can be allocated."));
+            return UnprocessableEntity(Err("PAIRING_NOT_CONFIRMED", "Chỉ cặp đấu đã xác nhận mới được xếp vào cuộc đua."));
         }
         catch (InvalidOperationException ex) when (ex.Message == "HORSE_NOT_APPROVED")
         {
-            return UnprocessableEntity(Err("HORSE_NOT_APPROVED", "The horse has not been approved."));
+            return UnprocessableEntity(Err("HORSE_NOT_APPROVED", "Ngựa chưa được duyệt."));
         }
         catch (InvalidOperationException ex) when (ex.Message == "JOCKEY_EXPERIENCE_TOO_LOW")
         {
             return UnprocessableEntity(Err("JOCKEY_EXPERIENCE_TOO_LOW",
-                "The jockey does not meet the tournament's minimum experience requirement."));
+                "Nài ngựa chưa đủ số năm kinh nghiệm mà giải yêu cầu."));
         }
         catch (InvalidOperationException ex) when (ex.Message == "MAX_HORSES_REACHED")
         {
-            return Conflict(Err("MAX_HORSES_REACHED", "The race already reached the maximum number of horses."));
+            return Conflict(Err("MAX_HORSES_REACHED", "Cuộc đua đã đủ số ngựa tối đa."));
         }
         catch (InvalidOperationException ex) when (ex.Message == "DUPLICATE_IN_RACE")
         {
-            return Conflict(Err("DUPLICATE_IN_RACE", "This horse or jockey is already entered in this race."));
+            return Conflict(Err("DUPLICATE_IN_RACE", "Ngựa hoặc nài này đã có trong cuộc đua."));
         }
         catch (InvalidOperationException ex) when (ex.Message == "DOUBLE_BOOKED")
         {
-            return Conflict(Err("DOUBLE_BOOKED", "This horse or jockey is booked in another race at the same time."));
+            return Conflict(Err("DOUBLE_BOOKED", "Ngựa hoặc nài này đã có mặt ở một cuộc đua khác cùng giờ."));
         }
         catch (InvalidOperationException ex) when (ex.Message is "RACE_IN_PAST" or "RACE_OUT_OF_WINDOW" or "RACE_BEFORE_ROUND")
         {
-            return UnprocessableEntity(Err("INVALID_SCHEDULE", "Race schedule is outside the valid window."));
+            return UnprocessableEntity(Err("INVALID_SCHEDULE", "Lịch cuộc đua nằm ngoài khoảng thời gian hợp lệ."));
         }
     }
 
@@ -96,19 +96,19 @@ public class SchedulingController : ControllerBase
         }
         catch (KeyNotFoundException ex) when (ex.Message == "RACE_NOT_FOUND")
         {
-            return NotFound(Err("RACE_NOT_FOUND", "Race was not found."));
+            return NotFound(Err("RACE_NOT_FOUND", "Không tìm thấy cuộc đua."));
         }
         catch (InvalidOperationException ex) when (ex.Message == "ALREADY_DRAWN")
         {
-            return Conflict(Err("ALREADY_DRAWN", "Post positions have already been drawn for this race."));
+            return Conflict(Err("ALREADY_DRAWN", "Cuộc đua này đã bốc thăm vị trí xuất phát rồi."));
         }
         catch (InvalidOperationException ex) when (ex.Message == "NO_ELIGIBLE_ENTRIES")
         {
-            return UnprocessableEntity(Err("NO_ELIGIBLE_ENTRIES", "There are no eligible entries to draw."));
+            return UnprocessableEntity(Err("NO_ELIGIBLE_ENTRIES", "Chưa có ngựa hợp lệ để bốc thăm."));
         }
         catch (InvalidOperationException ex) when (ex.Message == "DRAW_CONFLICT")
         {
-            return Conflict(Err("DRAW_CONFLICT", "A concurrent draw conflict occurred. Please retry."));
+            return Conflict(Err("DRAW_CONFLICT", "Có xung đột khi bốc thăm đồng thời. Vui lòng thử lại."));
         }
     }
 
@@ -130,20 +130,20 @@ public class SchedulingController : ControllerBase
         }
         catch (KeyNotFoundException ex) when (ex.Message == "ENTRY_NOT_FOUND")
         {
-            return NotFound(Err("ENTRY_NOT_FOUND", "Race entry was not found."));
+            return NotFound(Err("ENTRY_NOT_FOUND", "Không tìm thấy đăng ký cuộc đua."));
         }
         catch (UnauthorizedAccessException ex) when (ex.Message == "FORBIDDEN")
         {
             return StatusCode(StatusCodes.Status403Forbidden,
-                Err("FORBIDDEN", "You are not allowed to confirm this entry."));
+                Err("FORBIDDEN", "Bạn không có quyền xác nhận đăng ký này."));
         }
         catch (InvalidOperationException ex) when (ex.Message == "INVALID_STATUS")
         {
-            return Conflict(Err("INVALID_STATUS", "Only pending entries can be confirmed."));
+            return Conflict(Err("INVALID_STATUS", "Chỉ đăng ký đang chờ mới có thể xác nhận."));
         }
         catch (InvalidOperationException ex) when (ex.Message == "CONFIRMATION_CLOSED")
         {
-            return UnprocessableEntity(Err("CONFIRMATION_CLOSED", "The confirmation cut-off time has passed."));
+            return UnprocessableEntity(Err("CONFIRMATION_CLOSED", "Đã quá hạn xác nhận tham gia."));
         }
     }
 
@@ -164,12 +164,12 @@ public class SchedulingController : ControllerBase
         }
         catch (KeyNotFoundException ex) when (ex.Message == "ENTRY_NOT_FOUND")
         {
-            return NotFound(Err("ENTRY_NOT_FOUND", "Race entry was not found."));
+            return NotFound(Err("ENTRY_NOT_FOUND", "Không tìm thấy đăng ký cuộc đua."));
         }
         catch (UnauthorizedAccessException ex) when (ex.Message == "FORBIDDEN")
         {
             return StatusCode(StatusCodes.Status403Forbidden,
-                Err("FORBIDDEN", "You are not allowed to withdraw this entry."));
+                Err("FORBIDDEN", "Bạn không có quyền rút đăng ký này."));
         }
     }
 
@@ -182,7 +182,7 @@ public class SchedulingController : ControllerBase
     }
 
     private IActionResult UnauthorizedResult() =>
-        Unauthorized(Err("UNAUTHORIZED", "Invalid or missing user identity."));
+        Unauthorized(Err("UNAUTHORIZED", "Phiên đăng nhập không hợp lệ."));
 
     private static object Err(string error, string message) => new { error, message };
 }
