@@ -551,6 +551,10 @@ public partial class HRTMSDbContext : DbContext
 
             entity.HasIndex(e => new { e.RaceId, e.PairingId }, "UQ_RaceEntries_RacePairing").IsUnique();
 
+            entity.Property(e => e.AdvancementStatus)
+                .HasMaxLength(20)
+                .IsUnicode(false);
+            entity.Property(e => e.AdvancementReason).HasMaxLength(255);
             entity.Property(e => e.ClinicalStatus)
                 .HasMaxLength(20)
                 .IsUnicode(false);
@@ -740,6 +744,11 @@ public partial class HRTMSDbContext : DbContext
         {
             entity.HasIndex(e => e.Status, "IX_Tournaments_Status");
 
+            entity.Property(e => e.AdvancementRule)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasDefaultValue("TopPerRace");
+            entity.Property(e => e.AdvancementCount).HasDefaultValue(5);
             entity.Property(e => e.AllowedBreed)
                 .HasMaxLength(30)
                 .IsUnicode(false);
