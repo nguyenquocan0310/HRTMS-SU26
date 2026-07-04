@@ -11,15 +11,16 @@ namespace HRTMS.Infrastructure.Services;
 public class JockeyService : IJockeyService
 {
     private readonly HRTMSDbContext _context;
+    private readonly INotificationService _notificationService;
 
-    public JockeyService(HRTMSDbContext context)
+    public JockeyService(HRTMSDbContext context, INotificationService notificationService)
     {
         _context = context;
+        _notificationService = notificationService;
     }
 
     public async Task<JockeyProfileDto?> GetProfileAsync(int jockeyId)
     {
-        // Lay thong tin profile cua Jockey theo JockeyId
         return await _context.JockeyProfiles
             .AsNoTracking()
             .Where(j => j.JockeyId == jockeyId)
@@ -44,7 +45,6 @@ public class JockeyService : IJockeyService
         int jockeyId,
         UpdateJockeyProfileDto dto)
     {
-        // Lay profile Jockey kem thong tin User
         var jockey = await _context.JockeyProfiles
             .Include(j => j.Jockey)
             .FirstOrDefaultAsync(j => j.JockeyId == jockeyId);
@@ -55,14 +55,13 @@ public class JockeyService : IJockeyService
         }
 
         var oldLicense = jockey.LicenseCertificate;
+        var oldStatus = jockey.Status;
         var licenseChanged = false;
 
-        // Chi cap nhat license khi client co gui gia tri moi
         if (!string.IsNullOrWhiteSpace(dto.LicenseCertificate))
         {
             var normalizedLicense = dto.LicenseCertificate.Trim();
 
-            // Kiem tra license da duoc Jockey khac su dung hay chua
             var licenseExists = await _context.JockeyProfiles
                 .AnyAsync(j =>
                     j.JockeyId != jockeyId &&
@@ -78,17 +77,21 @@ public class JockeyService : IJockeyService
             {
                 jockey.LicenseCertificate = normalizedLicense;
                 licenseChanged = true;
+
+                // License la credential duoc Admin duyet - doi license phai
+                // re-trigger approval, khong duoc giu nguyen Status cu (dong bo
+                // pattern HRS.6 cua Horse: sua field nhay cam -> ve Pending).
+                jockey.Status = "Pending";
+                jockey.RejectionReason = null;
             }
         }
 
-        // Cap nhat can nang tu khai neu co gui len
         if (dto.SelfDeclaredWeight.HasValue)
         {
             jockey.SelfDeclaredWeight =
                 dto.SelfDeclaredWeight.Value;
         }
 
-        // Cap nhat nhom mau neu co gui len
         if (dto.BloodType != null)
         {
             jockey.BloodType = string.IsNullOrWhiteSpace(dto.BloodType)
@@ -96,7 +99,6 @@ public class JockeyService : IJockeyService
                 : dto.BloodType.Trim();
         }
 
-        // Cap nhat tinh trang suc khoe neu co gui len
         if (dto.HealthStatus != null)
         {
             var validHealthStatuses = new[]
@@ -117,7 +119,6 @@ public class JockeyService : IJockeyService
 
         jockey.UpdatedAt = DateTime.UtcNow;
 
-        // Neu license thay doi thi ghi AuditLog
         if (licenseChanged)
         {
             _context.AuditLogs.Add(new AuditLog
@@ -128,12 +129,14 @@ public class JockeyService : IJockeyService
                 EntityId = jockeyId.ToString(),
                 OldValue = JsonSerializer.Serialize(new
                 {
-                    LicenseCertificate = oldLicense
+                    LicenseCertificate = oldLicense,
+                    Status = oldStatus
                 }),
                 NewValue = JsonSerializer.Serialize(new
                 {
                     LicenseCertificate =
-                        jockey.LicenseCertificate
+                        jockey.LicenseCertificate,
+                    jockey.Status
                 }),
                 CreatedAt = DateTime.UtcNow
             });
@@ -141,7 +144,18 @@ public class JockeyService : IJockeyService
 
         await _context.SaveChangesAsync();
 
-        // Tra ve profile sau khi cap nhat
+        if (licenseChanged)
+        {
+            await _notificationService.SendAsync(
+                jockeyId,
+                "Hồ sơ Jockey đang chờ duyệt lại",
+                "Bạn vừa cập nhật License Certificate. Hồ sơ của bạn sẽ tạm chuyển về " +
+                "trạng thái chờ duyệt (Pending) cho tới khi Admin xác nhận lại chứng chỉ mới.",
+                type: "Both",
+                relatedEntityType: "JockeyProfiles",
+                relatedEntityId: jockeyId);
+        }
+
         return new JockeyProfileDto
         {
             JockeyId = jockey.JockeyId,
@@ -183,34 +197,18 @@ public class JockeyService : IJockeyService
             throw new KeyNotFoundException("TOURNAMENT_NOT_FOUND");
         }
 
-        // Lay danh sach Tournament trung thoi gian voi Tournament hien tai
-        // Neu khac ngay thi Jockey van co the tham gia giai khac
-        var overlappingTournamentIds = await _context.Tournaments
-            .AsNoTracking()
-            .Where(t =>
-                t.TournamentId == tournamentId ||
-                (
-                    t.StartDate <= tournament.EndDate &&
-                    t.EndDate >= tournament.StartDate
-                ))
-            .Select(t => t.TournamentId)
+        var ownerHorseIds = await _context.Horses
+            .Where(h => h.OwnerId == ownerId)
+            .Select(h => h.HorseId)
             .ToListAsync();
 
-        // Chi loai Jockey neu da Accepted hoac Confirmed o Tournament trung thoi gian
-        // Pending khong loai vi Jockey chua chap nhan loi moi
-        var unavailableJockeyIds = await _context.Pairings
-            .AsNoTracking()
+        var pendingJockeyIds = await _context.Pairings
             .Where(p =>
-                overlappingTournamentIds.Contains(p.TournamentId) &&
-                (
-                    p.Status == "Accepted" ||
-                    p.Status == "Confirmed"
-                ))
+                ownerHorseIds.Contains(p.HorseId) &&
+                p.Status == "Pending")
             .Select(p => p.JockeyId)
-            .Distinct()
             .ToListAsync();
 
-        // Chi jockey co trong roster Approved cua giai moi duoc hien thi
         var rosterJockeyIds = await _context.TournamentParticipants
             .Where(p =>
                 p.TournamentId == tournamentId &&
@@ -223,10 +221,9 @@ public class JockeyService : IJockeyService
             .Include(j => j.Jockey)
             .Where(j =>
                 j.Status == "Active" &&
-                j.Jockey.Status == "Active" &&
                 j.ExperienceYears >= tournament.MinJockeyExperienceYears &&
                 rosterJockeyIds.Contains(j.JockeyId) &&
-                !unavailableJockeyIds.Contains(j.JockeyId));
+                !pendingJockeyIds.Contains(j.JockeyId));
 
         var total = await query.CountAsync();
 
@@ -260,7 +257,6 @@ public class JockeyService : IJockeyService
             int page,
             int pageSize)
     {
-        // Chuan hoa gia tri phan trang
         page = page < 1 ? 1 : page;
         pageSize = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
 
@@ -271,7 +267,6 @@ public class JockeyService : IJockeyService
             "Declined"
         };
 
-        // Kiem tra trang thai Pairing hop le
         if (!string.IsNullOrWhiteSpace(status) &&
             !validStatuses.Contains(status))
         {
@@ -279,7 +274,6 @@ public class JockeyService : IJockeyService
                 "INVALID_PAIRING_STATUS");
         }
 
-        // Lay danh sach loi moi cua Jockey dang dang nhap
         var query = _context.Pairings
             .AsNoTracking()
             .Where(p => p.JockeyId == jockeyId);
@@ -333,7 +327,6 @@ public class JockeyService : IJockeyService
         int page,
         int pageSize)
     {
-        // Chuan hoa gia tri phan trang
         page = page < 1 ? 1 : page;
         pageSize = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
 
@@ -345,7 +338,6 @@ public class JockeyService : IJockeyService
         "Disqualified"
     };
 
-        // Kiem tra trang thai RaceEntry hop le neu client co filter
         if (!string.IsNullOrWhiteSpace(status) &&
             !validStatuses.Contains(status))
         {
@@ -353,8 +345,6 @@ public class JockeyService : IJockeyService
                 "INVALID_RACE_ENTRY_STATUS");
         }
 
-        // Lay danh sach race entry cua Jockey dang dang nhap
-        // RaceEntries -> Pairings -> JockeyId = current user id
         var query = _context.RaceEntries
             .AsNoTracking()
             .Where(re => re.Pairing.JockeyId == jockeyId);
