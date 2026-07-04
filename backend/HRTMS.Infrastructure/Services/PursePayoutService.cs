@@ -66,7 +66,7 @@ namespace HRTMS.Infrastructure.Services
         {
             var newStatus = (dto.PayoutStatus ?? string.Empty).Trim();
             if (!ValidStatuses.Contains(newStatus))
-                throw new ArgumentException("PayoutStatus chỉ nhận 'Paid' hoặc 'Unpaid'");
+                throw new ArgumentException("Trạng thái chi thưởng chỉ nhận 'Paid' hoặc 'Unpaid'.");
 
             var payout = await _context.PursePayouts
                 .Include(p => p.RecipientUser)

@@ -48,7 +48,7 @@ namespace HRTMS.Infrastructure.Services
         private static void ValidateRaceDistance(int distance, string fieldName)
         {
             if (distance <= MinRaceDistanceMeters || distance >= MaxRaceDistanceMeters)
-                throw new ArgumentException($"{fieldName} must be greater than {MinRaceDistanceMeters} and less than {MaxRaceDistanceMeters}");
+                throw new ArgumentException($"{fieldName} phải lớn hơn {MinRaceDistanceMeters}m và nhỏ hơn {MaxRaceDistanceMeters}m.");
         }
 
         private static void ValidateRaceDistanceOverride(int? distance)
@@ -60,7 +60,7 @@ namespace HRTMS.Infrastructure.Services
         private static void ValidateTournamentWindow(DateTime startDate, DateTime endDate)
         {
             if (endDate <= startDate)
-                throw new ArgumentException("EndDate must be after StartDate");
+                throw new ArgumentException("Ngày kết thúc phải sau ngày bắt đầu.");
         }
 
         private static void ValidateTournamentNumbers(
@@ -72,17 +72,17 @@ namespace HRTMS.Infrastructure.Services
             decimal postRaceWeightDiffThresholdKg)
         {
             if (maxHorses <= 0)
-                throw new ArgumentException("MaxHorses must be greater than 0");
+                throw new ArgumentException("Số ngựa tối đa phải lớn hơn 0.");
             if (minJockeyExperienceYears < 0)
-                throw new ArgumentException("MinJockeyExperienceYears must be greater than or equal to 0");
+                throw new ArgumentException("Số năm kinh nghiệm tối thiểu của nài không được âm.");
             if (purseAmount < 0)
-                throw new ArgumentException("PurseAmount must be greater than or equal to 0");
+                throw new ArgumentException("Tổng giải thưởng không được âm.");
             if (entryFeeAmount < 0)
-                throw new ArgumentException("EntryFeeAmount must be greater than or equal to 0");
+                throw new ArgumentException("Lệ phí tham gia không được âm.");
             if (preRaceWeightThresholdKg <= 0)
-                throw new ArgumentException("PreRaceWeightThresholdKg must be greater than 0");
+                throw new ArgumentException("Ngưỡng cân trước đua phải lớn hơn 0.");
             if (postRaceWeightDiffThresholdKg <= 0)
-                throw new ArgumentException("PostRaceWeightDiffThresholdKg must be greater than 0");
+                throw new ArgumentException("Ngưỡng chênh cân sau đua phải lớn hơn 0.");
         }
 
         private static void ValidateTournamentScheduleIntegrity(Tournament tournament)
@@ -90,14 +90,14 @@ namespace HRTMS.Infrastructure.Services
             foreach (var round in tournament.Rounds)
             {
                 if (round.ScheduledDate < tournament.StartDate || round.ScheduledDate > tournament.EndDate)
-                    throw new ArgumentException($"Round #{round.RoundId} is outside the tournament date range");
+                    throw new ArgumentException($"Vòng #{round.RoundId} nằm ngoài khoảng thời gian của giải.");
 
                 foreach (var race in round.Races)
                 {
                     if (race.ScheduledTime < tournament.StartDate || race.ScheduledTime > tournament.EndDate)
-                        throw new ArgumentException($"Race #{race.RaceId} is outside the tournament date range");
+                        throw new ArgumentException($"Cuộc đua #{race.RaceId} nằm ngoài khoảng thời gian của giải.");
                     if (race.ScheduledTime < round.ScheduledDate)
-                        throw new ArgumentException($"Race #{race.RaceId} is scheduled before its round");
+                        throw new ArgumentException($"Cuộc đua #{race.RaceId} được xếp trước ngày của vòng.");
                 }
             }
 
@@ -105,7 +105,7 @@ namespace HRTMS.Infrastructure.Services
                 .SelectMany(r => r.Races)
                 .Sum(r => r.PurseAmount);
             if (allocatedPurse > tournament.PurseAmount)
-                throw new ArgumentException($"Total race purse ({allocatedPurse}) exceeds tournament purse ({tournament.PurseAmount})");
+                throw new ArgumentException($"Tổng giải thưởng các cuộc đua ({allocatedPurse}) vượt quá tổng giải thưởng của giải ({tournament.PurseAmount}).");
         }
 
         private static TournamentResponseDto MapToResponseDto(Tournament t)
@@ -169,11 +169,11 @@ namespace HRTMS.Infrastructure.Services
         {
             // 1. Validate enum values
             if (!ValidBreeds.Contains(dto.AllowedBreed))
-                throw new ArgumentException($"AllowedBreed Invalid: {dto.AllowedBreed}");
+                throw new ArgumentException($"Giống ngựa cho phép không hợp lệ: {dto.AllowedBreed}");
             if (!ValidTrackType.Contains(dto.TrackType))
-                throw new ArgumentException($"TrackType Invalid: {dto.TrackType}");
+                throw new ArgumentException($"Loại đường đua không hợp lệ: {dto.TrackType}");
             if (!ValidCategories.Contains(dto.RaceCategory))
-                throw new ArgumentException($"RaceCategory Invalid: {dto.RaceCategory}");
+                throw new ArgumentException($"Hạng đua không hợp lệ: {dto.RaceCategory}");
             ValidateRaceDistance(dto.RaceDistance, nameof(dto.RaceDistance));
 
             // 2. Validate date range and numeric constraints
@@ -253,7 +253,7 @@ namespace HRTMS.Infrastructure.Services
                 .Include(t => t.Rounds).ThenInclude(r => r.Races)
                 .Include(t => t.PrizeDistributions)
                 .FirstOrDefaultAsync(t => t.TournamentId == tournamentId)
-                ?? throw new KeyNotFoundException($"Không tìm thấy Tournament #{tournamentId}");
+                ?? throw new KeyNotFoundException($"Không tìm thấy giải #{tournamentId}.");
 
             // TRN.9 — chỉ cho sửa khi còn ở Draft hoặc Open Registration
             if (tournament.Status != "Draft" && tournament.Status != "Open Registration")
@@ -262,11 +262,11 @@ namespace HRTMS.Infrastructure.Services
 
             // Bug 9 fix — validate enum khi update
             if (dto.AllowedBreed != null && !ValidBreeds.Contains(dto.AllowedBreed))
-                throw new ArgumentException($"AllowedBreed Invalid: {dto.AllowedBreed}");
+                throw new ArgumentException($"Giống ngựa cho phép không hợp lệ: {dto.AllowedBreed}");
             if (dto.TrackType != null && !ValidTrackType.Contains(dto.TrackType))
-                throw new ArgumentException($"TrackType Invalid: {dto.TrackType}");
+                throw new ArgumentException($"Loại đường đua không hợp lệ: {dto.TrackType}");
             if (dto.RaceCategory != null && !ValidCategories.Contains(dto.RaceCategory))
-                throw new ArgumentException($"RaceCategory Invalid: {dto.RaceCategory}");
+                throw new ArgumentException($"Hạng đua không hợp lệ: {dto.RaceCategory}");
             if (dto.RaceDistance.HasValue)
                 ValidateRaceDistance(dto.RaceDistance.Value, nameof(dto.RaceDistance));
 
@@ -316,13 +316,13 @@ namespace HRTMS.Infrastructure.Services
         {
             targetStatus = targetStatus?.Trim() ?? string.Empty;
             if (targetStatus.Length == 0)
-                throw new InvalidOperationException("TargetStatus is required");
+                throw new InvalidOperationException("Vui lòng chọn trạng thái muốn chuyển.");
 
             var tournament = await _context.Tournaments
                 .Include(t => t.Rounds).ThenInclude(r => r.Races)
                 .Include(t => t.PrizeDistributions)
                 .FirstOrDefaultAsync(t => t.TournamentId == tournamentId)
-                ?? throw new KeyNotFoundException($"Không tìm thấy Tournament #{tournamentId}");
+                ?? throw new KeyNotFoundException($"Không tìm thấy giải #{tournamentId}.");
 
             // TRN.8 AC#2 — chặn set Tournament sang trạng thái cấp Race (Pre-Race/Live/In-Progress/...).
             if (RaceLevelStatuses.Contains(targetStatus))
@@ -405,7 +405,7 @@ namespace HRTMS.Infrastructure.Services
                 .Include(t => t.Rounds).ThenInclude(r => r.Races)
                     .ThenInclude(race => race.Predictions)
                 .FirstOrDefaultAsync(t => t.TournamentId == tournamentId)
-                ?? throw new KeyNotFoundException($"Không tìm thấy Tournament #{tournamentId}");
+                ?? throw new KeyNotFoundException($"Không tìm thấy giải #{tournamentId}.");
 
             if (tournament.Status == "Completed")
                 throw new InvalidOperationException("Không thể hủy giải đã hoàn thành");
@@ -574,7 +574,7 @@ namespace HRTMS.Infrastructure.Services
             // Bug 6 fix — kiểm tra tournament tồn tại trước khi upsert
             var exists = await _context.Tournaments.AnyAsync(t => t.TournamentId == tournamentId);
             if (!exists)
-                throw new KeyNotFoundException($"Không tìm thấy Tournament #{tournamentId}");
+                throw new KeyNotFoundException($"Không tìm thấy giải #{tournamentId}.");
 
             // 1. Validate đủ 5 position không trùng
             var positions = dto.Distributions.Select(d => d.Position).OrderBy(p => p).ToList();
@@ -616,7 +616,7 @@ namespace HRTMS.Infrastructure.Services
         public async Task<RoundResponseDto> CreateRoundAsync(int tournamentId, CreateRoundDto dto)
         {
             var tournament = await _context.Tournaments.FindAsync(tournamentId)
-                ?? throw new KeyNotFoundException($"Không tìm thấy Tournament #{tournamentId}");
+                ?? throw new KeyNotFoundException($"Không tìm thấy giải #{tournamentId}.");
 
             // TRN.7 — validate date nằm trong cửa sổ giải
             if (dto.ScheduledDate < tournament.StartDate || dto.ScheduledDate > tournament.EndDate)
@@ -630,7 +630,7 @@ namespace HRTMS.Infrastructure.Services
 
             // Bug 7 fix — kiểm tra trùng SequenceOrder trong cùng tournament
             if (existingRounds.Any(r => r.SequenceOrder == dto.SequenceOrder))
-                throw new ArgumentException($"SequenceOrder {dto.SequenceOrder} đã tồn tại trong Tournament #{tournamentId}");
+                throw new ArgumentException($"Thứ tự vòng {dto.SequenceOrder} đã tồn tại trong giải #{tournamentId}.");
 
             // Validate tính liên tục thời gian giữa các vòng: vòng sau phải diễn ra
             // sau khi vòng ngay trước nó đã kết thúc (sau race cuối cùng của vòng trước).
@@ -689,27 +689,27 @@ namespace HRTMS.Infrastructure.Services
             var round = await _context.Rounds
                 .Include(r => r.Tournament)
                 .FirstOrDefaultAsync(r => r.RoundId == roundId)
-                ?? throw new KeyNotFoundException($"Không tìm thấy Round #{roundId}");
+                ?? throw new KeyNotFoundException($"Không tìm thấy vòng #{roundId}.");
 
             var tournament = round.Tournament;
             ValidateRaceDistanceOverride(dto.RaceDistanceOverride);
 
             // TRN.7 — validate thời gian
             if (dto.ScheduledTime <= DateTime.UtcNow)
-                throw new ArgumentException("ScheduledTime phải ở tương lai");
+                throw new ArgumentException("Thời gian thi đấu phải ở tương lai.");
 
             if (dto.ScheduledTime < tournament.StartDate || dto.ScheduledTime > tournament.EndDate)
                 throw new ArgumentException(
-                    $"ScheduledTime phải nằm trong cửa sổ giải [{tournament.StartDate:d}, {tournament.EndDate:d}]");
+                    $"Thời gian thi đấu phải nằm trong thời gian diễn ra giải ({tournament.StartDate:d} - {tournament.EndDate:d}).");
 
             // Bug 8 fix — kiểm tra trùng RaceNumber trong cùng round
             if (dto.ScheduledTime < round.ScheduledDate)
-                throw new ArgumentException("ScheduledTime must not be earlier than the round date");
+                throw new ArgumentException("Thời gian thi đấu không được sớm hơn ngày của vòng.");
 
             var isDuplicateRaceNumber = await _context.Races
                 .AnyAsync(r => r.RoundId == roundId && r.RaceNumber == dto.RaceNumber);
             if (isDuplicateRaceNumber)
-                throw new ArgumentException($"RaceNumber {dto.RaceNumber} đã tồn tại trong Round #{roundId}");
+                throw new ArgumentException($"Số cuộc đua {dto.RaceNumber} đã tồn tại trong vòng #{roundId}.");
 
             // TRN.7 — validate tổng PurseAmount không vượt giải
             var existingPurseTotal = await _context.Races
@@ -718,7 +718,7 @@ namespace HRTMS.Infrastructure.Services
 
             if (existingPurseTotal + dto.PurseAmount > tournament.PurseAmount)
                 throw new ArgumentException(
-                    $"Tổng quỹ Race ({existingPurseTotal + dto.PurseAmount}) vượt quỹ giải ({tournament.PurseAmount})");
+                    $"Tổng giải thưởng các cuộc đua ({existingPurseTotal + dto.PurseAmount}) vượt quá tổng giải thưởng của giải ({tournament.PurseAmount}).");
 
             var race = new Race
             {
@@ -761,7 +761,7 @@ namespace HRTMS.Infrastructure.Services
             var race = await _context.Races
                 .Include(r => r.Round).ThenInclude(rd => rd.Tournament)
                 .FirstOrDefaultAsync(r => r.RaceId == raceId)
-                ?? throw new KeyNotFoundException($"Không tìm thấy Race #{raceId}");
+                ?? throw new KeyNotFoundException($"Không tìm thấy cuộc đua #{raceId}.");
 
             var tournament = race.Round.Tournament;
             ValidateRaceDistanceOverride(dto.RaceDistanceOverride);
@@ -781,14 +781,14 @@ namespace HRTMS.Infrastructure.Services
             if (race.ScheduledTime != dto.ScheduledTime)
             {
                 if (dto.ScheduledTime <= DateTime.UtcNow)
-                    throw new ArgumentException("ScheduledTime phải ở tương lai");
+                    throw new ArgumentException("Thời gian thi đấu phải ở tương lai.");
 
                 if (dto.ScheduledTime < tournament.StartDate || dto.ScheduledTime > tournament.EndDate)
                     throw new ArgumentException(
-                        $"ScheduledTime phải nằm trong cửa sổ giải [{tournament.StartDate:d}, {tournament.EndDate:d}]");
+                        $"Thời gian thi đấu phải nằm trong thời gian diễn ra giải ({tournament.StartDate:d} - {tournament.EndDate:d}).");
 
                 if (dto.ScheduledTime < race.Round.ScheduledDate)
-                    throw new ArgumentException("ScheduledTime không được sớm hơn ngày của Round");
+                    throw new ArgumentException("Thời gian thi đấu không được sớm hơn ngày của vòng.");
             }
 
             // TRN.7 — tong PurseAmount khong vuot quy giai (tru chinh race nay).
@@ -800,7 +800,7 @@ namespace HRTMS.Infrastructure.Services
 
                 if (otherPurseTotal + dto.PurseAmount > tournament.PurseAmount)
                     throw new ArgumentException(
-                        $"Tổng quỹ Race ({otherPurseTotal + dto.PurseAmount}) vượt quỹ giải ({tournament.PurseAmount})");
+                        $"Tổng giải thưởng các cuộc đua ({otherPurseTotal + dto.PurseAmount}) vượt quá tổng giải thưởng của giải ({tournament.PurseAmount}).");
             }
 
             race.ScheduledTime = dto.ScheduledTime;

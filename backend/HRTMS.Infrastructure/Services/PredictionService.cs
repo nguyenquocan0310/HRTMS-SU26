@@ -36,11 +36,11 @@ public class PredictionService : IPredictionService
     {
         var race = await _context.Races.FirstOrDefaultAsync(r => r.RaceId == raceId);
         if (race == null)
-            return ApiResponse<bool>.Fail("Không tìm thấy Race.");
+            return ApiResponse<bool>.Fail("Không tìm thấy cuộc đua.");
 
         // BR-09: chỉ cho phép MỞ cổng (IsPredictionGateClosed = false) khi đã bốc thăm
         if (dto.IsPredictionGateClosed == false && !race.IsPostPositionDrawn)
-            return ApiResponse<bool>.Fail("Không thể mở cổng dự đoán khi chưa bốc thăm vị trí xuất phát (Post Position Draw).");
+            return ApiResponse<bool>.Fail("Chưa bốc thăm vị trí xuất phát nên chưa thể mở cổng dự đoán.");
 
         race.IsPredictionGateClosed = dto.IsPredictionGateClosed;
         race.UpdatedAt = DateTime.UtcNow;
@@ -65,7 +65,7 @@ public class PredictionService : IPredictionService
             .FirstOrDefaultAsync(r => r.RaceId == raceId);
 
         if (race == null)
-            return ApiResponse<PredictionGateStatusDto>.Fail("Không tìm thấy Race.");
+            return ApiResponse<PredictionGateStatusDto>.Fail("Không tìm thấy cuộc đua.");
 
         var status = new PredictionGateStatusDto
         {
@@ -93,7 +93,7 @@ public class PredictionService : IPredictionService
             .Include(r => r.Round)
             .FirstOrDefaultAsync(r => r.RaceId == raceId);
         if (race == null)
-            return ApiResponse<List<FormScoreDto>>.Fail("Không tìm thấy Race.");
+            return ApiResponse<List<FormScoreDto>>.Fail("Không tìm thấy cuộc đua.");
 
         var entries = await _context.RaceEntries
             .AsNoTracking()
@@ -214,10 +214,10 @@ public class PredictionService : IPredictionService
             var race = await _context.Races
                 .FirstOrDefaultAsync(r => r.RaceId == dto.RaceId);
             if (race == null)
-                return ApiResponse<PredictionResponseDto>.Fail("Không tìm thấy Race.");
+                return ApiResponse<PredictionResponseDto>.Fail("Không tìm thấy cuộc đua.");
 
             if (race.Status != RaceStatusUpcoming)
-                return ApiResponse<PredictionResponseDto>.Fail("Cuộc đua không còn ở trạng thái Upcoming, không thể đặt dự đoán.");
+                return ApiResponse<PredictionResponseDto>.Fail("Cuộc đua đã bắt đầu hoặc kết thúc, không thể đặt dự đoán.");
 
             if (race.IsPredictionGateClosed)
                 return ApiResponse<PredictionResponseDto>.Fail("Cổng dự đoán đã đóng.");
@@ -228,7 +228,7 @@ public class PredictionService : IPredictionService
             var raceEntry = await _context.RaceEntries
                 .FirstOrDefaultAsync(re => re.RaceEntryId == dto.RaceEntryId && re.RaceId == dto.RaceId);
             if (raceEntry == null || raceEntry.IsWithdrawn)
-                return ApiResponse<PredictionResponseDto>.Fail("RaceEntry không hợp lệ hoặc đã rút lui.");
+                return ApiResponse<PredictionResponseDto>.Fail("Ngựa này không hợp lệ hoặc đã rút khỏi cuộc đua.");
 
             // FIX #3: Kiểm tra duplicate trước khi thao tác ví
             // (unique index UQ_Predictions_SpectatorEntry chặn ở tầng DB,
