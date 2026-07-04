@@ -37,6 +37,11 @@ public partial class Tournament
 
     public string Status { get; set; } = null!;
 
+    // Progression (patch 002): rule chọn ngựa đi tiếp + Top N per race.
+    public string AdvancementRule { get; set; } = "TopPerRace";
+
+    public int AdvancementCount { get; set; } = 5;
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
