@@ -33,7 +33,7 @@
 | 6 | PATCH | `/api/pairings/{id}/decline` | Jockey | Từ chối lời mời |
 | 7 | GET | `/api/jockeys/invitations` | Jockey | Danh sách lời mời đang chờ |
 | 8 | GET | `/api/owner/pairings` | Owner | Danh sách cặp ghép của Owner |
-| 9 | GET | `/api/admin/pairings` | Admin | Danh sách pairing để allocate vào Race (filter `tournamentId`/`status` mặc định `Confirmed`/`unallocatedOnly`) → `PagedResult<AdminPairingDto>` |
+| 9 | GET | `/api/admin/pairings` | Admin | Danh sách pairing để allocate vào Race (filter `tournamentId`/`status` mặc định `Confirmed`/`unallocatedOnly`) → `PagedResult<AdminPairingDto>`. `unallocatedOnly`/`isAllocated` chỉ tính entry `Pending/Confirmed` ở race **chưa** `Official/Cancelled` — pairing đã đua xong round trước vẫn hiện lại để allocate round sau |
 
 ---
 ---
