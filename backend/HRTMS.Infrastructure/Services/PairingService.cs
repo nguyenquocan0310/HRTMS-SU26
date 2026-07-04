@@ -609,6 +609,9 @@ public class PairingService : IPairingService
             Page = page,
             PageSize = pageSize,
             TotalCount = total
+        };
+    }
+
     public async Task<PairingActionResponseDto> CancelAsync(
     int ownerId,
     int pairingId)
