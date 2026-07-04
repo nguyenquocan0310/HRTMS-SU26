@@ -50,6 +50,10 @@ public class SchedulingController : ControllerBase
         {
             return UnprocessableEntity(Err("INVALID_RACE_STATE", "Race is not in a state that allows allocation."));
         }
+        catch (InvalidOperationException ex) when (ex.Message == "PAIRING_TOURNAMENT_MISMATCH")
+        {
+            return UnprocessableEntity(Err("PAIRING_TOURNAMENT_MISMATCH", "The pairing does not belong to the race's tournament."));
+        }
         catch (InvalidOperationException ex) when (ex.Message == "PAIRING_NOT_CONFIRMED")
         {
             return UnprocessableEntity(Err("PAIRING_NOT_CONFIRMED", "Only confirmed pairings can be allocated."));
