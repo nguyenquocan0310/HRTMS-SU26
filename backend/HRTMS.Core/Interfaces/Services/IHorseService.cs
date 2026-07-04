@@ -31,7 +31,10 @@ namespace HRTMS.Core.Interfaces.Services
 
         // Admin - RaceEntry
         Task<ApiResponse<List<RaceEntryResponseDto>>> GetPendingFeeEntriesAsync(int page, int pageSize);
+        Task<ApiResponse<List<RaceEntryResponseDto>>> GetAdminRaceEntriesAsync(
+            string? status, string? feeStatus, int? tournamentId, int? raceId, int page, int pageSize);
         Task<ApiResponse<string>> ConfirmEntryFeeAsync(int adminId, int raceEntryId);
+        Task<ApiResponse<string>> CompleteRefundAsync(int adminId, int raceEntryId);
         Task<ApiResponse<string>> ApproveRaceEntryAsync(int adminId, int raceEntryId);
         Task<ApiResponse<string>> RejectRaceEntryAsync(int adminId, int raceEntryId, string reason);
 

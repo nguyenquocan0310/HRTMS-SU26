@@ -590,6 +590,30 @@ public class AdminController : ControllerBase
         return Ok(result);
     }
 
+    // Module E — liet ke MOI RaceEntry theo filter (khong khoa Unpaid nhu pending-fee).
+    [HttpGet("entries")]
+    public async Task<IActionResult> GetAdminRaceEntries(
+        [FromQuery] string? status,
+        [FromQuery] string? feeStatus,
+        [FromQuery] int? tournamentId,
+        [FromQuery] int? raceId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50)
+    {
+        var result = await _horseService.GetAdminRaceEntriesAsync(
+            status, feeStatus, tournamentId, raceId, page, pageSize);
+        return Ok(result);
+    }
+
+    // Module E — dong vong hoan phi: Refund Pending -> Refunded.
+    [HttpPatch("entries/{id:int}/refund-complete")]
+    public async Task<IActionResult> CompleteRefund(int id)
+    {
+        var result = await _horseService.CompleteRefundAsync(CurrentAdminId, id);
+        if (!result.Success) return BadRequest(result);
+        return Ok(result);
+    }
+
     [HttpPatch("entries/{id:int}/fee-status")]
     public async Task<IActionResult> ConfirmEntryFee(int id)
     {

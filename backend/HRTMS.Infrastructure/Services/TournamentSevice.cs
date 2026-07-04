@@ -344,6 +344,26 @@ namespace HRTMS.Infrastructure.Services
                 throw new InvalidOperationException("Phải cấu hình đủ 5 tỷ lệ PrizeDistributions trước khi đăng ký");
             }
 
+            // Đóng đăng ký: validate nhẹ để giải chạy được từ vòng loại tới chung kết.
+            // KHÔNG áp minimum cứng theo gate capacity (REQ-F-SCH.7: không có ngưỡng
+            // tối thiểu chặn cuộc đua) — chỉ chặn giải rỗng cấu trúc/không có cặp đua.
+            if (targetStatus == "Closed Registration")
+            {
+                if (tournament.Rounds.Count == 0)
+                {
+                    throw new InvalidOperationException(
+                        "Giải đấu chưa có vòng đấu nào. Hãy tạo cấu trúc vòng (vòng loại/chung kết) trước khi đóng đăng ký");
+                }
+
+                var confirmedPairings = await _context.Pairings
+                    .CountAsync(p => p.TournamentId == tournamentId && p.Status == "Confirmed");
+                if (confirmedPairings == 0)
+                {
+                    throw new InvalidOperationException(
+                        "Chưa có cặp Ngựa–Nài nào được xác nhận (Confirmed). Không thể đóng đăng ký");
+                }
+            }
+
             // TRN.8 AC#3 — chỉ cho Completed khi MỌI Race thuộc giải đã Official hoặc Cancelled.
             if (targetStatus == "Completed")
             {

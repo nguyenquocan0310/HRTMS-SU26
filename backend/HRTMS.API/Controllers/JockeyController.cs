@@ -23,7 +23,6 @@ public class JockeyController : ControllerBase
     [Authorize(Roles = "Jockey")]
     public async Task<IActionResult> GetProfile()
     {
-        // Lay JockeyId tu JWT token
         var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
         if (!int.TryParse(userIdValue, out var jockeyId))
@@ -54,7 +53,6 @@ public class JockeyController : ControllerBase
     public async Task<IActionResult> UpdateProfile(
         [FromBody] UpdateJockeyProfileDto dto)
     {
-        // Lay JockeyId tu JWT token
         var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
         if (!int.TryParse(userIdValue, out var jockeyId))
@@ -82,7 +80,10 @@ public class JockeyController : ControllerBase
         return Ok(new
         {
             jockeyId = profile.JockeyId,
-            message = "Jockey profile updated successfully."
+            status = profile.Status,
+            message = profile.Status == "Pending"
+                ? "Jockey profile updated. License changed — awaiting Admin re-approval."
+                : "Jockey profile updated successfully."
         });
     }
 
@@ -93,7 +94,6 @@ public class JockeyController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        // Lay OwnerId tu JWT token
         var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
         if (!int.TryParse(userIdValue, out var ownerId))
@@ -142,7 +142,6 @@ public class JockeyController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        // Lay JockeyId tu JWT token
         var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
         if (!int.TryParse(userIdValue, out var jockeyId))
@@ -175,42 +174,41 @@ public class JockeyController : ControllerBase
         }
     }
     [HttpGet("race-entries/my")]
-[Authorize(Roles = "Jockey")]
-public async Task<IActionResult> GetMyRaceEntries(
+    [Authorize(Roles = "Jockey")]
+    public async Task<IActionResult> GetMyRaceEntries(
     [FromQuery] string? status,
     [FromQuery] int page = 1,
     [FromQuery] int pageSize = 20)
-{
-    // Lay JockeyId tu JWT token
-    var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-    if (!int.TryParse(userIdValue, out var jockeyId))
     {
-        return Unauthorized(new
+        var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (!int.TryParse(userIdValue, out var jockeyId))
         {
-            error = "UNAUTHORIZED",
-            message = "Invalid or missing user identity."
-        });
-    }
+            return Unauthorized(new
+            {
+                error = "UNAUTHORIZED",
+                message = "Invalid or missing user identity."
+            });
+        }
 
-    try
-    {
-        var result = await _jockeyService.GetMyRaceEntriesAsync(
-            jockeyId,
-            status,
-            page,
-            pageSize);
-
-        return Ok(result);
-    }
-    catch (ArgumentException ex)
-        when (ex.Message == "INVALID_RACE_ENTRY_STATUS")
-    {
-        return BadRequest(new
+        try
         {
-            error = "VALIDATION_ERROR",
-            message = "Status must be Pending, Confirmed, Cancelled, or Disqualified."
-        });
+            var result = await _jockeyService.GetMyRaceEntriesAsync(
+                jockeyId,
+                status,
+                page,
+                pageSize);
+
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+            when (ex.Message == "INVALID_RACE_ENTRY_STATUS")
+        {
+            return BadRequest(new
+            {
+                error = "VALIDATION_ERROR",
+                message = "Status must be Pending, Confirmed, Cancelled, or Disqualified."
+            });
+        }
     }
-}
 }

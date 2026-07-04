@@ -50,9 +50,23 @@ public class SchedulingController : ControllerBase
         {
             return UnprocessableEntity(Err("INVALID_RACE_STATE", "Cuộc đua hiện không cho phép xếp ngựa vào."));
         }
+        catch (InvalidOperationException ex) when (ex.Message == "PAIRING_TOURNAMENT_MISMATCH")
+        {
+            return UnprocessableEntity(Err("PAIRING_TOURNAMENT_MISMATCH", "The pairing does not belong to the race's tournament."));
+        }
         catch (InvalidOperationException ex) when (ex.Message == "PAIRING_NOT_CONFIRMED")
         {
             return UnprocessableEntity(Err("PAIRING_NOT_CONFIRMED", "Chỉ cặp đấu đã xác nhận mới được xếp vào cuộc đua."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "PREVIOUS_ROUND_NOT_COMPLETED")
+        {
+            return UnprocessableEntity(Err("PREVIOUS_ROUND_NOT_COMPLETED",
+                "The previous round has not been completed yet; allocation for this round is not open."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "PAIRING_NOT_QUALIFIED")
+        {
+            return UnprocessableEntity(Err("PAIRING_NOT_QUALIFIED",
+                "The pairing is not qualified (or also-eligible) from the previous round."));
         }
         catch (InvalidOperationException ex) when (ex.Message == "HORSE_NOT_APPROVED")
         {
@@ -170,6 +184,30 @@ public class SchedulingController : ControllerBase
         {
             return StatusCode(StatusCodes.Status403Forbidden,
                 Err("FORBIDDEN", "Bạn không có quyền rút đăng ký này."));
+        }
+    }
+
+    // SCH.5 (Admin) — Admin huy race entry thay mat Owner (dieu phoi khan cap).
+    // Dung lai WithdrawAsync voi isSystem:true de bo qua check quyen so huu Owner.
+    [HttpDelete("admin/race-entries/{id:int}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> AdminCancel(int id, [FromQuery] string? reason)
+    {
+        if (!TryGetUserId(out var adminId))
+            return UnauthorizedResult();
+
+        try
+        {
+            var dto = new WithdrawEntryDto
+            {
+                Reason = string.IsNullOrWhiteSpace(reason) ? "Cancelled by admin" : reason
+            };
+            var result = await _service.WithdrawAsync(adminId, id, dto, isSystem: true);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex) when (ex.Message == "ENTRY_NOT_FOUND")
+        {
+            return NotFound(Err("ENTRY_NOT_FOUND", "Race entry was not found."));
         }
     }
 

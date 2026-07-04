@@ -681,6 +681,7 @@ Draft → Open Registration → Closed Registration → Completed
 ```
 
 - Để chuyển sang `Open Registration`: bắt buộc phải có đủ 5 `prizeDistributions`.
+- Để chuyển sang `Closed Registration`: giải phải có **ít nhất 1 Round** và **ít nhất 1 Pairing `Confirmed`** — không áp minimum cứng theo gate capacity (REQ-F-SCH.7: không có ngưỡng tối thiểu). Sau khi đóng, Admin allocate race động theo số pairing thực tế; số race mỗi round điều chỉnh được, không cần chốt từ lúc tạo giải.
 - Để chuyển sang `Completed`: **mọi Race** thuộc giải phải đã ở `Official` hoặc `Cancelled` (TRN.8 AC#3) — nếu còn race chưa kết thúc → 400.
 - **Không nhận** `targetStatus` là trạng thái cấp Race (`Pre-Race`, `Live`, `In-Progress`, `Unofficial`, `Official`) → 400 (TRN.8 AC#2).
 - Không thể nhảy cóc, không thể lùi lại.

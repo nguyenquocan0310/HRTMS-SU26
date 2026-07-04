@@ -7,7 +7,7 @@ namespace HRTMS.API.Extensions;
 
 public static class ApplicationServiceExtensions
 {
- 
+
     public static IServiceCollection AddApplicationServices(
         this IServiceCollection services,
         IConfiguration configuration)
@@ -22,6 +22,8 @@ public static class ApplicationServiceExtensions
         services.AddScoped<ITournamentParticipantService, TournamentParticipantService>();
         services.AddScoped<ITokenBlacklistService, TokenBlacklistService>();
         services.AddScoped<IJockeyService, JockeyService>();
+        services.AddScoped<IRefereeService, RefereeService>();
+        services.AddScoped<IDoctorService, DoctorService>();
         services.AddScoped<IPairingService, PairingService>();
         services.AddScoped<IResultService, ResultService>();
         services.AddScoped<IHorseService, HorseService>();

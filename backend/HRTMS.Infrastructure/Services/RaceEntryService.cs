@@ -60,10 +60,34 @@ public class RaceEntryService : IRaceEntryService
             .FirstOrDefaultAsync(p => p.PairingId == dto.PairingId)
             ?? throw new KeyNotFoundException("PAIRING_NOT_FOUND");
 
+        // Pairing chi co gia tri trong pham vi giai cua no — chan allocate cheo giai.
+        if (pairing.TournamentId != race.Round.TournamentId)
+            throw new InvalidOperationException("PAIRING_TOURNAMENT_MISMATCH");
+
         // SRS SCH.1 — chi cap da Confirmed (jockey accept + owner confirm) moi duoc dua vao dua.
         // "Accepted" moi chi la jockey dong y, owner chua confirm -> chua du dieu kien.
         if (pairing.Status != "Confirmed")
             throw new InvalidOperationException("PAIRING_NOT_CONFIRMED");
+
+        // Progression: round dau allocate tu do tu confirmed pairings; tu round 2 tro di
+        // chi pairing da Qualified/AlsoEligible o round TRUOC (round truoc phai Completed).
+        var previousRound = await _context.Rounds
+            .Where(r => r.TournamentId == race.Round.TournamentId &&
+                        r.SequenceOrder < race.Round.SequenceOrder)
+            .OrderByDescending(r => r.SequenceOrder)
+            .FirstOrDefaultAsync();
+        if (previousRound != null)
+        {
+            if (previousRound.Status != "Completed")
+                throw new InvalidOperationException("PREVIOUS_ROUND_NOT_COMPLETED");
+
+            var isEligible = await _context.RaceEntries.AnyAsync(e =>
+                e.PairingId == pairing.PairingId &&
+                e.Race.RoundId == previousRound.RoundId &&
+                (e.AdvancementStatus == "Qualified" || e.AdvancementStatus == "AlsoEligible"));
+            if (!isEligible)
+                throw new InvalidOperationException("PAIRING_NOT_QUALIFIED");
+        }
 
         // Ngua phai da duoc Admin duyet.
         if (pairing.Horse.AdminApprovalStatus != "Approved")

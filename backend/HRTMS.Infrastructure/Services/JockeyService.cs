@@ -11,15 +11,16 @@ namespace HRTMS.Infrastructure.Services;
 public class JockeyService : IJockeyService
 {
     private readonly HRTMSDbContext _context;
+    private readonly INotificationService _notificationService;
 
-    public JockeyService(HRTMSDbContext context)
+    public JockeyService(HRTMSDbContext context, INotificationService notificationService)
     {
         _context = context;
+        _notificationService = notificationService;
     }
 
     public async Task<JockeyProfileDto?> GetProfileAsync(int jockeyId)
     {
-        // Lay thong tin profile cua Jockey theo JockeyId
         return await _context.JockeyProfiles
             .AsNoTracking()
             .Where(j => j.JockeyId == jockeyId)
@@ -44,7 +45,6 @@ public class JockeyService : IJockeyService
         int jockeyId,
         UpdateJockeyProfileDto dto)
     {
-        // Lay profile Jockey kem thong tin User
         var jockey = await _context.JockeyProfiles
             .Include(j => j.Jockey)
             .FirstOrDefaultAsync(j => j.JockeyId == jockeyId);
@@ -55,14 +55,13 @@ public class JockeyService : IJockeyService
         }
 
         var oldLicense = jockey.LicenseCertificate;
+        var oldStatus = jockey.Status;
         var licenseChanged = false;
 
-        // Chi cap nhat license khi client co gui gia tri moi
         if (!string.IsNullOrWhiteSpace(dto.LicenseCertificate))
         {
             var normalizedLicense = dto.LicenseCertificate.Trim();
 
-            // Kiem tra license da duoc Jockey khac su dung hay chua
             var licenseExists = await _context.JockeyProfiles
                 .AnyAsync(j =>
                     j.JockeyId != jockeyId &&
@@ -78,17 +77,21 @@ public class JockeyService : IJockeyService
             {
                 jockey.LicenseCertificate = normalizedLicense;
                 licenseChanged = true;
+
+                // License la credential duoc Admin duyet - doi license phai
+                // re-trigger approval, khong duoc giu nguyen Status cu (dong bo
+                // pattern HRS.6 cua Horse: sua field nhay cam -> ve Pending).
+                jockey.Status = "Pending";
+                jockey.RejectionReason = null;
             }
         }
 
-        // Cap nhat can nang tu khai neu co gui len
         if (dto.SelfDeclaredWeight.HasValue)
         {
             jockey.SelfDeclaredWeight =
                 dto.SelfDeclaredWeight.Value;
         }
 
-        // Cap nhat nhom mau neu co gui len
         if (dto.BloodType != null)
         {
             jockey.BloodType = string.IsNullOrWhiteSpace(dto.BloodType)
@@ -96,7 +99,6 @@ public class JockeyService : IJockeyService
                 : dto.BloodType.Trim();
         }
 
-        // Cap nhat tinh trang suc khoe neu co gui len
         if (dto.HealthStatus != null)
         {
             var validHealthStatuses = new[]
@@ -117,7 +119,6 @@ public class JockeyService : IJockeyService
 
         jockey.UpdatedAt = DateTime.UtcNow;
 
-        // Neu license thay doi thi ghi AuditLog
         if (licenseChanged)
         {
             _context.AuditLogs.Add(new AuditLog
@@ -128,12 +129,14 @@ public class JockeyService : IJockeyService
                 EntityId = jockeyId.ToString(),
                 OldValue = JsonSerializer.Serialize(new
                 {
-                    LicenseCertificate = oldLicense
+                    LicenseCertificate = oldLicense,
+                    Status = oldStatus
                 }),
                 NewValue = JsonSerializer.Serialize(new
                 {
                     LicenseCertificate =
-                        jockey.LicenseCertificate
+                        jockey.LicenseCertificate,
+                    jockey.Status
                 }),
                 CreatedAt = DateTime.UtcNow
             });
@@ -141,7 +144,18 @@ public class JockeyService : IJockeyService
 
         await _context.SaveChangesAsync();
 
-        // Tra ve profile sau khi cap nhat
+        if (licenseChanged)
+        {
+            await _notificationService.SendAsync(
+                jockeyId,
+                "Hồ sơ Jockey đang chờ duyệt lại",
+                "Bạn vừa cập nhật License Certificate. Hồ sơ của bạn sẽ tạm chuyển về " +
+                "trạng thái chờ duyệt (Pending) cho tới khi Admin xác nhận lại chứng chỉ mới.",
+                type: "Both",
+                relatedEntityType: "JockeyProfiles",
+                relatedEntityId: jockeyId);
+        }
+
         return new JockeyProfileDto
         {
             JockeyId = jockey.JockeyId,
@@ -183,13 +197,11 @@ public class JockeyService : IJockeyService
             throw new KeyNotFoundException("TOURNAMENT_NOT_FOUND");
         }
 
-        // Lay danh sach HorseId cua Owner dang dang nhap
         var ownerHorseIds = await _context.Horses
             .Where(h => h.OwnerId == ownerId)
             .Select(h => h.HorseId)
             .ToListAsync();
 
-        // Lay danh sach Jockey da co pending invite tu Owner nay
         var pendingJockeyIds = await _context.Pairings
             .Where(p =>
                 ownerHorseIds.Contains(p.HorseId) &&
@@ -197,7 +209,6 @@ public class JockeyService : IJockeyService
             .Select(p => p.JockeyId)
             .ToListAsync();
 
-        // Chi jockey co trong roster Approved cua giai moi duoc hien thi
         var rosterJockeyIds = await _context.TournamentParticipants
             .Where(p =>
                 p.TournamentId == tournamentId &&
@@ -246,7 +257,6 @@ public class JockeyService : IJockeyService
             int page,
             int pageSize)
     {
-        // Chuan hoa gia tri phan trang
         page = page < 1 ? 1 : page;
         pageSize = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
 
@@ -257,7 +267,6 @@ public class JockeyService : IJockeyService
             "Declined"
         };
 
-        // Kiem tra trang thai Pairing hop le
         if (!string.IsNullOrWhiteSpace(status) &&
             !validStatuses.Contains(status))
         {
@@ -265,7 +274,6 @@ public class JockeyService : IJockeyService
                 "INVALID_PAIRING_STATUS");
         }
 
-        // Lay danh sach loi moi cua Jockey dang dang nhap
         var query = _context.Pairings
             .AsNoTracking()
             .Where(p => p.JockeyId == jockeyId);
@@ -318,95 +326,91 @@ public class JockeyService : IJockeyService
         string? status,
         int page,
         int pageSize)
-{
-    // Chuan hoa gia tri phan trang
-    page = page < 1 ? 1 : page;
-    pageSize = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
-
-    var validStatuses = new[]
     {
+        page = page < 1 ? 1 : page;
+        pageSize = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
+
+        var validStatuses = new[]
+        {
         "Pending",
         "Confirmed",
         "Cancelled",
         "Disqualified"
     };
 
-    // Kiem tra trang thai RaceEntry hop le neu client co filter
-    if (!string.IsNullOrWhiteSpace(status) &&
-        !validStatuses.Contains(status))
-    {
-        throw new ArgumentException(
-            "INVALID_RACE_ENTRY_STATUS");
-    }
-
-    // Lay danh sach race entry cua Jockey dang dang nhap
-    // RaceEntries -> Pairings -> JockeyId = current user id
-    var query = _context.RaceEntries
-        .AsNoTracking()
-        .Where(re => re.Pairing.JockeyId == jockeyId);
-
-    if (!string.IsNullOrWhiteSpace(status))
-    {
-        query = query.Where(re => re.Status == status);
-    }
-
-    var total = await query.CountAsync();
-
-    var data = await query
-        .OrderByDescending(re => re.Race.ScheduledTime)
-        .ThenByDescending(re => re.RaceEntryId)
-        .Skip((page - 1) * pageSize)
-        .Take(pageSize)
-        .Select(re => new JockeyRaceEntryDto
+        if (!string.IsNullOrWhiteSpace(status) &&
+            !validStatuses.Contains(status))
         {
-            RaceEntryId = re.RaceEntryId,
-            RaceId = re.RaceId,
-            PairingId = re.PairingId,
+            throw new ArgumentException(
+                "INVALID_RACE_ENTRY_STATUS");
+        }
 
-            TournamentId = re.Race.Round.TournamentId,
-            TournamentName = re.Race.Round.Tournament.Name,
+        var query = _context.RaceEntries
+            .AsNoTracking()
+            .Where(re => re.Pairing.JockeyId == jockeyId);
 
-            RoundId = re.Race.RoundId,
-            RoundName = re.Race.Round.Name,
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            query = query.Where(re => re.Status == status);
+        }
 
-            RaceNumber = re.Race.RaceNumber,
-            ScheduledTime = re.Race.ScheduledTime,
-            RaceStatus = re.Race.Status,
-            EntryStatus = re.Status,
-            PostPosition = re.PostPosition,
+        var total = await query.CountAsync();
 
-            HorseId = re.Pairing.HorseId,
-            HorseName = re.Pairing.Horse.Name,
+        var data = await query
+            .OrderByDescending(re => re.Race.ScheduledTime)
+            .ThenByDescending(re => re.RaceEntryId)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(re => new JockeyRaceEntryDto
+            {
+                RaceEntryId = re.RaceEntryId,
+                RaceId = re.RaceId,
+                PairingId = re.PairingId,
 
-            OwnerId = re.Pairing.Horse.OwnerId,
-            OwnerName = re.Pairing.Horse.Owner.Owner.FullName,
+                TournamentId = re.Race.Round.TournamentId,
+                TournamentName = re.Race.Round.Tournament.Name,
 
-            PairingStatus = re.Pairing.Status,
+                RoundId = re.Race.RoundId,
+                RoundName = re.Race.Round.Name,
 
-            PreRaceJockeyWeight = re.PreRaceJockeyWeight,
-            HorseIdentityCheckStatus = re.HorseIdentityCheckStatus,
-            ClinicalStatus = re.ClinicalStatus,
-            IndependenceCheckStatus = re.IndependenceCheckStatus,
-            PostRaceJockeyWeight = re.PostRaceJockeyWeight,
+                RaceNumber = re.Race.RaceNumber,
+                ScheduledTime = re.Race.ScheduledTime,
+                RaceStatus = re.Race.Status,
+                EntryStatus = re.Status,
+                PostPosition = re.PostPosition,
 
-            FinishPosition = re.FinishPosition,
-            FinishTime = re.FinishTime,
-            PointsAwarded = re.PointsAwarded,
-            EarningsAwarded = re.EarningsAwarded,
+                HorseId = re.Pairing.HorseId,
+                HorseName = re.Pairing.Horse.Name,
 
-            EntryFeeStatus = re.EntryFeeStatus,
-            IsWithdrawn = re.IsWithdrawn,
-            CreatedAt = re.CreatedAt,
-            UpdatedAt = re.UpdatedAt
-        })
-        .ToListAsync();
+                OwnerId = re.Pairing.Horse.OwnerId,
+                OwnerName = re.Pairing.Horse.Owner.Owner.FullName,
 
-    return new PagedResult<JockeyRaceEntryDto>
-    {
-        Items = data,
-        Page = page,
-        PageSize = pageSize,
-        TotalCount = total
-    };
-}
+                PairingStatus = re.Pairing.Status,
+
+                PreRaceJockeyWeight = re.PreRaceJockeyWeight,
+                HorseIdentityCheckStatus = re.HorseIdentityCheckStatus,
+                ClinicalStatus = re.ClinicalStatus,
+                IndependenceCheckStatus = re.IndependenceCheckStatus,
+                PostRaceJockeyWeight = re.PostRaceJockeyWeight,
+
+                FinishPosition = re.FinishPosition,
+                FinishTime = re.FinishTime,
+                PointsAwarded = re.PointsAwarded,
+                EarningsAwarded = re.EarningsAwarded,
+
+                EntryFeeStatus = re.EntryFeeStatus,
+                IsWithdrawn = re.IsWithdrawn,
+                CreatedAt = re.CreatedAt,
+                UpdatedAt = re.UpdatedAt
+            })
+            .ToListAsync();
+
+        return new PagedResult<JockeyRaceEntryDto>
+        {
+            Items = data,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = total
+        };
+    }
 }

@@ -26,12 +26,15 @@ Body:
 }
 ```
 Errors: `404 RACE_NOT_FOUND` · `404 PAIRING_NOT_FOUND` · `409 RACE_ALREADY_DRAWN` ·
-`422 INVALID_RACE_STATE` · `422 PAIRING_NOT_CONFIRMED` · `422 HORSE_NOT_APPROVED` ·
+`422 INVALID_RACE_STATE` · `422 PAIRING_TOURNAMENT_MISMATCH` · `422 PAIRING_NOT_CONFIRMED` · `422 HORSE_NOT_APPROVED` ·
+`422 PREVIOUS_ROUND_NOT_COMPLETED` · `422 PAIRING_NOT_QUALIFIED` ·
 `422 JOCKEY_EXPERIENCE_TOO_LOW` (EC-21) ·
 `409 MAX_HORSES_REACHED` (EC-46) · `409 DUPLICATE_IN_RACE` (EC-40) ·
 `409 DOUBLE_BOOKED` (EC-15) · `422 INVALID_SCHEDULE` (EC-35).
 
 > `entryFeeStatus` được set tự động khi tạo: `Paid` nếu `Tournament.EntryFeeAmount == 0`, ngược lại `Unpaid`.
+
+> **Progression (round 2 trở đi):** round đầu allocate tự do từ pairing `Confirmed`; từ round sau, round trước phải `Completed` và pairing phải có entry round trước với `advancementStatus ∈ {Qualified, AlsoEligible}`. Xem mục "Progression" cuối file.
 
 > Sau khi allocate thành công, gửi Notification đến Owner **(in-app + email)**: `title = "Ngựa đã được xếp vào cuộc đua"`, nhắc xác nhận trước cut-off.
 
@@ -72,9 +75,38 @@ Errors: `404 ENTRY_NOT_FOUND` · `403 FORBIDDEN`.
 Idempotent (BR-36): gọi lại khi đã `Cancelled` → `alreadyWithdrawn=true`, không tác động phụ.
 Hành vi: `Cancelled` + `PostPosition=null` (Vacant) + Prediction `Pending→Refunded` + entry `Paid→Refund Pending` + URGENT cho Admin **(in-app + email)** + Notification cho Owner & Jockey **(in-app + email)** + AuditLog, tất cả trong 1 transaction.
 
+### 5b. Admin hủy entry (thay mặt Owner) — SCH.5
+`DELETE /api/admin/race-entries/{id}` · Role: **Admin** · lý do (tùy chọn) qua query: `?reason=...` (mặc định `Cancelled by admin`).
+
+`200 OK` → `WithdrawResultDto` (giống #5). Dùng lại `WithdrawAsync(isSystem:true)` để bỏ qua check quyền sở hữu Owner.
+Errors: `404 ENTRY_NOT_FOUND`.
+
 ---
 
 ## Tích hợp
 - **SCH.5 (auto-cancel) — ĐÃ WIRE:** `IRaceEntryService.AutoCancelOverdueAsync()` được đăng ký làm recurring job **Hangfire** qua `HangfireExtensions.UseHangfireRecurringJobs()` (gọi trong `Program.cs` sau `app.Build()`, lịch `*/15 * * * *` — BR-08).
 - **SCH.9 (freeze config) — ĐÃ WIRE:** `TournamentSevice.UpdateRace` gọi `IRaceEntryService.EnsureRaceConfigEditableAsync(raceId)` khi phát hiện thay đổi trường nhạy cảm (`ScheduledTime` / `RaceDistanceOverride` / `TrackTypeOverride`) → throw `RACE_CONFIG_FROZEN` nếu đã bốc thăm hoặc đã có Prediction. Trường không nhạy cảm (`PurseAmount`, cutoff…) vẫn sửa được sau khi đóng băng.
 - **Refund điểm thực tế (còn lại):** Module N (`VirtualPointsTransaction` + `Wallet`) — hiện chỉ đánh dấu Prediction = `Refunded`.
+
+---
+
+## Progression — Tournament/Round/Race (patch 002)
+
+Hệ thống **không có điểm số** — chỉ có tiền thưởng (`EarningsAwarded` từ purse). Progression dựa trên `FinishPosition` + earnings.
+
+**Cấu hình (Tournaments):**
+- `AdvancementRule`: `TopPerRace` (default/MVP) · `EarningsBased` · `Hybrid` (P1 — chưa auto-compute).
+- `AdvancementCount`: N của Top N mỗi race (default 5, khớp PrizeDistributions Top1–Top5).
+
+**Kết quả (RaceEntries)** — set tự động trong Declare Official (Module K), chỉ khi tournament còn round sau (chung kết không xét):
+- `AdvancementStatus`: `Qualified` (trong Top N) · `AlsoEligible` (đồng hạng vắt ranh Top N — Admin quyết định khi allocate; hoặc overflow) · `Eliminated` (ngoài Top N / Disqualified) · `NULL` (chưa xét / entry Cancelled / round chung kết).
+- `AdvancementRank`: MVP = `FinishPosition` trong race.
+- `AdvancementReason`: lý do phục vụ audit.
+
+**Round completion:** `Round.Status → 'Completed'` tự động khi mọi race trong round đã `Official`/`Cancelled` (trong transaction Declare Official).
+
+**Allocation round sau (SCH.1):** round trước phải `Completed`; pairing phải `Qualified`/`AlsoEligible` ở round trước. Round đầu: allocate tự do từ pairing `Confirmed`.
+
+**Overflow/split (quy ước vận hành, chưa có endpoint):** qualified > sức chứa (`MaxHorses`) → Admin allocate Top theo rank/earnings, phần dư giữ `AlsoEligible`; không chia đều → Admin tạo thêm race trong round (split), gợi ý chia cân bằng (vd 22 qualified, max 12 → 2 race × 11). Ít hơn sức chứa → race vẫn chạy (REQ-F-SCH.7). Consolation race: P2.
+
+**Dependency:** `FinishPosition` do Module Result/Race Officiating nhập & chốt (RaceReport → Declare Official). Progression chỉ chạy khi official result đã có finish positions — backend không tự bịa dữ liệu.

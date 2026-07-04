@@ -51,6 +51,13 @@ public partial class RaceEntry
 
     public decimal? EarningsAwarded { get; set; }
 
+    // Progression (patch 002): tính sau khi race Official; NULL = chưa xét.
+    public string? AdvancementStatus { get; set; }
+
+    public int? AdvancementRank { get; set; }
+
+    public string? AdvancementReason { get; set; }
+
     public string EntryFeeStatus { get; set; } = null!;
 
     public int? EntryFeeConfirmedBy { get; set; }

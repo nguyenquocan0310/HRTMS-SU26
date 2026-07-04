@@ -105,6 +105,33 @@ public class PairingService : IPairingService
             throw new InvalidOperationException(
                 "JOCKEY_NOT_APPROVED_IN_TOURNAMENT");
         }
+        // Kiem tra Jockey da co cap Accepted/Confirmed trong cung giai
+        // hoac trong tournament khac bi trung thoi gian voi giai hien tai hay chua
+        var overlappingTournamentIds = await _context.Tournaments
+            .AsNoTracking()
+            .Where(t =>
+                t.TournamentId == dto.TournamentId ||
+                (
+                    t.StartDate <= tournament.EndDate &&
+                    t.EndDate >= tournament.StartDate
+                ))
+            .Select(t => t.TournamentId)
+            .ToListAsync();
+
+        var jockeyAlreadyHasActivePairing = await _context.Pairings
+            .AsNoTracking()
+            .AnyAsync(p =>
+                p.JockeyId == dto.JockeyId &&
+                overlappingTournamentIds.Contains(p.TournamentId) &&
+                (
+                    p.Status == "Accepted" ||
+                    p.Status == "Confirmed"
+                ));
+
+        if (jockeyAlreadyHasActivePairing)
+        {
+            throw new InvalidOperationException("JOCKEY_ALREADY_HAS_ACTIVE_PAIRING");
+        }
 
         // Khong cho tao trung cung mot cap horse-jockey trong cung tournament
         // neu dang Pending, Accepted hoac Confirmed
@@ -158,6 +185,7 @@ public class PairingService : IPairingService
             Status = pairing.Status,
             CreatedAt = pairing.CreatedAt
         };
+
     }
 
     public async Task<PairingActionResponseDto> AcceptAsync(
@@ -503,6 +531,129 @@ public class PairingService : IPairingService
             Page = page,
             PageSize = pageSize,
             TotalCount = total
+        };
+    }
+
+    public async Task<PagedResult<AdminPairingDto>> GetAdminPairingsAsync(
+        int? tournamentId,
+        string? status,
+        bool unallocatedOnly,
+        int page,
+        int pageSize)
+    {
+        page = page < 1 ? 1 : page;
+        pageSize = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
+
+        // Mac dinh "Confirmed" — trang thai duy nhat duoc phep allocate (SCH.1).
+        var effectiveStatus = string.IsNullOrWhiteSpace(status) ? "Confirmed" : status;
+
+        var validStatuses = new[]
+        {
+            "Pending",
+            "Accepted",
+            "Declined",
+            "Confirmed",
+            "Cancelled"
+        };
+
+        if (!validStatuses.Contains(effectiveStatus))
+        {
+            throw new ArgumentException("INVALID_PAIRING_STATUS");
+        }
+
+        var query = _context.Pairings
+            .AsNoTracking()
+            .Where(p => p.Status == effectiveStatus);
+
+        if (tournamentId.HasValue)
+        {
+            query = query.Where(p => p.TournamentId == tournamentId.Value);
+        }
+
+        // Chi giu pairing CHUA co RaceEntry active (Pending/Confirmed) trong race CHUA ket thuc.
+        // Race da Official/Cancelled khong con "chiem cho" — pairing phai xuat hien lai
+        // de Admin allocate vao round ke tiep (multi-round).
+        if (unallocatedOnly)
+        {
+            query = query.Where(p =>
+                !p.RaceEntries.Any(re =>
+                    (re.Status == "Pending" || re.Status == "Confirmed") &&
+                    re.Race.Status != "Official" &&
+                    re.Race.Status != "Cancelled"));
+        }
+
+        var total = await query.CountAsync();
+
+        var data = await query
+            .OrderByDescending(p => p.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(p => new AdminPairingDto
+            {
+                PairingId = p.PairingId,
+                TournamentId = p.TournamentId,
+                TournamentName = p.Tournament.Name,
+                HorseId = p.HorseId,
+                HorseName = p.Horse.Name,
+                HorseBreed = p.Horse.Breed,
+                JockeyId = p.JockeyId,
+                JockeyName = p.Jockey.Jockey.FullName,
+                OwnerId = p.Horse.OwnerId,
+                OwnerName = p.Horse.Owner.Owner.FullName,
+                Status = p.Status,
+                IsAllocated = p.RaceEntries.Any(re =>
+                    (re.Status == "Pending" || re.Status == "Confirmed") &&
+                    re.Race.Status != "Official" &&
+                    re.Race.Status != "Cancelled"),
+                CreatedAt = p.CreatedAt
+            })
+            .ToListAsync();
+
+        return new PagedResult<AdminPairingDto>
+        {
+            Items = data,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = total
+        };
+    }
+
+    public async Task<PairingActionResponseDto> CancelAsync(
+    int ownerId,
+    int pairingId)
+    {
+        var pairing = await _context.Pairings
+            .Include(p => p.Horse)
+            .FirstOrDefaultAsync(p => p.PairingId == pairingId);
+
+        if (pairing == null)
+        {
+            throw new KeyNotFoundException("PAIRING_NOT_FOUND");
+        }
+
+        // Chi Owner cua ngua moi duoc cancel loi moi
+        if (pairing.Horse.OwnerId != ownerId)
+        {
+            throw new UnauthorizedAccessException("HORSE_NOT_OWNED");
+        }
+
+        // Chi cho cancel khi loi moi dang Pending hoac da Accepted nhung chua Confirmed
+        if (pairing.Status != "Pending" &&
+            pairing.Status != "Accepted")
+        {
+            throw new InvalidOperationException("INVALID_STATUS");
+        }
+
+        pairing.Status = "Cancelled";
+        pairing.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return new PairingActionResponseDto
+        {
+            PairingId = pairing.PairingId,
+            Status = pairing.Status,
+            Message = "Pairing invitation cancelled successfully."
         };
     }
 }
