@@ -155,6 +155,11 @@ namespace HRTMS.Infrastructure.Services
                 result.PursePayoutsCreatedCount = payoutsCreated;
                 result.RemainderAmount = remainder;
 
+                // BƯỚC 5b — Progression: đánh dấu Qualified/AlsoEligible/Eliminated
+                // theo AdvancementRule của giải, và tự chốt Round.Status = 'Completed'
+                // khi mọi race trong round đã Official/Cancelled.
+                await ApplyProgressionAsync(race, now);
+
                 // BƯỚC 6 — Ghi AuditLog
                 await _context.SaveChangesAsync(); // lưu trước để có RaceId/EntryId chắc chắn tồn tại cho log
 
@@ -178,6 +183,83 @@ namespace HRTMS.Infrastructure.Services
             {
                 await transaction.RollbackAsync();
                 throw;
+            }
+        }
+
+        // =====================================================================
+        // Helper: Bước 5b — Progression sau khi race Official
+        // =====================================================================
+        // Chỉ tính advancement khi tournament còn round SAU round hiện tại
+        // (chung kết không có "đi tiếp"). MVP hỗ trợ rule 'TopPerRace';
+        // 'EarningsBased'/'Hybrid' cần earnings toàn round nên xử lý ở bước sau
+        // (P1) — entry giữ AdvancementStatus = NULL cho tới khi có quyết định.
+        private async Task ApplyProgressionAsync(Race race, DateTime now)
+        {
+            var tournament = race.Round.Tournament;
+
+            var hasNextRound = await _context.Rounds.AnyAsync(r =>
+                r.TournamentId == tournament.TournamentId &&
+                r.SequenceOrder > race.Round.SequenceOrder);
+
+            if (hasNextRound && tournament.AdvancementRule == "TopPerRace")
+            {
+                var topN = tournament.AdvancementCount;
+
+                // Entry hợp lệ để xét: có FinishPosition, không Cancelled/Disqualified.
+                var finishers = race.RaceEntries
+                    .Where(re => re.Status != "Cancelled" &&
+                                 re.Status != "Disqualified" &&
+                                 re.FinishPosition != null)
+                    .ToList();
+
+                foreach (var entry in finishers)
+                {
+                    var pos = entry.FinishPosition!.Value;
+                    // Dead heat (BR-35): nhóm đồng hạng xét theo số entry đứng TRƯỚC nhóm.
+                    var ahead = finishers.Count(re => re.FinishPosition!.Value < pos);
+                    var tieSize = finishers.Count(re => re.FinishPosition!.Value == pos);
+
+                    entry.AdvancementRank = pos;
+                    if (ahead + tieSize <= topN)
+                    {
+                        entry.AdvancementStatus = "Qualified";
+                        entry.AdvancementReason = $"Top {topN} của cuộc đua (TopPerRace)";
+                    }
+                    else if (ahead < topN)
+                    {
+                        // Nhóm đồng hạng vắt qua ranh Top N — Admin quyết định khi
+                        // allocate round sau (AlsoEligible vẫn được phép allocate).
+                        entry.AdvancementStatus = "AlsoEligible";
+                        entry.AdvancementReason = $"Đồng hạng tại ranh Top {topN} — chờ Admin quyết định";
+                    }
+                    else
+                    {
+                        entry.AdvancementStatus = "Eliminated";
+                        entry.AdvancementReason = $"Ngoài Top {topN} của cuộc đua";
+                    }
+                    entry.UpdatedAt = now;
+                }
+
+                // Disqualified → loại thẳng; Cancelled/không chạy → giữ NULL (không xét).
+                foreach (var entry in race.RaceEntries.Where(re => re.Status == "Disqualified"))
+                {
+                    entry.AdvancementStatus = "Eliminated";
+                    entry.AdvancementReason = "Bị loại khỏi cuộc đua (Disqualified)";
+                    entry.UpdatedAt = now;
+                }
+            }
+
+            // Round completion: mọi race trong round đã Official/Cancelled → 'Completed'.
+            // Race hiện tại vừa set Official in-memory (DB còn 'Unofficial') nên loại nó khỏi query.
+            var hasUnfinishedSibling = await _context.Races.AnyAsync(r =>
+                r.RoundId == race.RoundId &&
+                r.RaceId != race.RaceId &&
+                r.Status != "Official" &&
+                r.Status != "Cancelled");
+            if (!hasUnfinishedSibling)
+            {
+                race.Round.Status = "Completed";
+                race.Round.UpdatedAt = now;
             }
         }
 
