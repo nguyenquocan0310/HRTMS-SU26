@@ -570,12 +570,16 @@ public class PairingService : IPairingService
             query = query.Where(p => p.TournamentId == tournamentId.Value);
         }
 
-        // Chi giu pairing CHUA co RaceEntry active (Pending/Confirmed) gan voi no.
+        // Chi giu pairing CHUA co RaceEntry active (Pending/Confirmed) trong race CHUA ket thuc.
+        // Race da Official/Cancelled khong con "chiem cho" — pairing phai xuat hien lai
+        // de Admin allocate vao round ke tiep (multi-round).
         if (unallocatedOnly)
         {
             query = query.Where(p =>
                 !p.RaceEntries.Any(re =>
-                    re.Status == "Pending" || re.Status == "Confirmed"));
+                    (re.Status == "Pending" || re.Status == "Confirmed") &&
+                    re.Race.Status != "Official" &&
+                    re.Race.Status != "Cancelled"));
         }
 
         var total = await query.CountAsync();
@@ -598,7 +602,9 @@ public class PairingService : IPairingService
                 OwnerName = p.Horse.Owner.Owner.FullName,
                 Status = p.Status,
                 IsAllocated = p.RaceEntries.Any(re =>
-                    re.Status == "Pending" || re.Status == "Confirmed"),
+                    (re.Status == "Pending" || re.Status == "Confirmed") &&
+                    re.Race.Status != "Official" &&
+                    re.Race.Status != "Cancelled"),
                 CreatedAt = p.CreatedAt
             })
             .ToListAsync();
