@@ -58,6 +58,16 @@ public class SchedulingController : ControllerBase
         {
             return UnprocessableEntity(Err("PAIRING_NOT_CONFIRMED", "Only confirmed pairings can be allocated."));
         }
+        catch (InvalidOperationException ex) when (ex.Message == "PREVIOUS_ROUND_NOT_COMPLETED")
+        {
+            return UnprocessableEntity(Err("PREVIOUS_ROUND_NOT_COMPLETED",
+                "The previous round has not been completed yet; allocation for this round is not open."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "PAIRING_NOT_QUALIFIED")
+        {
+            return UnprocessableEntity(Err("PAIRING_NOT_QUALIFIED",
+                "The pairing is not qualified (or also-eligible) from the previous round."));
+        }
         catch (InvalidOperationException ex) when (ex.Message == "HORSE_NOT_APPROVED")
         {
             return UnprocessableEntity(Err("HORSE_NOT_APPROVED", "The horse has not been approved."));
