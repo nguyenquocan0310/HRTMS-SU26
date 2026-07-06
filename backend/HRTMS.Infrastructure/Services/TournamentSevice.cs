@@ -20,6 +20,11 @@ namespace HRTMS.Infrastructure.Services
             ["Turf", "Dirt", "Synthetic"];
         private static readonly string[] ValidCategories =
             ["Open", "Classic", "Maiden"];
+        // Progression (patch 002) — khop CHK_Tournaments_AdvRule. Hien chi 'TopPerRace'
+        // duoc tinh tu dong khi Declare Official; 'EarningsBased'/'Hybrid' luu duoc nhung
+        // chua auto-compute (P1).
+        private static readonly string[] ValidAdvancementRules =
+            ["TopPerRace", "EarningsBased", "Hybrid"];
         private const int MinRaceDistanceMeters = 1200;
         private const int MaxRaceDistanceMeters = 2400;
         // TRN.8 — State machine cấp GIẢI một chiều: Draft → Open Registration → Closed Registration → Completed
@@ -132,6 +137,8 @@ namespace HRTMS.Infrastructure.Services
                 PreRaceWeightThresholdKg = t.PreRaceWeightThresholdKg,
                 PostRaceWeightDiffThresholdKg = t.PostRaceWeightDiffThresholdKg,
                 Status = t.Status,
+                AdvancementRule = t.AdvancementRule,
+                AdvancementCount = t.AdvancementCount,
                 CreatedAt = t.CreatedAt,
                 Rounds = t.Rounds.Select(r => new RoundResponseDto
                 {
@@ -175,6 +182,10 @@ namespace HRTMS.Infrastructure.Services
             if (!ValidCategories.Contains(dto.RaceCategory))
                 throw new ArgumentException($"Hạng đua không hợp lệ: {dto.RaceCategory}");
             ValidateRaceDistance(dto.RaceDistance, nameof(dto.RaceDistance));
+            if (dto.AdvancementRule != null && !ValidAdvancementRules.Contains(dto.AdvancementRule))
+                throw new ArgumentException($"Quy tắc đi tiếp không hợp lệ: {dto.AdvancementRule}");
+            if (dto.AdvancementCount.HasValue && dto.AdvancementCount.Value <= 0)
+                throw new ArgumentException("Số suất đi tiếp (AdvancementCount) phải lớn hơn 0");
 
             // 2. Validate date range and numeric constraints
             ValidateTournamentWindow(dto.StartDate, dto.EndDate);
@@ -203,6 +214,9 @@ namespace HRTMS.Infrastructure.Services
                 EntryFeeAmount = dto.EntryFeeAmount,
                 PreRaceWeightThresholdKg = dto.PreRaceWeightThresholdKg,
                 PostRaceWeightDiffThresholdKg = dto.PostRaceWeightDiffThresholdKg,
+                // Khong truyen -> giu default entity (TopPerRace / 5).
+                AdvancementRule = dto.AdvancementRule ?? "TopPerRace",
+                AdvancementCount = dto.AdvancementCount ?? 5,
                 Status = "Draft",
                 CreatedBy = createdByUserId,
                 CreatedAt = DateTime.UtcNow,
@@ -269,6 +283,24 @@ namespace HRTMS.Infrastructure.Services
                 throw new ArgumentException($"Hạng đua không hợp lệ: {dto.RaceCategory}");
             if (dto.RaceDistance.HasValue)
                 ValidateRaceDistance(dto.RaceDistance.Value, nameof(dto.RaceDistance));
+            if (dto.AdvancementRule != null && !ValidAdvancementRules.Contains(dto.AdvancementRule))
+                throw new ArgumentException($"Quy tắc đi tiếp không hợp lệ: {dto.AdvancementRule}");
+            if (dto.AdvancementCount.HasValue && dto.AdvancementCount.Value <= 0)
+                throw new ArgumentException("Số suất đi tiếp (AdvancementCount) phải lớn hơn 0");
+
+            // Progression config chỉ được sửa trước khi tính đi tiếp: chặn nếu giải đã có
+            // race Official (progression có thể đã chạy). Guard Status ở trên đã chặn sau
+            // Closed Registration; đây là guard bổ sung cho trường hợp race Official sớm.
+            var changingAdvancement = dto.AdvancementRule != null || dto.AdvancementCount.HasValue;
+            if (changingAdvancement)
+            {
+                var hasOfficialRace = tournament.Rounds
+                    .SelectMany(r => r.Races)
+                    .Any(race => race.Status == "Official");
+                if (hasOfficialRace)
+                    throw new InvalidOperationException(
+                        "Không thể sửa cấu hình đi tiếp khi giải đã có cuộc đua ở trạng thái Official");
+            }
 
             var mergedStartDate = dto.StartDate ?? tournament.StartDate;
             var mergedEndDate = dto.EndDate ?? tournament.EndDate;
@@ -303,6 +335,8 @@ namespace HRTMS.Infrastructure.Services
             if (dto.EntryFeeAmount.HasValue) tournament.EntryFeeAmount = dto.EntryFeeAmount.Value;
             if (dto.PreRaceWeightThresholdKg.HasValue) tournament.PreRaceWeightThresholdKg = dto.PreRaceWeightThresholdKg.Value;
             if (dto.PostRaceWeightDiffThresholdKg.HasValue) tournament.PostRaceWeightDiffThresholdKg = dto.PostRaceWeightDiffThresholdKg.Value;
+            if (dto.AdvancementRule != null) tournament.AdvancementRule = dto.AdvancementRule;
+            if (dto.AdvancementCount.HasValue) tournament.AdvancementCount = dto.AdvancementCount.Value;
 
             ValidateTournamentScheduleIntegrity(tournament);
 

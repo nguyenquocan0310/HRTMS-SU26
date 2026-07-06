@@ -110,6 +110,8 @@ POST /api/tournament
 | entryFeeAmount | decimal | ≥ 0, mặc định `0` (miễn phí) |
 | preRaceWeightThresholdKg | decimal | mặc định `2.0` kg |
 | postRaceWeightDiffThresholdKg | decimal | mặc định `1.0` kg |
+| advancementRule | string | tùy chọn; `TopPerRace` (default) / `EarningsBased` / `Hybrid`. Không truyền → `TopPerRace` |
+| advancementCount | int | tùy chọn, > 0; số suất đi tiếp mỗi race (Top N). Không truyền → default `5` |
 
 ---
 
@@ -118,6 +120,7 @@ POST /api/tournament
 - Tournament được tạo với `status = "Draft"`, `createdAt = UtcNow`.
 - `entryFeeAmount = 0`: toàn bộ luồng xác nhận phí bị bỏ qua, `RaceEntry.EntryFeeStatus` tự động `"Paid"`.
 - `prizeDistributions` **không** được gửi trong request này — cấu hình riêng ở endpoint 2.
+- `advancementRule`/`advancementCount`: cấu hình rule đi tiếp chung cho giải. Chỉ `TopPerRace` được tính tự động khi Declare Official (Module J đọc `Tournament.AdvancementCount` để xét Top N); `EarningsBased`/`Hybrid` lưu được nhưng chưa auto-compute (P1). Rule không hợp lệ → 400; `advancementCount <= 0` → 400.
 
 ---
 
@@ -145,6 +148,8 @@ POST /api/tournament
     "preRaceWeightThresholdKg":      2.0,
     "postRaceWeightDiffThresholdKg": 1.0,
     "status":                        "Draft",
+    "advancementRule":               "TopPerRace",
+    "advancementCount":              5,
     "createdAt":                     "2026-06-15T07:57:57Z",
     "rounds":                        [],
     "prizeDistributions":            []
@@ -625,6 +630,7 @@ Chỉ gửi các trường cần cập nhật (partial update).
 
 - Chỉ được cập nhật khi `status ∈ {Draft, Open Registration}`.
 - Không cho sửa khi `status ∈ {Closed Registration, Completed, Cancelled}`.
+- Cho phép sửa `advancementRule`/`advancementCount` (partial). Riêng cấu hình đi tiếp còn bị chặn thêm nếu giải đã có bất kỳ cuộc đua nào `Official` (progression có thể đã tính) → 400. Rule không hợp lệ hoặc `advancementCount <= 0` → 400.
 
 ---
 

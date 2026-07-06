@@ -41,7 +41,13 @@ namespace HRTMS.Core.DTOs.Tournament
         [Range(0, double.MaxValue)]
         public decimal EntryFeeAmount { get; set; } = 0;
         // TRN.5 - nguong can nang
-        public decimal PreRaceWeightThresholdKg { get; set; } = 2.0m; 
+        public decimal PreRaceWeightThresholdKg { get; set; } = 2.0m;
         public decimal PostRaceWeightDiffThresholdKg { get; set; } = 1.0m;
+
+        // Progression (patch 002) - rule di tiep chung cho giai.
+        // Khong truyen -> dung default entity: AdvancementRule="TopPerRace", AdvancementCount=5.
+        public string? AdvancementRule { get; set; }
+        [Range(1, int.MaxValue, ErrorMessage = "AdvancementCount must be greater than 0")]
+        public int? AdvancementCount { get; set; }
     }
 }

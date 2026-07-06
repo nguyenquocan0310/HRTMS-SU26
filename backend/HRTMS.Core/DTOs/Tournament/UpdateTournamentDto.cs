@@ -26,5 +26,10 @@ namespace HRTMS.Core.DTOs.Tournament
         public decimal? EntryFeeAmount { get; set; }
         public decimal? PreRaceWeightThresholdKg { get; set; }
         public decimal? PostRaceWeightDiffThresholdKg { get; set; }
+
+        // Progression (patch 002) - chi cho sua truoc khi Closed Registration / truoc race Official.
+        public string? AdvancementRule { get; set; }
+        [Range(1, int.MaxValue, ErrorMessage = "AdvancementCount must be greater than 0")]
+        public int? AdvancementCount { get; set; }
     }
 }
