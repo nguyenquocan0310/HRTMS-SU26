@@ -31,6 +31,9 @@ namespace HRTMS.Core.DTOs.Tournament
         public decimal PreRaceWeightThresholdKg { get; set; }
         public decimal PostRaceWeightDiffThresholdKg { get; set; }
         public string Status { get; set; } = string.Empty;
+        // Progression (patch 002)
+        public string AdvancementRule { get; set; } = "TopPerRace";
+        public int AdvancementCount { get; set; } = 5;
         public DateTime CreatedAt { get; set; }
         public List<RoundResponseDto> Rounds { get; set; } = new();
         public List<PrizeDistributionResponseDto> PrizeDistributions { get; set; } = new();
