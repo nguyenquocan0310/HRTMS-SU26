@@ -303,13 +303,20 @@ const handleConfirmAction = async () => {
           onCancel={() => setPendingAction(null)}
         />
       )}
-      {detailUser && (
-        <UserDetailModal
-          userId={detailUser.id}
-          role={detailUser.role}
-          onClose={() => setDetailUser(null)}
-        />
-      )}
+{detailUser && (
+  <UserDetailModal
+    userId={detailUser.id}
+    role={detailUser.role}
+    basicInfo={{
+      username: detailUser.username,
+      email: detailUser.email,
+      role: ROLE_LABELS[detailUser.role] ?? detailUser.role,
+      status: detailUser.status,
+      joinedDate: detailUser.joinedDate,
+    }}
+    onClose={() => setDetailUser(null)}
+  />
+)}
     </div>
   );
 };

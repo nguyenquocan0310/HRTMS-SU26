@@ -13,21 +13,22 @@ const DETAIL_ENDPOINT: Record<string, string> = {
 interface Props {
   userId: string;
   role: string;
+  basicInfo: Record<string, string>;
   onClose: () => void;
 }
 
-const UserDetailModal = ({ userId, role, onClose }: Props) => {
+const UserDetailModal = ({ userId, role, basicInfo, onClose }: Props) => {
   const [detail, setDetail] = useState<Record<string, any> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [detailFailed, setDetailFailed] = useState(false);
   const [previewFile, setPreviewFile] = useState<string | null>(null);
 
   useEffect(() => {
     const endpoint = DETAIL_ENDPOINT[role];
     if (!endpoint) { setLoading(false); return; }
-    // TODO: đổi path nếu BE dùng route khác, ví dụ `${endpoint}/${userId}/detail`
     apiFetch<{ success: boolean; data: Record<string, any> }>(`${endpoint}/${userId}`)
       .then((res) => setDetail(res.data ?? null))
-      .catch((err) => console.error('Failed to fetch detail:', err))
+      .catch(() => setDetailFailed(true))
       .finally(() => setLoading(false));
   }, [userId, role]);
 
@@ -39,8 +40,24 @@ const UserDetailModal = ({ userId, role, onClose }: Props) => {
           <button onClick={onClose} style={{ border: 'none', background: 'transparent', fontSize: 20, cursor: 'pointer' }}>×</button>
         </div>
 
-        {loading && <p>Đang tải...</p>}
-        {!loading && !detail && <p>Không thể tải thông tin chi tiết.</p>}
+        {/* Thông tin cơ bản — luôn hiển thị, không phụ thuộc API */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+          {Object.entries(basicInfo).map(([key, val]) => (
+            <div key={key} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+              <span style={{ color: '#666', fontSize: 13 }}>{key}</span>
+              <span style={{ fontSize: 13 }}>{val}</span>
+            </div>
+          ))}
+        </div>
+
+        <hr style={{ margin: '12px 0', border: 'none', borderTop: '1px solid #eee' }} />
+
+        {loading && <p style={{ fontSize: 13, color: '#999' }}>Đang tải thông tin chi tiết...</p>}
+        {!loading && detailFailed && (
+          <p style={{ fontSize: 13, color: '#999' }}>
+            Thông tin hồ sơ chi tiết (CCCD, chứng chỉ...) chưa sẵn sàng — cần backend hoàn thiện endpoint chi tiết.
+          </p>
+        )}
 
         {!loading && detail && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
