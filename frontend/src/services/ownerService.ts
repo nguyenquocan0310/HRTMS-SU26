@@ -257,7 +257,6 @@ interface ApiResponse<T> {
 }
 
 export interface HorseCreatePayload {
-  tournamentId: number;
   name: string;
   birthYear: number;
   gender: string;
@@ -281,9 +280,9 @@ export interface HorseCreateResponse {
   color: string;
   weight: number;
   identifyingMarks: string;
-  screeningStatus: 'AutoEligible' | 'ManualReview' | 'AutoRejected' | string;
-  screeningReason: string | null;
-  adminApprovalStatus: string | null;
+  screeningStatus?: 'AutoEligible' | 'ManualReview' | 'AutoRejected' | string;
+  screeningReason?: string | null;
+  adminApprovalStatus?: string | null;
   enrollmentId?: number;
   tournamentId?: number;
   tournamentName?: string | null;
@@ -306,55 +305,46 @@ export interface HorseEnrollmentResponse {
 }
 
 /**
- * Schema v3: tạo hồ sơ ngựa vào kho trước, sau đó enroll vào giải để screening theo giải.
+ * POST /api/horses/{horseId}/enrollments
+ * Đưa một hồ sơ ngựa đã có trong kho vào một giải cụ thể để backend screening theo giải.
  */
-export const createHorseWithTournament = async (
+export const enrollHorseToTournament = async (
+  horseId: number | string,
+  tournamentId: number
+): Promise<HorseEnrollmentResponse> => {
+  const res = await apiFetch<ApiResponse<HorseEnrollmentResponse>>(
+    `/horses/${horseId}/enrollments`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ tournamentId }),
+    }
+  );
+
+  if (!res.success || !res.data) {
+    throw new Error(res.message || 'Đăng ký ngựa vào giải thất bại.');
+  }
+
+  return res.data;
+};
+
+/**
+ * POST /api/horses
+ * Chỉ tạo hồ sơ ngựa trong kho/stable, không gắn giải.
+ */
+export const createHorseProfile = async (
   payload: HorseCreatePayload
 ): Promise<HorseCreateResponse> => {
-  const { tournamentId, ...horsePayload } = payload;
-
   const horseRes = await apiFetch<ApiResponse<HorseCreateResponse>>('/horses', {
     method: 'POST',
-    body: JSON.stringify(horsePayload),
+    body: JSON.stringify(payload),
   });
 
   if (!horseRes.success || !horseRes.data) {
     throw new Error(horseRes.message || 'Tạo hồ sơ ngựa thất bại.');
   }
 
-  let enrollmentRes: ApiResponse<HorseEnrollmentResponse>;
-  try {
-    enrollmentRes = await apiFetch<ApiResponse<HorseEnrollmentResponse>>(
-      `/horses/${horseRes.data.horseId}/enrollments`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ tournamentId }),
-      }
-    );
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Đẩy ngựa vào giải thất bại.';
-    throw new Error(`Tạo hồ sơ ngựa thành công nhưng đẩy ngựa vào giải thất bại: ${message}`);
-  }
-
-  if (!enrollmentRes.success || !enrollmentRes.data) {
-    throw new Error(
-      `Tạo hồ sơ ngựa thành công nhưng đẩy ngựa vào giải thất bại: ${enrollmentRes.message || 'Không có dữ liệu enrollment.'}`
-    );
-  }
-
-  const enrollment = enrollmentRes.data;
-  return {
-    ...horseRes.data,
-    screeningStatus: enrollment.screeningStatus,
-    screeningReason: enrollment.screeningReason,
-    adminApprovalStatus: enrollment.adminApprovalStatus,
-    enrollmentId: enrollment.enrollmentId,
-    tournamentId: enrollment.tournamentId,
-    tournamentName: enrollment.tournamentName,
-    enrollmentStatus: enrollment.status,
-  };
+  return horseRes.data;
 };
-
 /**
  * PATCH /api/race-entries/{id}/confirm
  */
@@ -380,3 +370,5 @@ export const withdrawRaceEntry = async (id: number, reason: string): Promise<any
   if (!res.success) throw new Error(res.message || 'Rút lui thất bại.');
   return res.data;
 };
+
+
