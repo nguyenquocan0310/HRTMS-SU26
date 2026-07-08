@@ -1,6 +1,7 @@
 import { RegRole } from '../../../types/role.types';
 import { type RegisterFormData } from '../../../types/auth.types';
 import styles from './StepVerification.module.scss';
+import CertificateUpload from '../../../components/common/CertificateUpload';
 
 interface Props {
   role: RegRole | null;
@@ -151,23 +152,17 @@ const StepVerification = ({ role, formData, onChange }: Props) => {
               }
             />
           </div>
-          <div className={styles.field}>
-            <label className={styles.label}>License Certificate</label>
-            <input
-              type="text"
-              className={styles.input}
-              placeholder="Enter license certificate number"
-              value={formData.jockeyVerification.licenseCertificate}
-              onChange={(e) =>
-                onChange({
-                  jockeyVerification: {
-                    ...formData.jockeyVerification,
-                    licenseCertificate: e.target.value,
-                  },
-                })
-              }
-            />
-          </div>
+<div className={styles.field}>
+  <label className={styles.label}>License Certificate (ảnh/PDF)</label>
+  <CertificateUpload
+    value={formData.jockeyVerification.licenseCertificate}
+    onChange={(url) =>
+      onChange({
+        jockeyVerification: { ...formData.jockeyVerification, licenseCertificate: url },
+      })
+    }
+  />
+</div>
           <div className={styles.field}>
             <label className={styles.label}>Experience Years</label>
             <input

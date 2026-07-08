@@ -200,3 +200,20 @@ export const getMyJockeyRaceEntries = async (
 };
 
 
+/**
+ * Upload chứng chỉ hành nghề (ảnh/pdf).
+ * TODO: BE chưa có endpoint — hiện tạm dùng blob URL local để preview.
+ * Khi BE xong, thay thân hàm bằng:
+ *
+ * const form = new FormData();
+ * form.append('file', file);
+ * const res = await axiosInstance.post('/jockeys/certificate/upload', form, {
+ *   headers: { 'Content-Type': 'multipart/form-data' },
+ * });
+ * return { url: res.data.url, fileName: file.name };
+ */
+export const uploadCertificateFile = async (
+  file: File
+): Promise<{ url: string; fileName: string }> => {
+  return { url: URL.createObjectURL(file), fileName: file.name };
+};
