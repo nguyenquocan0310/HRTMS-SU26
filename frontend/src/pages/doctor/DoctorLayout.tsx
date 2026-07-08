@@ -1,97 +1,153 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { apiFetch } from '../../services/apiClient'
+import { logout } from '../../services/authService'
 import useAuthStore from '../../store/authStore'
 
-export default function DoctorLayout() {
-  const clearAuth = useAuthStore((state) => state.clearAuth)
-  const navigate = useNavigate()
+interface DoctorProfile {
+  userId: number
+  username: string
+  fullName: string
+  email: string
+  role: string
+  status: string
+}
 
-  const handleLogout = () => {
-    clearAuth()
-    navigate('/login')
+interface ProfileApiResponse {
+  success: boolean
+  message: string
+  data: DoctorProfile | null
+}
+
+const navItems = [
+  { to: '/doctor', label: 'Tổng quan', end: true },
+  { to: '/doctor/tournaments', label: 'Đăng ký giải đấu', end: false },
+  { to: '/doctor/paddock', label: 'Bảng điều khiển Paddock', end: false },
+  { to: '/doctor/coi', label: 'Khai báo COI', end: false },
+]
+
+export default function DoctorLayout() {
+  const [profile, setProfile] = useState<DoctorProfile | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const location = useLocation()
+  const navigate = useNavigate()
+  const clearAuth = useAuthStore((state) => state.clearAuth)
+
+  useEffect(() => {
+    apiFetch<ProfileApiResponse>('/auth/profile')
+      .then((res) => {
+        if (res.success && res.data) setProfile(res.data)
+      })
+      .catch(() => {
+        // Sidebar vẫn render navigation nếu profile không tải được.
+      })
+      .finally(() => setLoading(false))
+  }, [])
+
+  const currentNav = navItems.find((item) => {
+    if (item.end) return location.pathname === item.to
+    return location.pathname.startsWith(item.to)
+  })
+  const pageTitle = currentNav?.label ?? 'Tổng quan'
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return
+    setIsLoggingOut(true)
+
+    try {
+      await logout()
+    } finally {
+      clearAuth()
+      localStorage.removeItem('token')
+      sessionStorage.removeItem('token')
+      sessionStorage.removeItem('authReason')
+      navigate('/login', { replace: true })
+    }
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50 text-gray-900 font-sans">
-      {/* Sidebar cố định bên trái */}
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col fixed h-screen z-10">
-        {/* Header của Sidebar */}
-        <div className="p-6 border-b border-gray-100">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🏥</span>
-            <div>
-              <h2 className="font-bold text-lg text-gray-800 leading-tight">Bác sĩ thú y</h2>
-              <p className="text-xs text-gray-500 font-medium mt-0.5">Hệ thống Y tế & Sức khỏe</p>
-            </div>
-          </div>
+    <div className="flex min-h-screen bg-gray-50">
+      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col flex-shrink-0">
+        <div className="px-5 py-4 border-b border-gray-100">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">HRTMS</p>
+          <p className="text-sm font-bold text-gray-800 mt-0.5">Cổng bác sĩ thú y</p>
         </div>
 
-        {/* Các liên kết Navigation */}
-        <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
-          <NavLink
-            to="/doctor"
-            end
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive
-                  ? 'bg-emerald-100 text-emerald-700 font-semibold shadow-sm shadow-emerald-100/50'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-950'
-              }`
-            }
-          >
-            <span className="text-lg">📊</span>
-            <span>Tổng quan</span>
-          </NavLink>
+        <div className="px-4 py-4 border-b border-gray-100">
+          {loading ? (
+            <div className="space-y-1.5 animate-pulse">
+              <div className="h-3.5 bg-gray-200 rounded w-3/4" />
+              <div className="h-3 bg-gray-100 rounded w-1/2" />
+            </div>
+          ) : profile ? (
+            <div>
+              <p className="text-sm font-semibold text-gray-800 truncate">{profile.fullName}</p>
+              <p className="text-xs text-gray-400 truncate mt-0.5">{profile.email}</p>
+              <div className="mt-2 flex items-center gap-1.5">
+                <span className="inline-flex px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 rounded border border-blue-100">
+                  Bác sĩ thú y
+                </span>
+                {profile.status && (
+                  <span className="inline-flex px-2 py-0.5 text-xs font-medium bg-green-50 text-green-700 rounded border border-green-100">
+                    {profile.status}
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-red-500">Không tải được thông tin</p>
+          )}
+        </div>
 
-          <NavLink
-            to="/doctor/tournaments"
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive
-                  ? 'bg-emerald-100 text-emerald-700 font-semibold shadow-sm shadow-emerald-100/50'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-950'
-              }`
-            }
-          >
-            <span className="text-lg">🏆</span>
-            <span>Đăng ký giải đấu</span>
-          </NavLink>
-
-          <NavLink
-            to="/doctor/paddock"
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive
-                  ? 'bg-emerald-100 text-emerald-700 font-semibold shadow-sm shadow-emerald-100/50'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-950'
-              }`
-            }
-          >
-            <span className="text-lg">⏱️</span>
-            <span>Bảng điều khiển Paddock</span>
-          </NavLink>
+        <nav className="flex-1 py-3 overflow-y-auto">
+          <p className="px-5 pt-2 pb-1.5 text-xs font-semibold text-gray-400 uppercase tracking-widest">
+            Quản lý
+          </p>
+          <ul className="space-y-0.5 px-2">
+            {navItems.map((item) => (
+              <li key={item.to}>
+                <NavLink
+                  to={item.to}
+                  end={item.end}
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-sm rounded-md transition-colors ${
+                      isActive
+                        ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600 rounded-l-none pl-[10px]'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium border-l-2 border-transparent rounded-l-none pl-[10px]'
+                    }`
+                  }
+                >
+                  {item.label}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
         </nav>
 
-        {/* Nút Đăng xuất ở chân Sidebar */}
-        <div className="p-4 border-t border-gray-100">
+        <div className="px-4 py-3 border-t border-gray-100 space-y-2">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-red-200"
+            disabled={isLoggingOut}
+            className="w-full px-3 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-md hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <span className="text-lg">🚪</span>
-            <span>Đăng xuất</span>
+            {isLoggingOut ? 'Đang đăng xuất...' : 'Đăng xuất'}
           </button>
+          <p className="text-xs text-gray-400 text-center">Horse Racing TMS &copy; 2026</p>
         </div>
       </aside>
 
-      {/* Vùng nội dung chính bên phải */}
-      <div className="flex-1 pl-64 flex flex-col min-h-screen">
-        <main className="flex-grow p-6">
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-2 flex-shrink-0">
+          <span className="text-xs text-gray-400">Bác sĩ thú y</span>
+          <span className="text-xs text-gray-300">/</span>
+          <span className="text-xs font-semibold text-gray-700">{pageTitle}</span>
+        </header>
+
+        <main className="flex-1 overflow-auto p-6">
           <Outlet />
         </main>
       </div>
     </div>
   )
 }
-
-
-

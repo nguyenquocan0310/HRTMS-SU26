@@ -20,19 +20,19 @@ const TOURNAMENT_STATUS_CONFIG: Record<string, { label: string; bg: string; text
 
 // ─── Participation status config (Doctor sau khi đăng ký) ────────────────────
 const REG_STATUS: Record<string, { label: string; cls: string }> = {
-  Pending:      { label: '⏳ Đang chờ duyệt', cls: 'bg-yellow-50 border-yellow-300 text-yellow-700 cursor-not-allowed' },
-  ManualReview: { label: '⏳ Đang chờ duyệt', cls: 'bg-yellow-50 border-yellow-300 text-yellow-700 cursor-not-allowed' },
-  Approved:     { label: '✅ Đã được duyệt',  cls: 'bg-emerald-50 border-emerald-300 text-emerald-700 cursor-not-allowed' },
-  AutoEligible: { label: '✅ Đã được duyệt',  cls: 'bg-emerald-50 border-emerald-300 text-emerald-700 cursor-not-allowed' },
-  Rejected:     { label: '❌ Bị từ chối',     cls: 'bg-red-50 border-red-300 text-red-700 cursor-not-allowed' },
-  AutoRejected: { label: '❌ Bị từ chối',     cls: 'bg-red-50 border-red-300 text-red-700 cursor-not-allowed' },
+  Pending:      { label: 'Đang chờ duyệt', cls: 'bg-yellow-50 border-yellow-300 text-yellow-700 cursor-not-allowed' },
+  ManualReview: { label: 'Đang chờ duyệt', cls: 'bg-yellow-50 border-yellow-300 text-yellow-700 cursor-not-allowed' },
+  Approved:     { label: 'Đã được duyệt',  cls: 'bg-emerald-50 border-emerald-300 text-emerald-700 cursor-not-allowed' },
+  AutoEligible: { label: 'Đã được duyệt',  cls: 'bg-emerald-50 border-emerald-300 text-emerald-700 cursor-not-allowed' },
+  Rejected:     { label: 'Bị từ chối',     cls: 'bg-red-50 border-red-300 text-red-700 cursor-not-allowed' },
+  AutoRejected: { label: 'Bị từ chối',     cls: 'bg-red-50 border-red-300 text-red-700 cursor-not-allowed' },
 }
 
 /** Trả về config cho bất kỳ participation status nào — fallback an toàn, không bao giờ undefined. */
 function getRegStatusCfg(status: string): { label: string; cls: string } {
   return (
     REG_STATUS[status] ?? {
-      label: `ℹ️ ${status}`,
+      label: status,
       cls: 'bg-gray-50 border-gray-300 text-gray-700 cursor-not-allowed',
     }
   )
@@ -51,8 +51,7 @@ function TournamentStatusBadge({ status }: { status: string }) {
     dot: 'bg-gray-400',
   }
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${cfg.bg} ${cfg.text}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${cfg.bg} ${cfg.text}`}>
       {cfg.label}
     </span>
   )
@@ -69,14 +68,14 @@ function formatCurrency(n: number): string {
 // ─── Skeleton Loading ─────────────────────────────────────────────────────────
 function SkeletonCard() {
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-5 animate-pulse">
+    <div className="bg-white border border-gray-100 rounded-lg p-5 animate-pulse">
       <div className="flex justify-between items-start mb-3">
         <div className="h-5 bg-gray-200 rounded w-2/3" />
         <div className="h-5 bg-gray-100 rounded-full w-20" />
       </div>
       <div className="h-3 bg-gray-100 rounded w-1/2 mb-4" />
       <div className="grid grid-cols-2 gap-2 mb-4">
-        {[...Array(4)].map((_, i) => <div key={i} className="h-12 bg-gray-100 rounded-xl" />)}
+        {[...Array(4)].map((_, i) => <div key={i} className="h-12 bg-gray-100 rounded-lg" />)}
       </div>
       <div className="h-9 bg-gray-100 rounded-lg" />
     </div>
@@ -120,21 +119,21 @@ function TournamentDetailModal({ tournament, participation, onClose, onRegister 
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-gray-100"
+        className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-gray-100"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal header */}
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-start justify-between rounded-t-2xl">
+        <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-start justify-between rounded-t-lg">
           <div>
             <p className="text-xs text-gray-400 font-semibold uppercase tracking-widest mb-0.5">Chi tiết giải đấu</p>
             <h2 className="text-base font-bold text-gray-900 leading-tight">{tournament.name}</h2>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-xl leading-none font-light ml-4 mt-0.5 p-1 rounded hover:bg-gray-100 transition-colors"
+            className="text-xs font-semibold text-gray-500 hover:text-gray-700 ml-4 mt-0.5 px-2 py-1 rounded hover:bg-gray-100 transition-colors"
             aria-label="Đóng"
           >
-            ×
+            Đóng
           </button>
         </div>
 
@@ -149,7 +148,7 @@ function TournamentDetailModal({ tournament, participation, onClose, onRegister 
 
           {/* Description */}
           {tournament.description && (
-            <p className="text-sm text-gray-600 leading-relaxed bg-gray-50 rounded-xl p-3 border border-gray-100">
+            <p className="text-sm text-gray-600 leading-relaxed bg-gray-50 rounded-lg p-3 border border-gray-100">
               {tournament.description}
             </p>
           )}
@@ -166,7 +165,7 @@ function TournamentDetailModal({ tournament, participation, onClose, onRegister 
               { label: 'Tổng giải thưởng',      value: formatCurrency(tournament.purseAmount) },
               { label: 'Phí tham dự',           value: formatCurrency(tournament.entryFeeAmount) },
             ].map(({ label, value }) => (
-              <div key={label} className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100">
+              <div key={label} className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100">
                 <p className="text-xs text-gray-400 mb-0.5">{label}</p>
                 <p className="text-sm font-semibold text-gray-800">{value}</p>
               </div>
@@ -181,7 +180,7 @@ function TournamentDetailModal({ tournament, participation, onClose, onRegister 
               </p>
               <div className="space-y-1.5">
                 {tournament.rounds.map((round) => (
-                  <div key={round.roundId} className="flex items-center justify-between border border-gray-100 rounded-xl px-3 py-2.5 bg-gray-50">
+                  <div key={round.roundId} className="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2.5 bg-gray-50">
                     <div>
                       <p className="text-sm font-medium text-gray-800">{round.name}</p>
                       <p className="text-xs text-gray-400 mt-0.5">
@@ -205,7 +204,7 @@ function TournamentDetailModal({ tournament, participation, onClose, onRegister 
                 {tournament.prizeDistributions
                   .sort((a, b) => a.position - b.position)
                   .map((prize) => (
-                    <div key={prize.position} className="bg-yellow-50 border border-yellow-100 rounded-xl px-4 py-2 text-center min-w-[72px]">
+                    <div key={prize.position} className="bg-yellow-50 border border-yellow-100 rounded-lg px-4 py-2 text-center min-w-[72px]">
                       <p className="text-yellow-700 font-bold text-sm">#{prize.position}</p>
                       <p className="text-yellow-600 text-xs font-medium">{prize.percentage}%</p>
                     </div>
@@ -217,12 +216,12 @@ function TournamentDetailModal({ tournament, participation, onClose, onRegister 
           {/* ─── Khu vực đăng ký ─── */}
           <div className="border-t border-gray-100 pt-4 space-y-3">
             {successMsg && (
-              <div className="px-3 py-2.5 rounded-xl text-sm font-medium border bg-emerald-50 text-emerald-700 border-emerald-200 flex items-center gap-2">
-                <span>✓</span> {successMsg}
+              <div className="px-3 py-2.5 rounded-lg text-sm font-medium border bg-emerald-50 text-emerald-700 border-emerald-200 flex items-center gap-2">
+                {successMsg}
               </div>
             )}
             {errorMsg && (
-              <div className="px-3 py-2.5 rounded-xl text-sm font-medium border bg-red-50 text-red-700 border-red-200">
+              <div className="px-3 py-2.5 rounded-lg text-sm font-medium border bg-red-50 text-red-700 border-red-200">
                 {errorMsg}
               </div>
             )}
@@ -231,18 +230,18 @@ function TournamentDetailModal({ tournament, participation, onClose, onRegister 
               <div className="space-y-2">
                 <button
                   disabled
-                  className={`w-full flex items-center justify-center gap-2 border font-semibold py-2.5 rounded-xl text-sm ${getRegStatusCfg(partStatus).cls}`}
+                  className={`w-full flex items-center justify-center gap-2 border font-semibold py-2.5 rounded-md text-sm ${getRegStatusCfg(partStatus).cls}`}
                 >
                   {getRegStatusCfg(partStatus).label}
                 </button>
                 {participation?.screeningReason && (
-                  <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                  <p className="text-xs text-gray-500 bg-gray-50 rounded-md px-3 py-2 border border-gray-100">
                     <span className="font-semibold text-gray-600">Lý do xét duyệt:</span>{' '}
                     {participation.screeningReason}
                   </p>
                 )}
                 {isRejectedStatus(partStatus) && participation?.rejectionReason && (
-                  <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2 border border-red-100">
+                  <p className="text-xs text-red-600 bg-red-50 rounded-md px-3 py-2 border border-red-100">
                     <span className="font-semibold">Lý do từ chối:</span>{' '}
                     {participation.rejectionReason}
                   </p>
@@ -252,7 +251,7 @@ function TournamentDetailModal({ tournament, participation, onClose, onRegister 
               <button
                 onClick={handleRegister}
                 disabled={registering}
-                className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors disabled:cursor-not-allowed shadow-sm"
+                className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold py-2.5 rounded-md text-sm transition-colors disabled:cursor-not-allowed shadow-sm"
               >
                 {registering ? (
                   <>
@@ -286,7 +285,7 @@ function TournamentCard({ tournament, participation, onDetail }: TournamentCardP
   const isRegistered = partStatus !== null
 
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow duration-200 flex flex-col gap-3">
+    <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm hover:border-blue-200 hover:bg-blue-50/30 transition-colors flex flex-col gap-3">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
@@ -300,19 +299,19 @@ function TournamentCard({ tournament, participation, onDetail }: TournamentCardP
 
       {/* Quick info */}
       <div className="grid grid-cols-2 gap-2">
-        <div className="bg-gray-50 rounded-xl px-3 py-2 border border-gray-100">
+        <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
           <p className="text-[10px] text-gray-400 uppercase tracking-wide">Giống ngựa</p>
           <p className="text-xs font-semibold text-gray-800 mt-0.5 truncate">{tournament.allowedBreed}</p>
         </div>
-        <div className="bg-gray-50 rounded-xl px-3 py-2 border border-gray-100">
+        <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
           <p className="text-[10px] text-gray-400 uppercase tracking-wide">Cự ly</p>
           <p className="text-xs font-semibold text-gray-800 mt-0.5">{tournament.raceDistance} m</p>
         </div>
-        <div className="bg-gray-50 rounded-xl px-3 py-2 border border-gray-100">
+        <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
           <p className="text-[10px] text-gray-400 uppercase tracking-wide">Phí tham dự</p>
           <p className="text-xs font-semibold text-gray-800 mt-0.5">{formatCurrency(tournament.entryFeeAmount)}</p>
         </div>
-        <div className="bg-gray-50 rounded-xl px-3 py-2 border border-gray-100">
+        <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
           <p className="text-[10px] text-gray-400 uppercase tracking-wide">Giải thưởng</p>
           <p className="text-xs font-semibold text-emerald-700 mt-0.5">{formatCurrency(tournament.purseAmount)}</p>
         </div>
@@ -320,7 +319,7 @@ function TournamentCard({ tournament, participation, onDetail }: TournamentCardP
 
       {/* Registration status tag */}
       {isRegistered && partStatus && (
-        <div className={`text-xs font-semibold px-3 py-1.5 rounded-lg border text-center ${getRegStatusCfg(partStatus).cls}`}>
+        <div className={`text-xs font-semibold px-3 py-1.5 rounded-md border text-center ${getRegStatusCfg(partStatus).cls}`}>
           {getRegStatusCfg(partStatus).label}
         </div>
       )}
@@ -328,7 +327,7 @@ function TournamentCard({ tournament, participation, onDetail }: TournamentCardP
       {/* Action */}
       <button
         onClick={() => onDetail(tournament)}
-        className="w-full border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold text-xs py-2 rounded-xl transition-colors"
+        className="w-full border border-blue-100 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-xs py-2 rounded-md transition-colors"
       >
         Xem chi tiết {!isRegistered && '& Đăng ký'}
       </button>
@@ -400,8 +399,8 @@ const DoctorTournamentList: React.FC = () => {
     <div className="space-y-6">
       {/* Toast */}
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-50 bg-emerald-700 text-white px-4 py-3 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-300 flex-shrink-0" />
+        <div className="fixed bottom-6 right-6 z-50 bg-blue-700 text-white px-4 py-3 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-blue-300 flex-shrink-0" />
           {toastMsg}
         </div>
       )}
@@ -415,7 +414,7 @@ const DoctorTournamentList: React.FC = () => {
           </p>
         </div>
         {!loading && (
-          <span className="px-3 py-1.5 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full self-start">
+          <span className="px-3 py-1.5 text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100 rounded-full self-start">
             {filtered.length} giải mở đăng ký
           </span>
         )}
@@ -423,21 +422,20 @@ const DoctorTournamentList: React.FC = () => {
 
       {/* Tóm tắt trạng thái đăng ký */}
       {!loading && Object.keys(participationMap).length > 0 && (
-        <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 flex items-center gap-3">
-          <span className="text-lg">📋</span>
+        <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 flex items-center gap-3">
           <div>
-            <p className="text-sm font-semibold text-emerald-800">
+            <p className="text-sm font-semibold text-blue-800">
               Bạn đã đăng ký {registeredCount} / {filtered.length} giải đang mở
             </p>
-            <p className="text-xs text-emerald-600 mt-0.5">
+            <p className="text-xs text-blue-600 mt-0.5">
               Bấm "Xem chi tiết" để xem trạng thái duyệt của từng giải
             </p>
           </div>
           <button
             onClick={() => navigate('/doctor')}
-            className="ml-auto text-xs font-semibold text-emerald-700 hover:underline flex-shrink-0"
+            className="ml-auto text-xs font-semibold text-blue-700 hover:underline flex-shrink-0"
           >
-            Về Tổng quan ➔
+            Về Tổng quan
           </button>
         </div>
       )}
@@ -449,19 +447,18 @@ const DoctorTournamentList: React.FC = () => {
           placeholder="Tìm kiếm giải đấu theo tên..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full sm:max-w-sm px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white transition-colors"
+          className="w-full sm:max-w-sm px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white transition-colors"
         />
       </div>
 
       {/* Content */}
       {error ? (
         <div className="py-20 text-center">
-          <p className="text-4xl mb-3">⚠️</p>
           <p className="text-sm font-semibold text-gray-700 mb-1">Không thể tải dữ liệu</p>
           <p className="text-xs text-gray-500 mb-4">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors"
+            className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
           >
             Thử lại
           </button>
@@ -472,7 +469,6 @@ const DoctorTournamentList: React.FC = () => {
         </div>
       ) : filtered.length === 0 ? (
         <div className="py-20 text-center">
-          <p className="text-4xl mb-3">🏆</p>
           <p className="text-sm font-semibold text-gray-700 mb-1">
             {search ? 'Không tìm thấy giải phù hợp' : 'Hiện tại không có giải nào đang mở đăng ký'}
           </p>
