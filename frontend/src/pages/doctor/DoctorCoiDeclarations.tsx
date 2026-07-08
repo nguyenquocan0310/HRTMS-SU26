@@ -180,7 +180,7 @@ export default function DoctorCoiDeclarations() {
   return (
     <div className="space-y-6">
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-semibold text-white shadow-lg">
+        <div className="fixed bottom-6 right-6 z-50 rounded-lg bg-blue-700 px-4 py-3 text-sm font-semibold text-white shadow-lg">
           {toast}
         </div>
       )}
@@ -192,12 +192,12 @@ export default function DoctorCoiDeclarations() {
         </p>
       </div>
 
-      <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+      <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
         Doctor chỉ khai báo dữ liệu quan hệ. Hệ thống sẽ tự chạy COI Check khi Admin phân công Doctor vào Race.
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm xl:col-span-1">
+        <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm xl:col-span-1">
           <div className="mb-4">
             <h2 className="text-base font-bold text-gray-900">
               {editing ? 'Sửa khai báo' : 'Thêm khai báo'}
@@ -221,7 +221,7 @@ export default function DoctorCoiDeclarations() {
               <input
                 value={form.relatedPersonName}
                 onChange={(event) => setForm({ ...form, relatedPersonName: event.target.value })}
-                className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+                className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20"
                 placeholder="VD: Nguyễn Văn Phú"
               />
             </div>
@@ -235,7 +235,7 @@ export default function DoctorCoiDeclarations() {
                 min="1"
                 value={form.relatedUserId}
                 onChange={(event) => setForm({ ...form, relatedUserId: event.target.value })}
-                className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+                className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20"
                 placeholder="Không bắt buộc"
               />
             </div>
@@ -248,7 +248,7 @@ export default function DoctorCoiDeclarations() {
                 <select
                   value={form.relationType}
                   onChange={(event) => setForm({ ...form, relationType: event.target.value })}
-                  className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+                  className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20"
                 >
                   {RELATION_OPTIONS.map((option) => (
                     <option key={option} value={option}>
@@ -265,7 +265,7 @@ export default function DoctorCoiDeclarations() {
                 <select
                   value={form.industryRole}
                   onChange={(event) => setForm({ ...form, industryRole: event.target.value })}
-                  className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+                  className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20"
                 >
                   {ROLE_OPTIONS.map((option) => (
                     <option key={option} value={option}>
@@ -283,7 +283,7 @@ export default function DoctorCoiDeclarations() {
               <textarea
                 value={form.notes}
                 onChange={(event) => setForm({ ...form, notes: event.target.value })}
-                className="min-h-[96px] w-full resize-y rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+                className="min-h-[96px] w-full resize-y rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20"
                 placeholder="Không bắt buộc"
               />
             </div>
@@ -292,7 +292,7 @@ export default function DoctorCoiDeclarations() {
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
+                className="flex-1 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
               >
                 {saving ? 'Đang lưu...' : editing ? 'Cập nhật' : 'Thêm khai báo'}
               </button>
@@ -300,7 +300,7 @@ export default function DoctorCoiDeclarations() {
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50"
+                  className="rounded-md border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50"
                 >
                   Hủy
                 </button>
@@ -309,7 +309,7 @@ export default function DoctorCoiDeclarations() {
           </form>
         </section>
 
-        <section className="rounded-xl border border-gray-200 bg-white shadow-sm xl:col-span-2">
+        <section className="rounded-lg border border-gray-200 bg-white shadow-sm xl:col-span-2">
           <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
             <div>
               <h2 className="text-base font-bold text-gray-900">Danh sách khai báo</h2>
@@ -318,7 +318,7 @@ export default function DoctorCoiDeclarations() {
             <button
               onClick={loadDeclarations}
               disabled={loading}
-              className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50"
+              className="rounded-md border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50"
             >
               Làm mới
             </button>
@@ -377,14 +377,14 @@ export default function DoctorCoiDeclarations() {
                           <div className="flex justify-end gap-2">
                             <button
                               onClick={() => handleEdit(item)}
-                              className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                            className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50"
                             >
                               Sửa
                             </button>
                             <button
                               onClick={() => handleDelete(item)}
                               disabled={isDeleting}
-                              className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
+                            className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:opacity-50"
                             >
                               {isDeleting ? 'Đang xóa...' : 'Xóa'}
                             </button>

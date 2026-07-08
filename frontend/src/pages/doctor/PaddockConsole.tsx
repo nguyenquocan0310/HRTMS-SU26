@@ -1,525 +1,711 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { getMyTournamentParticipations } from '../../services/tournamentService'
-import { getMyDoctorRaceAssignments, type DoctorRaceAssignment } from '../../services/doctorService'
+import {
+  getDoctorRaceEntries,
+  getMyDoctorRaceAssignments,
+  updateClinicalCheck,
+  updateHorseIdentity,
+  updatePreRaceWeight,
+  type DoctorRaceAssignment,
+  type DoctorRaceEntry,
+} from '../../services/doctorService'
 
-interface JockeyWeightItem {
-  id: string
-  name: string
-  declaredWeight: number
-  actualWeight: number | ''
-  isConfirmed: boolean
+type ActiveTab = 'weigh-in' | 'vet-check' | 'weigh-out'
+type IdentityStatus = 'Matched' | 'Mismatch'
+type ClinicalStatus = 'Fit' | 'Unfit'
+
+const formatWeight = (value: number | null | undefined) =>
+  typeof value === 'number' && Number.isFinite(value) ? value.toFixed(1) : 'Chưa có'
+
+const getFriendlyError = (err: unknown) => {
+  const raw = err instanceof Error ? err.message : 'Không thể xử lý thao tác. Vui lòng thử lại.'
+  if (raw.includes('RACE_ENTRY_NOT_ELIGIBLE') || raw.toLowerCase().includes('not eligible')) {
+    return 'Race entry này đã bị hủy/rút/loại nên không thể cập nhật kiểm tra.'
+  }
+  return raw
 }
 
-interface HorseCheckItem {
-  id: string
-  name: string
-  chipId: string
-  identityVerified: boolean
-  isPassed: boolean
-  notes: string
-  isConfirmed: boolean
+const mergeEntryPatch = (entry: DoctorRaceEntry, patch: Partial<DoctorRaceEntry>) => ({
+  ...entry,
+  ...patch,
+  status: patch.raceEntryStatus ?? patch.status ?? entry.status,
+  raceEntryStatus: patch.raceEntryStatus ?? patch.status ?? entry.raceEntryStatus,
+})
+
+function EntryStatusBadge({ entry }: { entry: DoctorRaceEntry }) {
+  const status = entry.raceEntryStatus ?? entry.status
+  const isDisqualified = status === 'Disqualified' || entry.isEmergencyDisqualified
+  const cls = isDisqualified
+    ? 'bg-red-50 text-red-700 border-red-100'
+    : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${cls}`}>
+      {status}
+    </span>
+  )
+}
+
+function WeighInResultBadge({ entry }: { entry: DoctorRaceEntry }) {
+  const status = entry.raceEntryStatus ?? entry.status
+  if (status === 'Disqualified' || entry.isEmergencyDisqualified) {
+    return (
+      <span className="inline-flex rounded-full border border-red-100 bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">
+        Đã loại
+      </span>
+    )
+  }
+
+  if (entry.isWeightWarning) {
+    return (
+      <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
+        Vượt ngưỡng
+      </span>
+    )
+  }
+
+  if (entry.preRaceJockeyWeight != null) {
+    return (
+      <span className="inline-flex rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+        Đã cân
+      </span>
+    )
+  }
+
+  return (
+    <span className="inline-flex rounded-full border border-gray-100 bg-gray-50 px-2 py-0.5 text-xs font-semibold text-gray-500">
+      Chưa cân
+    </span>
+  )
+}
+
+function CheckResultLine({
+  label,
+  value,
+  emptyLabel,
+}: {
+  label: string
+  value: string | null | undefined
+  emptyLabel: string
+}) {
+  const normalized = value?.trim()
+  const isBad = normalized === 'Mismatch' || normalized === 'Unfit'
+  const isGood = normalized === 'Matched' || normalized === 'Fit'
+  const cls = isBad
+    ? 'border-red-100 bg-red-50 text-red-700'
+    : isGood
+      ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+      : 'border-gray-100 bg-gray-50 text-gray-500'
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="text-xs font-medium text-gray-500">{label}:</span>
+      <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${cls}`}>
+        {normalized || emptyLabel}
+      </span>
+    </div>
+  )
+}
+
+function VetCheckResultBadges({ entry }: { entry: DoctorRaceEntry }) {
+  const status = entry.raceEntryStatus ?? entry.status
+  const isDisqualified = status === 'Disqualified' || entry.isEmergencyDisqualified
+
+  return (
+    <div className="space-y-1.5">
+      <CheckResultLine
+        label="Danh tính"
+        value={entry.horseIdentityCheckStatus}
+        emptyLabel="Chưa kiểm tra"
+      />
+      <CheckResultLine label="Khám" value={entry.clinicalStatus} emptyLabel="Chưa khám" />
+      {isDisqualified && (
+        <span className="inline-flex rounded-full border border-red-200 bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">
+          Đã loại
+        </span>
+      )}
+    </div>
+  )
 }
 
 export default function PaddockConsole() {
   const location = useLocation()
-  const [activeTab, setActiveTab] = useState<'weigh-in' | 'vet-check' | 'weigh-out'>('weigh-in')
+  const [activeTab, setActiveTab] = useState<ActiveTab>('weigh-in')
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
 
-  // ── Đọc raceId từ query string (?raceId=...) ────────────────────────────────
   const searchParams = new URLSearchParams(location.search)
   const raceIdParam = searchParams.get('raceId')
   const selectedRaceId = raceIdParam ? Number(raceIdParam) : null
+  const hasValidRaceId = typeof selectedRaceId === 'number' && Number.isFinite(selectedRaceId)
 
-  // ── Lấy assignment được chọn từ API ─────────────────────────────────────────
   const [selectedRace, setSelectedRace] = useState<DoctorRaceAssignment | null>(null)
   const [raceLoading, setRaceLoading] = useState(false)
 
+  const [entries, setEntries] = useState<DoctorRaceEntry[]>([])
+  const [entriesLoading, setEntriesLoading] = useState(false)
+  const [entriesError, setEntriesError] = useState<string | null>(null)
+
+  const [weightInputs, setWeightInputs] = useState<Record<number, string>>({})
+  const [identityInputs, setIdentityInputs] = useState<Record<number, IdentityStatus>>({})
+  const [clinicalInputs, setClinicalInputs] = useState<Record<number, ClinicalStatus>>({})
+  const [unfitReasons, setUnfitReasons] = useState<Record<number, string>>({})
+  const [savingKey, setSavingKey] = useState<string | null>(null)
+
+  const showToast = (message: string) => {
+    setToastMessage(message)
+    window.setTimeout(() => setToastMessage(null), 3000)
+  }
+
   useEffect(() => {
-    if (!selectedRaceId) return
+    if (!hasValidRaceId || selectedRaceId === null) {
+      setSelectedRace(null)
+      return
+    }
+
     setRaceLoading(true)
     getMyDoctorRaceAssignments()
       .then((list) => {
-        const found = list.find((a) => a.raceId === selectedRaceId) ?? null
-        setSelectedRace(found)
+        setSelectedRace(list.find((race) => race.raceId === selectedRaceId) ?? null)
       })
       .catch(() => setSelectedRace(null))
       .finally(() => setRaceLoading(false))
-  }, [selectedRaceId])
-
-  // ── Kiểm tra Doctor đã được duyệt tham gia giải chưa ─────────────────────
-  const [hasApprovedTournament, setHasApprovedTournament] = useState<boolean | null>(null)
+  }, [hasValidRaceId, selectedRaceId])
 
   useEffect(() => {
-    getMyTournamentParticipations()
-      .then((list) => {
-        const approved = list.some(
-          (p) => p.status === 'Approved' || p.status === 'AutoEligible'
+    if (!hasValidRaceId || selectedRaceId === null) {
+      setEntries([])
+      setEntriesError('Không tìm thấy raceId để mở Paddock.')
+      return
+    }
+
+    setEntriesLoading(true)
+    setEntriesError(null)
+    getDoctorRaceEntries(selectedRaceId)
+      .then((data) => {
+        setEntries(data)
+        setWeightInputs(
+          Object.fromEntries(
+            data.map((entry) => [
+              entry.raceEntryId,
+              entry.preRaceJockeyWeight != null ? String(entry.preRaceJockeyWeight) : '',
+            ])
+          )
         )
-        setHasApprovedTournament(approved)
+        setIdentityInputs(
+          Object.fromEntries(
+            data.map((entry) => [
+              entry.raceEntryId,
+              entry.horseIdentityCheckStatus === 'Mismatch' ? 'Mismatch' : 'Matched',
+            ])
+          )
+        )
+        setClinicalInputs(
+          Object.fromEntries(
+            data.map((entry) => [
+              entry.raceEntryId,
+              entry.clinicalStatus === 'Unfit' ? 'Unfit' : 'Fit',
+            ])
+          )
+        )
+        setUnfitReasons(
+          Object.fromEntries(data.map((entry) => [entry.raceEntryId, entry.unfitReason ?? '']))
+        )
       })
-      .catch(() => {
-        // Nếu API lỗi, không hiển thị note — không chặn Paddock
-        setHasApprovedTournament(true)
+      .catch((err) => {
+        setEntries([])
+        setEntriesError(getFriendlyError(err) || 'Không tải được danh sách race entries.')
       })
-  }, [])
+      .finally(() => setEntriesLoading(false))
+  }, [hasValidRaceId, selectedRaceId])
 
-  // Trạng thái cho tab Weigh-In
-  const [weighInData, setWeighInData] = useState<JockeyWeightItem[]>([
-    { id: 'J1', name: 'Nguyễn Văn Hùng', declaredWeight: 54.0, actualWeight: '', isConfirmed: false },
-    { id: 'J2', name: 'Trần Minh Quân', declaredWeight: 55.5, actualWeight: 55.2, isConfirmed: false },
-    { id: 'J3', name: 'Lê Hoàng Nam', declaredWeight: 53.2, actualWeight: 54.5, isConfirmed: false },
-    { id: 'J4', name: 'Phạm Đức Duy', declaredWeight: 56.0, actualWeight: 56.0, isConfirmed: false },
-  ])
+  const thresholdLabel = useMemo(() => {
+    const threshold = entries.find((entry) => entry.thresholdKg != null)?.thresholdKg
+    return threshold != null ? threshold.toFixed(1) : 'theo cấu hình'
+  }, [entries])
 
-  // Trạng thái cho tab Kiểm tra ngựa (Vet Check)
-  const [horseData, setHorseData] = useState<HorseCheckItem[]>([
-    { id: 'H1', name: 'Kim Long', chipId: 'CHIP9821-VN', identityVerified: true, isPassed: true, notes: '', isConfirmed: false },
-    { id: 'H2', name: 'Xích Thố', chipId: 'CHIP7344-VN', identityVerified: true, isPassed: true, notes: '', isConfirmed: false },
-    { id: 'H3', name: 'Bạch Mã', chipId: 'CHIP1120-VN', identityVerified: false, isPassed: false, notes: 'Chip không phản hồi khi quét', isConfirmed: false },
-    { id: 'H4', name: 'Hắc Phong', chipId: 'CHIP4409-VN', identityVerified: true, isPassed: true, notes: '', isConfirmed: false },
-  ])
-
-  // Trạng thái cho tab Weigh-Out
-  const [weighOutData, setWeighOutData] = useState<JockeyWeightItem[]>([
-    { id: 'J1', name: 'Nguyễn Văn Hùng', declaredWeight: 54.0, actualWeight: '', isConfirmed: false },
-    { id: 'J2', name: 'Trần Minh Quân', declaredWeight: 55.5, actualWeight: '', isConfirmed: false },
-    { id: 'J3', name: 'Lê Hoàng Nam', declaredWeight: 53.2, actualWeight: '', isConfirmed: false },
-    { id: 'J4', name: 'Phạm Đức Duy', declaredWeight: 56.0, actualWeight: '', isConfirmed: false },
-  ])
-
-  // Toast feedback khi bấm nút xác nhận
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
-  
-  const showToast = (message: string) => {
-    setToastMessage(message)
-    setTimeout(() => setToastMessage(null), 3000)
+  const updateEntry = (raceEntryId: number, patch: Partial<DoctorRaceEntry>) => {
+    setEntries((prev) =>
+      prev.map((entry) => (entry.raceEntryId === raceEntryId ? mergeEntryPatch(entry, patch) : entry))
+    )
   }
 
-  // --- LOGIC TAB WEIGH-IN ---
-  const handleWeighInWeightChange = (id: string, val: string) => {
-    setWeighInData(prev => prev.map(item => {
-      if (item.id === id) {
-        const parsed = val === '' ? '' : parseFloat(val)
-        return { ...item, actualWeight: parsed, isConfirmed: false }
-      }
-      return item
-    }))
-  }
-
-  const handleWeighInConfirm = (id: string) => {
-    const item = weighInData.find(x => x.id === id)
-    if (!item || item.actualWeight === '') {
-      showToast('⚠️ Vui lòng nhập cân nặng thực tế trước khi xác nhận!')
+  const handleWeighInConfirm = async (entry: DoctorRaceEntry) => {
+    const rawValue = weightInputs[entry.raceEntryId]
+    const preRaceJockeyWeight = rawValue === '' ? Number.NaN : Number(rawValue)
+    if (!Number.isFinite(preRaceJockeyWeight) || preRaceJockeyWeight <= 0) {
+      showToast('Vui lòng nhập cân nặng trước đua hợp lệ.')
       return
     }
-    const diff = Math.abs(item.actualWeight - item.declaredWeight)
-    setWeighInData(prev => prev.map(x => x.id === id ? { ...x, isConfirmed: true } : x))
-    if (diff > 1.0) {
-      showToast(`⚠️ Xác nhận Weigh-In với cảnh báo vượt mức lệch ${diff.toFixed(1)}kg!`)
-    } else {
-      showToast(`✓ Đã xác nhận Weigh-In cho kỵ sĩ ${item.name} thành công.`)
+
+    const key = `weight-${entry.raceEntryId}`
+    setSavingKey(key)
+    try {
+      const res = await updatePreRaceWeight(entry.raceEntryId, preRaceJockeyWeight)
+      updateEntry(entry.raceEntryId, {
+        selfDeclaredWeight: res.selfDeclaredWeight ?? entry.selfDeclaredWeight,
+        preRaceJockeyWeight: res.preRaceJockeyWeight ?? preRaceJockeyWeight,
+        weightDifference: res.weightDifference ?? entry.weightDifference,
+        thresholdKg: res.thresholdKg ?? entry.thresholdKg,
+        isWeightWarning: Boolean(res.isWeightWarning),
+        message: res.message,
+      })
+      showToast(res.message ?? `Đã xác nhận Weigh-In cho ${entry.jockeyName}.`)
+    } catch (err) {
+      showToast(getFriendlyError(err))
+    } finally {
+      setSavingKey(null)
     }
   }
 
-  // --- LOGIC TAB KIỂM TRA NGỰA ---
-  const handleHorseTogglePassed = (id: string) => {
-    setHorseData(prev => prev.map(item => {
-      if (item.id === id) {
-        const nextPassed = !item.isPassed
-        return { 
-          ...item, 
-          isPassed: nextPassed, 
-          isConfirmed: false,
-          notes: nextPassed ? '' : item.notes || 'Không đạt tiêu chuẩn lâm sàng'
-        }
-      }
-      return item
-    }))
-  }
-
-  const handleHorseNotesChange = (id: string, val: string) => {
-    setHorseData(prev => prev.map(item => {
-      if (item.id === id) {
-        return { ...item, notes: val, isConfirmed: false }
-      }
-      return item
-    }))
-  }
-
-  const handleHorseConfirm = (id: string) => {
-    const item = horseData.find(x => x.id === id)
-    if (!item) return
-    setHorseData(prev => prev.map(x => x.id === id ? { ...x, isConfirmed: true } : x))
-    showToast(`✓ Đã cập nhật kết quả kiểm tra cho ngựa ${item.name} (${item.isPassed ? 'Đạt' : 'Không đạt'}).`)
-  }
-
-  // --- LOGIC TAB WEIGH-OUT ---
-  const handleWeighOutWeightChange = (id: string, val: string) => {
-    setWeighOutData(prev => prev.map(item => {
-      if (item.id === id) {
-        const parsed = val === '' ? '' : parseFloat(val)
-        return { ...item, actualWeight: parsed, isConfirmed: false }
-      }
-      return item
-    }))
-  }
-
-  const handleWeighOutConfirm = (id: string) => {
-    const item = weighOutData.find(x => x.id === id)
-    if (!item || item.actualWeight === '') {
-      showToast('⚠️ Vui lòng nhập cân nặng sau đua trước khi xác nhận!')
+  const handleHorseIdentityConfirm = async (entry: DoctorRaceEntry) => {
+    const horseIdentityCheckStatus = identityInputs[entry.raceEntryId] ?? 'Matched'
+    if (
+      horseIdentityCheckStatus === 'Mismatch' &&
+      !window.confirm('Xác nhận Mismatch có thể loại race entry này. Bạn muốn tiếp tục?')
+    ) {
       return
     }
-    const diff = Math.abs(item.actualWeight - item.declaredWeight)
-    setWeighOutData(prev => prev.map(x => x.id === id ? { ...x, isConfirmed: true } : x))
-    if (diff > 1.0) {
-      showToast(`⚠️ Xác nhận Weigh-Out với cảnh báo vượt mức lệch ${diff.toFixed(1)}kg!`)
-    } else {
-      showToast(`✓ Đã xác nhận Weigh-Out cho kỵ sĩ ${item.name} thành công.`)
+
+    const key = `identity-${entry.raceEntryId}`
+    setSavingKey(key)
+    try {
+      const res = await updateHorseIdentity(entry.raceEntryId, horseIdentityCheckStatus)
+      updateEntry(entry.raceEntryId, {
+        horseIdentityCheckStatus: res.horseIdentityCheckStatus ?? horseIdentityCheckStatus,
+        isEmergencyDisqualified: Boolean(res.isEmergencyDisqualified),
+        raceEntryStatus: res.raceEntryStatus ?? entry.raceEntryStatus,
+        message: res.message,
+      })
+      showToast(res.message ?? `Đã cập nhật danh tính ngựa ${entry.horseName}.`)
+    } catch (err) {
+      showToast(getFriendlyError(err))
+    } finally {
+      setSavingKey(null)
     }
   }
+
+  const handleClinicalConfirm = async (entry: DoctorRaceEntry) => {
+    const clinicalStatus = clinicalInputs[entry.raceEntryId] ?? 'Fit'
+    const unfitReason = unfitReasons[entry.raceEntryId]?.trim() ?? ''
+
+    if (clinicalStatus === 'Unfit' && unfitReason.length === 0) {
+      showToast('Vui lòng nhập lý do khi kết luận Unfit.')
+      return
+    }
+    if (
+      clinicalStatus === 'Unfit' &&
+      !window.confirm('Xác nhận Unfit có thể loại race entry này. Bạn muốn tiếp tục?')
+    ) {
+      return
+    }
+
+    const key = `clinical-${entry.raceEntryId}`
+    setSavingKey(key)
+    try {
+      const res = await updateClinicalCheck(
+        entry.raceEntryId,
+        clinicalStatus,
+        clinicalStatus === 'Unfit' ? unfitReason : null
+      )
+      updateEntry(entry.raceEntryId, {
+        clinicalStatus: res.clinicalStatus ?? clinicalStatus,
+        unfitReason: res.unfitReason ?? (clinicalStatus === 'Unfit' ? unfitReason : null),
+        isEmergencyDisqualified: Boolean(res.isEmergencyDisqualified),
+        raceEntryStatus: res.raceEntryStatus ?? entry.raceEntryStatus,
+        message: res.message,
+      })
+      showToast(res.message ?? `Đã cập nhật khám lâm sàng cho ${entry.horseName}.`)
+    } catch (err) {
+      showToast(getFriendlyError(err))
+    } finally {
+      setSavingKey(null)
+    }
+  }
+
+  const renderEntriesState = () => {
+    if (entriesLoading) {
+      return (
+        <div className="flex items-center justify-center py-12 text-sm text-gray-500">
+          <span className="mr-3 h-6 w-6 animate-spin rounded-full border-b-2 border-blue-600" />
+          Đang tải danh sách entries...
+        </div>
+      )
+    }
+
+    if (entriesError) {
+      return (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {entriesError}
+        </div>
+      )
+    }
+
+    if (entries.length === 0) {
+      return (
+        <div className="py-12 text-center">
+          <p className="mt-2 text-sm font-semibold text-gray-600">Chưa có race entry nào trong race này.</p>
+          <p className="mt-1 text-xs text-gray-400">Entries chỉ có sau khi race đã được bốc thăm.</p>
+        </div>
+      )
+    }
+
+    return null
+  }
+
+  const stateBlock = renderEntriesState()
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      {/* Toast Feedback */}
+    <div className="mx-auto max-w-6xl space-y-6">
       {toastMessage && (
-        <div className="fixed top-4 right-4 z-50 bg-gray-900 text-white text-xs font-semibold px-4 py-3 rounded-lg shadow-lg border border-gray-800 animate-fade-in flex items-center gap-2">
-          <span>🔔</span>
+        <div className="fixed right-4 top-4 z-50 flex items-center gap-2 rounded-lg border border-gray-800 bg-gray-900 px-4 py-3 text-xs font-semibold text-white shadow-lg">
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* Note nhẹ: Doctor chưa được duyệt tham gia giải */}
-      {hasApprovedTournament === false && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-center gap-3 text-amber-800">
-          <span className="text-base flex-shrink-0">ℹ️</span>
-          <p className="text-xs font-medium flex-1">
-            Lưu ý: Bạn cần được Admin duyệt tham gia giải trước khi nhận phân công Paddock.
-          </p>
-        </div>
-      )}
-
-      {/* Header với thông tin race được chọn */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-gray-200 gap-4">
+      <div className="flex flex-col gap-4 border-b border-gray-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
-            ⏱️ Bàn điều khiển Paddock
+          <h1 className="flex items-center gap-2 text-xl font-bold text-gray-900 sm:text-2xl">
+            Bàn điều khiển Paddock
           </h1>
-          {raceLoading && (
-            <p className="text-xs text-gray-400 mt-1">Đang tải thông tin race...</p>
-          )}
+          {raceLoading && <p className="mt-1 text-xs text-gray-400">Đang tải thông tin race...</p>}
           {!raceLoading && selectedRace && (
             <div className="mt-1.5 space-y-0.5">
               <p className="text-xs text-gray-500">
                 <span className="font-semibold text-gray-700">{selectedRace.tournamentName}</span>
-                {' — '}{selectedRace.roundName}
                 {' — '}
-                <span className="font-mono font-bold text-emerald-700">Race #{selectedRace.raceNumber}</span>
+                {selectedRace.roundName}
+                {' — '}
+                <span className="font-mono font-bold text-blue-700">Race #{selectedRace.raceNumber}</span>
               </p>
               <p className="text-xs text-gray-400">
                 {new Date(selectedRace.scheduledTime).toLocaleString('vi-VN', {
-                  day: '2-digit', month: '2-digit', year: 'numeric',
-                  hour: '2-digit', minute: '2-digit',
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
                 })}
               </p>
             </div>
           )}
-          {!raceLoading && !selectedRace && !selectedRaceId && (
-            <p className="text-xs sm:text-sm text-gray-500 mt-1">
-              Giao diện kiểm tra nhanh dành cho máy tính bảng tại khu vực Paddock
+          {!raceLoading && !selectedRace && hasValidRaceId && (
+            <p className="mt-1 text-xs text-amber-600">
+              Không tìm thấy race #{selectedRaceId} trong danh sách phân công, nhưng vẫn thử tải entries.
             </p>
           )}
-          {!raceLoading && !selectedRace && selectedRaceId && (
-            <p className="text-xs text-amber-600 mt-1">
-              Không tìm thấy race #{selectedRaceId} trong danh sách phân công.
-            </p>
+          {!hasValidRaceId && (
+            <p className="mt-1 text-xs text-red-600">Không tìm thấy raceId để mở Paddock.</p>
           )}
         </div>
-        <div className="flex items-center gap-2 bg-red-50 border border-red-100 rounded-lg py-1.5 px-3 self-start sm:self-center">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-600"></span>
-          </span>
-          <span className="text-red-700 font-bold text-xs tracking-wider uppercase">ĐANG DIỄN RA</span>
+        <div className="flex items-center gap-2 self-start rounded-md border border-blue-100 bg-blue-50 px-3 py-1.5 sm:self-center">
+          <span className="h-2 w-2 rounded-full bg-blue-600" />
+          <span className="text-xs font-bold uppercase tracking-wider text-blue-700">Doctor Paddock</span>
         </div>
       </div>
 
-      {/* Hệ thống TAB chuyển đổi trạng thái */}
-      <div className="bg-white p-1.5 border border-gray-200 rounded-xl shadow-sm flex">
+      <div className="flex rounded-lg border border-gray-200 bg-white p-1.5 shadow-sm">
         <button
           onClick={() => setActiveTab('weigh-in')}
-          className={`flex-1 text-center py-2.5 rounded-lg text-sm font-semibold transition-all ${
+          className={`flex-1 rounded-lg py-2.5 text-center text-sm font-semibold transition-all ${
             activeTab === 'weigh-in'
-              ? 'bg-emerald-600 text-white shadow-sm'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
           }`}
         >
-          ⚖️ Cân nặng trước đua (Weigh-In)
+          Cân nặng trước đua (Weigh-In)
         </button>
         <button
           onClick={() => setActiveTab('vet-check')}
-          className={`flex-1 text-center py-2.5 rounded-lg text-sm font-semibold transition-all ${
+          className={`flex-1 rounded-lg py-2.5 text-center text-sm font-semibold transition-all ${
             activeTab === 'vet-check'
-              ? 'bg-emerald-600 text-white shadow-sm'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
           }`}
         >
-          🐴 Kiểm tra ngựa (Vet Check)
+          Kiểm tra ngựa (Vet Check)
         </button>
         <button
           onClick={() => setActiveTab('weigh-out')}
-          className={`flex-1 text-center py-2.5 rounded-lg text-sm font-semibold transition-all ${
+          className={`flex-1 rounded-lg py-2.5 text-center text-sm font-semibold transition-all ${
             activeTab === 'weigh-out'
-              ? 'bg-emerald-600 text-white shadow-sm'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
           }`}
         >
-          ⚖️ Cân nặng sau đua (Weigh-Out)
+          Cân nặng sau đua (Weigh-Out)
         </button>
       </div>
 
-      {/* Nội dung theo từng Tab */}
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-        {/* --- TAB WEIGH-IN --- */}
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
         {activeTab === 'weigh-in' && (
-          <div className="p-4 sm:p-6 space-y-4">
-            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+          <div className="space-y-4 p-4 sm:p-6">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h2 className="text-sm font-bold text-gray-900">Danh sách Kỵ sĩ cân trước cuộc đua</h2>
-              <span className="text-xs text-gray-400">Yêu cầu lệch không quá 1.0kg</span>
+              <span className="text-xs text-gray-400">Ngưỡng cảnh báo: {thresholdLabel} kg</span>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-gray-700">
-                <thead>
-                  <tr className="border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider bg-gray-50/50">
-                    <th className="py-3 px-4">Kỵ sĩ</th>
-                    <th className="py-3 px-4">Cân tự khai (kg)</th>
-                    <th className="py-3 px-4">Cân thực tế (kg)</th>
-                    <th className="py-3 px-4">Chênh lệch (kg)</th>
-                    <th className="py-3 px-4 text-right">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {weighInData.map((item) => {
-                    const diff = item.actualWeight !== '' ? Number((item.actualWeight - item.declaredWeight).toFixed(1)) : 0
-                    const isExceeded = item.actualWeight !== '' && Math.abs(diff) > 1.0
 
-                    return (
-                      <tr key={item.id} className="hover:bg-gray-50/20 transition-colors">
-                        <td className="py-4 px-4 font-semibold text-gray-900">{item.name}</td>
-                        <td className="py-4 px-4 font-mono font-medium">{item.declaredWeight.toFixed(1)}</td>
-                        <td className="py-4 px-4">
-                          <input
-                            type="number"
-                            step="0.1"
-                            className={`w-28 bg-gray-50 border rounded-lg px-3 py-1.5 text-sm font-semibold focus:bg-white focus:outline-none focus:ring-2 transition-all ${
-                              isExceeded 
-                                ? 'border-red-500 focus:ring-red-500/20 text-red-700 bg-red-50/50' 
-                                : 'border-gray-200 focus:ring-emerald-500/20 focus:border-emerald-500'
-                            }`}
-                            placeholder="Nhập cân"
-                            value={item.actualWeight}
-                            onChange={(e) => handleWeighInWeightChange(item.id, e.target.value)}
-                          />
-                        </td>
-                        <td className="py-4 px-4">
-                          {item.actualWeight !== '' ? (
-                            <div className="flex items-center gap-2">
-                              <span className={`font-mono font-bold ${isExceeded ? 'text-red-600' : 'text-emerald-600'}`}>
-                                {diff > 0 ? `+${diff}` : diff}
-                              </span>
-                              {isExceeded && (
-                                <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">
-                                  Vượt mức
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-gray-400 text-xs italic">Chưa cân</span>
-                          )}
-                        </td>
-                        <td className="py-4 px-4 text-right">
-                          <button
-                            onClick={() => handleWeighInConfirm(item.id)}
-                            disabled={item.actualWeight === ''}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                              item.isConfirmed
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default'
-                                : 'bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed'
-                            }`}
-                          >
-                            {item.isConfirmed ? '✓ Đã xác nhận' : 'Xác nhận Weigh-In'}
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* --- TAB KIỂM TRA NGỰA --- */}
-        {activeTab === 'vet-check' && (
-          <div className="p-4 sm:p-6 space-y-4">
-            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-              <h2 className="text-sm font-bold text-gray-900">Báo cáo sức khỏe lâm sàng & chip định danh ngựa</h2>
-              <span className="text-xs text-gray-400">Yêu cầu xác nhận cho từng ngựa</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-gray-700">
-                <thead>
-                  <tr className="border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider bg-gray-50/50">
-                    <th className="py-3 px-4">Tên ngựa</th>
-                    <th className="py-3 px-4">Mã số chip</th>
-                    <th className="py-3 px-4">Xác minh chip</th>
-                    <th className="py-3 px-4">Trạng thái sức khỏe</th>
-                    <th className="py-3 px-4">Lý do / Ghi chú</th>
-                    <th className="py-3 px-4 text-right">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {horseData.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50/20 transition-colors">
-                      <td className="py-4 px-4 font-semibold text-gray-900">{item.name}</td>
-                      <td className="py-4 px-4 font-mono text-xs text-gray-600">{item.chipId}</td>
-                      <td className="py-4 px-4">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                            item.identityVerified
-                              ? 'bg-emerald-50 text-emerald-700'
-                              : 'bg-red-50 text-red-700'
-                          }`}
-                        >
-                          {item.identityVerified ? '✓ Khớp danh tính' : '✗ Lỗi danh tính'}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4">
-                        {/* Toggle Đạt / Không đạt */}
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleHorseTogglePassed(item.id)}
-                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                              item.isPassed ? 'bg-emerald-600' : 'bg-red-500'
-                            }`}
-                          >
-                            <span
-                              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                item.isPassed ? 'translate-x-5' : 'translate-x-0'
-                              }`}
-                            />
-                          </button>
-                          <span className={`text-xs font-semibold ${item.isPassed ? 'text-emerald-700' : 'text-red-700'}`}>
-                            {item.isPassed ? 'Đạt' : 'Không đạt'}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <input
-                          type="text"
-                          className="w-full min-w-[150px] bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
-                          placeholder="Lý do không đạt hoặc ghi chú"
-                          value={item.notes}
-                          onChange={(e) => handleHorseNotesChange(item.id, e.target.value)}
-                        />
-                      </td>
-                      <td className="py-4 px-4 text-right">
-                        <button
-                          onClick={() => handleHorseConfirm(item.id)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                            item.isConfirmed
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default'
-                              : 'bg-gray-900 text-white hover:bg-gray-800'
-                          }`}
-                        >
-                          {item.isConfirmed ? '✓ Đã hoàn tất' : 'Hoàn tất kiểm tra'}
-                        </button>
-                      </td>
+            {stateBlock ?? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-gray-700">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/50 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                      <th className="px-4 py-3">Post</th>
+                      <th className="px-4 py-3">Kỵ sĩ / Ngựa</th>
+                      <th className="px-4 py-3">Cân tự khai</th>
+                      <th className="px-4 py-3">Cân thực tế</th>
+                      <th className="px-4 py-3">Chênh lệch</th>
+                      <th className="px-4 py-3">Kết quả cân</th>
+                      <th className="px-4 py-3 text-right">Thao tác</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {entries.map((entry) => {
+                      const key = `weight-${entry.raceEntryId}`
+                      const input = weightInputs[entry.raceEntryId] ?? ''
+                      const actual = input === '' ? null : Number(input)
+                      const diff =
+                        entry.weightDifference ??
+                        (actual != null && entry.selfDeclaredWeight != null
+                          ? Number((actual - entry.selfDeclaredWeight).toFixed(1))
+                          : null)
+                      const isExceeded =
+                        entry.isWeightWarning ||
+                        (diff != null && entry.thresholdKg != null && Math.abs(diff) > entry.thresholdKg)
+
+                      return (
+                        <tr key={entry.raceEntryId} className="transition-colors hover:bg-gray-50/20">
+                          <td className="px-4 py-4 font-mono text-xs font-bold text-gray-500">
+                            {entry.postPosition ?? '-'}
+                          </td>
+                          <td className="px-4 py-4">
+                            <p className="font-semibold text-gray-900">{entry.jockeyName}</p>
+                            <p className="mt-0.5 text-xs text-gray-400">{entry.horseName}</p>
+                          </td>
+                          <td className="px-4 py-4 font-mono font-medium">
+                            {formatWeight(entry.selfDeclaredWeight)}
+                          </td>
+                          <td className="px-4 py-4">
+                            <input
+                              type="number"
+                              step="0.1"
+                              className={`w-28 rounded-lg border bg-gray-50 px-3 py-1.5 text-sm font-semibold transition-all focus:bg-white focus:outline-none focus:ring-2 ${
+                                isExceeded
+                                  ? 'border-red-500 bg-red-50/50 text-red-700 focus:ring-red-500/20'
+                                  : 'border-gray-200 focus:border-blue-500 focus:ring-blue-500/20'
+                              }`}
+                              placeholder="Nhập cân"
+                              value={input}
+                              onChange={(event) =>
+                                setWeightInputs((prev) => ({
+                                  ...prev,
+                                  [entry.raceEntryId]: event.target.value,
+                                }))
+                              }
+                            />
+                          </td>
+                          <td className="px-4 py-4">
+                            {diff != null ? (
+                              <div className="flex items-center gap-2">
+                                <span className={`font-mono font-bold ${isExceeded ? 'text-red-600' : 'text-emerald-600'}`}>
+                                  {diff > 0 ? `+${diff}` : diff}
+                                </span>
+                                {isExceeded && (
+                                  <span className="rounded border border-red-200 bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
+                                    Vượt mức
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-xs italic text-gray-400">Chưa cân</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4">
+                            <WeighInResultBadge entry={entry} />
+                          </td>
+                          <td className="px-4 py-4 text-right">
+                            <button
+                              onClick={() => handleWeighInConfirm(entry)}
+                              disabled={input === '' || savingKey === key}
+                              className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white transition-all hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-30"
+                            >
+                              {savingKey === key ? 'Đang lưu...' : entry.preRaceJockeyWeight != null ? 'Cập nhật Weigh-In' : 'Xác nhận Weigh-In'}
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
-        {/* --- TAB WEIGH-OUT --- */}
-        {activeTab === 'weigh-out' && (
-          <div className="p-4 sm:p-6 space-y-4">
-            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-              <h2 className="text-sm font-bold text-gray-900">Danh sách Kỵ sĩ cân sau cuộc đua</h2>
-              <span className="text-xs text-gray-400">Yêu cầu lệch không quá 1.0kg</span>
+        {activeTab === 'vet-check' && (
+          <div className="space-y-4 p-4 sm:p-6">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h2 className="text-sm font-bold text-gray-900">Kiểm tra danh tính ngựa & khám lâm sàng</h2>
+              <span className="text-xs text-gray-400">Mismatch hoặc Unfit có thể loại entry</span>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-gray-700">
-                <thead>
-                  <tr className="border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider bg-gray-50/50">
-                    <th className="py-3 px-4">Kỵ sĩ</th>
-                    <th className="py-3 px-4">Cân trước đua (kg)</th>
-                    <th className="py-3 px-4">Cân sau đua (kg)</th>
-                    <th className="py-3 px-4">Chênh lệch (kg)</th>
-                    <th className="py-3 px-4 text-right">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {weighOutData.map((item) => {
-                    const diff = item.actualWeight !== '' ? Number((item.actualWeight - item.declaredWeight).toFixed(1)) : 0
-                    const isExceeded = item.actualWeight !== '' && Math.abs(diff) > 1.0
 
-                    return (
-                      <tr key={item.id} className="hover:bg-gray-50/20 transition-colors">
-                        <td className="py-4 px-4 font-semibold text-gray-900">{item.name}</td>
-                        <td className="py-4 px-4 font-mono font-medium">{item.declaredWeight.toFixed(1)}</td>
-                        <td className="py-4 px-4">
-                          <input
-                            type="number"
-                            step="0.1"
-                            className={`w-28 bg-gray-50 border rounded-lg px-3 py-1.5 text-sm font-semibold focus:bg-white focus:outline-none focus:ring-2 transition-all ${
-                              isExceeded 
-                                ? 'border-red-500 focus:ring-red-500/20 text-red-700 bg-red-50/50' 
-                                : 'border-gray-200 focus:ring-emerald-500/20 focus:border-emerald-500'
-                            }`}
-                            placeholder="Nhập cân"
-                            value={item.actualWeight}
-                            onChange={(e) => handleWeighOutWeightChange(item.id, e.target.value)}
-                          />
-                        </td>
-                        <td className="py-4 px-4">
-                          {item.actualWeight !== '' ? (
+            {stateBlock ?? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-gray-700">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/50 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                      <th className="px-4 py-3">Ngựa / Kỵ sĩ</th>
+                      <th className="px-4 py-3">Danh tính</th>
+                      <th className="px-4 py-3">Khám lâm sàng</th>
+                      <th className="px-4 py-3">Lý do Unfit</th>
+                      <th className="px-4 py-3">Kết quả kiểm tra</th>
+                      <th className="px-4 py-3 text-right">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {entries.map((entry) => {
+                      const identityKey = `identity-${entry.raceEntryId}`
+                      const clinicalKey = `clinical-${entry.raceEntryId}`
+                      const clinicalStatus = clinicalInputs[entry.raceEntryId] ?? 'Fit'
+
+                      return (
+                        <tr key={entry.raceEntryId} className="transition-colors hover:bg-gray-50/20">
+                          <td className="px-4 py-4">
+                            <p className="font-semibold text-gray-900">{entry.horseName}</p>
+                            <p className="mt-0.5 text-xs text-gray-400">
+                              {entry.jockeyName}
+                              {entry.horseBreed ? ` - ${entry.horseBreed}` : ''}
+                            </p>
+                            <p className="mt-0.5 text-xs text-gray-400">Post {entry.postPosition ?? '-'}</p>
+                          </td>
+                          <td className="px-4 py-4">
                             <div className="flex items-center gap-2">
-                              <span className={`font-mono font-bold ${isExceeded ? 'text-red-600' : 'text-emerald-600'}`}>
-                                {diff > 0 ? `+${diff}` : diff}
-                              </span>
-                              {isExceeded && (
-                                <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">
-                                  Vượt mức
+                              <select
+                                value={identityInputs[entry.raceEntryId] ?? 'Matched'}
+                                onChange={(event) =>
+                                  setIdentityInputs((prev) => ({
+                                    ...prev,
+                                    [entry.raceEntryId]: event.target.value as IdentityStatus,
+                                  }))
+                                }
+                                className="rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-semibold focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                              >
+                                <option value="Matched">Matched</option>
+                                <option value="Mismatch">Mismatch</option>
+                              </select>
+                              {entry.horseIdentityCheckStatus && (
+                                <span className="text-xs font-semibold text-emerald-700">
+                                  {entry.horseIdentityCheckStatus}
                                 </span>
                               )}
                             </div>
-                          ) : (
-                            <span className="text-gray-400 text-xs italic">Chưa cân</span>
-                          )}
+                          </td>
+                          <td className="px-4 py-4">
+                            <select
+                              value={clinicalStatus}
+                              onChange={(event) =>
+                                setClinicalInputs((prev) => ({
+                                  ...prev,
+                                  [entry.raceEntryId]: event.target.value as ClinicalStatus,
+                                }))
+                              }
+                              className={`rounded-lg border px-3 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 ${
+                                clinicalStatus === 'Unfit'
+                                  ? 'border-red-200 bg-red-50 text-red-700 focus:ring-red-500/20'
+                                  : 'border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-500/20'
+                              }`}
+                            >
+                              <option value="Fit">Fit</option>
+                              <option value="Unfit">Unfit</option>
+                            </select>
+                          </td>
+                          <td className="px-4 py-4">
+                            <input
+                              type="text"
+                              value={unfitReasons[entry.raceEntryId] ?? ''}
+                              disabled={clinicalStatus !== 'Unfit'}
+                              onChange={(event) =>
+                                setUnfitReasons((prev) => ({
+                                  ...prev,
+                                  [entry.raceEntryId]: event.target.value,
+                                }))
+                              }
+                              placeholder={clinicalStatus === 'Unfit' ? 'Nhập lý do Unfit' : 'Không cần khi Fit'}
+                              className="w-56 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                            />
+                          </td>
+                          <td className="px-4 py-4">
+                            <VetCheckResultBadges entry={entry} />
+                          </td>
+                          <td className="px-4 py-4 text-right">
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => handleHorseIdentityConfirm(entry)}
+                                disabled={savingKey === identityKey}
+                                className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-30"
+                              >
+                                {savingKey === identityKey ? 'Đang lưu...' : 'Lưu danh tính'}
+                              </button>
+                              <button
+                                onClick={() => handleClinicalConfirm(entry)}
+                                disabled={savingKey === clinicalKey}
+                                className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-30"
+                              >
+                                {savingKey === clinicalKey ? 'Đang lưu...' : 'Lưu khám'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'weigh-out' && (
+          <div className="space-y-4 p-4 sm:p-6">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h2 className="text-sm font-bold text-gray-900">Cân nặng sau đua (Weigh-Out)</h2>
+              <span className="text-xs text-gray-400">Chưa gắn API ở bước này</span>
+            </div>
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Backend hiện chưa có endpoint Weigh-Out trong scope prompt, nên màn này chỉ hiển thị thông tin entries thật và chưa cho lưu.
+            </div>
+            {stateBlock ?? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-gray-700">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/50 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                      <th className="px-4 py-3">Post</th>
+                      <th className="px-4 py-3">Kỵ sĩ / Ngựa</th>
+                      <th className="px-4 py-3">Cân trước đua</th>
+                      <th className="px-4 py-3">Trạng thái</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {entries.map((entry) => (
+                      <tr key={entry.raceEntryId}>
+                        <td className="px-4 py-4 font-mono text-xs font-bold text-gray-500">
+                          {entry.postPosition ?? '-'}
                         </td>
-                        <td className="py-4 px-4 text-right">
-                          <button
-                            onClick={() => handleWeighOutConfirm(item.id)}
-                            disabled={item.actualWeight === ''}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                              item.isConfirmed
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default'
-                                : 'bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed'
-                            }`}
-                          >
-                            {item.isConfirmed ? '✓ Đã xác nhận' : 'Xác nhận Weigh-Out'}
-                          </button>
+                        <td className="px-4 py-4">
+                          <p className="font-semibold text-gray-900">{entry.jockeyName}</p>
+                          <p className="mt-0.5 text-xs text-gray-400">{entry.horseName}</p>
+                        </td>
+                        <td className="px-4 py-4 font-mono font-medium">
+                          {formatWeight(entry.preRaceJockeyWeight)}
+                        </td>
+                        <td className="px-4 py-4">
+                          <EntryStatusBadge entry={entry} />
                         </td>
                       </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>
