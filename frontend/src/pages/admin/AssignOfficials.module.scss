@@ -1,0 +1,154 @@
+.container { display: flex; flex-direction: column; gap: 1.5rem; }
+.pageHeader { display: flex; flex-direction: column; gap: 0.2rem; }
+.heading { font-size: 1.65rem; font-weight: 800; color: #111; margin: 0; }
+.subtext { font-size: 0.88rem; color: #888; margin: 0; }
+.sectionHeader { display: flex; flex-direction: column; gap: 0.3rem; }
+.sectionTitle { font-size: 1.3rem; font-weight: 800; color: #111; margin: 0; }
+.sectionDesc { font-size: 0.85rem; color: #888; margin: 0; }
+
+/* ─── Filter card ─── */
+.filterCard {
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 14px;
+  padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;
+}
+.filterRow { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.filterGroup { display: flex; flex-direction: column; gap: 0.4rem; }
+.filterLabel { font-size: 0.78rem; font-weight: 600; color: #555; }
+.selectWrap { position: relative; display: flex; align-items: center; }
+.select {
+  width: 100%; appearance: none; background: #f9fafb; border: 1px solid #d1d5db;
+  border-radius: 8px; padding: 0.55rem 2rem 0.55rem 0.85rem;
+  font-size: 0.85rem; color: #333; outline: none; cursor: pointer;
+  &:focus { border-color: #2563eb; }
+}
+.selectIcon { position: absolute; right: 0.7rem; color: #999; pointer-events: none; }
+
+.raceInfo {
+  display: flex; gap: 1.5rem; flex-wrap: wrap;
+  padding: 0.75rem 1rem; background: #f9fafb; border-radius: 8px;
+}
+.raceInfoItem { font-size: 0.82rem; color: #555; }
+
+/* ─── Messages ─── */
+.successMsg { color: #16a34a; font-size: 0.85rem; margin: 0; }
+.errorMsg { color: #dc2626; font-size: 0.85rem; margin: 0; }
+
+/* ─── Assignment grid ─── */
+.assignGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+
+.assignCard {
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 14px;
+  padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;
+}
+.cardTitle { font-size: 1rem; font-weight: 700; color: #111; margin: 0; }
+
+.emptyAssign { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; padding: 1rem 0; }
+.emptyText { font-size: 0.85rem; color: #aaa; margin: 0; text-align: center; }
+
+.assignBtn {
+  padding: 0.6rem 1.5rem; background: #2563eb; color: #fff; border: none;
+  border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+  transition: background 0.2s;
+  &:hover { background: #1d4ed8; }
+}
+
+.assignedItem {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 1rem; background: #f9fafb; border-radius: 10px; padding: 1rem;
+}
+.assignedInfo { display: flex; flex-direction: column; gap: 0.25rem; flex: 1; }
+.assignedName { font-size: 0.92rem; font-weight: 700; color: #111; }
+.assignedRole { font-size: 0.75rem; font-weight: 600; color: #2563eb; }
+.assignedMeta { font-size: 0.75rem; color: #888; }
+
+.removeBtn {
+  display: flex; align-items: center; gap: 0.3rem; flex-shrink: 0;
+  background: #fff; border: 1px solid #fca5a5; color: #dc2626;
+  padding: 0.4rem 0.75rem; border-radius: 7px; font-size: 0.78rem; font-weight: 600;
+  cursor: pointer; transition: all 0.2s;
+  &:hover:not(:disabled) { background: #fef2f2; }
+  &:disabled { opacity: 0.4; cursor: not-allowed; }
+}
+
+.addMoreBtn {
+  background: transparent; border: 1px dashed #d1d5db; color: #888;
+  padding: 0.5rem; border-radius: 8px; font-size: 0.82rem; cursor: pointer;
+  transition: all 0.2s; width: 100%;
+  &:hover { border-color: #2563eb; color: #2563eb; }
+}
+
+.loading { color: #999; font-size: 0.85rem; text-align: center; padding: 1rem 0; }
+
+/* ─── Status card ─── */
+.statusCard {
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 1.5rem;
+  display: flex; flex-direction: column; gap: 0.75rem;
+}
+.statusItems { display: flex; gap: 1.5rem; }
+.statusItem {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 0.85rem; font-weight: 600;
+}
+.statusOk { color: #16a34a; }
+.statusPending { color: #888; }
+.statusDot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #d1d5db; display: inline-block; }
+.statusNote { font-size: 0.82rem; color: #888; margin: 0; }
+.statusReady { font-size: 0.85rem; color: #16a34a; font-weight: 600; margin: 0; }
+
+/* ─── Modal ─── */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 200; }
+.modal {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  background: #fff; border-radius: 14px; padding: 1.5rem;
+  width: 460px; max-width: 95vw; z-index: 201;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+  display: flex; flex-direction: column; gap: 1rem;
+  max-height: 80vh; overflow-y: auto;
+}
+.modalHeader { display: flex; align-items: center; justify-content: space-between; }
+.modalTitle { font-size: 1rem; font-weight: 700; color: #111; margin: 0; }
+.closeBtn {
+  background: transparent; border: none; color: #888; cursor: pointer; padding: 0.3rem;
+  border-radius: 6px; transition: all 0.2s;
+  &:hover { background: #f3f4f6; color: #111; }
+}
+
+.roleSelect { display: flex; flex-direction: column; gap: 0.4rem; }
+
+.searchWrap { position: relative; display: flex; align-items: center; }
+.searchIcon { position: absolute; left: 0.75rem; color: #999; pointer-events: none; }
+.searchInput {
+  width: 100%; background: #f9fafb; border: 1px solid #d1d5db; border-radius: 8px;
+  padding: 0.55rem 0.85rem 0.55rem 2.2rem; font-size: 0.84rem; color: #333; outline: none;
+  &:focus { border-color: #2563eb; }
+  &::placeholder { color: #bbb; }
+}
+
+.personList { display: flex; flex-direction: column; gap: 0.5rem; }
+.personRow {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 0.85rem 1rem; background: #f9fafb; border-radius: 10px;
+  border: 1px solid #e5e7eb;
+}
+.personInfo { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; }
+.personName { font-size: 0.88rem; font-weight: 600; color: #111; }
+.personMeta { font-size: 0.75rem; color: #888; }
+.personStatus {
+  display: inline-flex; padding: 0.15rem 0.5rem; border-radius: 999px;
+  font-size: 0.68rem; font-weight: 700; width: fit-content;
+}
+.statusApproved { background: #dcfce7; color: #16a34a; }
+.statusOtherBadge { background: #f3f4f6; color: #888; }
+
+.sendBtn {
+  background: #2563eb; color: #fff; border: none; padding: 0.45rem 1rem;
+  border-radius: 7px; font-size: 0.82rem; font-weight: 600; cursor: pointer;
+  white-space: nowrap; transition: background 0.2s; flex-shrink: 0;
+  &:hover:not(:disabled) { background: #1d4ed8; }
+  &:disabled { opacity: 0.4; cursor: not-allowed; }
+}
+
+@media (max-width: 768px) {
+  .filterRow, .assignGrid { grid-template-columns: 1fr; }
+  .statusItems { flex-direction: column; }
+}

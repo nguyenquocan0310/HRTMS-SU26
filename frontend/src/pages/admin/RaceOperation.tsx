@@ -8,6 +8,7 @@ import {
   type RaceSchedule,
 } from '../../services/raceOperationService';
 import styles from './RaceOperation.module.scss';
+import { Link } from 'react-router-dom';
 ``
 interface TournamentOption { id: number; name: string; }
 interface RaceOption { id: number; label: string; }
@@ -168,6 +169,12 @@ const RaceOperations = () => {
           >
             {allocating ? 'Đang xử lý...' : 'Allocate'}
           </button>
+
+          {schedule?.isPostPositionDrawn ?(
+              <Link to="/admin/assign-officials" className={styles.assignOfficialsBtn}>
+              Assign Officials →
+            </Link>
+          ):(
           <button
             type="button"
             className={styles.drawBtn}
@@ -176,6 +183,7 @@ const RaceOperations = () => {
           >
             {drawing ? 'Đang bốc...' : 'Draw post positions'}
           </button>
+          )}
         </div>
 
         {actionMsg && <p className={styles.successMsg}>{actionMsg}</p>}
