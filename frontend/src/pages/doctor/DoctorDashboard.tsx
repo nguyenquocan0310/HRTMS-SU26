@@ -6,11 +6,20 @@ import { getMyDoctorRaceAssignments, type DoctorRaceAssignment } from '../../ser
 // ─── Status badge helper ──────────────────────────────────────────────────────
 
 const RACE_STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  Upcoming:  { label: 'Sắp diễn ra',    cls: 'bg-blue-50 text-blue-700 border border-blue-100'     },
-  Active:    { label: 'Đang diễn ra',    cls: 'bg-emerald-50 text-emerald-700 border border-emerald-100' },
-  Running:   { label: 'Đang diễn ra',    cls: 'bg-emerald-50 text-emerald-700 border border-emerald-100' },
-  Completed: { label: 'Đã hoàn thành',   cls: 'bg-gray-50 text-gray-600 border border-gray-100'    },
-  Cancelled: { label: 'Đã hủy',          cls: 'bg-red-50 text-red-600 border border-red-100'        },
+  // ── Sắp diễn ra ──
+  Upcoming:        { label: 'Sắp diễn ra',  cls: 'bg-blue-50 text-blue-700 border border-blue-100'         },
+  'Sắp diễn ra':  { label: 'Sắp diễn ra',  cls: 'bg-blue-50 text-blue-700 border border-blue-100'         },
+  // ── Đang diễn ra ──
+  Active:          { label: 'Đang diễn ra', cls: 'bg-emerald-50 text-emerald-700 border border-emerald-100' },
+  Running:         { label: 'Đang diễn ra', cls: 'bg-emerald-50 text-emerald-700 border border-emerald-100' },
+  InProgress:      { label: 'Đang diễn ra', cls: 'bg-emerald-50 text-emerald-700 border border-emerald-100' },
+  'Đang diễn ra': { label: 'Đang diễn ra', cls: 'bg-emerald-50 text-emerald-700 border border-emerald-100' },
+  // ── Đã hoàn thành ──
+  Completed:       { label: 'Đã hoàn thành', cls: 'bg-gray-50 text-gray-600 border border-gray-100'         },
+  Official:        { label: 'Chính thức',    cls: 'bg-gray-50 text-gray-600 border border-gray-100'         },
+  'Đã hoàn thành': { label: 'Đã hoàn thành', cls: 'bg-gray-50 text-gray-600 border border-gray-100'        },
+  // ── Đã hủy ──
+  Cancelled:       { label: 'Đã hủy',        cls: 'bg-red-50 text-red-600 border border-red-100'            },
 }
 
 function RaceStatusBadge({ status }: { status: string }) {
@@ -165,7 +174,9 @@ export default function DoctorDashboard() {
           <div>
             <p className="text-xs font-semibold text-yellow-600 uppercase tracking-wider">Sắp diễn ra</p>
             <p className="text-3xl font-bold text-gray-900 mt-2">
-              {assignmentsLoading ? '…' : assignments.filter(a => a.raceStatus === 'Upcoming').length}
+              {assignmentsLoading ? '…' : assignments.filter(a =>
+                a.raceStatus === 'Upcoming' || a.raceStatus === 'Sắp diễn ra'
+              ).length}
             </p>
           </div>
           <div className="w-12 h-12 bg-yellow-50 text-yellow-600 flex items-center justify-center rounded-xl text-2xl font-semibold shadow-inner">
@@ -178,7 +189,10 @@ export default function DoctorDashboard() {
           <div>
             <p className="text-xs font-semibold text-green-600 uppercase tracking-wider">Đang diễn ra</p>
             <p className="text-3xl font-bold text-gray-900 mt-2">
-              {assignmentsLoading ? '…' : assignments.filter(a => a.raceStatus === 'Active' || a.raceStatus === 'Running').length}
+              {assignmentsLoading ? '…' : assignments.filter(a =>
+                a.raceStatus === 'Active' || a.raceStatus === 'Running' ||
+                a.raceStatus === 'InProgress' || a.raceStatus === 'Đang diễn ra'
+              ).length}
             </p>
           </div>
           <div className="w-12 h-12 bg-green-50 text-green-600 flex items-center justify-center rounded-xl text-2xl font-semibold shadow-inner">
@@ -191,7 +205,10 @@ export default function DoctorDashboard() {
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Đã hoàn thành</p>
             <p className="text-3xl font-bold text-gray-900 mt-2">
-              {assignmentsLoading ? '…' : assignments.filter(a => a.raceStatus === 'Completed').length}
+              {assignmentsLoading ? '…' : assignments.filter(a =>
+                a.raceStatus === 'Completed' || a.raceStatus === 'Official' ||
+                a.raceStatus === 'Đã hoàn thành'
+              ).length}
             </p>
           </div>
           <div className="w-12 h-12 bg-gray-50 text-gray-500 flex items-center justify-center rounded-xl text-2xl font-semibold shadow-inner">
