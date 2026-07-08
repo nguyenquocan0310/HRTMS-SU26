@@ -15,6 +15,7 @@ const OPERATIONS_ITEMS: NavItem[] = [
   { label: 'Tournaments', path: '/admin/tournaments', icon: <FiList size={18} /> },
   { label: 'Tournament Builder', path: '/admin/tournament-builder', icon: <FiPlusCircle size={18} /> },
   { label: 'Race Operations', path: '/admin/race-operations', icon: <FiFlag size={18} /> },
+  { label: 'Assign Officials', path: '/admin/assign-officials', icon: <FiUsers size={18} /> },
   { label: 'Entry Fees', path: '/admin/entry-fees', icon: <FiCreditCard size={18} /> },
 ];
 
