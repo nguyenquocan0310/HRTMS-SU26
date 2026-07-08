@@ -580,23 +580,17 @@ const StepVerification = ({ role, formData, onChange }: Props) => {
               }
             />
           </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Medical License Number</label>
-            <input
-              type="text"
-              className={styles.input}
-              placeholder="Enter your medical license number"
-              value={formData.doctorVerification.medicalLicenseNumber}
-              onChange={(e) =>
-                onChange({
-                  doctorVerification: {
-                    ...formData.doctorVerification,
-                    medicalLicenseNumber: e.target.value,
-                  },
-                })
-              }
-            />
-          </div>
+<div className={styles.field}>
+  <label className={styles.label}>Medical License Certificate (ảnh/PDF)</label>
+  <CertificateUpload
+    value={formData.doctorVerification.medicalLicenseNumber}
+    onChange={(url) =>
+      onChange({
+        doctorVerification: { ...formData.doctorVerification, medicalLicenseNumber: url },
+      })
+    }
+  />
+</div>
         </div>
       </div>
     );
