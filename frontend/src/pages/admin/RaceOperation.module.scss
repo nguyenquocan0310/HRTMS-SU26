@@ -205,8 +205,17 @@
 }
 
 .assignOfficialsBtn {
-  padding: 0.6rem 1.25rem; background: #16a34a; color: #fff;
-  border-radius: 8px; font-size: 0.85rem; font-weight: 600;
-  text-decoration: none; white-space: nowrap;
+  padding: 0.6rem 1.25rem;
+  background: #16a34a;
+  color: #fff;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  transition: background 0.2s;
+
   &:hover { background: #15803d; color: #fff; }
 }

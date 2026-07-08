@@ -5,6 +5,7 @@ import StatusBadge, { type StatusType } from '../../components/common/StatusBadg
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { apiFetch } from '../../services/apiClient';
 import styles from './UserManagement.module.scss';
+import UserDetailModal from '../../components/common/UserDetailModal';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type UserRole = 'Admin' | 'HorseOwner' |'Owner'| 'Jockey' | 'RaceReferee' |'Referee'| 'Doctor' | 'Spectator';
@@ -192,13 +193,15 @@ const handleConfirmAction = async () => {
               Activate
             </button>
           )}
-          <button type="button" className={styles.detailBtn}>
-            Xem chi tiết
-          </button>
+<button type="button" className={styles.detailBtn} onClick={() => setDetailUser(row)}>
+  Xem chi tiết
+</button>
         </div>
       ),
     },
   ];
+
+  const [detailUser, setDetailUser] = useState<SystemUser | null>(null);
 
   return (
     <div className={styles.container}>
@@ -300,8 +303,24 @@ const handleConfirmAction = async () => {
           onCancel={() => setPendingAction(null)}
         />
       )}
+{detailUser && (
+  <UserDetailModal
+    userId={detailUser.id}
+    role={detailUser.role}
+    basicInfo={{
+      username: detailUser.username,
+      email: detailUser.email,
+      role: ROLE_LABELS[detailUser.role] ?? detailUser.role,
+      status: detailUser.status,
+      joinedDate: detailUser.joinedDate,
+    }}
+    onClose={() => setDetailUser(null)}
+  />
+)}
     </div>
   );
 };
+
+
 
 export default UserManagement;
