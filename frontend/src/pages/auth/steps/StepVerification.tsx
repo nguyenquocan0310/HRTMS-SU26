@@ -133,7 +133,7 @@ const StepVerification = ({ role, formData, onChange }: Props) => {
                 color: formData.jockeyVerification.identityNumber.length === 12 ? '#4caf50' : '#999',
               }}
             >
-              {formData.ownerVerification.identityNumber.length}/12 số
+              {formData.jockeyVerification.identityNumber.length}/12 số
             </span>
           </div>
           <div className={styles.field}>
