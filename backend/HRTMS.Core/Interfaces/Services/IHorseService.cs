@@ -26,7 +26,7 @@ namespace HRTMS.Core.Interfaces.Services
         Task<ApiResponse<HorseResponseDto>> GetHorseByIdAdminAsync(int horseId);
         Task<ApiResponse<string>> ApproveEnrollmentAsync(int adminId, int enrollmentId);
         Task<ApiResponse<string>> RejectEnrollmentAsync(int adminId, int enrollmentId, AdminRejectHorseDto dto);
-        // RaceEntry (RaceEntry chi do Admin tao qua Module E SCH.1; Owner chi xem)
+        // RaceEntry (RaceEntry chỉ do Admin tạo qua Module E; Owner chỉ xem)
         Task<ApiResponse<List<RaceEntryResponseDto>>> GetMyRaceEntriesAsync(int ownerId, string? status, string? feeStatus, int page, int pageSize);
 
         // Admin - RaceEntry

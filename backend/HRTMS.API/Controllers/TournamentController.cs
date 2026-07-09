@@ -220,7 +220,7 @@ namespace HRTMS.API.Controllers
             return Ok(new { success = true, data = entries });
         }
 
-        // SCH.9/EC-48 — cap nhat cau hinh Race; dong bang truong nhay cam sau boc tham / co Prediction.
+        // Cập nhật cấu hình Race; đóng băng trường nhạy cảm sau bốc thăm / có Prediction.
         [HttpPut("/api/races/{raceId:int}")]
         public async Task<ActionResult<ApiResponse<RaceResponseDto>>> UpdateRace(
             int raceId, [FromBody] UpdateRaceDto dto)

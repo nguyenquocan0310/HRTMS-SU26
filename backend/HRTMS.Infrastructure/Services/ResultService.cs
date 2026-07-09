@@ -26,7 +26,7 @@ namespace HRTMS.Infrastructure.Services
         }
 
         // =====================================================================
-        // REQ-F-RES.1 — Danh sách Race Unofficial + cờ điều kiện chặn Declare
+        // Danh sách Race Unofficial + cờ điều kiện chặn Declare
         // =====================================================================
         public async Task<List<UnofficialRaceListItemDto>> GetUnofficialRacesAsync(int? tournamentId)
         {
@@ -72,7 +72,7 @@ namespace HRTMS.Infrastructure.Services
         }
 
         // =====================================================================
-        // REQ-F-RES.2/RES.3/RES.4/RES.5 — Declare Official (ACID 6 bước)
+        // Declare Official (ACID 6 bước)
         // =====================================================================
         public async Task<DeclareOfficialResultDto> DeclareOfficialAsync(
             int raceId, DeclareOfficialDto dto, int adminUserId)
@@ -94,7 +94,7 @@ namespace HRTMS.Infrastructure.Services
             // VALIDATION TIỀN ĐIỀU KIỆN
             // ---------------------------------------------------------------
 
-            // BR-34/EC-01 — idempotent guard chống double-click
+            // Idempotent guard chống double-click
             if (race.Status != "Unofficial")
                 throw new InvalidOperationException(
                     $"Không thể công bố kết quả: cuộc đua đang ở trạng thái '{race.Status}', " +
@@ -142,7 +142,7 @@ namespace HRTMS.Infrastructure.Services
                 race.RaceReport.IsLocked = true;
                 race.RaceReport.LockedAt = now;
 
-                // BƯỚC 3 — Đối chiếu dự đoán & trả thưởng ví ảo Spectator (EC-03)
+                // BƯỚC 3 — Đối chiếu dự đoán & trả thưởng ví ảo Spectator
                 var (settledCount, refundedCount) = await SettlePredictionsAsync(race, now);
                 result.PredictionsSettledCount = settledCount;
                 result.PredictionsRefundedCount = refundedCount;
@@ -215,7 +215,7 @@ namespace HRTMS.Infrastructure.Services
                 foreach (var entry in finishers)
                 {
                     var pos = entry.FinishPosition!.Value;
-                    // Dead heat (BR-35): nhóm đồng hạng xét theo số entry đứng TRƯỚC nhóm.
+                    // Dead heat: nhóm đồng hạng xét theo số entry đứng TRƯỚC nhóm.
                     var ahead = finishers.Count(re => re.FinishPosition!.Value < pos);
                     var tieSize = finishers.Count(re => re.FinishPosition!.Value == pos);
 
@@ -264,7 +264,7 @@ namespace HRTMS.Infrastructure.Services
         }
 
         // =====================================================================
-        // Helper: Bước 3 — Đối chiếu & trả thưởng dự đoán (REQ-F-REC.1/REC.2, EC-03)
+        // Helper: Bước 3 — Đối chiếu & trả thưởng dự đoán
         // =====================================================================
         private async Task<(int settled, int refunded)> SettlePredictionsAsync(Race race, DateTime now)
         {
@@ -274,19 +274,19 @@ namespace HRTMS.Infrastructure.Services
 
             int settled = 0, refunded = 0;
 
-            // Schema v2 đã bỏ Tournament.PredictionRewardPoints → dùng hằng số chuẩn (REC.2: +200).
+            // Schema v2 đã bỏ Tournament.PredictionRewardPoints → dùng hằng số chuẩn (+200).
             var rewardPoints = PredictionWinRewardPoints;
 
-            // Tập ngựa về Nhất chính thức — cho phép đồng hạng (BR-35/EC-02)
+            // Tập ngựa về Nhất chính thức — cho phép đồng hạng
             var winningEntryIds = race.RaceEntries
                 .Where(re => re.FinishPosition == 1 && re.Status != "Cancelled" && re.Status != "Disqualified")
                 .Select(re => re.RaceEntryId)
                 .ToHashSet();
 
-            // Map RaceEntryId -> Status để biết Disqualified/Cancelled (EC-03)
+            // Map RaceEntryId -> Status để biết Disqualified/Cancelled
             var entryStatusById = race.RaceEntries.ToDictionary(re => re.RaceEntryId, re => re.Status);
 
-            // Gộp theo Spectator để ghi 1 dòng VPT/Spectator (tránh update phi tất định — BR-35)
+            // Gộp theo Spectator để ghi 1 dòng VPT/Spectator (tránh update phi tất định)
             var rewardBySpectator = new Dictionary<int, int>();
             var refundBySpectator = new Dictionary<int, int>();
 
@@ -367,7 +367,7 @@ namespace HRTMS.Infrastructure.Services
 
         /// <summary>
         /// Cộng/trừ ví Spectator + ghi 1 dòng sổ cái trong cùng transaction.
-        /// Giữ bất biến Balance = SUM(VirtualPointsTransactions.Amount) — EC-13.
+        /// Giữ bất biến Balance = SUM(VirtualPointsTransactions.Amount).
         /// Pattern Include(s => s.Wallet) giống CancelTournamentAsync (Bug 2 fix gốc).
         /// </summary>
         private async Task ApplyWalletTransactionAsync(int spectatorId, int amount, string type, DateTime now)
@@ -380,7 +380,7 @@ namespace HRTMS.Infrastructure.Services
 
             if (spectator?.Wallet == null)
             {
-                // Không nên xảy ra (mọi Spectator có Wallet từ lúc đăng ký — EC-47/BR-56),
+                // Không nên xảy ra (mọi Spectator có Wallet từ lúc đăng ký),
                 // nhưng không throw để tránh chặn toàn bộ Declare Official vì 1 ví thiếu.
                 return;
             }
@@ -398,7 +398,7 @@ namespace HRTMS.Infrastructure.Services
         }
 
         // =====================================================================
-        // Helper: Bước 4 — set PointsAwarded theo thứ hạng (nguồn Leaderboard — REQ-F-LDR.1)
+        // Helper: Bước 4 — set PointsAwarded theo thứ hạng (nguồn Leaderboard)
         // =====================================================================
         private static void UpdateLeaderboardPoints(IEnumerable<RaceEntry> entries)
         {
@@ -418,7 +418,7 @@ namespace HRTMS.Infrastructure.Services
         }
 
         // =====================================================================
-        // Helper: Bước 5 — Phân bổ Purse theo PrizeDistributions (BR-42/EC-33, BR-26/EC-08)
+        // Helper: Bước 5 — Phân bổ Purse theo PrizeDistributions
         // =====================================================================
         private (int payoutsCreated, decimal? remainder) AllocatePurse(Race race, DateTime now)
         {
@@ -429,7 +429,7 @@ namespace HRTMS.Infrastructure.Services
             var purseAmount = race.PurseAmount;
             int created = 0;
 
-            // Nhóm theo FinishPosition để xử lý đồng hạng (BR-35)
+            // Nhóm theo FinishPosition để xử lý đồng hạng
             var finishersByPosition = race.RaceEntries
                 .Where(re => re.Status != "Cancelled" && re.Status != "Disqualified" && re.FinishPosition != null)
                 .GroupBy(re => re.FinishPosition!.Value)
@@ -458,7 +458,7 @@ namespace HRTMS.Infrastructure.Services
                     created += CreatePayoutForEntry(entry, groupPrizeAmount, now);
             }
 
-            // EC-08/BR-26: phần dư khi số ngựa về đích hợp lệ < số vị trí thưởng
+            // Phần dư khi số ngựa về đích hợp lệ < số vị trí thưởng
             decimal? remainder = null;
             var unallocated = 100m - allocatedPercentage;
             if (unallocated > 0)
@@ -526,7 +526,7 @@ namespace HRTMS.Infrastructure.Services
         // Validation helpers
         // =====================================================================
 
-        /// <summary>BR-42/EC-33/EC-08: tổng PrizeDistributions của giải phải = 100%.</summary>
+        /// <summary>Tổng PrizeDistributions của giải phải = 100%.</summary>
         private async Task<bool> IsPrizeDistributionsValidAsync(int tournamentId)
         {
             var distributions = await _context.PrizeDistributions
@@ -541,7 +541,7 @@ namespace HRTMS.Infrastructure.Services
         }
 
         /// <summary>
-        /// EC-41/BR-50/EC-02/EC-14: standard-ranking integrity check.
+        /// Standard-ranking integrity check.
         /// Cho phép đồng hạng (1,1,3) nhưng không cho thiếu vị trí (1,2,4 — nhảy cóc).
         /// </summary>
         private static bool IsRankingIntegrityValid(IEnumerable<RaceEntry> entries)
@@ -554,7 +554,7 @@ namespace HRTMS.Infrastructure.Services
             if (positions.Any(p => p == null)) return false;
 
             var sorted = positions.Select(p => p!.Value).OrderBy(p => p).ToList();
-            if (sorted.Count == 0) return true; // race rỗng — EC-16 "ngựa bao nhiêu đua bấy nhiêu"
+            if (sorted.Count == 0) return true; // race rỗng — "ngựa bao nhiêu đua bấy nhiêu"
 
             int expectedNext = 1, i = 0;
             while (i < sorted.Count)
@@ -570,7 +570,7 @@ namespace HRTMS.Infrastructure.Services
             return true;
         }
 
-        /// <summary>EC-42/BR-51: mọi entry hợp lệ phải có PostRaceJockeyWeight trước khi Declare.</summary>
+        /// <summary>Mọi entry hợp lệ phải có PostRaceJockeyWeight trước khi Declare.</summary>
         private static bool IsPostRaceWeighInComplete(IEnumerable<RaceEntry> entries)
         {
             return entries

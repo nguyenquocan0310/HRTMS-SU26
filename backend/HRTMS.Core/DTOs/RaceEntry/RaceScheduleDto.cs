@@ -1,6 +1,6 @@
 namespace HRTMS.Core.DTOs.RaceEntry;
 
-// SCH.3 — Lich thi dau cong khai cua mot Race (hien thi cho moi Actor).
+// Lịch thi đấu công khai của một Race (hiển thị cho mọi Actor).
 public class RaceScheduleDto
 {
     public int RaceId { get; set; }

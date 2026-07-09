@@ -7,9 +7,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HRTMS.Infrastructure.Services;
 
-// Module E — Lap lich, Boc tham & Rut lui (REQ-F-SCH).
-// Theo convention HRTMS: service dung HRTMSDbContext truc tiep, nem exception voi
-// "error code" la message de Controller map sang HTTP status.
+// Module E — Lập lịch, Bốc thăm & Rút lui.
+// Theo convention HRTMS: service dùng HRTMSDbContext trực tiếp, ném exception với
+// "error code" là message để Controller map sang HTTP status.
 public class RaceEntryService : IRaceEntryService
 {
     // Cac trang thai entry duoc tinh la "hop le" (chiem 1 suat trong Race / 1 cong).
@@ -30,7 +30,7 @@ public class RaceEntryService : IRaceEntryService
     }
 
     // =====================================================================
-    // SCH.1 — Phan bo Pairing vao Race
+    // Phân bổ Pairing vào Race
     // =====================================================================
     public async Task<RaceEntryResponseDto> AllocateAsync(
         int adminId, int raceId, AllocateEntryDto dto)
@@ -42,7 +42,7 @@ public class RaceEntryService : IRaceEntryService
             .FirstOrDefaultAsync(r => r.RaceId == raceId)
             ?? throw new KeyNotFoundException("RACE_NOT_FOUND");
 
-        // EC-48: da boc tham roi thi khong them entry duoc nua (danh sach xuat phat da chot).
+        // Đã bốc thăm rồi thì không thêm entry được nữa (danh sách xuất phát đã chốt).
         if (race.IsPostPositionDrawn)
             throw new InvalidOperationException("RACE_ALREADY_DRAWN");
 
@@ -50,7 +50,7 @@ public class RaceEntryService : IRaceEntryService
         if (race.Status != "Upcoming")
             throw new InvalidOperationException("INVALID_RACE_STATE");
 
-        // SCH.6 / EC-35 — cua so thoi gian phai con hop le.
+        // Cửa sổ thời gian phải còn hợp lệ.
         ValidateScheduleWindow(race);
 
         // Load Pairing kem Horse + Jockey(User) de kiem dieu kien va de tra ve ten.
@@ -64,8 +64,8 @@ public class RaceEntryService : IRaceEntryService
         if (pairing.TournamentId != race.Round.TournamentId)
             throw new InvalidOperationException("PAIRING_TOURNAMENT_MISMATCH");
 
-        // SRS SCH.1 — chi cap da Confirmed (jockey accept + owner confirm) moi duoc dua vao dua.
-        // "Accepted" moi chi la jockey dong y, owner chua confirm -> chua du dieu kien.
+        // Chỉ cặp đã Confirmed (jockey accept + owner confirm) mới được đưa vào đua.
+        // "Accepted" mới chỉ là jockey đồng ý, owner chưa confirm -> chưa đủ điều kiện.
         if (pairing.Status != "Confirmed")
             throw new InvalidOperationException("PAIRING_NOT_CONFIRMED");
 
@@ -93,18 +93,18 @@ public class RaceEntryService : IRaceEntryService
         if (pairing.Horse.AdminApprovalStatus != "Approved")
             throw new InvalidOperationException("HORSE_NOT_APPROVED");
 
-        // EC-21 (BR-05) — tai kiem tra kinh nghiem Jockey tai thoi diem dua cap vao Race cu the,
-        // vi nguong MinJockeyExperienceYears phu thuoc tung giai.
+        // Tái kiểm tra kinh nghiệm Jockey tại thời điểm đưa cặp vào Race cụ thể,
+        // vì ngưỡng MinJockeyExperienceYears phụ thuộc từng giải.
         if (pairing.Jockey.ExperienceYears < race.Round.Tournament.MinJockeyExperienceYears)
             throw new InvalidOperationException("JOCKEY_EXPERIENCE_TOO_LOW");
 
-        // SCH.7 / EC-46 — chan khi so entry hop le da dat MaxHorses (khong ap so toi thieu).
+        // Chặn khi số entry hợp lệ đã đạt MaxHorses (không áp số tối thiểu).
         var currentCount = await _context.RaceEntries
             .CountAsync(e => e.RaceId == raceId && ActiveEntryStatuses.Contains(e.Status));
         if (currentCount >= race.Round.Tournament.MaxHorses)
             throw new InvalidOperationException("MAX_HORSES_REACHED");
 
-        // SCH.8 / EC-40 — chan cung HorseId hoac JockeyId xuat hien 2 lan trong CUNG mot Race.
+        // Chặn cùng HorseId hoặc JockeyId xuất hiện 2 lần trong CÙNG một Race.
         var duplicateInRace = await _context.RaceEntries
             .Include(e => e.Pairing)
             .AnyAsync(e =>
@@ -115,8 +115,8 @@ public class RaceEntryService : IRaceEntryService
         if (duplicateInRace)
             throw new InvalidOperationException("DUPLICATE_IN_RACE");
 
-        // SCH.8 / EC-15 — chan double-booking: cung Horse/Jockey o Race khac cung gio chay.
-        // Pha 1 dinh nghia "chong lap" = trung ScheduledTime (chua co truong thoi luong dua).
+        // Chặn double-booking: cùng Horse/Jockey ở Race khác cùng giờ chạy.
+        // Pha 1 định nghĩa "chồng lấp" = trùng ScheduledTime (chưa có trường thời lượng đua).
         var doubleBooked = await _context.RaceEntries
             .Include(e => e.Pairing)
             .Include(e => e.Race)
@@ -175,7 +175,7 @@ public class RaceEntryService : IRaceEntryService
     }
 
     // =====================================================================
-    // SCH.2 — Boc tham vi tri xuat phat (NGUYEN TU)
+    // Bốc thăm vị trí xuất phát (NGUYÊN TỬ)
     // =====================================================================
     public async Task<PostPositionDrawResultDto> DrawPostPositionsAsync(int adminId, int raceId)
     {
@@ -262,7 +262,7 @@ public class RaceEntryService : IRaceEntryService
     }
 
     // =====================================================================
-    // SCH.3 — Lich thi dau cong khai
+    // Lịch thi đấu công khai
     // =====================================================================
     public async Task<RaceScheduleDto> GetRaceScheduleAsync(int raceId)
     {
@@ -301,7 +301,7 @@ public class RaceEntryService : IRaceEntryService
     }
 
     // =====================================================================
-    // SCH.4 — Owner xac nhan tham gia
+    // Owner xác nhận tham gia
     // =====================================================================
     public async Task<RaceEntryResponseDto> ConfirmAsync(int ownerId, int raceEntryId)
     {
@@ -336,7 +336,7 @@ public class RaceEntryService : IRaceEntryService
     }
 
     // =====================================================================
-    // SCH.5 — Withdrawal Flow (idempotent)
+    // Withdrawal Flow (idempotent)
     // =====================================================================
     public async Task<WithdrawResultDto> WithdrawAsync(
         int actorId, int raceEntryId, WithdrawEntryDto dto, bool isSystem = false)
@@ -372,7 +372,7 @@ public class RaceEntryService : IRaceEntryService
         await using var tx = await _context.Database.BeginTransactionAsync();
         try
         {
-            // Guard nguyen tu (BR-36): chi flip khi dang Pending/Confirmed. ExecuteUpdate tra ve so dong
+            // Guard nguyên tử: chỉ flip khi đang Pending/Confirmed. ExecuteUpdate trả về số dòng
             // bi anh huong -> dong vai tro @@ROWCOUNT, chong race condition + chong huy 2 lan.
             var rows = await _context.RaceEntries
                 .Where(e => e.RaceEntryId == raceEntryId &&
@@ -398,7 +398,7 @@ public class RaceEntryService : IRaceEntryService
                 };
             }
 
-            // Entry da thanh toan -> chuyen Refund Pending (REQ-F-HRS.8) de Module N xu ly hoan phi.
+            // Entry đã thanh toán -> chuyển Refund Pending để Module N xử lý hoàn phí.
             if (entry.EntryFeeStatus == "Paid")
             {
                 await _context.RaceEntries
@@ -472,7 +472,7 @@ public class RaceEntryService : IRaceEntryService
     }
 
     // =====================================================================
-    // SCH.5 — Job nen: tu dong cancel cac entry qua han (BR-08)
+    // Job nén: tự động cancel các entry quá hạn
     // =====================================================================
     public async Task<int> AutoCancelOverdueAsync()
     {
@@ -509,7 +509,7 @@ public class RaceEntryService : IRaceEntryService
     }
 
     // =====================================================================
-    // SCH.9 — Guard dong bang cau hinh Race
+    // Guard đóng băng cấu hình Race
     // =====================================================================
     public async Task EnsureRaceConfigEditableAsync(int raceId)
     {
@@ -529,7 +529,7 @@ public class RaceEntryService : IRaceEntryService
     // Helpers
     // =====================================================================
 
-    // SCH.6 / EC-35 — StartDate <= Round.ScheduledDate <= Race.ScheduledTime <= EndDate, va > Now.
+    // StartDate <= Round.ScheduledDate <= Race.ScheduledTime <= EndDate, và > Now.
     private static void ValidateScheduleWindow(Race race)
     {
         var tournament = race.Round.Tournament;

@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace HRTMS.Core.DTOs.RaceEntry;
 
-// SCH.5 — Owner chu dong rut lui. Ly do la tuy chon (vi du suc khoe ngua).
+// Owner chủ động rút lui. Lý do là tùy chọn (ví dụ sức khỏe ngựa).
 public class WithdrawEntryDto
 {
     [MaxLength(255)]

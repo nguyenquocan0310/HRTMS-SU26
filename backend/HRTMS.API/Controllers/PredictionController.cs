@@ -19,7 +19,7 @@ public class PredictionController : ControllerBase
         _predictionService = predictionService;
     }
 
-    // REQ-F-PRD.1 — Admin cấu hình / đóng-mở cổng dự đoán
+    // Admin cấu hình / đóng-mở cổng dự đoán
     [HttpPut("races/{raceId:int}/gate")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> SetGate(int raceId, [FromBody] PredictionGateConfigDto dto)
@@ -38,7 +38,7 @@ public class PredictionController : ControllerBase
         return result.Success ? Ok(result) : NotFound(result);
     }
 
-    // REQ-F-PRD.4 — Form Score (UI-S32, UI-S33)
+    // Form Score (UI-S32, UI-S33)
     [HttpGet("races/{raceId:int}/form-scores")]
     public async Task<IActionResult> GetFormScores(int raceId)
     {
@@ -46,7 +46,7 @@ public class PredictionController : ControllerBase
         return result.Success ? Ok(result) : NotFound(result);
     }
 
-    // REQ-F-PRD.3 + PRD.5 + PRD.6 — Spectator đặt dự đoán Win
+    // Spectator đặt dự đoán Win
     [HttpPost]
     [Authorize(Roles = "Spectator")]
     public async Task<IActionResult> PlacePrediction([FromBody] PlacePredictionDto dto)

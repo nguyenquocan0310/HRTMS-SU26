@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace HRTMS.Core.DTOs.Result
 {
 	// ===========================================================================
-	// REQ-F-RES.1 — Danh sách Race đang Unofficial (đã có biên bản) chờ Declare
+	// Danh sách Race đang Unofficial (đã có biên bản) chờ Declare
 	// ===========================================================================
 	public class UnofficialRaceListItemDto
 	{
@@ -18,7 +18,7 @@ namespace HRTMS.Core.DTOs.Result
 		public bool HasRaceReport { get; set; }
 		public bool IsRaceReportLocked { get; set; }
 
-		// Các điều kiện chặn Declare Official (EC-41/BR-50, EC-08/33/BR-42, EC-42/BR-51)
+		// Các điều kiện chặn Declare Official
 		public bool HasPendingProtests { get; set; }
 		public bool PrizeDistributionsConfigured { get; set; }
 		public bool RankingIntegrityValid { get; set; }
@@ -51,7 +51,7 @@ namespace HRTMS.Core.DTOs.Result
 		public int PredictionsRefundedCount { get; set; }
 		public int PursePayoutsCreatedCount { get; set; }
 
-		// EC-08/BR-26: phần dư khi số ngựa về đích hợp lệ < số vị trí thưởng.
+		// Phần dư khi số ngựa về đích hợp lệ < số vị trí thưởng.
 		// Không lưu DB (chưa có cột tương ứng) — chỉ trả về để UI-S14 hiển thị,
 		// Admin xử lý thủ công (ghi nhận Remainder) ngoài hệ thống.
 		public decimal? RemainderAmount { get; set; }

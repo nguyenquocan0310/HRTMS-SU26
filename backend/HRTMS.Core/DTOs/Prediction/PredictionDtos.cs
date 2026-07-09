@@ -3,13 +3,13 @@ using System.Collections.Generic;
 
 namespace HRTMS.Core.DTOs.Prediction;
 
-// ====== PRD.1 — Admin cấu hình / đóng-mở cổng dự đoán ======
+// ====== Admin cấu hình / đóng-mở cổng dự đoán ======
 public class PredictionGateConfigDto
 {
     public bool IsPredictionGateClosed { get; set; }
 }
 
-// ====== PRD.4 — Form Score (SQL thuần 40/35/25) ======
+// ====== Form Score (SQL thuần 40/35/25) ======
 public class FormScoreDto
 {
     public int RaceEntryId { get; set; }
@@ -23,7 +23,7 @@ public class FormScoreDto
     public decimal FormScore { get; set; }           // tổng có trọng số
 }
 
-// ====== PRD.5 — Đặt dự đoán ======
+// ====== Đặt dự đoán ======
 public class PlacePredictionDto
 {
     public int RaceId { get; set; }

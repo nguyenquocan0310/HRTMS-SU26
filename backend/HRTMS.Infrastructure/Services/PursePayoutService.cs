@@ -24,7 +24,7 @@ namespace HRTMS.Infrastructure.Services
         }
 
         // =====================================================================
-        // REQ-F-PRZ.6 + PRZ.4 — Bảng phân bổ Purse + dòng Remainder của 1 cuộc đua
+        // Bảng phân bổ Purse + dòng Remainder của 1 cuộc đua
         // =====================================================================
         public async Task<RacePayoutSummaryDto> GetRacePayoutsAsync(int raceId)
         {
@@ -59,7 +59,7 @@ namespace HRTMS.Infrastructure.Services
         }
 
         // =====================================================================
-        // REQ-F-PRZ.6 — Đổi trạng thái Paid/Unpaid + ghi AuditLog (AC#1)
+        // Đổi trạng thái Paid/Unpaid + ghi AuditLog
         // =====================================================================
         public async Task<PursePayoutItemDto> UpdatePayoutStatusAsync(
             int payoutId, MarkPayoutStatusDto dto, int adminUserId)
@@ -100,7 +100,7 @@ namespace HRTMS.Infrastructure.Services
         }
 
         // =====================================================================
-        // REQ-F-PRZ.6 — Lịch sử thưởng tích lũy theo người nhận (Owner/Jockey)
+        // Lịch sử thưởng tích lũy theo người nhận (Owner/Jockey)
         // =====================================================================
         public async Task<List<EarningsHistoryItemDto>> GetEarningsHistoryAsync(
             int? recipientUserId, string? role)

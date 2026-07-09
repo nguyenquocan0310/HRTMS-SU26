@@ -13,7 +13,7 @@ public class HorseService : IHorseService
     private readonly IAuditLogService _auditLog;
     private readonly INotificationService _notification;
 
-    // 4 trường nhạy cảm — sửa bất kỳ trường nào → trigger re-validate (EC-23)
+    // 4 trường nhạy cảm — sửa bất kỳ trường nào → trigger re-validate
     private static readonly string[] SensitiveFields =
         ["Breed", "VaccinationRecordRef", "DopingTestDate", "DopingTestResult"];
 
@@ -30,7 +30,7 @@ public class HorseService : IHorseService
 
     public async Task<ApiResponse<HorseResponseDto>> CreateHorseAsync(int ownerId, CreateHorseDto dto)
     {
-        // EC-22: bắt buộc tích cam kết
+        // Bắt buộc tích cam kết
         if (!dto.LegalConsentAccepted)
             return ApiResponse<HorseResponseDto>.Fail("Bạn phải đồng ý cam kết pháp lý trước khi gửi hồ sơ.");
 
@@ -157,7 +157,7 @@ public class HorseService : IHorseService
             UpdatedAt = DateTime.UtcNow
         };
 
-        // REQ-F-HRS.4 + BR-01/BR-02: screen breed/doping theo giải → AutoEligible / ManualReview / AutoRejected
+        // Screen breed/doping theo giải → AutoEligible / ManualReview / AutoRejected
         string category = ScreenEnrollment(horse, tournament, entry);
         ApplyScreeningToEnrollment(entry, category);
 
@@ -315,7 +315,7 @@ public class HorseService : IHorseService
         if (horse.OwnerId != ownerId)
             return ApiResponse<HorseResponseDto>.Fail("HORSE_NOT_OWNED");
 
-        // HRS.1/HRS.2: validate trước khi lưu (đồng bộ với CreateHorseAsync)
+        // Validate trước khi lưu (đồng bộ với CreateHorseAsync)
         if (dto.BirthYear != null && dto.BirthYear > DateTime.UtcNow.Year)
             return ApiResponse<HorseResponseDto>.Fail("Năm sinh không được ở tương lai.");
         if (dto.DopingTestDate != null && dto.DopingTestDate > DateOnly.FromDateTime(DateTime.UtcNow))
@@ -343,7 +343,7 @@ public class HorseService : IHorseService
 
         horse.UpdatedAt = DateTime.UtcNow;
 
-        // HRS.6 / EC-23: sửa trường nhạy cảm → re-screen baseline hồ sơ + MỌI enrollment đang Enrolled.
+        // Sửa trường nhạy cảm → re-screen baseline hồ sơ + MỌI enrollment đang Enrolled.
         bool revalidated = sensitiveChanged;
         if (revalidated)
         {
@@ -437,7 +437,7 @@ public class HorseService : IHorseService
         if (entry.AdminApprovalStatus == "Approved")
             return ApiResponse<string>.Fail("ALREADY_APPROVED");
 
-        // HRS.4: Admin KHÔNG được override auto-reject cứng (doping Failed / breed mismatch).
+        // Admin KHÔNG được override auto-reject cứng (doping Failed / breed mismatch).
         if (entry.ScreeningStatus == "AutoRejected")
             return ApiResponse<string>.Fail(
                 $"Ngựa bị hệ thống tự động từ chối, không thể duyệt lại. Lý do: {entry.ScreeningReason}");
@@ -546,13 +546,13 @@ public class HorseService : IHorseService
     }
 
     /// <summary>
-    /// REQ-F-HRS.4 + BR-01/BR-02: screen enrollment theo rule của <paramref name="tournament"/>,
+    /// Screen enrollment theo rule của <paramref name="tournament"/>,
     /// set <see cref="HorseTournamentEntry.ScreeningStatus"/> / ScreeningReason.
     /// Trả về category: "AutoRejected" | "ManualReview" | "AutoEligible".
     /// </summary>
     private static string ScreenEnrollment(Horse horse, Tournament tournament, HorseTournamentEntry entry)
     {
-        // Auto-reject cứng — doping Failed (BR-02). Admin không override.
+        // Auto-reject cứng — doping Failed. Admin không override.
         if (horse.DopingTestResult == "Failed")
         {
             entry.ScreeningStatus = "AutoRejected";
@@ -560,7 +560,7 @@ public class HorseService : IHorseService
             return "AutoRejected";
         }
 
-        // Auto-reject cứng — breed mismatch (BR-01). Admin không override.
+        // Auto-reject cứng — breed mismatch. Admin không override.
         if (!string.Equals(horse.Breed, tournament.AllowedBreed, StringComparison.OrdinalIgnoreCase))
         {
             entry.ScreeningStatus = "AutoRejected";
@@ -660,8 +660,8 @@ public class HorseService : IHorseService
         UpdatedAt = h.UpdatedAt
     };
     // ── RACE ENTRY ────────────────────────────────────────────────────────────
-    // RaceEntry chi do Admin tao qua Module E (SCH.1 - POST /api/admin/races/{raceId}/entries).
-    // HorseService chi con phuc vu Owner xem danh sach entry cua minh.
+    // RaceEntry chỉ do Admin tạo qua Module E (POST /api/admin/races/{raceId}/entries).
+    // HorseService chỉ còn phục vụ Owner xem danh sách entry của mình.
 
     public async Task<ApiResponse<List<RaceEntryResponseDto>>> GetMyRaceEntriesAsync(
         int ownerId, string? status, string? feeStatus, int page, int pageSize)

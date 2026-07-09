@@ -2,8 +2,8 @@ using System.ComponentModel.DataAnnotations;
 
 namespace HRTMS.Core.DTOs.RaceEntry;
 
-// SCH.1 — Admin phan bo mot Pairing da duoc Accepted vao mot Race.
-// RaceId lay tu route, PairingId lay tu body.
+// Admin phân bổ một Pairing đã được Accepted vào một Race.
+// RaceId lấy từ route, PairingId lấy từ body.
 public class AllocateEntryDto
 {
     [Range(1, int.MaxValue)]

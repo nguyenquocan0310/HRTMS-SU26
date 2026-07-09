@@ -10,8 +10,8 @@ namespace HRTMS.Infrastructure.Services
     {
         private readonly HRTMSDbContext _context;
         private readonly IAuditLogService _auditLog;
-        // Module E (SCH.9) — guard dong bang cau hinh Race dung chung voi RaceEntryService,
-        // tranh viet lai logic freeze inline (EC-48).
+        // Guard đóng băng cấu hình Race dùng chung với RaceEntryService,
+        // tránh viết lại logic freeze inline.
         private readonly IRaceEntryService _raceEntry;
 
         private static readonly string[] ValidBreeds =
@@ -27,9 +27,9 @@ namespace HRTMS.Infrastructure.Services
             ["TopPerRace", "EarningsBased", "Hybrid"];
         private const int MinRaceDistanceMeters = 1200;
         private const int MaxRaceDistanceMeters = 2400;
-        // TRN.8 — State machine cấp GIẢI một chiều: Draft → Open Registration → Closed Registration → Completed
+        // State machine cấp GIẢI một chiều: Draft → Open Registration → Closed Registration → Completed
         // (nhánh Cancelled xử lý riêng ở CancelTournamentAsync). Pre-Race/Live/In-Progress/Unofficial/Official
-        // là trạng thái cấp RACE, KHÔNG lưu ở Tournament (BR-45, EC-36).
+        // là trạng thái cấp RACE, KHÔNG lưu ở Tournament.
         private static readonly Dictionary<string, string> ValidTransitions = new()
         {
             ["Draft"]               = "Open Registration",
@@ -37,7 +37,7 @@ namespace HRTMS.Infrastructure.Services
             ["Closed Registration"] = "Completed",
         };
 
-        // Các trạng thái thuộc cấp Race — không bao giờ được set cho Tournament (TRN.8 AC#2).
+        // Các trạng thái thuộc cấp Race — không bao giờ được set cho Tournament.
         private static readonly string[] RaceLevelStatuses =
             ["Pre-Race", "Live", "In-Progress", "Unofficial", "Official"];
 
@@ -269,7 +269,7 @@ namespace HRTMS.Infrastructure.Services
                 .FirstOrDefaultAsync(t => t.TournamentId == tournamentId)
                 ?? throw new KeyNotFoundException($"Không tìm thấy giải #{tournamentId}.");
 
-            // TRN.9 — chỉ cho sửa khi còn ở Draft hoặc Open Registration
+            // Chỉ cho sửa khi còn ở Draft hoặc Open Registration
             if (tournament.Status != "Draft" && tournament.Status != "Open Registration")
                 throw new InvalidOperationException(
                     $"Không thể sửa giải ở trạng thái '{tournament.Status}'");
@@ -358,7 +358,7 @@ namespace HRTMS.Infrastructure.Services
                 .FirstOrDefaultAsync(t => t.TournamentId == tournamentId)
                 ?? throw new KeyNotFoundException($"Không tìm thấy giải #{tournamentId}.");
 
-            // TRN.8 AC#2 — chặn set Tournament sang trạng thái cấp Race (Pre-Race/Live/In-Progress/...).
+            // Chặn set Tournament sang trạng thái cấp Race (Pre-Race/Live/In-Progress/...).
             if (RaceLevelStatuses.Contains(targetStatus))
             {
                 throw new InvalidOperationException(
@@ -379,7 +379,7 @@ namespace HRTMS.Infrastructure.Services
             }
 
             // Đóng đăng ký: validate nhẹ để giải chạy được từ vòng loại tới chung kết.
-            // KHÔNG áp minimum cứng theo gate capacity (REQ-F-SCH.7: không có ngưỡng
+            // KHÔNG áp minimum cứng theo gate capacity (không có ngưỡng
             // tối thiểu chặn cuộc đua) — chỉ chặn giải rỗng cấu trúc/không có cặp đua.
             if (targetStatus == "Closed Registration")
             {
@@ -398,7 +398,7 @@ namespace HRTMS.Infrastructure.Services
                 }
             }
 
-            // TRN.8 AC#3 — chỉ cho Completed khi MỌI Race thuộc giải đã Official hoặc Cancelled.
+            // Chỉ cho Completed khi MỌI Race thuộc giải đã Official hoặc Cancelled.
             if (targetStatus == "Completed")
             {
                 var unfinished = tournament.Rounds
@@ -467,7 +467,7 @@ namespace HRTMS.Infrastructure.Services
                         // 3. Hủy tất cả RaceEntry
                         foreach (var entry in race.RaceEntries)
                         {
-                            // BR-41/HRS.8 — entry Paid → Refund Pending trong CÙNG transaction,
+                            // Entry Paid → Refund Pending trong CÙNG transaction,
                             // kèm Notification cho Owner + AuditLog Update_Entry_Fee_Status (không phụ thuộc trí nhớ Admin).
                             if (entry.EntryFeeStatus == "Paid")
                             {
@@ -527,7 +527,7 @@ namespace HRTMS.Infrastructure.Services
                         }
                     }
 
-                // 4b. Vô hiệu các Pairing của giải (TRN.10): chuyển Cancelled cho pairing chưa kết thúc.
+                // 4b. Vô hiệu các Pairing của giải: chuyển Cancelled cho pairing chưa kết thúc.
                 // Schema mới expose Pairing.TournamentId nên lọc trực tiếp theo tournament.
                 var pairings = await _context.Pairings
                     .Where(p => p.TournamentId == tournamentId
@@ -652,7 +652,7 @@ namespace HRTMS.Infrastructure.Services
             var tournament = await _context.Tournaments.FindAsync(tournamentId)
                 ?? throw new KeyNotFoundException($"Không tìm thấy giải #{tournamentId}.");
 
-            // TRN.7 — validate date nằm trong cửa sổ giải
+            // Validate date nằm trong cửa sổ giải
             if (dto.ScheduledDate < tournament.StartDate || dto.ScheduledDate > tournament.EndDate)
                 throw new ArgumentException(
                     $"ScheduledDate phải nằm trong [{tournament.StartDate:d}, {tournament.EndDate:d}]");
@@ -728,7 +728,7 @@ namespace HRTMS.Infrastructure.Services
             var tournament = round.Tournament;
             ValidateRaceDistanceOverride(dto.RaceDistanceOverride);
 
-            // TRN.7 — validate thời gian
+            // Validate thời gian
             if (dto.ScheduledTime <= DateTime.UtcNow)
                 throw new ArgumentException("Thời gian thi đấu phải ở tương lai.");
 
@@ -745,7 +745,7 @@ namespace HRTMS.Infrastructure.Services
             if (isDuplicateRaceNumber)
                 throw new ArgumentException($"Số cuộc đua {dto.RaceNumber} đã tồn tại trong vòng #{roundId}.");
 
-            // TRN.7 — validate tổng PurseAmount không vượt giải
+            // Validate tổng PurseAmount không vượt giải
             var existingPurseTotal = await _context.Races
                 .Where(r => r.Round.TournamentId == tournament.TournamentId)
                 .SumAsync(r => r.PurseAmount);
@@ -789,7 +789,7 @@ namespace HRTMS.Infrastructure.Services
             };
         }
 
-        // SCH.9/EC-48 — cap nhat cau hinh Race, dong bang truong nhay cam sau cam ket.
+        // Cập nhật cấu hình Race, đóng băng trường nhạy cảm sau cam kết.
         public async Task<RaceResponseDto> UpdateRaceAsync(int raceId, UpdateRaceDto dto)
         {
             var race = await _context.Races
@@ -800,8 +800,8 @@ namespace HRTMS.Infrastructure.Services
             var tournament = race.Round.Tournament;
             ValidateRaceDistanceOverride(dto.RaceDistanceOverride);
 
-            // SCH.9 / EC-48 — chi cac truong nhay cam moi bi dong bang sau khi boc tham hoac da co Prediction.
-            // Cho phep sua cac truong khong nhay cam (PurseAmount, cutoff...) ngay ca khi da dong bang.
+            // Chỉ các trường nhạy cảm mới bị đóng băng sau khi bốc thăm hoặc đã có Prediction.
+            // Cho phép sửa các trường không nhạy cảm (PurseAmount, cutoff...) ngay cả khi đã đóng băng.
             var sensitiveChanged =
                 race.ScheduledTime != dto.ScheduledTime ||
                 race.RaceDistanceOverride != dto.RaceDistanceOverride ||
@@ -811,7 +811,7 @@ namespace HRTMS.Infrastructure.Services
             if (sensitiveChanged)
                 await _raceEntry.EnsureRaceConfigEditableAsync(raceId);
 
-            // EC-35 — validate cua so thoi gian (chi khi ScheduledTime thay doi).
+            // Validate cửa sổ thời gian (chỉ khi ScheduledTime thay đổi).
             if (race.ScheduledTime != dto.ScheduledTime)
             {
                 if (dto.ScheduledTime <= DateTime.UtcNow)
@@ -825,7 +825,7 @@ namespace HRTMS.Infrastructure.Services
                     throw new ArgumentException("Thời gian thi đấu không được sớm hơn ngày của vòng.");
             }
 
-            // TRN.7 — tong PurseAmount khong vuot quy giai (tru chinh race nay).
+            // Tổng PurseAmount không vượt quỹ giải (trừ chính race này).
             if (race.PurseAmount != dto.PurseAmount)
             {
                 var otherPurseTotal = await _context.Races

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace HRTMS.Core.DTOs.Purse
 {
 	// ===========================================================================
-	// REQ-F-PRZ.6 — Một dòng phân bổ tiền thưởng (UI-S14: người nhận, vai trò,
+	// Một dòng phân bổ tiền thưởng (UI-S14: người nhận, vai trò,
 	// vị trí, số tiền, trạng thái chi trả). Chỉ ĐỌC + cập nhật trạng thái Paid/Unpaid.
 	// ===========================================================================
 	public class PursePayoutItemDto
@@ -28,9 +28,9 @@ namespace HRTMS.Core.DTOs.Purse
 	}
 
 	// ===========================================================================
-	// REQ-F-PRZ.6 + PRZ.4 — Bảng phân bổ Purse của 1 cuộc đua kèm dòng Remainder.
+	// Bảng phân bổ Purse của 1 cuộc đua kèm dòng Remainder.
 	// RemainderAmount tính ON-THE-FLY = PurseAmount − SUM(CalculatedAmount),
-	// KHÔNG lưu cột DB (theo quyết định đã chốt). EC-08/BR-26: phần dư khi số ngựa
+	// KHÔNG lưu cột DB (theo quyết định đã chốt). Phần dư khi số ngựa
 	// về đích hợp lệ < số vị trí thưởng — Admin xử lý thủ công ngoài hệ thống.
 	// ===========================================================================
 	public class RacePayoutSummaryDto
@@ -58,7 +58,7 @@ namespace HRTMS.Core.DTOs.Purse
 	}
 
 	// ===========================================================================
-	// REQ-F-PRZ.6 — Lịch sử tiền thưởng tích lũy cho từng Chủ ngựa / Nài ngựa.
+	// Lịch sử tiền thưởng tích lũy cho từng Chủ ngựa / Nài ngựa.
 	// ===========================================================================
 	public class EarningsHistoryItemDto
 	{

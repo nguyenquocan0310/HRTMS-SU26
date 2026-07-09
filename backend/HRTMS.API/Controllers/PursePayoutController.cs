@@ -12,7 +12,7 @@ namespace HRTMS.API.Controllers
 {
     [Tags("results")]
     [ApiController]
-    [Authorize(Roles = "Admin")]   // REQ-F-PRZ.6 — chỉ Admin quản lý chi trả
+    [Authorize(Roles = "Admin")]   // Chỉ Admin quản lý chi trả
     public class PursePayoutController : ControllerBase
     {
         private readonly IPursePayoutService _payoutService;
@@ -27,7 +27,7 @@ namespace HRTMS.API.Controllers
 
         // =====================================================================
         // GET /api/races/{raceId}/payouts
-        // REQ-F-PRZ.6 + PRZ.4 — Bảng phân bổ Purse + dòng Remainder của 1 cuộc đua (UI-S14)
+        // Bảng phân bổ Purse + dòng Remainder của 1 cuộc đua (UI-S14)
         // =====================================================================
         [HttpGet("api/races/{raceId}/payouts")]
         public async Task<ActionResult<ApiResponse<RacePayoutSummaryDto>>> GetRacePayouts(int raceId)
@@ -45,7 +45,7 @@ namespace HRTMS.API.Controllers
 
         // =====================================================================
         // PUT /api/payouts/{payoutId}/status
-        // REQ-F-PRZ.6 — Đánh dấu Paid/Unpaid (ghi AuditLog trong service)
+        // Đánh dấu Paid/Unpaid (ghi AuditLog trong service)
         // =====================================================================
         [HttpPut("api/payouts/{payoutId}/status")]
         public async Task<ActionResult<ApiResponse<PursePayoutItemDto>>> UpdatePayoutStatus(
@@ -68,7 +68,7 @@ namespace HRTMS.API.Controllers
 
         // =====================================================================
         // GET /api/payouts/earnings-history?recipientUserId=&role=
-        // REQ-F-PRZ.6 — Lịch sử thưởng tích lũy cho Owner/Jockey
+        // Lịch sử thưởng tích lũy cho Owner/Jockey
         // =====================================================================
         [HttpGet("api/payouts/earnings-history")]
         public async Task<ActionResult<ApiResponse<List<EarningsHistoryItemDto>>>> GetEarningsHistory(

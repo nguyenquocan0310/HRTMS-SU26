@@ -67,8 +67,8 @@ public class TournamentParticipantService : ITournamentParticipantService
             ApprovedAt = decision.ApprovedImmediately ? now : null
         };
 
-        // TRN.11 — Auto-screening roster:
-        // - Owner Active đăng ký thành công → AutoEligible + Approved ngay, KHÔNG vào Admin approval queue (AC#3).
+        // Auto-screening roster:
+        // - Owner Active đăng ký thành công → AutoEligible + Approved ngay, KHÔNG vào Admin approval queue.
         // - Jockey/Referee/Doctor Active + đủ điều kiện → AutoEligible, Status = Pending cho bulk approval.
         // - Dữ liệu mơ hồ → ManualReview; vi phạm cứng → AutoRejected + Rejected.
 

@@ -6,8 +6,8 @@ using System.Security.Claims;
 
 namespace HRTMS.API.Controllers;
 
-// Module E — Lap lich, Boc tham & Rut lui (REQ-F-SCH).
-// Tach rieng khoi RaceEntryController (von phuc vu Owner dang ky entry + entry fee).
+// Module E — Lập lịch, Bốc thăm & Rút lui.
+// Tách riêng khỏi RaceEntryController (vốn phục vụ Owner đăng ký entry + entry fee).
 [Tags("scheduling")]
 [ApiController]
 [Route("api")]
@@ -20,7 +20,7 @@ public class SchedulingController : ControllerBase
         _service = service;
     }
 
-    // SCH.1 — Admin phan bo Pairing vao Race.
+    // Admin phân bổ Pairing vào Race.
     [HttpPost("admin/races/{raceId:int}/entries")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Allocate(int raceId, [FromBody] AllocateEntryDto dto)
@@ -95,7 +95,7 @@ public class SchedulingController : ControllerBase
         }
     }
 
-    // SCH.2 — Admin boc tham vi tri xuat phat (nguyen tu).
+    // Admin bốc thăm vị trí xuất phát (nguyên tử).
     [HttpPost("admin/races/{raceId:int}/draw")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Draw(int raceId)
@@ -126,10 +126,10 @@ public class SchedulingController : ControllerBase
         }
     }
 
-    // SCH.3 — Lich thi dau cong khai da co san: GET /api/races/{raceId}/entries
-    // (TournamentController - Module B). Service van expose GetRaceScheduleAsync de tai su dung neu can.
+    // Lịch thi đấu công khai đã có sẵn: GET /api/races/{raceId}/entries
+    // (TournamentController - Module B). Service vẫn expose GetRaceScheduleAsync để tái sử dụng nếu cần.
 
-    // SCH.4 — Owner xac nhan tham gia.
+    // Owner xác nhận tham gia.
     [HttpPatch("race-entries/{id:int}/confirm")]
     [Authorize(Roles = "Owner")]
     public async Task<IActionResult> Confirm(int id)
@@ -161,8 +161,8 @@ public class SchedulingController : ControllerBase
         }
     }
 
-    // SCH.5 — Owner rut lui (Withdrawal Flow, idempotent).
-    // DELETE theo contract; ly do (tuy chon) truyen qua query: ?reason=...
+    // Owner rút lui (Withdrawal Flow, idempotent).
+    // DELETE theo contract; lý do (tùy chọn) truyền qua query: ?reason=...
     [HttpDelete("race-entries/{id:int}")]
     [Authorize(Roles = "Owner")]
     public async Task<IActionResult> Withdraw(int id, [FromQuery] string? reason)
@@ -187,8 +187,8 @@ public class SchedulingController : ControllerBase
         }
     }
 
-    // SCH.5 (Admin) — Admin huy race entry thay mat Owner (dieu phoi khan cap).
-    // Dung lai WithdrawAsync voi isSystem:true de bo qua check quyen so huu Owner.
+    // (Admin) Admin hủy race entry thay mặt Owner (điều phối khẩn cấp).
+    // Dùng lại WithdrawAsync với isSystem:true để bỏ qua check quyền sở hữu Owner.
     [HttpDelete("admin/race-entries/{id:int}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> AdminCancel(int id, [FromQuery] string? reason)

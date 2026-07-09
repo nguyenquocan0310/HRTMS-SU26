@@ -4,7 +4,7 @@ using HRTMS.Core.Interfaces.Services;
 
 namespace HRTMS.API.Extensions;
 
-// Module E (BR-08) — job nen Hangfire tu dong cancel cac RaceEntry qua Confirmation Cut-off.
+// Module E — job nén Hangfire tự động cancel các RaceEntry quá Confirmation Cut-off.
 public static class HangfireExtensions
 {
     public static IServiceCollection AddHangfireJobs(
@@ -35,7 +35,7 @@ public static class HangfireExtensions
         var recurring = app.ApplicationServices
             .GetRequiredService<IRecurringJobManager>();
 
-        // Chay moi 15 phut: cancel cac entry qua han chua xac nhan (BR-08).
+        // Chạy mỗi 15 phút: cancel các entry quá hạn chưa xác nhận.
         recurring.AddOrUpdate<IRaceEntryService>(
             "auto-cancel-overdue-entries",
             svc => svc.AutoCancelOverdueAsync(),

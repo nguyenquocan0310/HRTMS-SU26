@@ -1,6 +1,6 @@
 namespace HRTMS.Core.DTOs.RaceEntry;
 
-// SCH.5 — Ket qua cua Withdrawal Flow (idempotent).
+// Kết quả của Withdrawal Flow (idempotent).
 public class WithdrawResultDto
 {
     public int RaceEntryId { get; set; }

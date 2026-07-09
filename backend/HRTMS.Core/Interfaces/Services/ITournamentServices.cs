@@ -19,17 +19,17 @@ namespace HRTMS.Core.Interfaces.Services
         // STATE MACHINE
         Task<TournamentResponseDto> ChangeStatusAsync(int tournamentId, string targetStatus, int adminUserId);
 
-        // CANCEL (TRN.10)
+        // CANCEL
         Task CancelTournamentAsync(int tournamentId, int adminUserId);
 
-        // PRIZE DISTRIBUTION (TRN.4)
+        // PRIZE DISTRIBUTION
         Task<List<PrizeDistributionResponseDto>> SetPrizeDistributionsAsync(int tournamentId, SetPrizeDistributionDto dto);
 
-        // ROUND & RACE (TRN.6)
+        // ROUND & RACE
         Task<RoundResponseDto> CreateRoundAsync(int tournamentId, CreateRoundDto dto);
         Task<RaceResponseDto> CreateRaceAsync(int roundId, CreateRaceDto dto);
 
-        // SCH.9/EC-48 — cap nhat Race; dong bang truong nhay cam sau boc tham / co Prediction
+        // Cập nhật Race; đóng băng trường nhạy cảm sau bốc thăm / có Prediction
         Task<RaceResponseDto> UpdateRaceAsync(int raceId, UpdateRaceDto dto);
     }
 }

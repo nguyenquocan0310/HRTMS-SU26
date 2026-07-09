@@ -1,9 +1,9 @@
 using System.ComponentModel.DataAnnotations;
 
-// Nhan data khi cap nhat cau hinh mot Race.
+// Nhận data khi cập nhật cấu hình một Race.
 // PUT /api/races/{raceId}
-// SCH.9/EC-48: cac truong ScheduledTime, TrackTypeOverride, RaceDistanceOverride bi DONG BANG
-// sau khi da boc tham (IsPostPositionDrawn) hoac da co Prediction.
+// Các trường ScheduledTime, TrackTypeOverride, RaceDistanceOverride bị ĐÓNG BĂNG
+// sau khi đã bốc thăm (IsPostPositionDrawn) hoặc đã có Prediction.
 namespace HRTMS.Core.DTOs.Tournament
 {
     public class UpdateRaceDto

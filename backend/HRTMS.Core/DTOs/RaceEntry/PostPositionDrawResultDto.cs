@@ -1,6 +1,6 @@
 namespace HRTMS.Core.DTOs.RaceEntry;
 
-// SCH.2 — Ket qua boc tham vi tri xuat phat (Post Position Draw).
+// Kết quả bốc thăm vị trí xuất phát (Post Position Draw).
 public class PostPositionDrawResultDto
 {
     public int RaceId { get; set; }

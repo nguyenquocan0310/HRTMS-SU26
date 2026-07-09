@@ -2,31 +2,31 @@ using HRTMS.Core.DTOs.RaceEntry;
 
 namespace HRTMS.Core.Interfaces.Services;
 
-// Module E — Lap lich, Boc tham & Rut lui (REQ-F-SCH).
+// Module E — Lập lịch, Bốc thăm & Rút lui.
 public interface IRaceEntryService
 {
-    // SCH.1 — Admin phan bo Pairing (Accepted) vao Race, tao RaceEntry.
-    // Cuong che: SCH.6 (cua so thoi gian), SCH.7 (MaxHorses), SCH.8 (double-booking & trung trong Race).
+    // Admin phân bổ Pairing (Accepted) vào Race, tạo RaceEntry.
+    // Cưỡng chế: cửa sổ thời gian, MaxHorses, double-booking & trùng trong Race.
     Task<RaceEntryResponseDto> AllocateAsync(int adminId, int raceId, AllocateEntryDto dto);
 
-    // SCH.2 — Boc tham vi tri xuat phat nguyen tu trong mot transaction.
+    // Bốc thăm vị trí xuất phát nguyên tử trong một transaction.
     Task<PostPositionDrawResultDto> DrawPostPositionsAsync(int adminId, int raceId);
 
-    // SCH.3 — Lay lich thi dau cong khai (khong yeu cau dang nhap).
+    // Lấy lịch thi đấu công khai (không yêu cầu đăng nhập).
     Task<RaceScheduleDto> GetRaceScheduleAsync(int raceId);
 
-    // SCH.4 — Owner xac nhan tham gia truoc Confirmation Cut-off.
+    // Owner xác nhận tham gia trước Confirmation Cut-off.
     Task<RaceEntryResponseDto> ConfirmAsync(int ownerId, int raceEntryId);
 
-    // SCH.5 — Withdrawal Flow (Owner rut hoac he thong cancel khi qua han).
-    // Idempotent: goi lai khi da Cancelled khong gay tac dong phu.
+    // Withdrawal Flow (Owner rút hoặc hệ thống cancel khi quá hạn).
+    // Idempotent: gọi lại khi đã Cancelled không gây tác động phụ.
     Task<WithdrawResultDto> WithdrawAsync(int actorId, int raceEntryId, WithdrawEntryDto dto, bool isSystem = false);
 
-    // SCH.5 — Job nen (Hangfire): tu dong cancel cac entry qua Confirmation Cut-off ma chua xac nhan.
-    // Tra ve so entry da bi cancel.
+    // Job nén (Hangfire): tự động cancel các entry quá Confirmation Cut-off mà chưa xác nhận.
+    // Trả về số entry đã bị cancel.
     Task<int> AutoCancelOverdueAsync();
 
-    // SCH.9 — Guard dong bang cau hinh Race. Goi truoc khi sua ScheduledTime /
-    // RaceDistanceOverride / TrackTypeOverride. Throw "RACE_CONFIG_FROZEN" neu da boc tham hoac da co Prediction.
+    // Guard đóng băng cấu hình Race. Gọi trước khi sửa ScheduledTime /
+    // RaceDistanceOverride / TrackTypeOverride. Throw "RACE_CONFIG_FROZEN" nếu đã bốc thăm hoặc đã có Prediction.
     Task EnsureRaceConfigEditableAsync(int raceId);
 }

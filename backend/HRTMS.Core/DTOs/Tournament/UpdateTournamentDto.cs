@@ -4,9 +4,9 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-// TRN.9 - Nhan data khi Admin update giai dau
-// Tat ca field deu nullable(string?, int?) vi Admin co the chi sua 1 
-// field, cac field con lai khong gui len thi giu nguyen trong DB 
+// Nhận data khi Admin update giải đấu
+// Tất cả field đều nullable (string?, int?) vì Admin có thể chỉ sửa 1
+// field, các field còn lại không gửi lên thì giữ nguyên trong DB
 namespace HRTMS.Core.DTOs.Tournament
 {
     public class UpdateTournamentDto

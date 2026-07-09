@@ -28,8 +28,8 @@ public class PredictionService : IPredictionService
     }
 
     // =========================================================
-    // REQ-F-PRD.1 — Admin cấu hình / đóng-mở cổng dự đoán
-    // REQ-F-PRD.2 — Cổng chỉ mở sau Post Position Draw (BR-09)
+    // Admin cấu hình / đóng-mở cổng dự đoán
+    // Cổng chỉ mở sau Post Position Draw
     // =========================================================
     public async Task<ApiResponse<bool>> SetPredictionGateAsync(
         int raceId, PredictionGateConfigDto dto, int adminId, string? ipAddress)
@@ -38,7 +38,7 @@ public class PredictionService : IPredictionService
         if (race == null)
             return ApiResponse<bool>.Fail("Không tìm thấy cuộc đua.");
 
-        // BR-09: chỉ cho phép MỞ cổng (IsPredictionGateClosed = false) khi đã bốc thăm
+        // Chỉ cho phép MỞ cổng (IsPredictionGateClosed = false) khi đã bốc thăm
         if (dto.IsPredictionGateClosed == false && !race.IsPostPositionDrawn)
             return ApiResponse<bool>.Fail("Chưa bốc thăm vị trí xuất phát nên chưa thể mở cổng dự đoán.");
 
@@ -82,7 +82,7 @@ public class PredictionService : IPredictionService
     }
 
     // =========================================================
-    // REQ-F-PRD.4 — Form Score: 40% lịch sử ngựa + 35% lịch sử Jockey
+    // Form Score: 40% lịch sử ngựa + 35% lịch sử Jockey
     // + 25% kết quả trung bình theo loại vòng đua. Tính server-side.
     //
     // FIX #1: Tải toàn bộ lịch sử 1 lần trước vòng lặp (loại bỏ N+1 query).
@@ -194,9 +194,9 @@ public class PredictionService : IPredictionService
     }
 
     // =========================================================
-    // REQ-F-PRD.3 — Chỉ hỗ trợ Win
-    // REQ-F-PRD.5 — Đặt dự đoán: trừ ví + ghi ledger cùng transaction (BR-39)
-    // REQ-F-PRD.6 — Server-side gate (BR-23, EC-05)
+    // Chỉ hỗ trợ Win
+    // Đặt dự đoán: trừ ví + ghi ledger cùng transaction
+    // Server-side gate
     //
     // FIX #2: Dùng ExecuteUpdateAsync để trừ Balance nguyên tử (tránh race condition).
     // FIX #3: Duplicate check dựa vào unique index UQ_Predictions_SpectatorEntry.
@@ -210,7 +210,7 @@ public class PredictionService : IPredictionService
         await using var transaction = await _context.Database.BeginTransactionAsync();
         try
         {
-            // PRD.6: server-side gate — không tin tưởng frontend
+            // Server-side gate — không tin tưởng frontend
             var race = await _context.Races
                 .FirstOrDefaultAsync(r => r.RaceId == dto.RaceId);
             if (race == null)
