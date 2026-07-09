@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { FiPlus, FiEdit2 } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiEye  } from 'react-icons/fi';
 import DataTable, { type DataTableColumn } from '../../components/common/DataTable';
 import StatusBadge, { type StatusType } from '../../components/common/StatusBadge';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
@@ -343,6 +343,7 @@ const loadDraft = async (id: number) => {
   // Tournament đã tồn tại trên BE có id là số nguyên thật — dùng để phân biệt
   // giữa "tạo mới" (POST) và "cập nhật" (PUT).
   const isNewDraft = draft.id.startsWith('t-');
+  const isReadOnly = !isNewDraft && draft.status !== 'Draft';
 
 // Lưu toàn bộ draft xuống BE (tạo/cập nhật giải + tỷ lệ thưởng + rounds + races).
 // Trả về tournamentId để Publish dùng tiếp.
@@ -474,10 +475,11 @@ const handleSaveDraft = async () => {
       width: '320px',
       render: (row) => {
         const next = NEXT_STATUS[row.status as TournamentStatus];
+        const isDraftRow = row.status === 'Draft';
         return (
           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
             <button type="button" className={styles.editBtn} onClick={() => goEdit(row.tournamentId)}>
-              <FiEdit2 size={13} /> Edit
+                      {isDraftRow ? (<><FiEdit2 size={13} /> Edit</>) : (<><FiEye size={13} /> View Detail</>)}            
             </button>
             {next && (
               <button
@@ -562,6 +564,7 @@ const handleSaveDraft = async () => {
           <TabBasicInfo
             data={draft.basicInfo}
             onChange={(basicInfo) => setDraft((prev) => ({ ...prev, basicInfo }))}
+            readOnly={isReadOnly}
           />
         )}
 
@@ -570,6 +573,7 @@ const handleSaveDraft = async () => {
             prizeDistribution={draft.prizeDistribution}
             totalPurse={typeof draft.basicInfo.purseAmount === 'number' ? draft.basicInfo.purseAmount : 0}
             onChange={(prizeDistribution) => setDraft((prev) => ({ ...prev, prizeDistribution }))}
+            readOnly={isReadOnly}
           />
         )}
 
@@ -580,6 +584,7 @@ const handleSaveDraft = async () => {
             tournamentStartDate={draft.basicInfo.startDate}
             tournamentEndDate={draft.basicInfo.endDate}
             onChange={(rounds) => setDraft((prev) => ({ ...prev, rounds }))}
+            readOnly={isReadOnly}
           />
         )}
 
@@ -589,6 +594,7 @@ const handleSaveDraft = async () => {
     tournamentName={draft.basicInfo.name}
     rounds={draft.rounds}
     isNewDraft={isNewDraft}
+    readOnly={isReadOnly}
   />
 )}
 
@@ -596,6 +602,7 @@ const handleSaveDraft = async () => {
           <TabPostPositionDraw
             rounds={draft.rounds}
             onChange={(rounds) => setDraft((prev) => ({ ...prev, rounds }))}
+            readOnly={isReadOnly}
           />
         )}
       </div>
@@ -603,26 +610,27 @@ const handleSaveDraft = async () => {
       {/* ═══ ACTION BAR (cố định ở mọi tab) ══════════════════════ */}
 {saveError && <div className={styles.listError}>{saveError}</div>}
 
-      <div className={styles.actionBar}>
-        <button type="button" className={styles.cancelTournamentBtn} onClick={() => setShowCancelModal(true)}>
-          Cancel Tournament
-        </button>
-
-        <div className={styles.actionBarRight}>
-          <button type="button" className={styles.saveDraftBtn} onClick={handleSaveDraft} disabled={isSaving}>
-            {isSaving ? 'Đang lưu...' : 'Save Draft'}
-          </button>
-          <button
-            type="button"
-            className={styles.publishBtn}
-            onClick={handlePublish}
-            disabled={!canPublish || isSaving}
-            title={!canPublish ? 'Cần hoàn tất đủ điều kiện cả 4 tab trước khi Publish.' : undefined}
-          >
-            {isSaving ? 'Đang xử lý...' : 'Publish'}
-          </button>
-        </div>
-      </div>
+{!isReadOnly && (
+  <div className={styles.actionBar}>
+    <button type="button" className={styles.cancelTournamentBtn} onClick={() => setShowCancelModal(true)}>
+      Cancel Tournament
+    </button>
+    <div className={styles.actionBarRight}>
+      <button type="button" className={styles.saveDraftBtn} onClick={handleSaveDraft} disabled={isSaving}>
+        {isSaving ? 'Đang lưu...' : 'Save Draft'}
+      </button>
+      <button
+        type="button"
+        className={styles.publishBtn}
+        onClick={handlePublish}
+        disabled={!canPublish || isSaving}
+        title={!canPublish ? 'Cần hoàn tất đủ điều kiện cả 4 tab trước khi Publish.' : undefined}
+      >
+        {isSaving ? 'Đang xử lý...' : 'Publish'}
+      </button>
+    </div>
+  </div>
+)}
 
       {showCancelModal && (
         <ConfirmationModal
