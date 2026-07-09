@@ -158,7 +158,9 @@ public class RefereeAssignmentService : IRefereeAssignmentService
             RaceId = raceId,
             RefereeId = dto.RefereeId,
             Role = dto.Role,
-            AssignedAt = now
+            AssignedAt = now,
+            CoiCheckStatus = "Passed",
+            CoiCheckedAt = now
         };
 
         _context.RefereeAssignments.Add(assignment);
