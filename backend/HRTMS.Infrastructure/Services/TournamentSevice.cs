@@ -606,9 +606,16 @@ namespace HRTMS.Infrastructure.Services
         public async Task<List<PrizeDistributionResponseDto>> SetPrizeDistributionsAsync(int tournamentId, SetPrizeDistributionDto dto)
         {
             // Bug 6 fix — kiểm tra tournament tồn tại trước khi upsert
-            var exists = await _context.Tournaments.AnyAsync(t => t.TournamentId == tournamentId);
-            if (!exists)
-                throw new KeyNotFoundException($"Không tìm thấy giải #{tournamentId}.");
+            var tournament = await _context.Tournaments
+                .FirstOrDefaultAsync(t => t.TournamentId == tournamentId)
+                ?? throw new KeyNotFoundException($"Không tìm thấy giải #{tournamentId}.");
+
+            // Chỉ cho sửa tỷ lệ thưởng khi còn ở Draft hoặc Open Registration —
+            // đồng bộ guard với UpdateTournamentAsync để tránh đổi % sau khi đã
+            // đóng đăng ký (PursePayout có thể đã tính theo tỷ lệ cũ).
+            if (tournament.Status != "Draft" && tournament.Status != "Open Registration")
+                throw new InvalidOperationException(
+                    $"Không thể sửa tỷ lệ thưởng khi giải ở trạng thái '{tournament.Status}'");
 
             // 1. Validate đủ 5 position không trùng
             var positions = dto.Distributions.Select(d => d.Position).OrderBy(p => p).ToList();
