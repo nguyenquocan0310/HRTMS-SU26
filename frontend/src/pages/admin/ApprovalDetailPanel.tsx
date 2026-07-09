@@ -13,8 +13,7 @@ import styles from './ApprovalDetailPanel.module.scss';
 interface Props {
   item: ApprovalItem;
   onClose: () => void;
-  onSuccess: () => void; // gọi lại để refresh danh sách sau khi duyệt/từ chối
-}
+ onSuccess: (newStatus: 'Approved' | 'Rejected') => void;}
 
 const ApprovalDetailPanel = ({ item, onClose, onSuccess }: Props) => {
   const [showRejectForm, setShowRejectForm] = useState(false);
@@ -38,7 +37,7 @@ const ApprovalDetailPanel = ({ item, onClose, onSuccess }: Props) => {
     setActionError('');
     try {
       await doApprove();
-      onSuccess();
+      onSuccess('Approved');
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Duyệt hồ sơ thất bại.');
     } finally {
@@ -52,7 +51,7 @@ const ApprovalDetailPanel = ({ item, onClose, onSuccess }: Props) => {
     setActionError('');
     try {
       await rejectHorse(item.entityId, rejectReason.trim());
-      onSuccess();
+      onSuccess('Rejected');
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Từ chối hồ sơ thất bại.');
     } finally {

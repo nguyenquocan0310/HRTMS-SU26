@@ -13,7 +13,7 @@ interface VerificationLogEntry { id: string; label: string; time: string; }
 interface Props {
   item: ApprovalItem;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (newStatus: 'Approved' | 'Rejected') => void;
 }
 
 const MOCK_LOGS: VerificationLogEntry[] = [
@@ -56,7 +56,7 @@ const ApprovalDetailPanel = ({ item, onClose, onSuccess }: Props) => {
           await approveDoctor(item.entityId);
         }
       }
-      onSuccess();
+      onSuccess('Approved');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Approve thất bại.');
     } finally {
@@ -79,7 +79,7 @@ const ApprovalDetailPanel = ({ item, onClose, onSuccess }: Props) => {
           body: JSON.stringify({ reason: rejectReason.trim() }),
         });
       }
-      onSuccess();
+      onSuccess('Rejected');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Reject thất bại.');
     } finally {

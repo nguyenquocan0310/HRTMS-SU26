@@ -303,16 +303,18 @@ const ApprovalCenter = () => {
 
 
       {/* ═══ DETAIL PANEL ══════════════════════════════════════ */}
-      {selectedItem && (
-        <ApprovalDetailPanel
-          item={selectedItem}
-          onClose={() => setSelectedItem(null)}
-          onSuccess={() => {
-            setSelectedItem(null);
-            loadData();
-          }}
-        />
-      )}
+{selectedItem && (
+  <ApprovalDetailPanel
+    item={selectedItem}
+    onClose={() => setSelectedItem(null)}
+    onSuccess={(newStatus) => {
+      setItems((prev) =>
+        prev.map((it) => (it.id === selectedItem.id ? { ...it, status: newStatus } : it))
+      );
+      setSelectedItem(null);
+    }}
+  />
+)}
     </div>
   );
 };

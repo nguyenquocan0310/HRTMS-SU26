@@ -5,9 +5,10 @@ import styles from './StepRoleSelection.module.scss';
 interface Props {
   selected: RegRole | null;
   onSelect: (role: RegRole) => void;
+  error?: string;
 }
 
-const StepRoleSelection = ({ selected, onSelect }: Props) => {
+const StepRoleSelection = ({ selected, onSelect, error }: Props) => {
   return (
     <div className={styles.container}>
       <h2 className={styles.title}>Select Your Role</h2>
@@ -24,6 +25,7 @@ const StepRoleSelection = ({ selected, onSelect }: Props) => {
           />
         ))}
       </div>
+      {error && <p style={{ color: '#e53935', fontSize: '13px', marginTop: '12px' }}>{error}</p>}
     </div>
   );
 };

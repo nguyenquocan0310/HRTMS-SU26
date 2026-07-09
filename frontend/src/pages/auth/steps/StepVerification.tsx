@@ -133,7 +133,7 @@ const StepVerification = ({ role, formData, onChange }: Props) => {
                 color: formData.jockeyVerification.identityNumber.length === 12 ? '#4caf50' : '#999',
               }}
             >
-              {formData.ownerVerification.identityNumber.length}/12 số
+              {formData.jockeyVerification.identityNumber.length}/12 số
             </span>
           </div>
           <div className={styles.field}>
@@ -544,12 +544,12 @@ const StepVerification = ({ role, formData, onChange }: Props) => {
               className={styles.input}
               placeholder="Nhập đúng 12 số CCCD"
               maxLength={12}
-              value={formData.refereeVerification.identityNumber}
+              value={formData.doctorVerification.identityNumber}
               onChange={(e) => {
                 const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 12);
                 onChange({
-                  refereeVerification: {
-                    ...formData.refereeVerification,
+                  doctorVerification: {
+                    ...formData.doctorVerification,
                     identityNumber: digitsOnly,
                   },
                 });
@@ -558,10 +558,10 @@ const StepVerification = ({ role, formData, onChange }: Props) => {
             <span
               style={{
                 fontSize: '12px',
-                color: formData.refereeVerification.identityNumber.length === 12 ? '#4caf50' : '#999',
+                color: formData.doctorVerification.identityNumber.length === 12 ? '#4caf50' : '#999',
               }}
             >
-              {formData.refereeVerification.identityNumber.length}/12 số
+              {formData.doctorVerification.identityNumber.length}/12 số
             </span>
           </div>
           <div className={styles.field}>
@@ -580,23 +580,17 @@ const StepVerification = ({ role, formData, onChange }: Props) => {
               }
             />
           </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Medical License Number</label>
-            <input
-              type="text"
-              className={styles.input}
-              placeholder="Enter your medical license number"
-              value={formData.doctorVerification.medicalLicenseNumber}
-              onChange={(e) =>
-                onChange({
-                  doctorVerification: {
-                    ...formData.doctorVerification,
-                    medicalLicenseNumber: e.target.value,
-                  },
-                })
-              }
-            />
-          </div>
+<div className={styles.field}>
+  <label className={styles.label}>Medical License Certificate (ảnh/PDF)</label>
+  <CertificateUpload
+    value={formData.doctorVerification.medicalLicenseNumber}
+    onChange={(url) =>
+      onChange({
+        doctorVerification: { ...formData.doctorVerification, medicalLicenseNumber: url },
+      })
+    }
+  />
+</div>
         </div>
       </div>
     );

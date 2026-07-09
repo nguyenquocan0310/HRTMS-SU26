@@ -60,7 +60,7 @@ const UserManagement = () => {
 
   const [pendingAction, setPendingAction] = useState<{
     user: SystemUser;
-    action: 'suspend' | 'activate' | 'approve';
+    action: 'suspend' | 'activate' | 'approve' | 'reject';
   } | null>(null);
 
   // ─── Fetch users từ API ───────────────────────────────────────────────────
@@ -117,7 +117,7 @@ const handleConfirmAction = async () => {
   const { user, action } = pendingAction;
 
   try {
-    if (action === 'approve') {
+    if (action === 'approve' || action === 'reject') {
       const endpoint = APPROVE_ENDPOINT[user.role];
       if (!endpoint) return;
       await apiFetch(`${endpoint}/${user.id}/approve`, { method: 'PATCH' });
@@ -126,6 +126,7 @@ const handleConfirmAction = async () => {
       await apiFetch(`/admin/users/${user.id}/suspend`, { method: 'PATCH' });
     }
     await fetchUsers();
+    setDetailUser(null);
   } catch (err) {
     console.error('Action failed:', err);
   } finally {
@@ -288,15 +289,18 @@ const handleConfirmAction = async () => {
         <ConfirmDialog
           title={
             pendingAction.action === 'approve' ? 'Phê duyệt tài khoản' :
+            pendingAction.action === 'reject' ? 'Từ chối tài khoản' :
             pendingAction.action === 'suspend' ? 'Suspend tài khoản' : 'Activate tài khoản'
           }
           message={`Bạn có chắc muốn ${
             pendingAction.action === 'approve' ? 'phê duyệt' :
+            pendingAction.action === 'reject' ? 'từ chối' :
             pendingAction.action === 'suspend' ? 'Suspend' : 'Activate'
           } tài khoản "${pendingAction.user.username}"?`}
           variant={pendingAction.action === 'suspend' ? 'danger' : 'default'}
           confirmLabel={
             pendingAction.action === 'approve' ? 'Approve' :
+            pendingAction.action === 'reject' ? 'Reject' :
             pendingAction.action === 'suspend' ? 'Suspend' : 'Activate'
           }
           onConfirm={handleConfirmAction}
@@ -314,6 +318,9 @@ const handleConfirmAction = async () => {
       status: detailUser.status,
       joinedDate: detailUser.joinedDate,
     }}
+    showActions={detailUser.status === 'Pending' && !!APPROVE_ENDPOINT[detailUser.role]}
+    onApprove={() => setPendingAction({ user: detailUser, action: 'approve' })}
+    onReject={() => setPendingAction({ user: detailUser, action: 'reject' })}
     onClose={() => setDetailUser(null)}
   />
 )}
