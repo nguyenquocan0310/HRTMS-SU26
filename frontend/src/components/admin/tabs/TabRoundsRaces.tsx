@@ -9,6 +9,7 @@ interface Props {
   tournamentStartDate: string;
   tournamentEndDate: string;
   onChange: (rounds: Round[]) => void;
+  readOnly?: boolean;
 }
 
 const createEmptyRace = (sequenceOrder: number): Race => ({
@@ -35,7 +36,7 @@ const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat('vi-VN').format(value) + ' VNĐ';
 };
 
-const TabRoundsRaces = ({ rounds, tournamentPurse, tournamentStartDate, tournamentEndDate, onChange }: Props) => {
+const TabRoundsRaces = ({ rounds, tournamentPurse, tournamentStartDate, tournamentEndDate, onChange, readOnly }: Props) => {
   const [expandedRounds, setExpandedRounds] = useState<Record<string, boolean>>({});
 
   const toggleRound = (id: string) => {
@@ -150,6 +151,7 @@ const TabRoundsRaces = ({ rounds, tournamentPurse, tournamentStartDate, tourname
                   type="text"
                   className={styles.roundNameInput}
                   value={round.name}
+                  disabled={readOnly}
                   onChange={(e) => handleRoundFieldChange(round.id, 'name', e.target.value)}
                 />
 
@@ -157,19 +159,22 @@ const TabRoundsRaces = ({ rounds, tournamentPurse, tournamentStartDate, tourname
                   type="date"
                   className={styles.roundDateInput}
                   value={round.scheduledDate}
+                  disabled={readOnly}
                   onChange={(e) => handleRoundFieldChange(round.id, 'scheduledDate', e.target.value)}
                 />
 
                 <span className={styles.raceCountBadge}>{round.races.length} race</span>
 
-                <button
-                  type="button"
-                  className={styles.removeRoundBtn}
-                  onClick={() => handleRemoveRound(round.id)}
-                  aria-label="Xóa Round"
-                >
-                  <FiTrash2 size={15} />
-                </button>
+{!readOnly && (
+  <button
+    type="button"
+    className={styles.removeRoundBtn}
+    onClick={() => handleRemoveRound(round.id)}
+    aria-label="Xóa Round"
+  >
+    <FiTrash2 size={15} />
+  </button>
+)}
               </div>
 
               {isExpanded && (
@@ -187,13 +192,15 @@ const TabRoundsRaces = ({ rounds, tournamentPurse, tournamentStartDate, tourname
                               🔒 Đã bốc thăm
                             </span>
                           )}
-                          <button
-                            type="button"
-                            className={styles.removeRaceBtn}
-                            onClick={() => handleRemoveRace(round.id, race.id)}
-                          >
-                            <FiTrash2 size={13} />
-                          </button>
+{!readOnly && (
+  <button
+    type="button"
+    className={styles.removeRaceBtn}
+    onClick={() => handleRemoveRace(round.id, race.id)}
+  >
+    <FiTrash2 size={13} />
+  </button>
+)}
                         </div>
 
                         <div className={styles.raceFields}>
@@ -202,6 +209,7 @@ const TabRoundsRaces = ({ rounds, tournamentPurse, tournamentStartDate, tourname
                             <input
                               type="date"
                               value={race.scheduledDate}
+                              disabled={isFrozen || readOnly}
                               onChange={(e) =>
                                 handleRaceFieldChange(round.id, race.id, 'scheduledDate', e.target.value)
                               }
@@ -213,7 +221,7 @@ const TabRoundsRaces = ({ rounds, tournamentPurse, tournamentStartDate, tourname
                             <input
                               type="time"
                               value={race.scheduledTime}
-                              disabled={isFrozen}
+                              disabled={isFrozen || readOnly}
                               title={isFrozen ? 'Đã đóng băng sau khi bốc thăm — muốn đổi phải hủy race' : undefined}
                               onChange={(e) =>
                                 handleRaceFieldChange(round.id, race.id, 'scheduledTime', e.target.value)
@@ -226,6 +234,7 @@ const TabRoundsRaces = ({ rounds, tournamentPurse, tournamentStartDate, tourname
                             <input
                               type="number"
                               value={race.purseAmount}
+                              disabled={readOnly}
                               onChange={(e) =>
                                 handleRaceFieldChange(
                                   round.id,
@@ -243,7 +252,7 @@ const TabRoundsRaces = ({ rounds, tournamentPurse, tournamentStartDate, tourname
                               type="number"
                               placeholder="Mét"
                               value={race.raceDistanceOverride}
-                              disabled={isFrozen}
+                              disabled={isFrozen || readOnly}
                               title={isFrozen ? 'Đã đóng băng sau khi bốc thăm — muốn đổi phải hủy race' : undefined}
                               onChange={(e) =>
                                 handleRaceFieldChange(
@@ -260,7 +269,7 @@ const TabRoundsRaces = ({ rounds, tournamentPurse, tournamentStartDate, tourname
                             <label>Track Type Override (tùy chọn)</label>
                             <select
                               value={race.trackTypeOverride}
-                              disabled={isFrozen}
+                              disabled={isFrozen || readOnly}
                               title={isFrozen ? 'Đã đóng băng sau khi bốc thăm — muốn đổi phải hủy race' : undefined}
                               onChange={(e) =>
                                 handleRaceFieldChange(
@@ -284,13 +293,11 @@ const TabRoundsRaces = ({ rounds, tournamentPurse, tournamentStartDate, tourname
                     );
                   })}
 
-                  <button
-                    type="button"
-                    className={styles.addRaceBtn}
-                    onClick={() => handleAddRace(round.id)}
-                  >
-                    <FiPlus size={14} /> Thêm Race
-                  </button>
+{!readOnly && (
+  <button type="button" className={styles.addRaceBtn} onClick={() => handleAddRace(round.id)}>
+    <FiPlus size={14} /> Thêm Race
+  </button>
+)}
                 </div>
               )}
             </div>
@@ -298,9 +305,11 @@ const TabRoundsRaces = ({ rounds, tournamentPurse, tournamentStartDate, tourname
         })}
       </div>
 
-      <button type="button" className={styles.addRoundBtn} onClick={handleAddRound}>
-        <FiPlus size={16} /> Thêm Round
-      </button>
+{!readOnly && (
+  <button type="button" className={styles.addRoundBtn} onClick={handleAddRound}>
+    <FiPlus size={16} /> Thêm Round
+  </button>
+)}
     </div>
   );
 };
