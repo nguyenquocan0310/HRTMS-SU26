@@ -60,7 +60,7 @@ namespace HRTMS.API.Controllers
         public async Task<IActionResult> GetHorseById(int id)
         {
             var result = await _horseService.GetHorseByIdAsync(CurrentUserId, id);
-            if (!result.Success) return result.Message.Contains("NOT_FOUND") ? NotFound(result) : Forbid();
+            if (!result.Success) return result.Message.Contains("Không tìm thấy") ? NotFound(result) : Forbid();
             return Ok(result);
         }
 
@@ -72,7 +72,7 @@ namespace HRTMS.API.Controllers
         public async Task<IActionResult> UpdateHorse(int id, [FromBody] UpdateHorseDto dto)
         {
             var result = await _horseService.UpdateHorseAsync(CurrentUserId, id, dto);
-            if (!result.Success) return result.Message.Contains("NOT_FOUND") ? NotFound(result) : Forbid();
+            if (!result.Success) return result.Message.Contains("Không tìm thấy") ? NotFound(result) : Forbid();
             return Ok(result);
         }
 
@@ -87,8 +87,8 @@ namespace HRTMS.API.Controllers
             var result = await _horseService.EnrollHorseAsync(CurrentUserId, horseId, dto);
             if (!result.Success)
             {
-                if (result.Message.Contains("NOT_FOUND")) return NotFound(result);
-                if (result.Message.Contains("NOT_OWNED")) return Forbid();
+                if (result.Message.Contains("Không tìm thấy")) return NotFound(result);
+                if (result.Message.Contains("không thuộc quyền sở hữu")) return Forbid();
                 return BadRequest(result);
             }
             return CreatedAtAction(nameof(GetHorseEnrollments), new { horseId }, result);
@@ -131,8 +131,8 @@ namespace HRTMS.API.Controllers
             var result = await _horseService.WithdrawEnrollmentAsync(CurrentUserId, horseId, enrollmentId);
             if (!result.Success)
             {
-                if (result.Message.Contains("NOT_FOUND")) return NotFound(result);
-                if (result.Message.Contains("NOT_OWNED")) return Forbid();
+                if (result.Message.Contains("Không tìm thấy")) return NotFound(result);
+                if (result.Message.Contains("không thuộc quyền sở hữu")) return Forbid();
                 return BadRequest(result);
             }
             return Ok(result);

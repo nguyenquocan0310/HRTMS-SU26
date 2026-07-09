@@ -36,7 +36,7 @@ public class TournamentParticipantController : ControllerBase
     {
         var result = await _service.RegisterAsync(CurrentUserId, CurrentRole, tournamentId);
         if (!result.Success)
-            return result.Message.Contains("NOT_FOUND") ? NotFound(result) : BadRequest(result);
+            return result.Message.Contains("Không tìm thấy") ? NotFound(result) : BadRequest(result);
         return Ok(result);
     }
 
@@ -71,7 +71,7 @@ public class TournamentParticipantController : ControllerBase
     {
         var result = await _service.ApproveAsync(CurrentUserId, participantId);
         if (!result.Success)
-            return result.Message.Contains("NOT_FOUND") ? NotFound(result) : BadRequest(result);
+            return result.Message.Contains("Không tìm thấy") ? NotFound(result) : BadRequest(result);
         return Ok(result);
     }
 
@@ -84,7 +84,7 @@ public class TournamentParticipantController : ControllerBase
     {
         var result = await _service.RejectAsync(CurrentUserId, participantId, dto.Reason);
         if (!result.Success)
-            return result.Message.Contains("NOT_FOUND") ? NotFound(result) : BadRequest(result);
+            return result.Message.Contains("Không tìm thấy") ? NotFound(result) : BadRequest(result);
         return Ok(result);
     }
 }

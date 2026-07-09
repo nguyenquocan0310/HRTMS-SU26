@@ -103,14 +103,14 @@ public class HorseService : IHorseService
     {
         var horse = await _context.Horses.FirstOrDefaultAsync(h => h.HorseId == horseId);
         if (horse == null)
-            return ApiResponse<HorseEnrollmentResponseDto>.Fail("HORSE_NOT_FOUND");
+            return ApiResponse<HorseEnrollmentResponseDto>.Fail("Không tìm thấy hồ sơ ngựa này.");
         if (horse.OwnerId != ownerId)
-            return ApiResponse<HorseEnrollmentResponseDto>.Fail("HORSE_NOT_OWNED");
+            return ApiResponse<HorseEnrollmentResponseDto>.Fail("Ngựa này không thuộc quyền sở hữu của bạn.");
 
         // Giải đấu phải tồn tại và đang mở đăng ký
         var tournament = await _context.Tournaments.FindAsync(dto.TournamentId);
         if (tournament == null)
-            return ApiResponse<HorseEnrollmentResponseDto>.Fail("TOURNAMENT_NOT_FOUND");
+            return ApiResponse<HorseEnrollmentResponseDto>.Fail("Không tìm thấy giải đấu này.");
         if (tournament.Status != "Open Registration")
             return ApiResponse<HorseEnrollmentResponseDto>.Fail("Giải hiện không mở đăng ký.");
 
@@ -233,11 +233,11 @@ public class HorseService : IHorseService
             .FirstOrDefaultAsync(e => e.EnrollmentId == enrollmentId);
 
         if (entry == null || entry.HorseId != horseId)
-            return ApiResponse<string>.Fail("ENROLLMENT_NOT_FOUND");
+            return ApiResponse<string>.Fail("Không tìm thấy đăng ký ngựa vào giải này.");
         if (entry.OwnerId != ownerId)
-            return ApiResponse<string>.Fail("ENROLLMENT_NOT_OWNED");
+            return ApiResponse<string>.Fail("Đăng ký này không thuộc quyền sở hữu của bạn.");
         if (entry.Status == "Withdrawn")
-            return ApiResponse<string>.Fail("ALREADY_WITHDRAWN");
+            return ApiResponse<string>.Fail("Ngựa này đã được rút khỏi giải trước đó.");
 
         // "Trước khi pairing": chặn rút nếu ngựa đã có pairing active trong đúng giải này.
         var hasActivePairing = await _context.Pairings.AnyAsync(p =>
@@ -294,10 +294,10 @@ public class HorseService : IHorseService
         var horse = await _context.Horses.FindAsync(horseId);
 
         if (horse == null)
-            return ApiResponse<HorseResponseDto>.Fail("HORSE_NOT_FOUND");
+            return ApiResponse<HorseResponseDto>.Fail("Không tìm thấy hồ sơ ngựa này.");
 
         if (horse.OwnerId != ownerId)
-            return ApiResponse<HorseResponseDto>.Fail("HORSE_NOT_OWNED");
+            return ApiResponse<HorseResponseDto>.Fail("Ngựa này không thuộc quyền sở hữu của bạn.");
 
         return ApiResponse<HorseResponseDto>.Ok(MapToDto(horse));
     }
@@ -310,10 +310,10 @@ public class HorseService : IHorseService
             .FirstOrDefaultAsync(h => h.HorseId == horseId);
 
         if (horse == null)
-            return ApiResponse<HorseResponseDto>.Fail("HORSE_NOT_FOUND");
+            return ApiResponse<HorseResponseDto>.Fail("Không tìm thấy hồ sơ ngựa này.");
 
         if (horse.OwnerId != ownerId)
-            return ApiResponse<HorseResponseDto>.Fail("HORSE_NOT_OWNED");
+            return ApiResponse<HorseResponseDto>.Fail("Ngựa này không thuộc quyền sở hữu của bạn.");
 
         // Validate trước khi lưu (đồng bộ với CreateHorseAsync)
         if (dto.BirthYear != null && dto.BirthYear > DateTime.UtcNow.Year)
@@ -419,7 +419,7 @@ public class HorseService : IHorseService
         var horse = await _context.Horses.FindAsync(horseId);
 
         if (horse == null)
-            return ApiResponse<HorseResponseDto>.Fail("HORSE_NOT_FOUND");
+            return ApiResponse<HorseResponseDto>.Fail("Không tìm thấy hồ sơ ngựa này.");
 
         return ApiResponse<HorseResponseDto>.Ok(MapToDto(horse));
     }
@@ -432,10 +432,10 @@ public class HorseService : IHorseService
             .FirstOrDefaultAsync(e => e.EnrollmentId == enrollmentId);
 
         if (entry == null)
-            return ApiResponse<string>.Fail("ENROLLMENT_NOT_FOUND");
+            return ApiResponse<string>.Fail("Không tìm thấy đăng ký ngựa vào giải này.");
 
         if (entry.AdminApprovalStatus == "Approved")
-            return ApiResponse<string>.Fail("ALREADY_APPROVED");
+            return ApiResponse<string>.Fail("Đăng ký này đã được duyệt trước đó.");
 
         // Admin KHÔNG được override auto-reject cứng (doping Failed / breed mismatch).
         if (entry.ScreeningStatus == "AutoRejected")
@@ -487,10 +487,10 @@ public class HorseService : IHorseService
             .FirstOrDefaultAsync(e => e.EnrollmentId == enrollmentId);
 
         if (entry == null)
-            return ApiResponse<string>.Fail("ENROLLMENT_NOT_FOUND");
+            return ApiResponse<string>.Fail("Không tìm thấy đăng ký ngựa vào giải này.");
 
         if (entry.AdminApprovalStatus == "Rejected")
-            return ApiResponse<string>.Fail("ALREADY_REJECTED");
+            return ApiResponse<string>.Fail("Đăng ký này đã bị từ chối trước đó.");
 
         string oldStatus = entry.AdminApprovalStatus;
 
@@ -735,8 +735,8 @@ public class HorseService : IHorseService
         var entry = await _context.RaceEntries
             .Include(e => e.Pairing).ThenInclude(p => p.Horse)
             .FirstOrDefaultAsync(e => e.RaceEntryId == raceEntryId);
-        if (entry == null) return ApiResponse<string>.Fail("RACE_ENTRY_NOT_FOUND");
-        if (entry.EntryFeeStatus == "Paid") return ApiResponse<string>.Fail("FEE_ALREADY_CONFIRMED");
+        if (entry == null) return ApiResponse<string>.Fail("Không tìm thấy lượt đăng ký thi đấu này.");
+        if (entry.EntryFeeStatus == "Paid") return ApiResponse<string>.Fail("Lệ phí tham gia đã được xác nhận trước đó.");
 
         entry.EntryFeeStatus = "Paid";
         entry.EntryFeeConfirmedBy = adminId;
@@ -751,7 +751,7 @@ public class HorseService : IHorseService
         await _notification.SendAsync(
             entry.Pairing.Horse.OwnerId,
             "Lệ phí tham gia đã được xác nhận",
-            $"Lệ phí cho ngựa '{entry.Pairing.Horse.Name}' (đăng ký #{raceEntryId}) đã được xác nhận (Paid).",
+            $"Lệ phí cho ngựa '{entry.Pairing.Horse.Name}' (đăng ký #{raceEntryId}) đã được xác nhận.",
             type: "Both",
             relatedEntityType: "RaceEntry", relatedEntityId: raceEntryId);
 
@@ -764,8 +764,8 @@ public class HorseService : IHorseService
         var entry = await _context.RaceEntries
             .Include(e => e.Pairing).ThenInclude(p => p.Horse)
             .FirstOrDefaultAsync(e => e.RaceEntryId == raceEntryId);
-        if (entry == null) return ApiResponse<string>.Fail("RACE_ENTRY_NOT_FOUND");
-        if (entry.EntryFeeStatus != "Refund Pending") return ApiResponse<string>.Fail("NOT_REFUND_PENDING");
+        if (entry == null) return ApiResponse<string>.Fail("Không tìm thấy lượt đăng ký thi đấu này.");
+        if (entry.EntryFeeStatus != "Refund Pending") return ApiResponse<string>.Fail("Lượt đăng ký này hiện không ở trạng thái chờ hoàn phí.");
 
         entry.EntryFeeStatus = "Refunded";
         entry.UpdatedAt = DateTime.UtcNow;
@@ -777,7 +777,7 @@ public class HorseService : IHorseService
         await _notification.SendAsync(
             entry.Pairing.Horse.OwnerId,
             "Đã hoàn phí tham gia",
-            $"Lệ phí cho ngựa '{entry.Pairing.Horse.Name}' (đăng ký #{raceEntryId}) đã được hoàn (Refunded).",
+            $"Lệ phí cho ngựa '{entry.Pairing.Horse.Name}' (đăng ký #{raceEntryId}) đã được hoàn.",
             type: "Both",
             relatedEntityType: "RaceEntry", relatedEntityId: raceEntryId);
 
@@ -791,8 +791,8 @@ public class HorseService : IHorseService
             .Include(e => e.Race).ThenInclude(r => r.Round).ThenInclude(r => r.Tournament)
             .FirstOrDefaultAsync(e => e.RaceEntryId == raceEntryId);
 
-        if (entry == null) return ApiResponse<string>.Fail("RACE_ENTRY_NOT_FOUND");
-        if (entry.EntryFeeStatus != "Paid") return ApiResponse<string>.Fail("ENTRY_FEE_NOT_PAID");
+        if (entry == null) return ApiResponse<string>.Fail("Không tìm thấy lượt đăng ký thi đấu này.");
+        if (entry.EntryFeeStatus != "Paid") return ApiResponse<string>.Fail("Lệ phí tham gia của lượt đăng ký này chưa được thanh toán.");
 
         // Schema v3: gate theo enrollment của ĐÚNG giải (duyệt lại mỗi giải), không phải hồ sơ ngựa.
         var enrollmentApproved = await _context.HorseTournamentEntries.AnyAsync(e =>
@@ -800,14 +800,14 @@ public class HorseService : IHorseService
             e.TournamentId == entry.Pairing.TournamentId &&
             e.AdminApprovalStatus == "Approved");
         if (!enrollmentApproved)
-            return ApiResponse<string>.Fail("HORSE_ENROLLMENT_NOT_APPROVED");
+            return ApiResponse<string>.Fail("Ngựa chưa được duyệt tham gia giải này.");
 
-        if (entry.Status == "Confirmed") return ApiResponse<string>.Fail("ENTRY_ALREADY_CONFIRMED");
+        if (entry.Status == "Confirmed") return ApiResponse<string>.Fail("Lượt đăng ký này đã được xác nhận trước đó.");
 
         // Breed check — có Tournament context tại đây
         string allowedBreed = entry.Race.Round.Tournament.AllowedBreed;
         if (entry.Pairing.Horse.Breed != allowedBreed)
-            return ApiResponse<string>.Fail($"AUTO_REJECTED_BREED: yêu cầu '{allowedBreed}', ngựa có '{entry.Pairing.Horse.Breed}'.");
+            return ApiResponse<string>.Fail($"Giống ngựa không phù hợp: giải yêu cầu giống '{allowedBreed}', ngựa của bạn thuộc giống '{entry.Pairing.Horse.Breed}'.");
 
         entry.Status = "Confirmed";
         entry.UpdatedAt = DateTime.UtcNow;
@@ -834,8 +834,8 @@ public class HorseService : IHorseService
         var entry = await _context.RaceEntries
             .Include(e => e.Pairing).ThenInclude(p => p.Horse)
             .FirstOrDefaultAsync(e => e.RaceEntryId == raceEntryId);
-        if (entry == null) return ApiResponse<string>.Fail("RACE_ENTRY_NOT_FOUND");
-        if (entry.Status == "Cancelled") return ApiResponse<string>.Fail("ALREADY_CANCELLED");
+        if (entry == null) return ApiResponse<string>.Fail("Không tìm thấy lượt đăng ký thi đấu này.");
+        if (entry.Status == "Cancelled") return ApiResponse<string>.Fail("Lượt đăng ký này đã bị hủy trước đó.");
 
         string oldStatus = entry.Status;
         // CHK_RaceEntries_Status chỉ cho phép Pending/Confirmed/Cancelled/Disqualified

@@ -37,7 +37,7 @@ public class TournamentParticipantService : ITournamentParticipantService
 
         var tournament = await _context.Tournaments.FindAsync(tournamentId);
         if (tournament == null)
-            return ApiResponse<ParticipantResponseDto>.Fail("TOURNAMENT_NOT_FOUND");
+            return ApiResponse<ParticipantResponseDto>.Fail("Không tìm thấy giải đấu này.");
 
         // Chỉ nhận đăng ký khi giải đang mở đăng ký
         if (tournament.Status != "Open Registration")
@@ -52,7 +52,7 @@ public class TournamentParticipantService : ITournamentParticipantService
         var now = DateTime.UtcNow;
         var decision = await BuildScreeningDecisionAsync(userId, role, tournament);
         if (decision == null)
-            return ApiResponse<ParticipantResponseDto>.Fail("USER_NOT_FOUND");
+            return ApiResponse<ParticipantResponseDto>.Fail("Không tìm thấy tài khoản người dùng.");
 
         var participant = new TournamentParticipant
         {
@@ -133,7 +133,7 @@ public class TournamentParticipantService : ITournamentParticipantService
     {
         var participant = await _context.TournamentParticipants.FindAsync(participantId);
         if (participant == null)
-            return ApiResponse<ParticipantResponseDto>.Fail("PARTICIPANT_NOT_FOUND");
+            return ApiResponse<ParticipantResponseDto>.Fail("Không tìm thấy đăng ký tham gia này.");
         if (participant.Status == "Approved")
             return ApiResponse<ParticipantResponseDto>.Fail("Đăng ký này đã được duyệt.");
 
@@ -166,7 +166,7 @@ public class TournamentParticipantService : ITournamentParticipantService
 
         var participant = await _context.TournamentParticipants.FindAsync(participantId);
         if (participant == null)
-            return ApiResponse<ParticipantResponseDto>.Fail("PARTICIPANT_NOT_FOUND");
+            return ApiResponse<ParticipantResponseDto>.Fail("Không tìm thấy đăng ký tham gia này.");
         if (participant.Status == "Rejected")
             return ApiResponse<ParticipantResponseDto>.Fail("Đăng ký này đã bị từ chối.");
 
@@ -201,10 +201,10 @@ public class TournamentParticipantService : ITournamentParticipantService
             return null;
 
         if (user.Role != role)
-            return AutoRejected($"Tài khoản role {user.Role} không khớp role đăng ký {role}.");
+            return AutoRejected($"Vai trò tài khoản ({user.Role}) không khớp với vai trò đăng ký ({role}).");
 
         if (user.Status != "Active")
-            return AutoRejected("Tài khoản chưa Active nên không đủ điều kiện tham gia giải.");
+            return AutoRejected("Tài khoản của bạn chưa được kích hoạt nên chưa đủ điều kiện tham gia giải.");
 
         switch (role)
         {
@@ -214,7 +214,7 @@ public class TournamentParticipantService : ITournamentParticipantService
                     ? new ScreeningDecision(
                         "Approved",
                         "AutoEligible",
-                        "Owner Active và có hồ sơ chủ ngựa → tự động đủ điều kiện tham gia.",
+                        "Tài khoản đã kích hoạt và có hồ sơ chủ ngựa nên tự động đủ điều kiện tham gia.",
                         null,
                         true,
                         "Đăng ký tham gia giải thành công, bạn đã được tự động phê duyệt.")
@@ -223,41 +223,41 @@ public class TournamentParticipantService : ITournamentParticipantService
             case "Jockey":
                 var jockey = await _context.JockeyProfiles.FirstOrDefaultAsync(j => j.JockeyId == userId);
                 if (jockey == null) return AutoRejected("Bạn cần khai báo hồ sơ Jockey trước.");
-                if (jockey.Status != "Active") return AutoRejected("Hồ sơ Jockey chưa được Admin duyệt Active.");
+                if (jockey.Status != "Active") return AutoRejected("Hồ sơ Jockey của bạn chưa được Admin kích hoạt.");
                 if (string.IsNullOrWhiteSpace(jockey.LicenseCertificate))
-                    return AutoRejected("Jockey thiếu chứng chỉ/license bắt buộc.");
+                    return AutoRejected("Bạn chưa cung cấp chứng chỉ hành nghề bắt buộc.");
                 if (!HasRequiredIdentity(user))
-                    return AutoRejected("Jockey thiếu định danh, số điện thoại hoặc ngày sinh bắt buộc.");
+                    return AutoRejected("Bạn chưa cung cấp đầy đủ thông tin định danh, số điện thoại hoặc ngày sinh.");
                 if (jockey.ExperienceYears < tournament.MinJockeyExperienceYears)
-                    return AutoRejected($"Jockey cần ít nhất {tournament.MinJockeyExperienceYears} năm kinh nghiệm cho giải này.");
+                    return AutoRejected($"Bạn cần có ít nhất {tournament.MinJockeyExperienceYears} năm kinh nghiệm để đăng ký giải này.");
                 if (jockey.SelfDeclaredWeight <= 0)
-                    return ManualReview("Jockey chưa có cân nặng tự khai báo hợp lệ.");
+                    return ManualReview("Bạn chưa khai báo cân nặng hợp lệ trong hồ sơ.");
                 if (!string.IsNullOrWhiteSpace(jockey.HealthStatus) && jockey.HealthStatus != "Good")
-                    return ManualReview($"Tình trạng sức khỏe Jockey cần Admin xem xét: {jockey.HealthStatus}.");
-                return AutoEligible("Hồ sơ Jockey Active, đủ định danh/license và đạt kinh nghiệm tối thiểu.");
+                    return ManualReview($"Tình trạng sức khỏe của bạn cần Admin xem xét thêm: {jockey.HealthStatus}.");
+                return AutoEligible("Hồ sơ Jockey đã được kích hoạt, đủ thông tin định danh, chứng chỉ hành nghề và đạt kinh nghiệm tối thiểu.");
 
             case "Doctor":
                 var doctor = await _context.DoctorProfiles.FirstOrDefaultAsync(d => d.DoctorId == userId);
                 if (doctor == null) return AutoRejected("Bạn cần khai báo hồ sơ Doctor trước.");
-                if (doctor.Status != "Active") return AutoRejected("Hồ sơ Doctor chưa được Admin duyệt Active.");
+                if (doctor.Status != "Active") return AutoRejected("Hồ sơ Doctor của bạn chưa được Admin kích hoạt.");
                 if (!HasRequiredIdentity(user))
-                    return AutoRejected("Doctor thiếu định danh, số điện thoại hoặc ngày sinh bắt buộc.");
+                    return AutoRejected("Bạn chưa cung cấp đầy đủ thông tin định danh, số điện thoại hoặc ngày sinh.");
                 if (string.IsNullOrWhiteSpace(doctor.MedicalLicenseNumber))
-                    return ManualReview("Doctor chưa có mã giấy phép y tế rõ ràng.");
-                return AutoEligible("Hồ sơ Doctor Active, đủ định danh và giấy phép y tế.");
+                    return ManualReview("Bạn chưa cung cấp mã giấy phép hành nghề y rõ ràng.");
+                return AutoEligible("Hồ sơ Doctor đã được kích hoạt, đủ thông tin định danh và giấy phép hành nghề y.");
 
             case "Referee":
                 var referee = await _context.RefereeProfiles.FirstOrDefaultAsync(r => r.RefereeId == userId);
                 if (referee == null) return AutoRejected("Bạn cần khai báo hồ sơ Referee trước.");
-                if (referee.Status != "Active") return AutoRejected("Hồ sơ Referee chưa được Admin duyệt Active.");
+                if (referee.Status != "Active") return AutoRejected("Hồ sơ Referee của bạn chưa được Admin kích hoạt.");
                 if (!HasRequiredIdentity(user))
-                    return AutoRejected("Referee thiếu định danh, số điện thoại hoặc ngày sinh bắt buộc.");
+                    return AutoRejected("Bạn chưa cung cấp đầy đủ thông tin định danh, số điện thoại hoặc ngày sinh.");
                 if (string.IsNullOrWhiteSpace(referee.CertificationLevel))
-                    return ManualReview("Referee chưa có cấp chứng nhận rõ ràng.");
-                return AutoEligible("Hồ sơ Referee Active, đủ định danh và chứng nhận.");
+                    return ManualReview("Bạn chưa cung cấp cấp chứng nhận trọng tài rõ ràng.");
+                return AutoEligible("Hồ sơ Referee đã được kích hoạt, đủ thông tin định danh và chứng nhận.");
 
             default:
-                return AutoRejected("Role không hợp lệ.");
+                return AutoRejected("Vai trò không hợp lệ.");
         }
     }
 
