@@ -6,9 +6,10 @@ import styles from './TabPostPositionDraw.module.scss';
 interface Props {
   rounds: Round[];
   onChange: (rounds: Round[]) => void;
+  readOnly?: boolean;
 }
 
-const TabPostPositionDraw = ({ rounds, onChange }: Props) => {
+const TabPostPositionDraw = ({ rounds, onChange, readOnly }: Props) => {
   // Lấy danh sách tất cả race từ mọi round, để Admin chọn 1 race cụ thể
   const allRaces = rounds.flatMap((round) =>
     round.races.map((race) => ({ round, race }))
@@ -93,14 +94,16 @@ const TabPostPositionDraw = ({ rounds, onChange }: Props) => {
               <span className={styles.notDrawnBadge}>Chưa bốc thăm</span>
             )}
 
-            <button
-              type="button"
-              className={styles.randomizeBtn}
-              onClick={handleRandomizeDraw}
-              disabled={selected.race.entries.length === 0}
-            >
-              <FiShuffle size={15} /> Randomize Draw
-            </button>
+{!readOnly && (
+  <button
+    type="button"
+    className={styles.randomizeBtn}
+    onClick={handleRandomizeDraw}
+    disabled={selected.race.entries.length === 0}
+  >
+    <FiShuffle size={15} /> Randomize Draw
+  </button>
+)}
           </div>
 
           {selected.race.entries.length === 0 ? (
