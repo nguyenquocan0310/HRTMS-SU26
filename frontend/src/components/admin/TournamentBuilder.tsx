@@ -279,7 +279,7 @@ const loadDraft = async (id: number) => {
         races: r.races?.map((race) => ({
           id: String(race.raceId),
           sequenceOrder: race.raceNumber,
-          scheduledDate: toDateInput(r.scheduledDate),
+          scheduledDate: toDateInput(race.scheduledDate),
           raceNumber: race.raceNumber,
           scheduledTime: toTimeInput(race.scheduledTime),
           purseAmount: race.purseAmount,
