@@ -15,19 +15,26 @@ const RegisterPage = () => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [formData, setFormData] = useState<RegisterFormData>(initialFormData);
+  const [roleError, setRoleError] = useState<string>('');
+
 
   const updateFormData = (partial: Partial<RegisterFormData>) => {
     setFormData(prev => ({ ...prev, ...partial }));
   };
 
-  const nextStep = () => {
-    // Spectator skip bước 4
-    if (currentStep === 3 && formData.role === RegRole.Spectator) {
-      setCurrentStep(5);
-      return;
-    }
-    setCurrentStep(prev => Math.min(prev + 1, 6));
-  };
+const nextStep = () => {
+  if (currentStep === 1 && !formData.role) {
+    setRoleError('Vui lòng chọn role trước khi tiếp tục');
+    return;
+  }
+  setRoleError('');
+  // Spectator skip bước 4
+  if (currentStep === 3 && formData.role === RegRole.Spectator) {
+    setCurrentStep(5);
+    return;
+  }
+  setCurrentStep(prev => Math.min(prev + 1, 6));
+};
 
   const prevStep = () => {
     // Spectator skip bước 4 khi back
@@ -46,7 +53,10 @@ const RegisterPage = () => {
         return (
           <StepRoleSelection
             selected={formData.role}
-            onSelect={(role) => updateFormData({ role })}
+            onSelect={(role) => {
+              updateFormData({ role });
+              setRoleError('');
+            }}
           />
         );
       case 2:
