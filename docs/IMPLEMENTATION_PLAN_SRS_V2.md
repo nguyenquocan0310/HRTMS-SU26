@@ -1,6 +1,6 @@
 # Implementation Plan theo SRS
 
-Ngày cập nhật: 2026-06-28
+Ngày cập nhật: 2026-07-09
 
 | Module | Mảng | Controller/Service chính | Trạng thái | Chủ |
 | --- | --- | --- | --- | --- |
@@ -13,22 +13,22 @@ Ngày cập nhật: 2026-06-28
 | G | Pre-race checks | `DoctorAssignmentController`, `MedicalCheckController`, `IndependenceCheckController`, `StartingListController` | \~85% — thiếu post-race weigh-out | Phong |
 | H | Race live/violations | **KHÔNG có controller** | **\~20%** — thiếu transition Live, Violations, Unofficial | Phong |
 | I | Protest | Entity có; **KHÔNG có** `ProtestController` | **\~10%** — thiếu toàn bộ submit/investigate/rule | Phong |
-| J | Declare Official | `ResultController`, `ResultService` (500d) | \~85% — đã có ACID + guard, rà refund Protest-DQ | An |
+| J | Declare Official | `ResultController`, `ResultService` (500d) | \~85% — đã có ACID + guard, rà refund Protest-DQ | Hào |
 | K | Purse/Prize | `PursePayoutController`, `PursePayoutService` | \~80% — rà remainder (PRZ.4), internal split (PRZ.3) | An |
-| L | Leaderboard | `ResultService.UpdateLeaderboardPoints` (ghi điểm) nhưng **KHÔNG có controller đọc** | **\~30%** — thiếu API leaderboard + standings + polling | An |
+| L | Leaderboard | `ResultService.UpdateLeaderboardPoints` (ghi điểm) nhưng **KHÔNG có controller đọc** | **\~30%** — thiếu API leaderboard + standings + polling | Hào |
 | M | Prediction | `PredictionController`, `PredictionService` (318d) | \~85% — rà gate chỉ mở sau draw (PRD.2), server gate (PRD.6) | An |
-| N | Reconciliation | `ReconciliationController` (read), reward trong `ResultService` | \~80% — đủ read; rà reward +200 & email (REC.2, REC.5) | An |
+| N | Reconciliation | `ReconciliationController` (read), reward trong `ResultService` | \~80% — đủ read; rà reward +200 & email (REC.2, REC.5) | Hào |
 | O | Notification | `NotificationController`, `NotificationService` | \~70% — **thiếu SMTP email (NOTI.2)**, rà đủ event (NOTI.3) | Hào |
-| P | Reports | **KHÔNG có controller** | **0%** — thiếu CSV/PDF export | Hào (hoặc An) |
+| P | Reports | **KHÔNG có controller** | **0%** — thiếu CSV/PDF export | An |
 | Q | Security/Audit | `AuditLogService`, `TokenBlacklistService`, `JwtService` | \~80% — ✅ append-only DB đã có (trigger `trg_AuditLogs_AppendOnly` + `trg_RaceReports_Immutable` trong `database/hrtms_schema.sql`); còn rà đủ audit event | Hào |
 
 ---
 
 ## Task chi tiết theo thành viên
 
-### 1 Hào — BE1 — Module A, O, Q (+ P optional)
+### 1 Hào — BE1 — Module A, Q, J, O, L, N
 
-**Đã có:** đăng ký theo role, login/logout JWT, `/me` + `/profile`, suspend/activate, approve Jockey/Referee/Doctor, list users, pending-approvals, audit-logs GET, SignUp Bonus +1000 nguyên tử (`AuthService` dòng \~152–175), TokenBlacklist + middleware.
+**Đã có:** đăng ký theo role, login/logout JWT, `/me` + `/profile`, suspend/activate, approve Jockey/Referee/Doctor, list users, pending-approvals, audit-logs GET, SignUp Bonus +1000 nguyên tử (`AuthService` dòng \~152–175), TokenBlacklist + middleware; Declare Official ACID 6 bước + idempotent guard + check pending protests (`ResultService` 500d); ghi điểm leaderboard (`ResultService.UpdateLeaderboardPoints`); Reconciliation read (`ReconciliationController`).
 
 **Còn thiếu / cần làm:**
 
@@ -69,17 +69,27 @@ Ngày cập nhật: 2026-06-28
 
 - [ ] **SEC.2 — Session timeout:** xác nhận JWT có expiry + refresh/timeout theo NFR.
 
-#### Module P — Reports (Low, có thể giao An nếu Hào quá tải)
+#### Module J — Results (đã mạnh)
 
-- [ ] **RPT.1/2/3** — `ReportController`: export CSV + PDF/print, lọc dữ liệu theo RBAC (UI-S18).
+- [ ] **RES.3 bước 3:** rà refund Prediction Pending trên cặp DQ/Cancelled nằm trong transaction Declare Official.
 
-**Acceptance:** register role professional thiếu identity → reject; Admin tạo account ghi audit; email gửi đúng event; `AuditLogs` không sửa/xóa được ở DB.
+#### Module L — Leaderboard (THIẾU CONTROLLER)
+
+- [ ] **LDR.1/2 —** `LeaderboardController`**:** `GET /api/leaderboard/horses?tournamentId=&mode=points|earnings`, `GET /api/leaderboard/jockeys` (wins, top, win-rate, earnings). Đọc từ `RaceEntries.PointsAwarded` + `PursePayouts` (chỉ race `Official`).
+
+- [ ] **LDR.3/4 — Polling:** đảm bảo endpoint read `READ COMMITTED`, FE polling ≥ 30s (không WebSocket).
+
+#### Module N — Reconciliation
+
+- [ ] **REC.2/5:** verify reward +200 `Prediction Win Reward` ghi sổ cái trong transaction Official; gửi notification (in-app + email) sau commit.
+
+**Acceptance:** register role professional thiếu identity → reject; Admin tạo account ghi audit; email gửi đúng event; `AuditLogs` không sửa/xóa được ở DB; Declare Official idempotent (bấm 2 lần không nhân đôi thưởng); leaderboard chỉ tính race Official; reward reconciliation ghi đúng sổ cái + notify sau commit.
 
 ---
 
-### 2 An — BE2 — Module B, C, E, J, K, L, M, N
+### 2 An — BE2 — Module B, C, E, K, M, P
 
-**Đã có:** Tournament CRUD + status + prize-distributions + rounds/races (`TournamentController` 248d, service 580d); Horse CRUD + admin approve/reject + fee-status; RaceEntry tạo/draw/confirm/withdraw (`SchedulingController` + `RaceEntryService` 535d); Declare Official ACID 6 bước + idempotent guard + check pending protests (`ResultService` 500d); Purse payout (`PursePayoutController`); Prediction gate/place/form-score (`PredictionService` 318d); Reconciliation read (`ReconciliationController`).
+**Đã có:** Tournament CRUD + status + prize-distributions + rounds/races (`TournamentController` 248d, service 580d); Horse CRUD + admin approve/reject + fee-status; RaceEntry tạo/draw/confirm/withdraw (`SchedulingController` + `RaceEntryService` 535d); Purse payout (`PursePayoutController`); Prediction gate/place/form-score (`PredictionService` 318d).
 
 **Còn thiếu / cần rà:**
 
@@ -111,21 +121,11 @@ Ngày cập nhật: 2026-06-28
 
 - [ ] **SCH.9 — Freeze config:** sau draw / có prediction → khóa sửa `ScheduledTime/RaceDistanceOverride/TrackTypeOverride`; muốn đổi → hủy race + refund prediction.
 
-#### Module J — Results (đã mạnh)
-
-- [ ] **RES.3 bước 3:** rà refund Prediction Pending trên cặp DQ/Cancelled nằm trong transaction Declare Official.
-
 #### Module K — Purse
 
 - [ ] **PRZ.2/4 — Remainder:** phân bổ nạp từ `PrizeDistributions` (không hard-code), xử lý đồng hạng chia trung bình %, phần dư ghi `Remainder` không thất thoát.
 
 - [ ] **PRZ.3 — Internal split:** Jockey 10% nhất / 5% nhì–tư / phí cố định ngoài top; Owner phần còn lại.
-
-#### Module L — Leaderboard (THIẾU CONTROLLER)
-
-- [ ] **LDR.1/2 —** `LeaderboardController`**:** `GET /api/leaderboard/horses?tournamentId=&mode=points|earnings`, `GET /api/leaderboard/jockeys` (wins, top, win-rate, earnings). Đọc từ `RaceEntries.PointsAwarded` + `PursePayouts` (chỉ race `Official`).
-
-- [ ] **LDR.3/4 — Polling:** đảm bảo endpoint read `READ COMMITTED`, FE polling ≥ 30s (không WebSocket).
 
 #### Module M — Prediction
 
@@ -135,11 +135,11 @@ Ngày cập nhật: 2026-06-28
 
 - [ ] **PRD.6 — Server gate:** chặn nhận prediction khi gate đóng hoặc race ≠ `Upcoming` (server-side).
 
-#### Module N — Reconciliation
+#### Module P — Reports
 
-- [ ] **REC.2/5:** verify reward +200 `Prediction Win Reward` ghi sổ cái trong transaction Official; gửi notification (in-app + email) sau commit.
+- [ ] **RPT.1/2/3** — `ReportController`: export CSV + PDF/print, lọc dữ liệu theo RBAC (UI-S18).
 
-**Acceptance:** Declare Official idempotent (bấm 2 lần không nhân đôi thưởng); leaderboard chỉ tính race Official; gate đóng khi Live; cancel giải hoàn điểm + refund pending trong 1 transaction.
+**Acceptance:** gate đóng khi Live; cancel giải hoàn điểm + refund pending trong 1 transaction; purse remainder không thất thoát; report export đúng RBAC.
 
 ---
 
