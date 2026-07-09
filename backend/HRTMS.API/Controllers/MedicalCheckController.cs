@@ -116,4 +116,15 @@ public class MedicalCheckController : ControllerBase
         catch (InvalidOperationException ex) when (ex.Message == "UNFIT_REASON_TOO_SHORT")
         { return BadRequest(new { error = "UNFIT_REASON_TOO_SHORT", message = "Unfit reason must be at least 20 characters." }); }
     }
+    [HttpGet("races/{raceId}/entries")]
+    public async Task<IActionResult> GetRaceEntries(int raceId)
+    {
+        var doctorId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+        var result = await _medicalCheckService.GetRaceEntriesAsync(
+            doctorId,
+            raceId);
+
+        return Ok(result);
+    }
 }
