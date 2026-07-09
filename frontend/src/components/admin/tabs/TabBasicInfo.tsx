@@ -7,7 +7,6 @@ interface Props {
   readOnly?: boolean;
 }
 
-const TabBasicInfo = ({ data, onChange, readOnly }: Props) => {
 
 const RACE_DISTANCES = [1000, 1200, 1400, 1600, 1800, 2000];
 
@@ -20,7 +19,7 @@ const parseVND = (s: string): number | '' => {
   return isNaN(n) || cleaned === '' ? '' : n;
 };
 
-const TabBasicInfo = ({ data, onChange }: Props) => {
+const TabBasicInfo = ({ data, onChange, readOnly }: Props) => {
   const update = <K extends keyof TournamentBasicInfo>(field: K, value: TournamentBasicInfo[K]) => {
     onChange({ ...data, [field]: value });
   };

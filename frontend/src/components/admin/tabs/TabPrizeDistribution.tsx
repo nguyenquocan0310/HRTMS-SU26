@@ -7,14 +7,16 @@ interface Props {
   prizeDistribution: PrizeRow[];
   totalPurse: number;
   onChange: (rows: PrizeRow[]) => void;
+  readOnly?: boolean;
 }
+
 
 const RANK_LABELS: Record<number, string> = { 1:'Top 1', 2:'Top 2', 3:'Top 3', 4:'Top 4', 5:'Top 5' };
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('vi-VN').format(Math.round(value)) + ' VNĐ';
 
-const TabPrizeDistribution = ({ prizeDistribution, totalPurse, onChange }: Props) => {
+const TabPrizeDistribution = ({ prizeDistribution, totalPurse, onChange, readOnly }: Props) => {
   // locked: set of ranks bị khóa
   const [locked, setLocked] = useState<Set<number>>(new Set());
 
@@ -87,7 +89,7 @@ const TabPrizeDistribution = ({ prizeDistribution, totalPurse, onChange }: Props
                 step={1}
                 value={row.percentage}
                 className={styles.slider}
-                disabled={isLocked}
+                disabled={isLocked || readOnly}
                 onChange={(e) => handleChange(row.rank, Number(e.target.value))}
               />
 
@@ -98,7 +100,7 @@ const TabPrizeDistribution = ({ prizeDistribution, totalPurse, onChange }: Props
                   max={100}
                   className={styles.percentInput}
                   value={row.percentage}
-                  disabled={isLocked}
+                  disabled={isLocked || readOnly}
                   onChange={(e) => handleChange(row.rank, Number(e.target.value) || 0)}
                 />
                 <span className={styles.percentSign}>%</span>
@@ -111,6 +113,7 @@ const TabPrizeDistribution = ({ prizeDistribution, totalPurse, onChange }: Props
                 className={`${styles.lockBtn} ${isLocked ? styles.lockBtnActive : ''}`}
                 onClick={() => toggleLock(row.rank)}
                 title={isLocked ? 'Bỏ khóa' : 'Khóa giá trị này'}
+                disabled={readOnly}
               >
                 {isLocked ? <FiLock size={14} /> : <FiUnlock size={14} />}
               </button>
