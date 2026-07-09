@@ -544,12 +544,12 @@ const StepVerification = ({ role, formData, onChange }: Props) => {
               className={styles.input}
               placeholder="Nhập đúng 12 số CCCD"
               maxLength={12}
-              value={formData.refereeVerification.identityNumber}
+              value={formData.doctorVerification.identityNumber}
               onChange={(e) => {
                 const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 12);
                 onChange({
-                  refereeVerification: {
-                    ...formData.refereeVerification,
+                  doctorVerification: {
+                    ...formData.doctorVerification,
                     identityNumber: digitsOnly,
                   },
                 });
@@ -558,10 +558,10 @@ const StepVerification = ({ role, formData, onChange }: Props) => {
             <span
               style={{
                 fontSize: '12px',
-                color: formData.refereeVerification.identityNumber.length === 12 ? '#4caf50' : '#999',
+                color: formData.doctorVerification.identityNumber.length === 12 ? '#4caf50' : '#999',
               }}
             >
-              {formData.refereeVerification.identityNumber.length}/12 số
+              {formData.doctorVerification.identityNumber.length}/12 số
             </span>
           </div>
           <div className={styles.field}>
