@@ -17,4 +17,7 @@ public interface IMedicalCheckService
         int doctorId,
         int raceEntryId,
     RecordClinicalCheckDto dto);
+    Task<List<MedicalCheckListDto>> GetRaceEntriesAsync(
+        int doctorId,
+        int raceId);
 }

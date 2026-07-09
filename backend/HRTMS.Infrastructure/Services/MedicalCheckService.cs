@@ -1,4 +1,5 @@
 ﻿using HRTMS.Core.DTOs.Medical;
+using HRTMS.Core.Entities;
 using HRTMS.Core.Interfaces.Services;
 using HRTMS.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +18,24 @@ public class MedicalCheckService : IMedicalCheckService
         _context = context;
         _emergencyDisqualificationService = emergencyDisqualificationService;
     }
+    // Kiem tra doctor hop le
+    private async Task<DoctorProfile> ValidateDoctorAsync(int doctorId)
+    {
+        var doctor = await _context.DoctorProfiles
+            .Include(d => d.Doctor)
+            .FirstOrDefaultAsync(d => d.DoctorId == doctorId);
+
+        if (doctor == null)
+            throw new KeyNotFoundException("DOCTOR_NOT_FOUND");
+
+        if (doctor.Doctor.Role != "Doctor")
+            throw new InvalidOperationException("USER_NOT_DOCTOR");
+
+        if (doctor.Status != "Active")
+            throw new InvalidOperationException("DOCTOR_NOT_ACTIVE");
+
+        return doctor;
+    }
 
     public async Task<PreRaceWeightResultDto> RecordPreRaceWeightAsync(
         int doctorId,
@@ -24,24 +43,7 @@ public class MedicalCheckService : IMedicalCheckService
         RecordPreRaceWeightDto dto)
     {
         // Kiem tra Doctor co ton tai va dang Active hay khong
-        var doctor = await _context.DoctorProfiles
-            .Include(d => d.Doctor)
-            .FirstOrDefaultAsync(d => d.DoctorId == doctorId);
-
-        if (doctor == null)
-        {
-            throw new KeyNotFoundException("DOCTOR_NOT_FOUND");
-        }
-
-        if (doctor.Doctor.Role != "Doctor")
-        {
-            throw new InvalidOperationException("USER_NOT_DOCTOR");
-        }
-
-        if (doctor.Status != "Active")
-        {
-            throw new InvalidOperationException("DOCTOR_NOT_ACTIVE");
-        }
+        var doctor = await ValidateDoctorAsync(doctorId);
 
         // Lay RaceEntry kem Race, Tournament, Horse, Jockey
         var raceEntry = await _context.RaceEntries
@@ -123,24 +125,7 @@ public class MedicalCheckService : IMedicalCheckService
      RecordHorseIdentityDto dto)
     {
         // Kiem tra Doctor co ton tai va dang Active hay khong
-        var doctor = await _context.DoctorProfiles
-            .Include(d => d.Doctor)
-            .FirstOrDefaultAsync(d => d.DoctorId == doctorId);
-
-        if (doctor == null)
-        {
-            throw new KeyNotFoundException("DOCTOR_NOT_FOUND");
-        }
-
-        if (doctor.Doctor.Role != "Doctor")
-        {
-            throw new InvalidOperationException("USER_NOT_DOCTOR");
-        }
-
-        if (doctor.Status != "Active")
-        {
-            throw new InvalidOperationException("DOCTOR_NOT_ACTIVE");
-        }
+        var doctor = await ValidateDoctorAsync(doctorId);
 
         // Lay RaceEntry kem Race va Horse
         var raceEntry = await _context.RaceEntries
@@ -214,31 +199,14 @@ public class MedicalCheckService : IMedicalCheckService
                 : "Horse identity matched successfully."
         };
     }
-    
+
     public async Task<ClinicalCheckResultDto> RecordClinicalCheckAsync(
     int doctorId,
     int raceEntryId,
     RecordClinicalCheckDto dto)
     {
         // Kiem tra Doctor co ton tai va dang Active hay khong
-        var doctor = await _context.DoctorProfiles
-            .Include(d => d.Doctor)
-            .FirstOrDefaultAsync(d => d.DoctorId == doctorId);
-
-        if (doctor == null)
-        {
-            throw new KeyNotFoundException("DOCTOR_NOT_FOUND");
-        }
-
-        if (doctor.Doctor.Role != "Doctor")
-        {
-            throw new InvalidOperationException("USER_NOT_DOCTOR");
-        }
-
-        if (doctor.Status != "Active")
-        {
-            throw new InvalidOperationException("DOCTOR_NOT_ACTIVE");
-        }
+       var doctor = await ValidateDoctorAsync(doctorId);
 
         // Lay RaceEntry kem Race va Horse
         var raceEntry = await _context.RaceEntries
@@ -334,4 +302,55 @@ public class MedicalCheckService : IMedicalCheckService
                 : "Horse is fit for racing."
         };
     }
+    public async Task<List<MedicalCheckListDto>> GetRaceEntriesAsync(
+    int doctorId,
+    int raceId)
+{
+    // Kiem tra doctor
+    await ValidateDoctorAsync(doctorId);
+
+    // Kiem tra doctor co duoc phan cong race khong
+    var assigned = await _context.DoctorAssignments.AnyAsync(x =>
+        x.DoctorId == doctorId &&
+        x.RaceId == raceId);
+
+    if (!assigned)
+    {
+        throw new InvalidOperationException(
+            "DOCTOR_NOT_ASSIGNED_TO_RACE");
+    }
+
+    var entries = await _context.RaceEntries
+        .Where(x => x.RaceId == raceId)
+        .Include(x => x.Pairing)
+            .ThenInclude(p => p.Horse)
+        .Include(x => x.Pairing)
+            .ThenInclude(p => p.Jockey)
+                .ThenInclude(j => j.Jockey)
+        .Select(x => new MedicalCheckListDto
+        {
+            RaceEntryId = x.RaceEntryId,
+
+            PairingId = x.PairingId,
+
+            HorseName = x.Pairing.Horse.Name,
+
+            JockeyName = x.Pairing.Jockey.Jockey.FullName,
+
+            SelfDeclaredWeight =
+                x.Pairing.Jockey.SelfDeclaredWeight,
+
+            PreRaceWeight =
+                x.PreRaceJockeyWeight,
+
+            HorseIdentityStatus =
+                x.HorseIdentityCheckStatus ?? "Pending",
+
+            ClinicalStatus =
+                x.ClinicalStatus ?? "Pending"
+        })
+        .ToListAsync();
+
+    return entries;
+}
 }
