@@ -217,6 +217,7 @@ PUT /api/tournament/{id}/prize-distributions
 
 - Gọi nhiều lần được — lần sau overwrite lần trước.
 - Bắt buộc phải cấu hình đủ trước khi chuyển sang `Open Registration`.
+- Chỉ sửa được khi giải ở trạng thái `Draft` hoặc `Open Registration`. Sau khi `Closed Registration` (hoặc các trạng thái sau đó), API trả lỗi 400 — tránh đổi % sau khi PursePayout đã tính theo tỷ lệ cũ.
 
 ---
 
