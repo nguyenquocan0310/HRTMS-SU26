@@ -1,96 +1,152 @@
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { apiFetch } from '../../services/apiClient';
+import { logout } from '../../services/authService';
+import useAuthStore from '../../store/authStore';
+
+interface RefereeAuthProfile {
+  userId: number;
+  username: string;
+  fullName: string;
+  email: string;
+  role: string;
+  status: string;
+}
+
+interface ProfileApiResponse {
+  success: boolean;
+  message: string;
+  data: RefereeAuthProfile | null;
+}
+
+const navItems = [
+  { to: '/referee', label: 'Tổng quan', end: true },
+  { to: '/referee/tournaments', label: 'Đăng ký giải đấu', end: false },
+  { to: '/referee/coi', label: 'Khai báo COI', end: false },
+  { to: '/referee/race-console', label: 'Race Console', end: false },
+];
 
 export default function RefereeLayout() {
+  const [profile, setProfile] = useState<RefereeAuthProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const clearAuth = useAuthStore((state) => state.clearAuth);
+
+  useEffect(() => {
+    apiFetch<ProfileApiResponse>('/auth/profile')
+      .then((res) => {
+        if (res.success && res.data) setProfile(res.data);
+      })
+      .catch(() => {
+        // Vẫn render navigation nếu profile không tải được.
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const currentNav = navItems.find((item) => {
+    if (item.end) return location.pathname === item.to;
+    return location.pathname.startsWith(item.to);
+  });
+  const pageTitle = currentNav?.label ?? 'Tổng quan';
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    try {
+      await logout();
+    } finally {
+      clearAuth();
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('authReason');
+      navigate('/login', { replace: true });
+    }
+  };
+
   return (
-    <div className="flex h-screen bg-slate-50 font-sans text-slate-800">
-      {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-slate-200 flex flex-col justify-between shadow-sm z-10">
-        <div>
-          {/* Header */}
-          <div className="p-6 border-b border-slate-100">
-            <div className="flex items-center space-x-2">
-              <span className="text-2xl" role="img" aria-label="Referee Flag">🏁</span>
-              <div>
-                <h1 className="text-lg font-bold text-slate-900 tracking-tight">Trọng tài chính</h1>
-                <p className="text-xs font-medium text-slate-500">Giám sát & Phán quyết</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Navigation Links */}
-          <nav className="p-4 space-y-1.5">
-            <NavLink
-              to="/referee"
-              end
-              className={({ isActive }) =>
-                `flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                  isActive
-                    ? 'bg-blue-100 text-blue-700 shadow-sm'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                }`
-              }
-            >
-              {/* Home Icon SVG */}
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
-              </svg>
-              <span>Lịch trình tổng quan</span>
-            </NavLink>
-
-            <NavLink
-              to="/referee/officiating"
-              className={({ isActive }) =>
-                `flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                  isActive
-                    ? 'bg-blue-100 text-blue-700 shadow-sm'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                }`
-              }
-            >
-              {/* Target / Eye Icon SVG */}
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              <span>Giám sát cuộc đua</span>
-            </NavLink>
-
-            <NavLink
-              to="/referee/protest"
-              className={({ isActive }) =>
-                `flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                  isActive
-                    ? 'bg-blue-100 text-blue-700 shadow-sm'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                }`
-              }
-            >
-              {/* Document/Scale/Shield Icon SVG */}
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <span>Xử lý khiếu nại</span>
-            </NavLink>
-          </nav>
+    <div className="flex min-h-screen bg-gray-50">
+      <aside className="flex w-64 flex-shrink-0 flex-col border-r border-gray-200 bg-white">
+        <div className="border-b border-gray-100 px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">HRTMS</p>
+          <p className="mt-0.5 text-sm font-bold text-gray-800">Cổng trọng tài</p>
         </div>
 
-        {/* Sidebar Footer */}
-        <div className="p-4 border-t border-slate-100">
-          <button className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 text-sm font-medium text-slate-600 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-100 rounded-xl transition-all duration-200">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
-            </svg>
-            <span>Đăng xuất</span>
+        <div className="border-b border-gray-100 px-4 py-4">
+          {loading ? (
+            <div className="space-y-1.5 animate-pulse">
+              <div className="h-3.5 w-3/4 rounded bg-gray-200" />
+              <div className="h-3 w-1/2 rounded bg-gray-100" />
+            </div>
+          ) : profile ? (
+            <div>
+              <p className="truncate text-sm font-semibold text-gray-800">{profile.fullName}</p>
+              <p className="mt-0.5 truncate text-xs text-gray-400">{profile.email}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="inline-flex rounded border border-blue-100 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                  Trọng tài
+                </span>
+                {profile.status && (
+                  <span className="inline-flex rounded border border-green-100 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+                    {profile.status}
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-red-500">Không tải được thông tin</p>
+          )}
+        </div>
+
+        <nav className="flex-1 overflow-y-auto py-3">
+          <p className="px-5 pb-1.5 pt-2 text-xs font-semibold uppercase tracking-widest text-gray-400">
+            Quản lý
+          </p>
+          <ul className="space-y-0.5 px-2">
+            {navItems.map((item) => (
+              <li key={item.to}>
+                <NavLink
+                  to={item.to}
+                  end={item.end}
+                  className={({ isActive }) =>
+                    `flex items-center rounded-md border-l-2 px-3 py-2 pl-[10px] text-sm transition-colors ${
+                      isActive
+                        ? 'rounded-l-none border-blue-600 bg-blue-50 font-semibold text-blue-700'
+                        : 'rounded-l-none border-transparent font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`
+                  }
+                >
+                  {item.label}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <div className="space-y-2 border-t border-gray-100 px-4 py-3">
+          <button
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isLoggingOut ? 'Đang đăng xuất...' : 'Đăng xuất'}
           </button>
+          <p className="text-center text-xs text-gray-400">Horse Racing TMS &copy; 2026</p>
         </div>
       </aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-7xl mx-auto p-8 animate-fade-in">
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <header className="flex flex-shrink-0 items-center gap-2 border-b border-gray-200 bg-white px-6 py-3">
+          <span className="text-xs text-gray-400">Trọng tài</span>
+          <span className="text-xs text-gray-300">/</span>
+          <span className="text-xs font-semibold text-gray-700">{pageTitle}</span>
+        </header>
+
+        <main className="flex-1 overflow-auto p-6">
           <Outlet />
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

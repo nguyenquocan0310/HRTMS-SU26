@@ -50,8 +50,9 @@ import DoctorCoiDeclarations from './pages/doctor/DoctorCoiDeclarations'
 // ── Import các trang Referee ──
 import RefereeLayout from './pages/referee/RefereeLayout'
 import RefereeDashboard from './pages/referee/RefereeDashboard'
-import RaceOfficiating from './pages/referee/RaceOfficiating'
-import ProtestHandling from './pages/referee/ProtestHandling'
+import RefereeRaceConsole from './pages/referee/RefereeRaceConsole'
+import RefereeTournamentList from './pages/referee/RefereeTournamentList'
+import RefereeCoiDeclarations from './pages/referee/RefereeCoiDeclarations'
 
 // ── Import các trang Spectator ──
 import SpectatorLayout from './pages/spectator/SpectatorLayout'
@@ -162,8 +163,9 @@ export default function App() {
           </ProtectedRoute>
         }>
           <Route index element={<RefereeDashboard />} />
-          <Route path="officiating" element={<RaceOfficiating />} />
-          <Route path="protest" element={<ProtestHandling />} />
+          <Route path="tournaments" element={<RefereeTournamentList />} />
+          <Route path="coi" element={<RefereeCoiDeclarations />} />
+          <Route path="race-console" element={<RefereeRaceConsole />} />
         </Route>
 
         {/* ── Cấu trúc Route của KHÁN GIẢ (Spectator) ── */}
