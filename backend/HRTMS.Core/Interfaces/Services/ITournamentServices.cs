@@ -23,13 +23,13 @@ namespace HRTMS.Core.Interfaces.Services
         Task CancelTournamentAsync(int tournamentId, int adminUserId);
 
         // PRIZE DISTRIBUTION
-        Task<List<PrizeDistributionResponseDto>> SetPrizeDistributionsAsync(int tournamentId, SetPrizeDistributionDto dto);
+        Task<List<PrizeDistributionResponseDto>> SetPrizeDistributionsAsync(int tournamentId, SetPrizeDistributionDto dto, int adminUserId);
 
         // ROUND & RACE
-        Task<RoundResponseDto> CreateRoundAsync(int tournamentId, CreateRoundDto dto);
-        Task<RaceResponseDto> CreateRaceAsync(int roundId, CreateRaceDto dto);
+        Task<RoundResponseDto> CreateRoundAsync(int tournamentId, CreateRoundDto dto, int adminUserId);
+        Task<RaceResponseDto> CreateRaceAsync(int roundId, CreateRaceDto dto, int adminUserId);
 
         // Cập nhật Race; đóng băng trường nhạy cảm sau bốc thăm / có Prediction
-        Task<RaceResponseDto> UpdateRaceAsync(int raceId, UpdateRaceDto dto);
+        Task<RaceResponseDto> UpdateRaceAsync(int raceId, UpdateRaceDto dto, int adminUserId);
     }
 }

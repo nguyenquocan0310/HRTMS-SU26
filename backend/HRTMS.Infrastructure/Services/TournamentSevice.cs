@@ -689,7 +689,16 @@ namespace HRTMS.Infrastructure.Services
             }
         }
 
-        public async Task<List<PrizeDistributionResponseDto>> SetPrizeDistributionsAsync(int tournamentId, SetPrizeDistributionDto dto)
+        // Giải Completed/Cancelled là trạng thái kết thúc — khóa mọi thao tác cấu trúc
+        // Round/Race (TRN.8: giải Completed không được phép còn race Upcoming mới).
+        private static void EnsureTournamentStructureEditable(string tournamentStatus)
+        {
+            if (tournamentStatus == "Completed" || tournamentStatus == "Cancelled")
+                throw new InvalidOperationException(
+                    $"Giải đấu đang ở trạng thái '{tournamentStatus}' — không thể tạo/sửa vòng đấu hoặc cuộc đua.");
+        }
+
+        public async Task<List<PrizeDistributionResponseDto>> SetPrizeDistributionsAsync(int tournamentId, SetPrizeDistributionDto dto, int adminUserId)
         {
             // Bug 6 fix — kiểm tra tournament tồn tại trước khi upsert
             var tournament = await _context.Tournaments
@@ -731,6 +740,14 @@ namespace HRTMS.Infrastructure.Services
             _context.PrizeDistributions.AddRange(newItems);
             await _context.SaveChangesAsync();
 
+            await _auditLog.LogAsync(
+                actorId: adminUserId,
+                action: "Set_Prize_Distributions",
+                entityName: "Tournament",
+                entityId: tournamentId.ToString(),
+                newValue: string.Join("; ", newItems.OrderBy(p => p.Position)
+                    .Select(p => $"Top{p.Position}={p.Percentage}%")));
+
             return newItems
                 .OrderBy(p => p.Position)
                 .Select(p => new PrizeDistributionResponseDto
@@ -740,10 +757,12 @@ namespace HRTMS.Infrastructure.Services
                 }).ToList();
         }
 
-        public async Task<RoundResponseDto> CreateRoundAsync(int tournamentId, CreateRoundDto dto)
+        public async Task<RoundResponseDto> CreateRoundAsync(int tournamentId, CreateRoundDto dto, int adminUserId)
         {
             var tournament = await _context.Tournaments.FindAsync(tournamentId)
                 ?? throw new KeyNotFoundException($"Không tìm thấy giải #{tournamentId}.");
+
+            EnsureTournamentStructureEditable(tournament.Status);
 
             // Validate date nằm trong cửa sổ giải
             if (dto.ScheduledDate < tournament.StartDate || dto.ScheduledDate > tournament.EndDate)
@@ -798,6 +817,13 @@ namespace HRTMS.Infrastructure.Services
             _context.Rounds.Add(round);
             await _context.SaveChangesAsync();
 
+            await _auditLog.LogAsync(
+                actorId: adminUserId,
+                action: "Create_Round",
+                entityName: "Round",
+                entityId: round.RoundId.ToString(),
+                newValue: $"Tournament={tournamentId};Sequence={dto.SequenceOrder};Name={dto.Name};ScheduledDate={dto.ScheduledDate:u}");
+
             return new RoundResponseDto
             {
                 RoundId = round.RoundId,
@@ -810,7 +836,7 @@ namespace HRTMS.Infrastructure.Services
             };
         }
 
-        public async Task<RaceResponseDto> CreateRaceAsync(int roundId, CreateRaceDto dto)
+        public async Task<RaceResponseDto> CreateRaceAsync(int roundId, CreateRaceDto dto, int adminUserId)
         {
             // Load Round kèm Tournament để validate
             var round = await _context.Rounds
@@ -819,6 +845,7 @@ namespace HRTMS.Infrastructure.Services
                 ?? throw new KeyNotFoundException($"Không tìm thấy vòng #{roundId}.");
 
             var tournament = round.Tournament;
+            EnsureTournamentStructureEditable(tournament.Status);
             ValidateRaceDistanceOverride(dto.RaceDistanceOverride);
 
             // Validate thời gian
@@ -867,6 +894,13 @@ namespace HRTMS.Infrastructure.Services
             _context.Races.Add(race);
             await _context.SaveChangesAsync();
 
+            await _auditLog.LogAsync(
+                actorId: adminUserId,
+                action: "Create_Race",
+                entityName: "Race",
+                entityId: race.RaceId.ToString(),
+                newValue: $"Round={roundId};RaceNumber={dto.RaceNumber};ScheduledTime={dto.ScheduledTime:u};Purse={dto.PurseAmount}");
+
             return new RaceResponseDto
             {
                 RaceId = race.RaceId,
@@ -883,7 +917,7 @@ namespace HRTMS.Infrastructure.Services
         }
 
         // Cập nhật cấu hình Race, đóng băng trường nhạy cảm sau cam kết.
-        public async Task<RaceResponseDto> UpdateRaceAsync(int raceId, UpdateRaceDto dto)
+        public async Task<RaceResponseDto> UpdateRaceAsync(int raceId, UpdateRaceDto dto, int adminUserId)
         {
             var race = await _context.Races
                 .Include(r => r.Round).ThenInclude(rd => rd.Tournament)
@@ -891,6 +925,7 @@ namespace HRTMS.Infrastructure.Services
                 ?? throw new KeyNotFoundException($"Không tìm thấy cuộc đua #{raceId}.");
 
             var tournament = race.Round.Tournament;
+            EnsureTournamentStructureEditable(tournament.Status);
             ValidateRaceDistanceOverride(dto.RaceDistanceOverride);
 
             // Chỉ các trường nhạy cảm mới bị đóng băng sau khi bốc thăm hoặc đã có Prediction.
@@ -930,6 +965,19 @@ namespace HRTMS.Infrastructure.Services
                         $"Tổng giải thưởng các cuộc đua ({otherPurseTotal + dto.PurseAmount}) vượt quá tổng giải thưởng của giải ({tournament.PurseAmount}).");
             }
 
+            var raceChanges = new List<string>();
+            void TrackRaceChange<T>(string field, T oldValue, T newValue)
+            {
+                if (!EqualityComparer<T>.Default.Equals(oldValue, newValue))
+                    raceChanges.Add($"{field}: {oldValue} -> {newValue}");
+            }
+            TrackRaceChange("ScheduledTime", race.ScheduledTime, dto.ScheduledTime);
+            TrackRaceChange("PurseAmount", race.PurseAmount, dto.PurseAmount);
+            TrackRaceChange("TrackTypeOverride", race.TrackTypeOverride, dto.TrackTypeOverride);
+            TrackRaceChange("RaceDistanceOverride", race.RaceDistanceOverride, dto.RaceDistanceOverride);
+            TrackRaceChange("ConfirmationCutoffHours", race.ConfirmationCutoffHours, dto.ConfirmationCutoffHours);
+            TrackRaceChange("ProtestDeadlineMinutes", race.ProtestDeadlineMinutes, dto.ProtestDeadlineMinutes);
+
             race.ScheduledTime = dto.ScheduledTime;
             race.PurseAmount = dto.PurseAmount;
             race.TrackTypeOverride = dto.TrackTypeOverride;
@@ -939,6 +987,16 @@ namespace HRTMS.Infrastructure.Services
             race.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
+
+            if (raceChanges.Count > 0)
+            {
+                await _auditLog.LogAsync(
+                    actorId: adminUserId,
+                    action: "Update_Race",
+                    entityName: "Race",
+                    entityId: raceId.ToString(),
+                    newValue: string.Join("; ", raceChanges));
+            }
 
             return new RaceResponseDto
             {
