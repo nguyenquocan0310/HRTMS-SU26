@@ -7,7 +7,7 @@ import RosterApprovalTable from './RosterApprovalTable';
 import {
   getPendingHorses,
   getPendingApprovals,
-  type HorsePending,
+  type HorseEnrollmentPending,
   type PersonPending,
 } from '../../services/approvalService';
 import styles from './ApprovalCenter.module.scss';
@@ -18,12 +18,15 @@ export type AccountSubTab = 'jockey' | 'onboarding';
 
 export interface HorseApproval {
   id: string;
-  entityId: number;
+  entityId: number; // = enrollmentId, dùng để approve/reject
+  horseId: number;  // dùng để gọi chi tiết ngựa riêng (GET /admin/horses/{horseId})
   type: 'horse';
   subject: string;
   submittedDate: string;
   stable: string;
   status: StatusType;
+  // breed/dopingTestResult/vaccinationRecordRef không có sẵn từ danh sách
+  // pending nữa — load riêng ở Detail Panel qua getHorseDetail().
   breed: string;
   allowedBreed: string;
   dopingTestResult: 'Passed' | 'Failed' | 'Pending' | string;
@@ -69,7 +72,7 @@ const mapHorse = (h: HorseEnrollmentPending): HorseApproval => ({
   type: 'horse',
   subject: h.horseName,
   submittedDate: formatDate(h.createdAt),
-  stable: h.tournamentName, // không còn ownerId, dùng tên giải thay thế
+  stable: h.tournamentName, // không có ownerId trong DTO này, dùng tên giải thay thế
   status: h.adminApprovalStatus as StatusType, // đúng field duyệt, không dùng h.status
   breed: '',
   allowedBreed: '',
@@ -178,7 +181,12 @@ const ApprovalCenter = () => {
     },
     {
       key: 'stable',
-      header: activeGroup === 'account' && accountSubTab === 'onboarding' ? 'Role' : 'Origin / Stable',
+      header:
+        activeGroup === 'account' && accountSubTab === 'onboarding'
+          ? 'Role'
+          : activeGroup === 'horse'
+          ? 'Tournament'
+          : 'Origin / Stable',
       render: (row) => row.stable,
     },
     {
