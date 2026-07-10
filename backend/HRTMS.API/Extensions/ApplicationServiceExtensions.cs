@@ -41,6 +41,7 @@ public static class ApplicationServiceExtensions
         services.AddScoped<IProfileService, ProfileService>();
         services.AddScoped<IPredictionService, PredictionService>();
         services.AddScoped<IReconciliationService, ReconciliationService>();
+        services.AddScoped<IWalletService, WalletService>();
         services.AddScoped<IIndependenceCheckService, IndependenceCheckService>();
         services.AddScoped<IEmergencyDisqualificationService, EmergencyDisqualificationService>();
         services.AddScoped<IStartingListService, StartingListService>();
