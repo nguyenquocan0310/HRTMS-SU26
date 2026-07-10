@@ -351,6 +351,30 @@ public class ReportService : IReportService
             })
             .ToListAsync();
 
+        // Spectator chỉ nhận cột public: BỎ HẲN (cả header lẫn row) PairingStatus,
+        // EntryFeeStatus, EnrollmentApprovalStatus — trạng thái tài chính/duyệt nội bộ
+        // (quyết định nhóm 2026-07-11; OwnerName giữ lại). Admin/Owner/Jockey đủ cột.
+        if (role == RoleSpectator)
+        {
+            return new ReportDataDto
+            {
+                Type = "entry-list",
+                TournamentId = tournamentId,
+                TournamentName = tournamentName,
+                Headers = new[]
+                {
+                    "TournamentId", "TournamentName", "RoundName", "RaceNumber", "HorseId", "HorseName",
+                    "OwnerName", "JockeyName", "PairingId", "EntryStatus", "IsWithdrawn"
+                },
+                Rows = rows.Select(r => new string?[]
+                {
+                    Num(tournamentId), tournamentName, r.RoundName, Num(r.RaceNumber), Num(r.HorseId), r.HorseName,
+                    r.OwnerName, r.JockeyName, Num(r.PairingId), r.EntryStatus,
+                    r.IsWithdrawn is null ? null : (r.IsWithdrawn.Value ? "true" : "false")
+                }).ToList()
+            };
+        }
+
         return new ReportDataDto
         {
             Type = "entry-list",
@@ -404,8 +428,27 @@ public class ReportService : IReportService
     private static string EscapeCsv(string? value)
     {
         if (string.IsNullOrEmpty(value)) return string.Empty;
+        value = NeutralizeFormula(value);
         if (value.IndexOfAny(new[] { ',', '"', '\n', '\r' }) < 0) return value;
         return string.Concat("\"", value.Replace("\"", "\"\""), "\"");
+    }
+
+    /// <summary>
+    /// Chống CSV formula injection: field bắt đầu bằng = + - @ tab CR sẽ bị Excel/Sheets
+    /// diễn giải thành công thức khi mở file. Prefix apostrophe để vô hiệu; giá trị parse
+    /// được thành số (vd -5.00 do Dec() sinh) không phải formula nên giữ nguyên.
+    /// Chạy TRƯỚC bước escape quote/comma/newline nên CSV vẫn đúng RFC 4180.
+    /// </summary>
+    private static string NeutralizeFormula(string value)
+    {
+        var first = value[0];
+        if (first is not ('=' or '+' or '-' or '@' or '\t' or '\r'))
+            return value;
+
+        if (decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out _))
+            return value;
+
+        return "'" + value;
     }
 
     private static string BuildFileName(ReportType type, int tournamentId)
