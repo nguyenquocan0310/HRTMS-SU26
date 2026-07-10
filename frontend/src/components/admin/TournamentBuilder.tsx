@@ -136,6 +136,13 @@ type TabKey = typeof TABS[number]['key'];
 // BE trả DateTime/Time dạng ISO; input date cần "yyyy-MM-dd", input time cần "HH:mm".
 const toDateInput = (value?: string | null): string => (value ?? '').slice(0, 10);
 const toTimeInput = (value?: string | null): string => (value ?? '').slice(0, 5);
+// Dành riêng cho field lưu datetime đầy đủ dạng ISO (vd race.scheduledTime),
+// khác với toTimeInput ở trên vốn chỉ dùng cho chuỗi giờ thuần "HH:mm:ss".
+const toTimeInputFromDateTime = (value?: string | null): string => {
+  if (!value) return '';
+  const timePart = value.split('T')[1];
+  return timePart ? timePart.slice(0, 5) : '';
+};
 
 // Đường dẫn route
 const LIST_PATH = '/admin/tournaments';
@@ -272,23 +279,23 @@ const loadDraft = async (id: number) => {
             { rank: 4, percentage: 12 },
             { rank: 5, percentage: 8 },
           ],
-      rounds: t.rounds?.map((r) => ({
-        id: String(r.roundId),
-        name: r.name,
-        scheduledDate: toDateInput(r.scheduledDate),
-        races: r.races?.map((race) => ({
-          id: String(race.raceId),
-          sequenceOrder: race.raceNumber,
-          scheduledDate: toDateInput(race.scheduledDate),
-          raceNumber: race.raceNumber,
-          scheduledTime: toTimeInput(race.scheduledTime),
-          purseAmount: race.purseAmount,
-          raceDistanceOverride: race.raceDistanceOverride ?? '',
-          trackTypeOverride: (race.trackTypeOverride as TrackType) ?? '',
-          isPostPositionDrawn: race.status !== 'Upcoming',
-          entries: [],
-        })) ?? [],
-      })) ?? [],
+rounds: t.rounds?.map((r) => ({
+  id: String(r.roundId),
+  name: r.name,
+  scheduledDate: toDateInput(r.scheduledDate),
+  races: r.races?.map((race) => ({
+    id: String(race.raceId),
+    sequenceOrder: race.raceNumber,
+    scheduledDate: toDateInput(race.scheduledTime),
+    raceNumber: race.raceNumber,
+    scheduledTime: toTimeInputFromDateTime(race.scheduledTime),
+    purseAmount: race.purseAmount,
+    raceDistanceOverride: race.raceDistanceOverride ?? '',
+    trackTypeOverride: (race.trackTypeOverride as TrackType) ?? '',
+    isPostPositionDrawn: race.status !== 'Upcoming',
+    entries: [],
+  })) ?? [],
+})) ?? [],
     });
     setActiveTab('basic');
   } catch (err) {
@@ -473,28 +480,28 @@ const handleSaveDraft = async () => {
       key: 'action',
       header: '',
       width: '320px',
-      render: (row) => {
-        const next = NEXT_STATUS[row.status as TournamentStatus];
-        const isDraftRow = row.status === 'Draft';
-        return (
-          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-            <button type="button" className={styles.editBtn} onClick={() => goEdit(row.tournamentId)}>
-                      {isDraftRow ? (<><FiEdit2 size={13} /> Edit</>) : (<><FiEye size={13} /> View Detail</>)}            
-            </button>
-            {next && (
-              <button
-                type="button"
-                className={styles.editBtn}
-                disabled={advancingId === row.tournamentId}
-                onClick={() => handleAdvanceStatus(row)}
-                title={`Chuyển sang "${next}"`}
-              >
-                {advancingId === row.tournamentId ? 'Đang chuyển...' : `→ ${next}`}
-              </button>
-            )}
-          </div>
-        );
-      },
+render: (row) => {
+  const next = NEXT_STATUS[row.status as TournamentStatus];
+  const isDraftRow = row.status === 'Draft';
+  return (
+    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+      <button type="button" className={styles.editBtn} onClick={() => goEdit(row.tournamentId)}>
+        {isDraftRow ? (<><FiEdit2 size={13} /> Edit</>) : (<><FiEye size={13} /> View Detail</>)}
+      </button>
+      {next && (
+        <button
+          type="button"
+          className={styles.editBtn}
+          disabled={advancingId === row.tournamentId}
+          onClick={() => handleAdvanceStatus(row)}
+          title={`Chuyển sang "${next}"`}
+        >
+          {advancingId === row.tournamentId ? 'Đang chuyển...' : `→ ${next}`}
+        </button>
+      )}
+    </div>
+  );
+},
     },
   ];
 
@@ -594,7 +601,6 @@ const handleSaveDraft = async () => {
     tournamentName={draft.basicInfo.name}
     rounds={draft.rounds}
     isNewDraft={isNewDraft}
-    readOnly={isReadOnly}
   />
 )}
 
