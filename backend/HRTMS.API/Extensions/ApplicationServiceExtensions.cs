@@ -45,6 +45,7 @@ public static class ApplicationServiceExtensions
         services.AddScoped<IIndependenceCheckService, IndependenceCheckService>();
         services.AddScoped<IEmergencyDisqualificationService, EmergencyDisqualificationService>();
         services.AddScoped<IStartingListService, StartingListService>();
+        services.AddScoped<IReportService, ReportService>();
         return services;
     }
 }
