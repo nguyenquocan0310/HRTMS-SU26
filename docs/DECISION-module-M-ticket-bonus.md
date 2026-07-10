@@ -1,8 +1,27 @@
 # Decision Checkpoint — Module M: Ticket Code Bonus & Reward 200
 
-> Trạng thái: **CHỜ NHÓM QUYẾT ĐỊNH** (Ticket Code Bonus). Reward 200: đã xác nhận, không cần sửa.
+> Trạng thái: **ĐÃ IMPLEMENT** (Ticket Code Bonus — nhóm chốt build). Reward 200: đã xác nhận, không cần sửa.
 > Người audit: An | Ngày: 2026-07-10 | Branch: `feat/module-m-wallet-closing`
 > Phạm vi: chỉ backend Module M. Không sửa FE. Không sửa trực tiếp `database/hrtms_schema.sql`.
+
+## CHỐT — Ticket Code Bonus đã triển khai
+
+Nhóm quyết định implement. Đã giao (không cần SQL patch — table `TicketRewardCodes` sẵn trong schema gốc):
+
+| Thành phần | File |
+| --- | --- |
+| DTO request/response | `backend/HRTMS.Core/DTOs/Wallet/RedeemTicketCodeDto.cs` |
+| Interface | `backend/HRTMS.Core/Interfaces/Services/IWalletService.cs` |
+| Service (redeem logic) | `backend/HRTMS.Infrastructure/Services/WalletService.cs` |
+| Controller endpoint | `backend/HRTMS.API/Controllers/WalletController.cs` — `POST /api/wallet/ticket-codes/redeem` (role Spectator) |
+| DI | `backend/HRTMS.API/Extensions/ApplicationServiceExtensions.cs` |
+| Tests (6, SQLite in-memory) | `backend/HRTMS.Tests/WalletServiceTicketCodeTests.cs` |
+
+**Đảm bảo nghiệp vụ:** hash mã (SHA-256 → CodeHash VARBINARY(32)); validate tồn tại / Active / chưa hết hạn; claim nguyên tử bằng `ExecuteUpdateAsync ... WHERE Status='Active' AND ExpiresAt > now` (affected==1) → chống double-redeem kể cả đồng thời; cộng ví + ghi VPT `Type='Ticket Code Bonus'`, `ReferenceType='TicketRewardCode'` cùng transaction; lỗi/không có ví → rollback (code không bị đánh dấu Redeemed). Test bao: success, không tồn tại, hết hạn, đã dùng, redeem hai lần (chỉ cộng một lần), rollback.
+
+Phần bên dưới là audit gốc (giữ lại làm evidence).
+
+---
 
 ---
 
