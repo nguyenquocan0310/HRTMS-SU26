@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FiX, FiClock, FiFileText, FiCheckCircle, FiXCircle } from 'react-icons/fi';
 import type { ApprovalItem } from './ApprovalCenter';
 import {
-  approveHorse, rejectHorse,
+  approveHorse, rejectHorse, getHorseDetail, type HorseDetail,
   approveJockey, approveReferee, approveDoctor,
 } from '../../services/approvalService';
 import { apiFetch } from '../../services/apiClient';
@@ -33,6 +33,20 @@ const ApprovalDetailPanel = ({ item, onClose, onSuccess }: Props) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Chi tiết ngựa (breed/vaccination/doping) không có sẵn trong list pending,
+  // phải gọi riêng theo horseId khi mở panel.
+  const [horseDetail, setHorseDetail] = useState<HorseDetail | null>(null);
+  const [horseDetailLoading, setHorseDetailLoading] = useState(false);
+
+  useEffect(() => {
+    if (item.type !== 'horse') return;
+    setHorseDetailLoading(true);
+    getHorseDetail(item.horseId)
+      .then(setHorseDetail)
+      .catch(() => setHorseDetail(null))
+      .finally(() => setHorseDetailLoading(false));
+  }, [item]);
+
   const isReasonValid = rejectReason.trim().length >= 10;
   const isHorse = item.type === 'horse';
   const entryFeeUnpaid = isHorse && item.entryFeeStatus !== 'Paid';
@@ -42,7 +56,7 @@ const ApprovalDetailPanel = ({ item, onClose, onSuccess }: Props) => {
     setError('');
     try {
       if (item.type === 'horse') {
-        // PATCH /api/admin/horse-entries/{id}/approve
+        // PATCH /api/admin/horse-entries/{enrollmentId}/approve
         await approveHorse(item.entityId);
       } else if (item.type === 'jockey') {
         // PATCH /api/admin/jockeys/{id}/approve
@@ -70,7 +84,7 @@ const ApprovalDetailPanel = ({ item, onClose, onSuccess }: Props) => {
     setError('');
     try {
       if (item.type === 'horse') {
-        // PATCH /api/admin/horse-entries/{id}/reject
+        // PATCH /api/admin/horse-entries/{enrollmentId}/reject
         await rejectHorse(item.entityId, rejectReason.trim());
       } else {
         // Personnel reject — dùng chung endpoint nếu BE có, tạm dùng approvalService pattern
@@ -103,19 +117,39 @@ const ApprovalDetailPanel = ({ item, onClose, onSuccess }: Props) => {
           {/* CORE SPECIFICATIONS */}
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>Core Specifications</h3>
+
             {item.type === 'horse' && (
               <div className={styles.specGrid}>
-                <SpecRow label="Breed" value={item.breed}
-                  warning={item.breed !== item.allowedBreed}
-                  warningText={`Không khớp Allowed Breed (${item.allowedBreed})`} />
-                <SpecRow label="Allowed Breed (Tournament)" value={item.allowedBreed} />
-                <SpecRow label="Doping Test Result" value={item.dopingTestResult}
-                  warning={item.dopingTestResult === 'Failed'} warningText="Doping test thất bại" />
-                <SpecRow label="Vaccination Record Ref" value={item.vaccinationRecordRef} />
-                <SpecRow label="Entry Fee Status" value={item.entryFeeStatus}
-                  warning={entryFeeUnpaid} warningText="Chưa thanh toán phí tham dự" />
+                {horseDetailLoading ? (
+                  <p style={{ fontSize: 13, color: '#999' }}>Đang tải chi tiết ngựa...</p>
+                ) : !horseDetail ? (
+                  <p style={{ fontSize: 13, color: '#999' }}>Không tải được chi tiết ngựa.</p>
+                ) : (
+                  <>
+                    <SpecRow label="Breed" value={horseDetail.breed} />
+                    <SpecRow label="Gender" value={horseDetail.gender} />
+                    <SpecRow label="Color" value={horseDetail.color} />
+                    <SpecRow label="Birth Year" value={String(horseDetail.birthYear)} />
+                    <SpecRow label="Weight" value={`${horseDetail.weight} kg`} />
+                    <SpecRow label="Pedigree" value={horseDetail.pedigree} />
+                    <SpecRow
+                      label="Doping Test Result"
+                      value={horseDetail.dopingTestResult}
+                      warning={horseDetail.dopingTestResult === 'Failed'}
+                      warningText="Doping test thất bại"
+                    />
+                    <SpecRow label="Vaccination Record Ref" value={horseDetail.vaccinationRecordRef} />
+                    <SpecRow
+                      label="Entry Fee Status"
+                      value={item.entryFeeStatus}
+                      warning={entryFeeUnpaid}
+                      warningText="Chưa thanh toán phí tham dự"
+                    />
+                  </>
+                )}
               </div>
             )}
+
             {item.type === 'jockey' && (
               <div className={styles.specGrid}>
                 <SpecRow label="License Certificate" value={item.licenseCertificate} />
