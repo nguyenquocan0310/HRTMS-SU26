@@ -62,18 +62,19 @@ export type ApprovalItem = HorseApproval | JockeyApproval | OnboardingApproval;
 const formatDate = (iso: string): string =>
   iso ? new Date(iso).toLocaleDateString('vi-VN') : '—';
 
-const mapHorse = (h: HorsePending): HorseApproval => ({
-  id: `h${h.horseId}`,
-  entityId: h.horseId,
+const mapHorse = (h: HorseEnrollmentPending): HorseApproval => ({
+  id: `h${h.enrollmentId}`,
+  entityId: h.enrollmentId,
+  horseId: h.horseId,
   type: 'horse',
-  subject: h.name,
+  subject: h.horseName,
   submittedDate: formatDate(h.createdAt),
-  stable: `Owner #${h.ownerId}`,
-  status: h.adminApprovalStatus as StatusType,
-  breed: h.breed,
-  allowedBreed: h.breed,
-  dopingTestResult: h.dopingTestResult || 'Pending',
-  vaccinationRecordRef: h.vaccinationRecordRef,
+  stable: h.tournamentName, // không còn ownerId, dùng tên giải thay thế
+  status: h.adminApprovalStatus as StatusType, // đúng field duyệt, không dùng h.status
+  breed: '',
+  allowedBreed: '',
+  dopingTestResult: 'Pending',
+  vaccinationRecordRef: '',
   entryFeeStatus: 'Paid',
 });
 
