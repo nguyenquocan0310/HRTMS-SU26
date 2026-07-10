@@ -230,6 +230,12 @@ public class PredictionService : IPredictionService
             if (raceEntry == null || raceEntry.IsWithdrawn)
                 return ApiResponse<PredictionResponseDto>.Fail("Ngựa này không hợp lệ hoặc đã rút khỏi cuộc đua.");
 
+            // Chỉ nhận dự đoán trên entry đã Confirmed — entry Pending có thể bị
+            // auto-cancel khi quá hạn xác nhận (sau draw, entry hợp lệ đều đã Confirmed).
+            if (raceEntry.Status != "Confirmed")
+                return ApiResponse<PredictionResponseDto>.Fail(
+                    "Ngựa này chưa được xác nhận tham gia cuộc đua nên chưa thể đặt dự đoán.");
+
             // FIX #3: Kiểm tra duplicate trước khi thao tác ví
             // (unique index UQ_Predictions_SpectatorEntry chặn ở tầng DB,
             //  check sớm ở đây để trả lỗi thân thiện thay vì DbUpdateException)

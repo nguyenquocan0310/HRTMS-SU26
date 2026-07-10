@@ -33,6 +33,19 @@ public class WalletService : IWalletService
     public async Task<ApiResponse<RedeemTicketCodeResponseDto>> RedeemTicketCodeAsync(
         int spectatorId, RedeemTicketCodeDto dto, string? ipAddress)
     {
+        // ACC.1.2: Spectator đăng ký tối giản, nhưng khi redeem ticket code (nhận
+        // reward) phải bổ sung đủ phone + CCCD. Đọc từ Users (spectatorId lấy từ JWT
+        // claim ở controller, không tin request param) — cùng pattern check identity
+        // với TournamentParticipantService (Module A của Hào chưa có helper riêng;
+        // khi có IIdentityCompletenessChecker thì thay đoạn này bằng helper đó).
+        var identityComplete = await _context.Users.AnyAsync(u =>
+            u.UserId == spectatorId &&
+            u.PhoneNumber != null &&
+            u.IdentityHash != null);
+        if (!identityComplete)
+            return ApiResponse<RedeemTicketCodeResponseDto>.Fail(
+                "Bạn cần bổ sung số điện thoại và số CCCD trong hồ sơ trước khi đổi mã vé thưởng.");
+
         var codeHash = HashCode(dto.Code);
         var now = DateTime.UtcNow;
 
