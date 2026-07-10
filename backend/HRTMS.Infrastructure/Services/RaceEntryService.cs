@@ -50,6 +50,10 @@ public class RaceEntryService : IRaceEntryService
         if (race.Status != "Upcoming")
             throw new InvalidOperationException("INVALID_RACE_STATE");
 
+        // Chi xep lich khi giai o Open/Closed Registration — chan Draft (cau truc
+        // chua chot) va Completed/Cancelled (giai da ket thuc).
+        EnsureTournamentOpenForScheduling(race.Round.Tournament.Status);
+
         // Cửa sổ thời gian phải còn hợp lệ.
         ValidateScheduleWindow(race);
 
@@ -89,9 +93,16 @@ public class RaceEntryService : IRaceEntryService
                 throw new InvalidOperationException("PAIRING_NOT_QUALIFIED");
         }
 
-        // Ngua phai da duoc Admin duyet.
-        if (pairing.Horse.AdminApprovalStatus != "Approved")
-            throw new InvalidOperationException("HORSE_NOT_APPROVED");
+        // Schema v3: ngua duoc duyet theo TUNG giai (HorseTournamentEntries), khong dung
+        // cot approval global tren Horse — enrollment co the bi Admin reject SAU khi
+        // pairing da Confirmed.
+        var enrollmentApproved = await _context.HorseTournamentEntries.AnyAsync(e =>
+            e.HorseId == pairing.HorseId &&
+            e.TournamentId == race.Round.TournamentId &&
+            e.Status == "Enrolled" &&
+            e.AdminApprovalStatus == "Approved");
+        if (!enrollmentApproved)
+            throw new InvalidOperationException("HORSE_NOT_APPROVED_IN_TOURNAMENT");
 
         // Tái kiểm tra kinh nghiệm Jockey tại thời điểm đưa cặp vào Race cụ thể,
         // vì ngưỡng MinJockeyExperienceYears phụ thuộc từng giải.
@@ -180,12 +191,16 @@ public class RaceEntryService : IRaceEntryService
     public async Task<PostPositionDrawResultDto> DrawPostPositionsAsync(int adminId, int raceId)
     {
         var race = await _context.Races
+            .Include(r => r.Round).ThenInclude(rd => rd.Tournament)
             .FirstOrDefaultAsync(r => r.RaceId == raceId)
             ?? throw new KeyNotFoundException("RACE_NOT_FOUND");
 
         // Khong boc tham 2 lan (idempotent-guard, tranh xao tron lai cong da cong khai).
         if (race.IsPostPositionDrawn)
             throw new InvalidOperationException("ALREADY_DRAWN");
+
+        // Cung guard voi AllocateAsync: giai phai o Open/Closed Registration.
+        EnsureTournamentOpenForScheduling(race.Round.Tournament.Status);
 
         // Chi boc cho cac entry hop le (Pending/Confirmed), bo qua Cancelled.
         var entries = await _context.RaceEntries
@@ -320,6 +335,16 @@ public class RaceEntryService : IRaceEntryService
         if (entry.Status != "Pending")
             throw new InvalidOperationException("INVALID_STATUS");
 
+        // Enrollment cua ngua trong giai nay phai con Approved tai thoi diem xac nhan
+        // (Admin co the reject enrollment sau khi entry duoc tao).
+        var enrollmentApproved = await _context.HorseTournamentEntries.AnyAsync(e =>
+            e.HorseId == entry.Pairing.HorseId &&
+            e.TournamentId == entry.Pairing.TournamentId &&
+            e.Status == "Enrolled" &&
+            e.AdminApprovalStatus == "Approved");
+        if (!enrollmentApproved)
+            throw new InvalidOperationException("HORSE_NOT_APPROVED_IN_TOURNAMENT");
+
         // Da qua Confirmation Cut-off thi khong cho xac nhan nua (se bi auto-cancel).
         var cutoff = entry.Race.ScheduledTime.AddHours(-entry.Race.ConfirmationCutoffHours);
         if (DateTime.UtcNow > cutoff)
@@ -342,6 +367,7 @@ public class RaceEntryService : IRaceEntryService
         int actorId, int raceEntryId, WithdrawEntryDto dto, bool isSystem = false)
     {
         var entry = await _context.RaceEntries
+            .Include(e => e.Race)
             .Include(e => e.Pairing).ThenInclude(p => p.Horse)
             .FirstOrDefaultAsync(e => e.RaceEntryId == raceEntryId)
             ?? throw new KeyNotFoundException("ENTRY_NOT_FOUND");
@@ -362,6 +388,17 @@ public class RaceEntryService : IRaceEntryService
                 Message = "Đăng ký này đã bị hủy trước đó."
             };
         }
+
+        // Race phai con Upcoming (moi actor) — khong duoc pha du lieu race
+        // Live/Unofficial/Official (ket qua, payout, leaderboard tham chieu entry).
+        if (entry.Race.Status != "Upcoming")
+            throw new InvalidOperationException("RACE_NOT_UPCOMING");
+
+        // Owner tu rut chi truoc Confirmation Cut-off; sau cut-off chi Admin/system
+        // (isSystem = true) duoc huy de dieu phoi khan cap.
+        var withdrawCutoff = entry.Race.ScheduledTime.AddHours(-entry.Race.ConfirmationCutoffHours);
+        if (!isSystem && DateTime.UtcNow > withdrawCutoff)
+            throw new InvalidOperationException("WITHDRAW_AFTER_CUTOFF");
 
         var reason = string.IsNullOrWhiteSpace(dto.Reason)
             ? (isSystem ? "Auto-cancelled: confirmation cut-off passed" : "Withdrawn by owner")
@@ -559,7 +596,11 @@ public class RaceEntryService : IRaceEntryService
         if (overdueIds.Count == 0)
             return 0;
 
-        // Actor cho job nen: dung Admin Active dau tien (AuditLog.ActorId la FK NOT NULL).
+        // Actor cho job nen: he thong CHUA co system user chuan (AuditLog.ActorId la FK
+        // NOT NULL toi Users) nen tam dung Admin Active dau tien. Audit phan biet duoc
+        // qua action AUTO_CANCEL_RACE_ENTRY + reason "Auto-cancelled: confirmation
+        // cut-off passed" — khong nham voi thao tac tay cua admin. Blocker: muon actor
+        // rieng phai seed system user (quyet dinh cap nhom, ngoai scope PR nay).
         var systemActorId = await _context.Users
             .Where(u => u.Role == "Admin" && u.Status == "Active")
             .Select(u => u.UserId)
@@ -597,6 +638,13 @@ public class RaceEntryService : IRaceEntryService
     // =====================================================================
     // Helpers
     // =====================================================================
+
+    // Giai chi cho xep lich (allocate/draw) khi o Open/Closed Registration (Q4).
+    private static void EnsureTournamentOpenForScheduling(string tournamentStatus)
+    {
+        if (tournamentStatus != "Open Registration" && tournamentStatus != "Closed Registration")
+            throw new InvalidOperationException("TOURNAMENT_NOT_OPEN_FOR_SCHEDULING");
+    }
 
     // StartDate <= Round.ScheduledDate <= Race.ScheduledTime <= EndDate, và > Now.
     private static void ValidateScheduleWindow(Race race)
