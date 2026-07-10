@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  FiFlag, FiUserCheck, FiCalendar, FiAlertTriangle,
+  FiFlag, FiUserCheck,
   FiArrowRight, FiPlus, FiCheckCircle, FiAward,
   FiShuffle, FiFileText, FiUser,
 } from 'react-icons/fi';
@@ -98,62 +98,42 @@ const AdminDashboard = () => {
       {/* ═══ STAT TILES ═══════════════════════════════════════ */}
       <div className={styles.statGrid}>
         <StatTile label="Open tourna..." value={openTournaments ?? '—'} icon={<FiFlag />} linkTo="/admin/tournaments" />
-        <StatTile label="Pending appr..." value={pendingApprovals ?? '—'} icon={<FiUserCheck />} linkTo="/admin/approval-center" />
-        <StatTile label="Upcoming races" value="Pending API" icon={<FiCalendar />} />
-        <StatTile label="Urgent alerts" value="Pending API" icon={<FiAlertTriangle />} variant="urgent" />
+        <StatTile label="Pending appr..." value={pendingApprovals ?? '—'} icon={<FiUserCheck />} linkTo="/admin/approval-center" />  
       </div>
 
       {/* ═══ OPEN TOURNAMENTS LIST ════════════════════════════ */}
-      <div className={styles.midRow}>
-        <div className={styles.integrityMap}>
-          <div className={styles.openTourHeader}>
-            <h3 className={styles.cardTitle}>Giải đấu đang mở</h3>
-            <span className={styles.openTourSub}>Operational preview</span>
-          </div>
+<div className={styles.integrityMap}>
+  <div className={styles.openTourHeader}>
+    <h3 className={styles.cardTitle}>Giải đấu đang mở</h3>
+    <span className={styles.openTourSub}>Operational preview</span>
+  </div>
 
-          {tournaments.length === 0 ? (
-            <p className={styles.emptyText}>Chưa có giải đấu nào.</p>
-          ) : (
-            <div className={styles.tourList}>
-              {tournaments.map((t) => (
-                <button
-                  key={t.tournamentId}
-                  type="button"
-                  className={styles.tourRow}
-                  onClick={() => navigate(`/admin/tournament-builder/${t.tournamentId}`)}
-                >
-                  <div className={styles.tourInfo}>
-                    <span className={styles.tourName}>{t.name}</span>
-                    <span className={styles.tourMeta}>
-                      {t.allowedBreed} · {formatDate(t.startDate)} – {formatDate(t.endDate)}
-                    </span>
-                  </div>
-                  <div className={styles.tourRight}>
-                    <span className={styles.tourStatus}>{statusLabel(t.status)}</span>
-                    <FiArrowRight size={14} className={styles.tourArrow} />
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className={styles.sideCards}>
-          <div className={styles.smallCard}>
-            <h4 className={styles.smallCardTitle}>System Status</h4>
-            <div className={styles.statusRow}>
-              <span className={styles.statusDot} />
-              <span>Core workspace online</span>
-            </div>
-            <div className={styles.barWrap}><div className={styles.bar} style={{ width: '92%' }} /></div>
+  {tournaments.length === 0 ? (
+    <p className={styles.emptyText}>Chưa có giải đấu nào.</p>
+  ) : (
+    <div className={styles.tourList}>
+      {tournaments.map((t) => (
+        <button
+          key={t.tournamentId}
+          type="button"
+          className={styles.tourRow}
+          onClick={() => navigate(`/admin/tournament-builder/${t.tournamentId}`)}
+        >
+          <div className={styles.tourInfo}>
+            <span className={styles.tourName}>{t.name}</span>
+            <span className={styles.tourMeta}>
+              {t.allowedBreed} · {formatDate(t.startDate)} – {formatDate(t.endDate)}
+            </span>
           </div>
-          <div className={styles.smallCard}>
-            <h4 className={styles.smallCardTitle}>Network Load</h4>
-            <div className={styles.loadValue}>34%</div>
-            <div className={styles.barWrap}><div className={styles.bar} style={{ width: '34%' }} /></div>
+          <div className={styles.tourRight}>
+            <span className={styles.tourStatus}>{statusLabel(t.status)}</span>
+            <FiArrowRight size={14} className={styles.tourArrow} />
           </div>
-        </div>
-      </div>
+        </button>
+      ))}
+    </div>
+  )}
+</div>
 
       {/* ═══ RECENT ACTIVITY ══════════════════════════════════ */}
       <div className={styles.activityCard}>
