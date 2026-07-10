@@ -53,7 +53,9 @@ namespace HRTMS.Infrastructure.Services
                 RaceStatus = race.Status,
                 PurseAmount = race.PurseAmount,
                 TotalAllocated = totalAllocated,
-                RemainderAmount = race.PurseAmount - totalAllocated,
+                // PRZ.4: remainder derive on-the-fly (quyết định nhóm — không persist).
+                // Clamp về 0 phòng dữ liệu payout bất thường vượt quỹ — không hiển thị số âm.
+                RemainderAmount = Math.Max(0m, race.PurseAmount - totalAllocated),
                 Payouts = items
             };
         }
