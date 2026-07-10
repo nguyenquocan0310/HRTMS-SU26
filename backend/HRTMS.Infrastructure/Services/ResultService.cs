@@ -16,7 +16,9 @@ namespace HRTMS.Infrastructure.Services
         private readonly IAuditLogService _auditLog;
         private readonly INotificationService _notificationService; // FIX #7
 
-        private const int PredictionWinRewardPoints = 200; // FIX #8: fallback — thực tế đọc từ race.Round.Tournament.PredictionRewardPoints
+        // Thưởng dự đoán Win cố định 200 điểm (quyết định nhóm 2026-07-11, PRD.1):
+        // KHÔNG cấu hình theo Tournament — schema v2 đã bỏ cột PredictionRewardPoints.
+        private const int PredictionWinRewardPoints = 200;
 
         public ResultService(HRTMSDbContext context, IAuditLogService auditLog, INotificationService notificationService)
         {
@@ -380,9 +382,11 @@ namespace HRTMS.Infrastructure.Services
 
             if (spectator?.Wallet == null)
             {
-                // Không nên xảy ra (mọi Spectator có Wallet từ lúc đăng ký),
-                // nhưng không throw để tránh chặn toàn bộ Declare Official vì 1 ví thiếu.
-                return;
+                // Ví thiếu là lỗi dữ liệu nghiêm trọng (mọi Spectator có Wallet từ lúc
+                // đăng ký). Throw để transaction Declare Official ROLLBACK toàn bộ —
+                // nhất quán với EmergencyDisqualificationService; tuyệt đối không
+                // đánh dấu prediction Won/Refunded mà không cộng điểm (mất thưởng im lặng).
+                throw new InvalidOperationException("WALLET_NOT_FOUND");
             }
 
             spectator.Wallet.Balance += amount;
