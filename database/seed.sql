@@ -271,6 +271,31 @@ BEGIN TRY
         SET IDENTITY_INSERT dbo.RaceEntries OFF;
     END
 
+    /*
+      TicketRewardCodes demo (BR-63 / REQ-F-PRD.5).
+      - Raw code duoi day CHI dung cho demo/test thu cong — DB chi luu SHA-256 hash.
+      - Application KHONG BAO GIO log hay tra lai raw code sau khi tao.
+      - HASHBYTES dung literal VARCHAR (khong co tien to N) de bytes ASCII trung khop
+        voi UTF-8 bytes ma WalletService.HashCode dung khi redeem.
+      Raw codes demo:
+        TKT-DEMO00000001  (+200 diem, Active)
+        TKT-DEMO00000002  (+200 diem, Active)
+        TKT-DEMO00000003  (+500 diem, Active)
+        TKT-DEMO00000004  (+500 diem, Active)
+        TKT-DEMO00000005  (+200 diem, Expired — demo case ma het han)
+    */
+    IF NOT EXISTS (SELECT 1 FROM dbo.TicketRewardCodes
+                   WHERE CodeHash = HASHBYTES('SHA2_256', 'TKT-DEMO00000001'))
+    BEGIN
+        INSERT INTO dbo.TicketRewardCodes (CodeHash, PointAmount, [Status], ExpiresAt, CreatedAt)
+        VALUES
+            (HASHBYTES('SHA2_256', 'TKT-DEMO00000001'), 200, N'Active',  DATEADD(DAY, 365, @Now), @Now),
+            (HASHBYTES('SHA2_256', 'TKT-DEMO00000002'), 200, N'Active',  DATEADD(DAY, 365, @Now), @Now),
+            (HASHBYTES('SHA2_256', 'TKT-DEMO00000003'), 500, N'Active',  DATEADD(DAY, 365, @Now), @Now),
+            (HASHBYTES('SHA2_256', 'TKT-DEMO00000004'), 500, N'Active',  DATEADD(DAY, 365, @Now), @Now),
+            (HASHBYTES('SHA2_256', 'TKT-DEMO00000005'), 200, N'Expired', DATEADD(DAY, -1, @Now), @Now);
+    END
+
     COMMIT TRANSACTION;
 END TRY
 BEGIN CATCH
