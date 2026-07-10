@@ -22,6 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="..\HRTMS.Core\HRTMS.Core.csproj" />
     <ProjectReference Include="..\HRTMS.Infrastructure\HRTMS.Infrastructure.csproj" />
+    <ProjectReference Include="..\HRTMS.API\HRTMS.API.csproj" />
   </ItemGroup>
 
 </Project>
