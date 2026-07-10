@@ -4,6 +4,9 @@
 import { apiFetch } from './apiClient';
 
 // ── NGỰA (Horse Entry / Enrollment) ─────────────────────────────────────────
+
+// Dữ liệu 1 dòng trong danh sách "pending" — theo đúng response thật
+// GET /api/admin/horse-entries/pending (xác nhận qua Swagger).
 export interface HorseEnrollmentPending {
   enrollmentId: number;
   horseId: number;
@@ -20,9 +23,11 @@ export interface HorseEnrollmentPending {
 }
 
 export const getPendingHorses = async (): Promise<HorseEnrollmentPending[]> => {
+  // Không catch nuốt lỗi — để lỗi thật hiện ra thay vì bảng rỗng câm.
   const res = await apiFetch<{ success: boolean; message: string; data: HorseEnrollmentPending[] }>(
     '/admin/horse-entries/pending?page=1&pageSize=50'
   );
+  if (!res.success) throw new Error(res.message || 'Không tải được danh sách hồ sơ ngựa.');
   return res.data ?? [];
 };
 
@@ -35,16 +40,37 @@ export const rejectHorse = (enrollmentId: number, reason: string): Promise<unkno
     body: JSON.stringify({ reason }),
   });
 
+// Chi tiết đầy đủ 1 con ngựa — theo đúng response thật GET /api/admin/horses/{id}.
+// Enrollment DTO ở trên không có breed/vaccination/doping nên phải gọi riêng.
 export interface HorseDetail {
   horseId: number;
+  ownerId: number;
+  name: string;
+  birthYear: number;
+  age: string;
+  gender: string;
+  color: string;
+  pedigree: string;
+  weight: number;
+  identifyingMarks: string;
   breed: string;
   vaccinationRecordRef: string;
+  dopingTestDate: string;
   dopingTestResult: string;
+  legalConsentAccepted: boolean;
+  screeningStatus: string;
+  screeningReason: string | null;
+  adminApprovalStatus: string;
+  rejectionReason: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export const getHorseDetail = async (horseId: number): Promise<HorseDetail> => {
-  const res = await apiFetch<{ success: boolean; data: HorseDetail }>(`/admin/horses/${horseId}`);
-  if (!res.success || !res.data) throw new Error('Không tải được chi tiết ngựa.');
+  const res = await apiFetch<{ success: boolean; message: string; data: HorseDetail }>(
+    `/admin/horses/${horseId}`
+  );
+  if (!res.success || !res.data) throw new Error(res.message || 'Không tải được chi tiết ngựa.');
   return res.data;
 };
 
@@ -66,10 +92,13 @@ interface PendingApprovalsData {
   jockeys: PersonPending[];
 }
 
+// ⚠️ Endpoint này hiện trả rỗng dù có tài khoản Pending thật — vấn đề đang
+// chờ BE xác nhận riêng, CHƯA có kết luận cuối cùng ở thời điểm sửa file này.
 export const getPendingApprovals = async (): Promise<PendingApprovalsData> => {
-  const res = await apiFetch<{ success: boolean; data: PendingApprovalsData }>(
+  const res = await apiFetch<{ success: boolean; message: string; data: PendingApprovalsData }>(
     '/admin/pending-approvals'
   );
+  if (!res.success) throw new Error(res.message || 'Không tải được danh sách hồ sơ tài khoản.');
   return res.data ?? { referees: [], doctors: [], jockeys: [] };
 };
 
