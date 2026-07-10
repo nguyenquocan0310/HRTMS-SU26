@@ -460,6 +460,98 @@ public sealed class ReportServiceTests : IDisposable
     }
 
     // =====================================================================
+    // CSV formula injection + bộ cột theo role
+    // =====================================================================
+
+    /// <summary>Thêm pairing (chưa allocate) với tên ngựa tùy ý — xuất hiện trong entry-list Admin.</summary>
+    private void AddPairingWithHorseName(int horseId, int pairingId, string horseName)
+    {
+        using var ctx = NewContext();
+        var now = DateTime.UtcNow;
+        ctx.Horses.Add(NewHorse(horseId, OwnerBId, horseName, now));
+        ctx.Pairings.Add(new Pairing
+        {
+            PairingId = pairingId, TournamentId = TournamentId, HorseId = horseId, JockeyId = JockeyYId,
+            Status = "Confirmed", CreatedAt = now, UpdatedAt = now
+        });
+        ctx.SaveChanges();
+    }
+
+    [Fact]
+    public async Task Csv_FormulaLeadingFields_ArePrefixed()
+    {
+        AddPairingWithHorseName(10, 10, "=SUM(A1)");
+        AddPairingWithHorseName(11, 11, "+cmd|calc");
+        AddPairingWithHorseName(12, 12, "@import");
+        AddPairingWithHorseName(13, 13, "\tTabName");
+        AddPairingWithHorseName(14, 14, "\rCrName");
+
+        var csv = CsvText(
+            (await NewService().ExportCsvAsync("entry-list", "csv", TournamentId, AdminId, "Admin")).Content);
+
+        Assert.Contains("'=SUM(A1)", csv);
+        Assert.Contains("'+cmd|calc", csv);
+        Assert.Contains("'@import", csv);
+        Assert.Contains("'\tTabName", csv);
+        Assert.Contains("'\rCrName", csv);           // CR-leading: prefix rồi mới bọc quote
+        Assert.DoesNotContain(",=SUM(A1)", csv);      // không còn bản chưa neutralize
+    }
+
+    [Fact]
+    public async Task Csv_NegativeDecimal_NotPrefixed()
+    {
+        using (var ctx = NewContext())
+        {
+            // Điều chỉnh payout âm (giả lập thu hồi) — cột số phải giữ nguyên, không prefix.
+            ctx.PursePayouts.Add(NewPayout(4, raceEntryId: 1, recipient: OwnerAId,
+                role: "Owner", amount: -5.00m, DateTime.UtcNow));
+            ctx.SaveChanges();
+        }
+
+        var csv = CsvText(
+            (await NewService().ExportCsvAsync("purse-payouts", "csv", TournamentId, AdminId, "Admin")).Content);
+
+        // SQLite trim trailing zero của decimal (-5.00m → "-5") — assert không phụ thuộc scale.
+        // Điều test cần chứng minh: số âm KHÔNG bị prefix apostrophe.
+        Assert.Contains(",-5", csv);
+        Assert.DoesNotContain("'-5", csv);
+    }
+
+    [Fact]
+    public async Task Spectator_EntryList_HasReducedColumns()
+    {
+        var data = await NewService().GetReportAsync("entry-list", TournamentId, SpectatorId, "Spectator");
+
+        Assert.Equal(11, data.Headers.Length);
+        Assert.DoesNotContain("PairingStatus", data.Headers);
+        Assert.DoesNotContain("EntryFeeStatus", data.Headers);
+        Assert.DoesNotContain("EnrollmentApprovalStatus", data.Headers);
+        Assert.Contains("OwnerName", data.Headers); // quyết định nhóm: OwnerName giữ lại
+
+        Assert.NotEmpty(data.Rows);
+        Assert.All(data.Rows, r => Assert.Equal(11, r.Length));
+        // Giá trị trạng thái nội bộ không còn xuất hiện ở bất kỳ cell nào.
+        Assert.All(data.Rows, r => Assert.DoesNotContain("Paid", r));
+        Assert.All(data.Rows, r => Assert.DoesNotContain("Approved", r));
+    }
+
+    [Fact]
+    public async Task AdminOwnerJockey_EntryList_KeepFullColumns()
+    {
+        foreach (var (userId, role) in new[] { (AdminId, "Admin"), (OwnerAId, "Owner"), (JockeyXId, "Jockey") })
+        {
+            var data = await NewService().GetReportAsync("entry-list", TournamentId, userId, role);
+
+            Assert.Equal(14, data.Headers.Length);
+            Assert.Contains("PairingStatus", data.Headers);
+            Assert.Contains("EntryFeeStatus", data.Headers);
+            Assert.Contains("EnrollmentApprovalStatus", data.Headers);
+            Assert.NotEmpty(data.Rows);
+            Assert.All(data.Rows, r => Assert.Equal(14, r.Length));
+        }
+    }
+
+    // =====================================================================
     // Audit log
     // =====================================================================
 
