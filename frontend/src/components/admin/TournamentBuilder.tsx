@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { FiPlus, FiEdit2 } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiEye  } from 'react-icons/fi';
 import DataTable, { type DataTableColumn } from '../../components/common/DataTable';
 import StatusBadge, { type StatusType } from '../../components/common/StatusBadge';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
@@ -136,6 +136,13 @@ type TabKey = typeof TABS[number]['key'];
 // BE trả DateTime/Time dạng ISO; input date cần "yyyy-MM-dd", input time cần "HH:mm".
 const toDateInput = (value?: string | null): string => (value ?? '').slice(0, 10);
 const toTimeInput = (value?: string | null): string => (value ?? '').slice(0, 5);
+// Dành riêng cho field lưu datetime đầy đủ dạng ISO (vd race.scheduledTime),
+// khác với toTimeInput ở trên vốn chỉ dùng cho chuỗi giờ thuần "HH:mm:ss".
+const toTimeInputFromDateTime = (value?: string | null): string => {
+  if (!value) return '';
+  const timePart = value.split('T')[1];
+  return timePart ? timePart.slice(0, 5) : '';
+};
 
 // Đường dẫn route
 const LIST_PATH = '/admin/tournaments';
@@ -272,23 +279,23 @@ const loadDraft = async (id: number) => {
             { rank: 4, percentage: 12 },
             { rank: 5, percentage: 8 },
           ],
-      rounds: t.rounds?.map((r) => ({
-        id: String(r.roundId),
-        name: r.name,
-        scheduledDate: toDateInput(r.scheduledDate),
-        races: r.races?.map((race) => ({
-          id: String(race.raceId),
-          sequenceOrder: race.raceNumber,
-          scheduledDate: toDateInput(r.scheduledDate),
-          raceNumber: race.raceNumber,
-          scheduledTime: toTimeInput(race.scheduledTime),
-          purseAmount: race.purseAmount,
-          raceDistanceOverride: race.raceDistanceOverride ?? '',
-          trackTypeOverride: (race.trackTypeOverride as TrackType) ?? '',
-          isPostPositionDrawn: race.status !== 'Upcoming',
-          entries: [],
-        })) ?? [],
-      })) ?? [],
+rounds: t.rounds?.map((r) => ({
+  id: String(r.roundId),
+  name: r.name,
+  scheduledDate: toDateInput(r.scheduledDate),
+  races: r.races?.map((race) => ({
+    id: String(race.raceId),
+    sequenceOrder: race.raceNumber,
+    scheduledDate: toDateInput(race.scheduledTime),
+    raceNumber: race.raceNumber,
+    scheduledTime: toTimeInputFromDateTime(race.scheduledTime),
+    purseAmount: race.purseAmount,
+    raceDistanceOverride: race.raceDistanceOverride ?? '',
+    trackTypeOverride: (race.trackTypeOverride as TrackType) ?? '',
+    isPostPositionDrawn: race.status !== 'Upcoming',
+    entries: [],
+  })) ?? [],
+})) ?? [],
     });
     setActiveTab('basic');
   } catch (err) {
@@ -343,6 +350,7 @@ const loadDraft = async (id: number) => {
   // Tournament đã tồn tại trên BE có id là số nguyên thật — dùng để phân biệt
   // giữa "tạo mới" (POST) và "cập nhật" (PUT).
   const isNewDraft = draft.id.startsWith('t-');
+  const isReadOnly = !isNewDraft && draft.status !== 'Draft';
 
 // Lưu toàn bộ draft xuống BE (tạo/cập nhật giải + tỷ lệ thưởng + rounds + races).
 // Trả về tournamentId để Publish dùng tiếp.
@@ -472,27 +480,28 @@ const handleSaveDraft = async () => {
       key: 'action',
       header: '',
       width: '320px',
-      render: (row) => {
-        const next = NEXT_STATUS[row.status as TournamentStatus];
-        return (
-          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-            <button type="button" className={styles.editBtn} onClick={() => goEdit(row.tournamentId)}>
-              <FiEdit2 size={13} /> Edit
-            </button>
-            {next && (
-              <button
-                type="button"
-                className={styles.editBtn}
-                disabled={advancingId === row.tournamentId}
-                onClick={() => handleAdvanceStatus(row)}
-                title={`Chuyển sang "${next}"`}
-              >
-                {advancingId === row.tournamentId ? 'Đang chuyển...' : `→ ${next}`}
-              </button>
-            )}
-          </div>
-        );
-      },
+render: (row) => {
+  const next = NEXT_STATUS[row.status as TournamentStatus];
+  const isDraftRow = row.status === 'Draft';
+  return (
+    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+      <button type="button" className={styles.editBtn} onClick={() => goEdit(row.tournamentId)}>
+        {isDraftRow ? (<><FiEdit2 size={13} /> Edit</>) : (<><FiEye size={13} /> View Detail</>)}
+      </button>
+      {next && (
+        <button
+          type="button"
+          className={styles.editBtn}
+          disabled={advancingId === row.tournamentId}
+          onClick={() => handleAdvanceStatus(row)}
+          title={`Chuyển sang "${next}"`}
+        >
+          {advancingId === row.tournamentId ? 'Đang chuyển...' : `→ ${next}`}
+        </button>
+      )}
+    </div>
+  );
+},
     },
   ];
 
@@ -562,6 +571,7 @@ const handleSaveDraft = async () => {
           <TabBasicInfo
             data={draft.basicInfo}
             onChange={(basicInfo) => setDraft((prev) => ({ ...prev, basicInfo }))}
+            readOnly={isReadOnly}
           />
         )}
 
@@ -570,6 +580,7 @@ const handleSaveDraft = async () => {
             prizeDistribution={draft.prizeDistribution}
             totalPurse={typeof draft.basicInfo.purseAmount === 'number' ? draft.basicInfo.purseAmount : 0}
             onChange={(prizeDistribution) => setDraft((prev) => ({ ...prev, prizeDistribution }))}
+            readOnly={isReadOnly}
           />
         )}
 
@@ -580,6 +591,7 @@ const handleSaveDraft = async () => {
             tournamentStartDate={draft.basicInfo.startDate}
             tournamentEndDate={draft.basicInfo.endDate}
             onChange={(rounds) => setDraft((prev) => ({ ...prev, rounds }))}
+            readOnly={isReadOnly}
           />
         )}
 
@@ -596,6 +608,7 @@ const handleSaveDraft = async () => {
           <TabPostPositionDraw
             rounds={draft.rounds}
             onChange={(rounds) => setDraft((prev) => ({ ...prev, rounds }))}
+            readOnly={isReadOnly}
           />
         )}
       </div>
@@ -603,26 +616,27 @@ const handleSaveDraft = async () => {
       {/* ═══ ACTION BAR (cố định ở mọi tab) ══════════════════════ */}
 {saveError && <div className={styles.listError}>{saveError}</div>}
 
-      <div className={styles.actionBar}>
-        <button type="button" className={styles.cancelTournamentBtn} onClick={() => setShowCancelModal(true)}>
-          Cancel Tournament
-        </button>
-
-        <div className={styles.actionBarRight}>
-          <button type="button" className={styles.saveDraftBtn} onClick={handleSaveDraft} disabled={isSaving}>
-            {isSaving ? 'Đang lưu...' : 'Save Draft'}
-          </button>
-          <button
-            type="button"
-            className={styles.publishBtn}
-            onClick={handlePublish}
-            disabled={!canPublish || isSaving}
-            title={!canPublish ? 'Cần hoàn tất đủ điều kiện cả 4 tab trước khi Publish.' : undefined}
-          >
-            {isSaving ? 'Đang xử lý...' : 'Publish'}
-          </button>
-        </div>
-      </div>
+{!isReadOnly && (
+  <div className={styles.actionBar}>
+    <button type="button" className={styles.cancelTournamentBtn} onClick={() => setShowCancelModal(true)}>
+      Cancel Tournament
+    </button>
+    <div className={styles.actionBarRight}>
+      <button type="button" className={styles.saveDraftBtn} onClick={handleSaveDraft} disabled={isSaving}>
+        {isSaving ? 'Đang lưu...' : 'Save Draft'}
+      </button>
+      <button
+        type="button"
+        className={styles.publishBtn}
+        onClick={handlePublish}
+        disabled={!canPublish || isSaving}
+        title={!canPublish ? 'Cần hoàn tất đủ điều kiện cả 4 tab trước khi Publish.' : undefined}
+      >
+        {isSaving ? 'Đang xử lý...' : 'Publish'}
+      </button>
+    </div>
+  </div>
+)}
 
       {showCancelModal && (
         <ConfirmationModal

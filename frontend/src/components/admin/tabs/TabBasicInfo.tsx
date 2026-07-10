@@ -4,7 +4,9 @@ import styles from './TabBasicInfo.module.scss';
 interface Props {
   data: TournamentBasicInfo;
   onChange: (data: TournamentBasicInfo) => void;
+  readOnly?: boolean;
 }
+
 
 const RACE_DISTANCES = [1000, 1200, 1400, 1600, 1800, 2000];
 
@@ -17,7 +19,7 @@ const parseVND = (s: string): number | '' => {
   return isNaN(n) || cleaned === '' ? '' : n;
 };
 
-const TabBasicInfo = ({ data, onChange }: Props) => {
+const TabBasicInfo = ({ data, onChange, readOnly }: Props) => {
   const update = <K extends keyof TournamentBasicInfo>(field: K, value: TournamentBasicInfo[K]) => {
     onChange({ ...data, [field]: value });
   };
@@ -36,6 +38,7 @@ const TabBasicInfo = ({ data, onChange }: Props) => {
             className={styles.input}
             placeholder="Ví dụ: Royal Stakes – Ascot Cup 2026"
             value={data.name}
+            disabled={readOnly}
             onChange={(e) => update('name', e.target.value)}
           />
         </div>
@@ -47,6 +50,7 @@ const TabBasicInfo = ({ data, onChange }: Props) => {
             type="date"
             className={styles.input}
             value={data.startDate}
+            disabled={readOnly}
             onChange={(e) => update('startDate', e.target.value)}
           />
         </div>
@@ -57,6 +61,7 @@ const TabBasicInfo = ({ data, onChange }: Props) => {
             type="date"
             className={`${styles.input} ${isDateRangeInvalid ? styles.inputError : ''}`}
             value={data.endDate}
+            disabled={readOnly}
             onChange={(e) => update('endDate', e.target.value)}
           />
           {isDateRangeInvalid && (
@@ -70,6 +75,7 @@ const TabBasicInfo = ({ data, onChange }: Props) => {
           <select
             className={styles.input}
             value={data.allowedBreed}
+            disabled={readOnly}
             onChange={(e) => update('allowedBreed', e.target.value as AllowedBreed)}
           >
             <option value="">-- Chọn giống ngựa --</option>
@@ -86,6 +92,7 @@ const TabBasicInfo = ({ data, onChange }: Props) => {
           <select
             className={styles.input}
             value={data.trackType}
+            disabled={readOnly}
             onChange={(e) => update('trackType', e.target.value as TrackType)}
           >
             <option value="">-- Chọn loại đường đua --</option>
@@ -105,6 +112,7 @@ const TabBasicInfo = ({ data, onChange }: Props) => {
             list="race-distance-options"
             value={data.raceDistance}
             onChange={(e) => update('raceDistance', e.target.value ? Number(e.target.value) : '')}
+            disabled={readOnly}
           />
           <datalist id="race-distance-options">
             {RACE_DISTANCES.map((d) => (
@@ -118,6 +126,7 @@ const TabBasicInfo = ({ data, onChange }: Props) => {
                 type="button"
                 className={`${styles.suggestionBtn} ${data.raceDistance === d ? styles.suggestionBtnActive : ''}`}
                 onClick={() => update('raceDistance', d)}
+                disabled={readOnly}
               >
                 {d.toLocaleString('vi-VN')}
               </button>
@@ -132,6 +141,7 @@ const TabBasicInfo = ({ data, onChange }: Props) => {
             className={styles.input}
             value={data.raceCategory}
             onChange={(e) => update('raceCategory', e.target.value as RaceCategory)}
+            disabled={readOnly}
           >
             <option value="">-- Chọn hạng đua --</option>
             <option value="Open">Open</option>
@@ -149,6 +159,7 @@ const TabBasicInfo = ({ data, onChange }: Props) => {
             placeholder="Ví dụ: 12"
             value={data.maxHorses}
             onChange={(e) => update('maxHorses', e.target.value ? Number(e.target.value) : '')}
+            disabled={readOnly}
           />
         </div>
 
@@ -161,6 +172,7 @@ const TabBasicInfo = ({ data, onChange }: Props) => {
             placeholder="Ví dụ: 2"
             value={data.minJockeyExperienceYears}
             onChange={(e) => update('minJockeyExperienceYears', e.target.value ? Number(e.target.value) : '')}
+            disabled={readOnly}
           />
         </div>
 
@@ -173,6 +185,7 @@ const TabBasicInfo = ({ data, onChange }: Props) => {
             placeholder="Ví dụ: 500.000.000"
             value={formatVND(data.purseAmount)}
             onChange={(e) => update('purseAmount', parseVND(e.target.value))}
+            disabled={readOnly}
           />
         </div>
 
@@ -188,6 +201,7 @@ const TabBasicInfo = ({ data, onChange }: Props) => {
               const val = parseVND(e.target.value);
               update('entryFeeAmount', val === '' ? 0 : val);
             }}
+            disabled={readOnly}
           />
           <span className={styles.hintText}>VND — qua luồng xác nhận phí.</span>
         </div>
@@ -201,6 +215,7 @@ const TabBasicInfo = ({ data, onChange }: Props) => {
             className={styles.input}
             value={data.preRaceWeightThresholdKg}
             onChange={(e) => update('preRaceWeightThresholdKg', Number(e.target.value) || 0)}
+            disabled={readOnly}
           />
         </div>
 
@@ -212,6 +227,7 @@ const TabBasicInfo = ({ data, onChange }: Props) => {
             className={styles.input}
             value={data.postRaceWeightDiffThresholdKg}
             onChange={(e) => update('postRaceWeightDiffThresholdKg', Number(e.target.value) || 0)}
+            disabled={readOnly}
           />
         </div>
 
