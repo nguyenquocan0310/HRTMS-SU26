@@ -54,6 +54,8 @@ public sealed class AdminTicketCodeTests : IDisposable
             UserId = SpectatorId, Username = "spec1", FullName = "Spectator One",
             Email = "spec1@test.local", NormalizedEmail = "SPEC1@TEST.LOCAL",
             PasswordHash = "x", Role = "Spectator", Status = "Active",
+            // Redeem yêu cầu identity đầy đủ (ACC.1.2) — seed sẵn phone + identity hash.
+            PhoneNumber = "0900000001", IdentityHash = Hash("001090000099"),
             CreatedAt = now, UpdatedAt = now
         });
         ctx.SpectatorProfiles.Add(new SpectatorProfile { SpectatorId = SpectatorId, CreatedAt = now });

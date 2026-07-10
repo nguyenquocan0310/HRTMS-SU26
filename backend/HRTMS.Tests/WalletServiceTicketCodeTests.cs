@@ -61,6 +61,9 @@ public sealed class WalletServiceTicketCodeTests : IDisposable
             PasswordHash = "x",
             Role = "Spectator",
             Status = "Active",
+            // Redeem yêu cầu identity đầy đủ (ACC.1.2) — seed sẵn phone + identity hash.
+            PhoneNumber = "0900000001",
+            IdentityHash = Hash("001090000099"),
             CreatedAt = now,
             UpdatedAt = now
         });
