@@ -77,7 +77,7 @@ namespace HRTMS.API.Controllers
         {
             try
             {
-                var result = await _tournamentService.UpdateTournamentAsync(id, dto);
+                var result = await _tournamentService.UpdateTournamentAsync(id, dto, GetCurrentUserId());
                 return Ok(ApiResponse<TournamentResponseDto>.Ok(result, "Cap nhat thanh cong"));
             }
             catch (KeyNotFoundException ex)
@@ -136,10 +136,14 @@ namespace HRTMS.API.Controllers
         {
             try
             {
-                var result = await _tournamentService.SetPrizeDistributionsAsync(id, dto);
+                var result = await _tournamentService.SetPrizeDistributionsAsync(id, dto, GetCurrentUserId());
                 return Ok(ApiResponse<List<PrizeDistributionResponseDto>>.Ok(result, "Cấu hình tỷ lệ thành công"));
             }
             catch (ArgumentException ex)
+            {
+                return BadRequest(ApiResponse<List<PrizeDistributionResponseDto>>.Fail(ex.Message));
+            }
+            catch (InvalidOperationException ex)
             {
                 return BadRequest(ApiResponse<List<PrizeDistributionResponseDto>>.Fail(ex.Message));
             }
@@ -152,7 +156,7 @@ namespace HRTMS.API.Controllers
         {
             try
             {
-                var result = await _tournamentService.CreateRoundAsync(id, dto);
+                var result = await _tournamentService.CreateRoundAsync(id, dto, GetCurrentUserId());
                 return Ok(ApiResponse<RoundResponseDto>.Ok(result, "Tạo vòng đua thành công"));
             }
             catch (KeyNotFoundException ex)
@@ -160,6 +164,10 @@ namespace HRTMS.API.Controllers
                 return NotFound(ApiResponse<RoundResponseDto>.Fail(ex.Message));
             }
             catch (ArgumentException ex)
+            {
+                return BadRequest(ApiResponse<RoundResponseDto>.Fail(ex.Message));
+            }
+            catch (InvalidOperationException ex)
             {
                 return BadRequest(ApiResponse<RoundResponseDto>.Fail(ex.Message));
             }
@@ -172,7 +180,7 @@ namespace HRTMS.API.Controllers
         {
             try
             {
-                var result = await _tournamentService.CreateRaceAsync(id, dto);
+                var result = await _tournamentService.CreateRaceAsync(id, dto, GetCurrentUserId());
                 return Ok(ApiResponse<RaceResponseDto>.Ok(result, "Tạo cuộc đua thành công"));
             }
             catch (KeyNotFoundException ex)
@@ -180,6 +188,10 @@ namespace HRTMS.API.Controllers
                 return NotFound(ApiResponse<RaceResponseDto>.Fail(ex.Message));
             }
             catch (ArgumentException ex)
+            {
+                return BadRequest(ApiResponse<RaceResponseDto>.Fail(ex.Message));
+            }
+            catch (InvalidOperationException ex)
             {
                 return BadRequest(ApiResponse<RaceResponseDto>.Fail(ex.Message));
             }
@@ -227,7 +239,7 @@ namespace HRTMS.API.Controllers
         {
             try
             {
-                var result = await _tournamentService.UpdateRaceAsync(raceId, dto);
+                var result = await _tournamentService.UpdateRaceAsync(raceId, dto, GetCurrentUserId());
                 return Ok(ApiResponse<RaceResponseDto>.Ok(result, "Cập nhật cuộc đua thành công"));
             }
             catch (KeyNotFoundException ex)
@@ -238,6 +250,10 @@ namespace HRTMS.API.Controllers
             {
                 return Conflict(ApiResponse<RaceResponseDto>.Fail(
                     "Cấu hình cuộc đua đã bị khóa sau khi bốc thăm hoặc đã có dự đoán (EC-48)."));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ApiResponse<RaceResponseDto>.Fail(ex.Message));
             }
             catch (ArgumentException ex)
             {
