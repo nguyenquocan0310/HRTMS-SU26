@@ -351,6 +351,30 @@ public class ReportService : IReportService
             })
             .ToListAsync();
 
+        // Spectator chỉ nhận cột public: BỎ HẲN (cả header lẫn row) PairingStatus,
+        // EntryFeeStatus, EnrollmentApprovalStatus — trạng thái tài chính/duyệt nội bộ
+        // (quyết định nhóm 2026-07-11; OwnerName giữ lại). Admin/Owner/Jockey đủ cột.
+        if (role == RoleSpectator)
+        {
+            return new ReportDataDto
+            {
+                Type = "entry-list",
+                TournamentId = tournamentId,
+                TournamentName = tournamentName,
+                Headers = new[]
+                {
+                    "TournamentId", "TournamentName", "RoundName", "RaceNumber", "HorseId", "HorseName",
+                    "OwnerName", "JockeyName", "PairingId", "EntryStatus", "IsWithdrawn"
+                },
+                Rows = rows.Select(r => new string?[]
+                {
+                    Num(tournamentId), tournamentName, r.RoundName, Num(r.RaceNumber), Num(r.HorseId), r.HorseName,
+                    r.OwnerName, r.JockeyName, Num(r.PairingId), r.EntryStatus,
+                    r.IsWithdrawn is null ? null : (r.IsWithdrawn.Value ? "true" : "false")
+                }).ToList()
+            };
+        }
+
         return new ReportDataDto
         {
             Type = "entry-list",
