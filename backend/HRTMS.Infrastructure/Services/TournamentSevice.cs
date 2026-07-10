@@ -20,11 +20,11 @@ namespace HRTMS.Infrastructure.Services
             ["Turf", "Dirt", "Synthetic"];
         private static readonly string[] ValidCategories =
             ["Open", "Classic", "Maiden"];
-        // Progression (patch 002) — khop CHK_Tournaments_AdvRule. Hien chi 'TopPerRace'
-        // duoc tinh tu dong khi Declare Official; 'EarningsBased'/'Hybrid' luu duoc nhung
-        // chua auto-compute (P1).
-        private static readonly string[] ValidAdvancementRules =
-            ["TopPerRace", "EarningsBased", "Hybrid"];
+        // Progression (patch 002). MVP chi ho tro 'TopPerRace' — 'EarningsBased'/'Hybrid'
+        // chua auto-compute khi Declare Official nen CHAN CHON tu dau (tranh giai
+        // multi-round chet cung vi entry khong bao gio co AdvancementStatus).
+        // CHK_Tournaments_AdvRule o DB van rong hon (giu nguyen, khong can patch).
+        private static readonly string[] ValidAdvancementRules = ["TopPerRace"];
         private const int MinRaceDistanceMeters = 1200;
         private const int MaxRaceDistanceMeters = 2400;
         // State machine cấp GIẢI một chiều: Draft → Open Registration → Closed Registration → Completed
@@ -183,11 +183,14 @@ namespace HRTMS.Infrastructure.Services
                 throw new ArgumentException($"Hạng đua không hợp lệ: {dto.RaceCategory}");
             ValidateRaceDistance(dto.RaceDistance, nameof(dto.RaceDistance));
             if (dto.AdvancementRule != null && !ValidAdvancementRules.Contains(dto.AdvancementRule))
-                throw new ArgumentException($"Quy tắc đi tiếp không hợp lệ: {dto.AdvancementRule}");
+                throw new ArgumentException($"Quy tắc đi tiếp '{dto.AdvancementRule}' chưa hỗ trợ ở phiên bản này (chỉ hỗ trợ TopPerRace).");
             if (dto.AdvancementCount.HasValue && dto.AdvancementCount.Value <= 0)
                 throw new ArgumentException("Số suất đi tiếp (AdvancementCount) phải lớn hơn 0");
 
             // 2. Validate date range and numeric constraints
+            // Giai moi khong duoc bat dau trong qua khu (cho phep ngay hom nay UTC).
+            if (dto.StartDate < DateTime.UtcNow.Date)
+                throw new ArgumentException("Ngày bắt đầu không được ở quá khứ.");
             ValidateTournamentWindow(dto.StartDate, dto.EndDate);
             ValidateTournamentNumbers(
                 dto.MaxHorses,
@@ -333,7 +336,7 @@ namespace HRTMS.Infrastructure.Services
             if (dto.RaceDistance.HasValue)
                 ValidateRaceDistance(dto.RaceDistance.Value, nameof(dto.RaceDistance));
             if (dto.AdvancementRule != null && !ValidAdvancementRules.Contains(dto.AdvancementRule))
-                throw new ArgumentException($"Quy tắc đi tiếp không hợp lệ: {dto.AdvancementRule}");
+                throw new ArgumentException($"Quy tắc đi tiếp '{dto.AdvancementRule}' chưa hỗ trợ ở phiên bản này (chỉ hỗ trợ TopPerRace).");
             if (dto.AdvancementCount.HasValue && dto.AdvancementCount.Value <= 0)
                 throw new ArgumentException("Số suất đi tiếp (AdvancementCount) phải lớn hơn 0");
 
