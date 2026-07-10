@@ -369,7 +369,10 @@ public class RaceEntryService : IRaceEntryService
 
         var now = DateTime.UtcNow;
 
-        await using var tx = await _context.Database.BeginTransactionAsync();
+        // Cascade flow (reject enrollment / update horse / cancel race) có thể đã mở
+        // transaction bên ngoài — không mở lồng, chỉ commit/rollback khi mình là chủ.
+        var ownsTransaction = _context.Database.CurrentTransaction == null;
+        var tx = ownsTransaction ? await _context.Database.BeginTransactionAsync() : null;
         try
         {
             // Guard nguyên tử: chỉ flip khi đang Pending/Confirmed. ExecuteUpdate trả về số dòng
@@ -387,7 +390,7 @@ public class RaceEntryService : IRaceEntryService
             if (rows == 0)
             {
                 // Mot tien trinh khac da xu ly truoc -> idempotent.
-                await tx.CommitAsync();
+                if (tx != null) await tx.CommitAsync();
                 return new WithdrawResultDto
                 {
                     RaceEntryId = raceEntryId,
@@ -406,11 +409,16 @@ public class RaceEntryService : IRaceEntryService
                     .ExecuteUpdateAsync(s => s.SetProperty(e => e.EntryFeeStatus, "Refund Pending"));
             }
 
-            // Hoan diem du doan: chi tren Prediction dang Pending -> Refunded (idempotent).
-            // Viec cong tra diem vao vi (VirtualPointsTransaction) thuoc Module N; o day chi danh dau trang thai.
-            var refunded = await _context.Predictions
+            // SCH.5: hoàn điểm ảo NGAY trong transaction withdraw — cộng ví + ghi sổ cái
+            // 'Prediction Refund' cho từng prediction Pending rồi mới đánh dấu Refunded.
+            // Guard idempotent ở entry (rows == 0 ở trên) bảo đảm không refund hai lần.
+            var pendingPredictions = await _context.Predictions
                 .Where(p => p.RaceEntryId == raceEntryId && p.Status == "Pending")
-                .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, "Refunded"));
+                .ToListAsync();
+            var refunded = await RefundPredictionsAsync(
+                pendingPredictions,
+                $"Ngựa bạn dự đoán ở lượt đăng ký #{raceEntryId} đã rút khỏi cuộc đua. Điểm dự đoán đã được hoàn về ví.",
+                "RaceEntry", raceEntryId, now);
 
             // Thong bao khan URGENT cho tat ca Admin de dieu phoi phuong an du phong.
             var adminIds = await _context.Users
@@ -453,7 +461,7 @@ public class RaceEntryService : IRaceEntryService
                 "RaceEntry", raceEntryId.ToString(),
                 entry.Status, $"Cancelled;Refunded={refunded};Reason={reason}");
 
-            await tx.CommitAsync();
+            if (tx != null) await tx.CommitAsync();
 
             return new WithdrawResultDto
             {
@@ -466,9 +474,70 @@ public class RaceEntryService : IRaceEntryService
         }
         catch
         {
-            await tx.RollbackAsync();
+            if (tx != null) await tx.RollbackAsync();
             throw;
         }
+        finally
+        {
+            if (tx != null) await tx.DisposeAsync();
+        }
+    }
+
+    // =====================================================================
+    // Hoàn điểm dự đoán: cộng ví + ghi sổ cái + đánh dấu Refunded (cùng transaction)
+    // =====================================================================
+    // Giữ bất biến Balance = SUM(VirtualPointsTransactions.Amount). Thiếu ví -> throw
+    // để rollback toàn bộ (giống EmergencyDisqualificationService), không mất điểm im lặng.
+    private async Task<int> RefundPredictionsAsync(
+        List<Prediction> pendingPredictions,
+        string notificationMessage,
+        string relatedEntityType,
+        int relatedEntityId,
+        DateTime now)
+    {
+        if (pendingPredictions.Count == 0)
+            return 0;
+
+        var spectatorIds = pendingPredictions.Select(p => p.SpectatorId).Distinct().ToList();
+        var wallets = await _context.Wallets
+            .Where(w => spectatorIds.Contains(w.SpectatorId))
+            .ToDictionaryAsync(w => w.SpectatorId);
+
+        foreach (var prediction in pendingPredictions)
+        {
+            if (!wallets.TryGetValue(prediction.SpectatorId, out var wallet))
+                throw new InvalidOperationException("WALLET_NOT_FOUND");
+
+            wallet.Balance += prediction.PointsPlaced;
+            wallet.UpdatedAt = now;
+
+            _context.VirtualPointsTransactions.Add(new VirtualPointsTransaction
+            {
+                WalletId = wallet.WalletId,
+                Amount = prediction.PointsPlaced,
+                Type = "Prediction Refund",
+                ReferenceId = $"Prediction:{prediction.PredictionId}",
+                CreatedAt = now
+            });
+
+            prediction.Status = "Refunded";
+            prediction.PointsAwarded = 0;
+        }
+
+        await _context.SaveChangesAsync();
+
+        // In-app cho spectator bị ảnh hưởng (trong cùng transaction — cùng số phận commit/rollback).
+        foreach (var spectatorId in spectatorIds)
+        {
+            await _notification.SendAsync(
+                spectatorId,
+                "Hoàn điểm dự đoán",
+                notificationMessage,
+                relatedEntityType: relatedEntityType,
+                relatedEntityId: relatedEntityId);
+        }
+
+        return pendingPredictions.Count;
     }
 
     // =====================================================================
