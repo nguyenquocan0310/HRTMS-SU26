@@ -469,11 +469,9 @@ namespace HRTMS.Infrastructure.Services
 
         /// <summary>
         /// Tạo PursePayouts cho Jockey (10% Nhất / 5% Nhì-Tư) và Owner (phần còn lại).
-        /// LƯU Ý: SRS mô tả "phí cố định cho ngựa ngoài top" cho Jockey nhưng không nêu
-        /// số tiền cụ thể — Phase 1 chỉ trả thưởng cho nhóm có % > 0 (Top được cấu hình
-        /// trong PrizeDistributions), nên trường hợp "ngoài top" không phát sinh ở đây
-        /// (groupPrizeAmount luôn > 0 khi gọi hàm này). Cần xác nhận thêm nếu muốn bổ
-        /// sung fee cố định riêng cho Jockey không nằm trong top thưởng.
+        /// PRZ.3 "phí cố định cho Jockey ngoài top": quyết định nhóm 2026-07-11 —
+        /// NGOÀI scope MVP (SRS không nêu số tiền/nguồn quỹ). Chỉ nhóm có % > 0 trong
+        /// PrizeDistributions mới có payout; ngựa ngoài top không nhận gì ở phase này.
         /// </summary>
         private int CreatePayoutForEntry(RaceEntry entry, decimal entryPrizeAmount, DateTime now)
         {
