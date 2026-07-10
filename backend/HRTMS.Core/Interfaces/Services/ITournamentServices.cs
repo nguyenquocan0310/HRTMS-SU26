@@ -14,7 +14,7 @@ namespace HRTMS.Core.Interfaces.Services
         Task<TournamentResponseDto> CreateTournamentAsync(CreateTournamentDto dto, int createByUserId);
         Task<TournamentResponseDto?> GetTournamentByIdAsync(int tournamentId);
         Task<List<TournamentResponseDto>> GetAllTournamentsAsync();
-        Task<TournamentResponseDto> UpdateTournamentAsync(int tournamentId, UpdateTournamentDto dto);
+        Task<TournamentResponseDto> UpdateTournamentAsync(int tournamentId, UpdateTournamentDto dto, int adminUserId);
 
         // STATE MACHINE
         Task<TournamentResponseDto> ChangeStatusAsync(int tournamentId, string targetStatus, int adminUserId);

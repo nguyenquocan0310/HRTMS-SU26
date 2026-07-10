@@ -77,7 +77,7 @@ namespace HRTMS.API.Controllers
         {
             try
             {
-                var result = await _tournamentService.UpdateTournamentAsync(id, dto);
+                var result = await _tournamentService.UpdateTournamentAsync(id, dto, GetCurrentUserId());
                 return Ok(ApiResponse<TournamentResponseDto>.Ok(result, "Cap nhat thanh cong"));
             }
             catch (KeyNotFoundException ex)
