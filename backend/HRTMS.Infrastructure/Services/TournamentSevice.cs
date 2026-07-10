@@ -13,6 +13,7 @@ namespace HRTMS.Infrastructure.Services
         // Guard đóng băng cấu hình Race dùng chung với RaceEntryService,
         // tránh viết lại logic freeze inline.
         private readonly IRaceEntryService _raceEntry;
+        private readonly INotificationService _notification;
 
         private static readonly string[] ValidBreeds =
             ["Thoroughbred", "Arabian", "Quarter Horse", "Mixed"];
@@ -41,11 +42,16 @@ namespace HRTMS.Infrastructure.Services
         private static readonly string[] RaceLevelStatuses =
             ["Pre-Race", "Live", "In-Progress", "Unofficial", "Official"];
 
-        public TournamentSevice(HRTMSDbContext context, IAuditLogService auditLog, IRaceEntryService raceEntry)
+        public TournamentSevice(
+            HRTMSDbContext context,
+            IAuditLogService auditLog,
+            IRaceEntryService raceEntry,
+            INotificationService notification)
         {
             _context = context;
             _auditLog = auditLog;
             _raceEntry = raceEntry;
+            _notification = notification;
         }
 
 
@@ -514,6 +520,31 @@ namespace HRTMS.Infrastructure.Services
                 oldValue: oldStatus,
                 newValue: targetStatus
             );
+
+            // Notify participant khi mở/đóng đăng ký (Module O). State machine một chiều
+            // nên transition không lặp lại được — retry sẽ fail ở guard trước khi tới
+            // đây, không có nguy cơ gửi trùng. Chưa có participant thì bỏ qua, không lỗi.
+            if (targetStatus is "Open Registration" or "Closed Registration")
+            {
+                var participantIds = await _context.TournamentParticipants
+                    .Where(p => p.TournamentId == tournamentId)
+                    .Select(p => p.UserId)
+                    .Distinct()
+                    .ToListAsync();
+
+                if (participantIds.Count > 0)
+                {
+                    var (title, message) = targetStatus == "Open Registration"
+                        ? ("Giải đấu mở đăng ký", $"Giải '{tournament.Name}' đã mở đăng ký tham gia.")
+                        : ("Giải đấu đóng đăng ký", $"Giải '{tournament.Name}' đã đóng đăng ký. Ban tổ chức sẽ chốt lịch thi đấu.");
+
+                    await _notification.SendBulkAsync(
+                        participantIds, title, message,
+                        type: "Both",
+                        relatedEntityType: "Tournament",
+                        relatedEntityId: tournamentId);
+                }
+            }
 
             return MapToResponseDto(tournament);
         }
