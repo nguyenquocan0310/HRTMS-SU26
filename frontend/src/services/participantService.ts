@@ -31,10 +31,13 @@ export const getRoster = (
   if (role) params.set('role', role);
   if (status) params.set('status', status);
   const query = params.toString() ? `?${params}` : '';
+  // Không catch nuốt lỗi — để lỗi thật hiện ra thay vì bảng rỗng câm.
   return apiFetch<ApiResponse<ParticipantResponse[]>>(
     `/tournament/${tournamentId}/participants${query}`
-  ).then((res) => res.data ?? [])
-  .catch(() => []);
+  ).then((res) => {
+    if (!res.success) throw new Error(res.message || 'Không tải được roster.');
+    return res.data ?? [];
+  });
 };
 
 export const approveParticipant = (participantId: number): Promise<ParticipantResponse> =>
