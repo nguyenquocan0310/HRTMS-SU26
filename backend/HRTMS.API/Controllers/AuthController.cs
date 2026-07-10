@@ -21,7 +21,8 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] RegisterDto dto)
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> Register([FromForm] RegisterDto dto)
     {
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
         var ua = HttpContext.Request.Headers["User-Agent"].ToString();

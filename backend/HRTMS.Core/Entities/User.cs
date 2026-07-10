@@ -41,6 +41,8 @@ public partial class User
 
     public virtual ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
 
+    public virtual ICollection<Certificate> Certificates { get; set; } = new List<Certificate>();
+
     public virtual DoctorProfile? DoctorProfile { get; set; }
 
     public virtual ICollection<FamilyRelationshipDeclaration> FamilyRelationshipDeclarationDeclarantUsers { get; set; } = new List<FamilyRelationshipDeclaration>();
