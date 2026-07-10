@@ -4,6 +4,8 @@ using HRTMS.Core.Entities;
 using HRTMS.Core.Interfaces.Services;
 using HRTMS.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+// Alias tránh đụng độ RaceEntryResponseDto giữa DTOs.Horse và DTOs.RaceEntry.
+using RaceEntryDtos = HRTMS.Core.DTOs.RaceEntry;
 
 namespace HRTMS.Infrastructure.Services;
 
@@ -12,16 +14,36 @@ public class HorseService : IHorseService
     private readonly HRTMSDbContext _context;
     private readonly IAuditLogService _auditLog;
     private readonly INotificationService _notification;
+    // Withdraw-flow dùng chung của Module E (fee -> Refund Pending, hoàn điểm dự đoán,
+    // giải phóng PostPosition, notification) — không tự set status entry tay ở đây.
+    private readonly IRaceEntryService _raceEntry;
 
     // 4 trường nhạy cảm — sửa bất kỳ trường nào → trigger re-validate
     private static readonly string[] SensitiveFields =
         ["Breed", "VaccinationRecordRef", "DopingTestDate", "DopingTestResult"];
 
-    public HorseService(HRTMSDbContext context, IAuditLogService auditLog, INotificationService notification)
+    public HorseService(
+        HRTMSDbContext context,
+        IAuditLogService auditLog,
+        INotificationService notification,
+        IRaceEntryService raceEntry)
     {
         _context = context;
         _auditLog = auditLog;
         _notification = notification;
+        _raceEntry = raceEntry;
+    }
+
+    // Entry còn "sống" trong race chưa chạy — đối tượng của cascade withdraw.
+    private async Task<List<int>> GetActiveEntryIdsAsync(IReadOnlyCollection<int> pairingIds)
+    {
+        if (pairingIds.Count == 0) return [];
+        return await _context.RaceEntries
+            .Where(re => pairingIds.Contains(re.PairingId) &&
+                         (re.Status == "Pending" || re.Status == "Confirmed") &&
+                         re.Race.Status == "Upcoming")
+            .Select(re => re.RaceEntryId)
+            .ToListAsync();
     }
 
     // -------------------------------------------------------------------------
@@ -347,46 +369,79 @@ public class HorseService : IHorseService
         bool revalidated = sensitiveChanged;
         if (revalidated)
         {
-            // Baseline profile (doping có thể đổi sang Failed → khóa hồ sơ).
-            ApplyProfileScreening(horse);
-
-            var entries = await _context.HorseTournamentEntries
-                .Where(e => e.HorseId == horseId && e.Status == "Enrolled")
-                .ToListAsync();
-
-            if (entries.Count > 0)
+            // Toàn bộ re-screen + hủy pairing + withdraw entry trong MỘT transaction —
+            // withdraw-flow của Module E ambient-aware nên không mở transaction lồng.
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            try
             {
-                var tournamentIds = entries.Select(e => e.TournamentId).ToList();
-                var tournaments = await _context.Tournaments
-                    .Where(t => tournamentIds.Contains(t.TournamentId))
-                    .ToDictionaryAsync(t => t.TournamentId);
+                // Baseline profile (doping có thể đổi sang Failed → khóa hồ sơ).
+                ApplyProfileScreening(horse);
 
-                foreach (var entry in entries)
+                var cancelledPairingIds = new List<int>();
+
+                var entries = await _context.HorseTournamentEntries
+                    .Where(e => e.HorseId == horseId && e.Status == "Enrolled")
+                    .ToListAsync();
+
+                if (entries.Count > 0)
                 {
-                    if (!tournaments.TryGetValue(entry.TournamentId, out var t)) continue;
+                    var tournamentIds = entries.Select(e => e.TournamentId).ToList();
+                    var tournaments = await _context.Tournaments
+                        .Where(t => tournamentIds.Contains(t.TournamentId))
+                        .ToDictionaryAsync(t => t.TournamentId);
 
-                    string cat = ScreenEnrollment(horse, t, entry);
-                    ApplyScreeningToEnrollment(entry, cat);
-                    if (cat == "AutoEligible")
-                        entry.AdminApprovalStatus = "Pending"; // sửa hồ sơ → buộc Admin duyệt lại
-                    entry.UpdatedAt = DateTime.UtcNow;
-
-                    // Hủy Pairing của đúng giải đó (DB không hỗ trợ "Suspended" — dùng "Cancelled").
-                    foreach (var pairing in horse.PairingHorses)
+                    foreach (var entry in entries)
                     {
-                        if (pairing.TournamentId == entry.TournamentId &&
-                            pairing.Status is "Pending" or "Accepted" or "Confirmed")
+                        if (!tournaments.TryGetValue(entry.TournamentId, out var t)) continue;
+
+                        string cat = ScreenEnrollment(horse, t, entry);
+                        ApplyScreeningToEnrollment(entry, cat);
+                        if (cat == "AutoEligible")
+                            entry.AdminApprovalStatus = "Pending"; // sửa hồ sơ → buộc Admin duyệt lại
+                        entry.UpdatedAt = DateTime.UtcNow;
+
+                        // Hủy Pairing của đúng giải đó (DB không hỗ trợ "Suspended" — dùng "Cancelled").
+                        foreach (var pairing in horse.PairingHorses)
                         {
-                            pairing.Status = "Cancelled";
-                            pairing.ResponseReason = "Hồ sơ ngựa vừa thay đổi thông tin quan trọng nên cần được duyệt lại.";
-                            pairing.UpdatedAt = DateTime.UtcNow;
+                            if (pairing.TournamentId == entry.TournamentId &&
+                                pairing.Status is "Pending" or "Accepted" or "Confirmed")
+                            {
+                                pairing.Status = "Cancelled";
+                                pairing.ResponseReason = "Hồ sơ ngựa vừa thay đổi thông tin quan trọng nên cần được duyệt lại.";
+                                pairing.UpdatedAt = DateTime.UtcNow;
+                                cancelledPairingIds.Add(pairing.PairingId);
+                            }
                         }
                     }
                 }
+
+                await _context.SaveChangesAsync();
+
+                // HRS.6: entry active của pairing vừa hủy đi qua withdraw-flow —
+                // fee Paid -> Refund Pending, hoàn điểm dự đoán, giải phóng cổng,
+                // notification. Chỉ race còn Upcoming; race đã chạy giữ dữ liệu lịch sử.
+                foreach (var raceEntryId in await GetActiveEntryIdsAsync(cancelledPairingIds))
+                {
+                    await _raceEntry.WithdrawAsync(ownerId, raceEntryId,
+                        new RaceEntryDtos.WithdrawEntryDto
+                        {
+                            Reason = "Hồ sơ ngựa thay đổi thông tin quan trọng nên cần được duyệt lại."
+                        },
+                        isSystem: true);
+                }
+
+                await transaction.CommitAsync();
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
             }
         }
-
-        await _context.SaveChangesAsync();
+        else
+        {
+            await _context.SaveChangesAsync();
+        }
 
         string message = !revalidated
             ? "Cập nhật hồ sơ thành công."
@@ -494,20 +549,58 @@ public class HorseService : IHorseService
 
         string oldStatus = entry.AdminApprovalStatus;
 
-        entry.AdminApprovalStatus = "Rejected";
-        entry.RejectionReason = dto.Reason.Trim();
-        entry.UpdatedAt = DateTime.UtcNow;
+        // Reject + cascade trong MỘT transaction: enrollment không còn Approved thì
+        // pairing/entry của ngựa trong giải đó không được tiếp tục (SCH.1, HRS.6).
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            entry.AdminApprovalStatus = "Rejected";
+            entry.RejectionReason = dto.Reason.Trim();
+            entry.UpdatedAt = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
+            var activePairings = await _context.Pairings
+                .Where(p => p.HorseId == entry.HorseId &&
+                            p.TournamentId == entry.TournamentId &&
+                            (p.Status == "Pending" || p.Status == "Accepted" || p.Status == "Confirmed"))
+                .ToListAsync();
+            foreach (var pairing in activePairings)
+            {
+                pairing.Status = "Cancelled";
+                pairing.ResponseReason = "Ngựa đã bị từ chối tham gia giải nên cặp thi đấu bị hủy.";
+                pairing.UpdatedAt = DateTime.UtcNow;
+            }
 
-        await _auditLog.LogAsync(
-            actorId: adminId,
-            action: "Reject_Enrollment",
-            entityName: "HorseTournamentEntry",
-            entityId: enrollmentId.ToString(),
-            oldValue: oldStatus,
-            newValue: "Rejected",
-            ipAddress: null);
+            await _context.SaveChangesAsync();
+
+            // Entry active của pairing bị hủy đi qua withdraw-flow (fee -> Refund Pending,
+            // hoàn điểm dự đoán, giải phóng cổng, notification) — không set status tay.
+            var cancelledPairingIds = activePairings.Select(p => p.PairingId).ToList();
+            foreach (var raceEntryId in await GetActiveEntryIdsAsync(cancelledPairingIds))
+            {
+                await _raceEntry.WithdrawAsync(adminId, raceEntryId,
+                    new RaceEntryDtos.WithdrawEntryDto
+                    {
+                        Reason = "Ngựa bị từ chối tham gia giải nên đăng ký thi đấu bị hủy."
+                    },
+                    isSystem: true);
+            }
+
+            await _auditLog.LogAsync(
+                actorId: adminId,
+                action: "Reject_Enrollment",
+                entityName: "HorseTournamentEntry",
+                entityId: enrollmentId.ToString(),
+                oldValue: oldStatus,
+                newValue: "Rejected",
+                ipAddress: null);
+
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
 
         await _notification.SendAsync(
             entry.Horse.OwnerId,
@@ -738,6 +831,15 @@ public class HorseService : IHorseService
         if (entry == null) return ApiResponse<string>.Fail("Không tìm thấy lượt đăng ký thi đấu này.");
         if (entry.EntryFeeStatus == "Paid") return ApiResponse<string>.Fail("Lệ phí tham gia đã được xác nhận trước đó.");
 
+        // Chỉ xác nhận được lệ phí đang Unpaid của entry còn hiệu lực — không ghi đè
+        // trạng thái hoàn phí (Refund Pending/Refunded) và không xác nhận entry đã hủy.
+        if (entry.Status == "Cancelled")
+            return ApiResponse<string>.Fail("Lượt đăng ký đã bị hủy, không thể xác nhận lệ phí.");
+        if (entry.EntryFeeStatus != "Unpaid")
+            return ApiResponse<string>.Fail(
+                $"Lệ phí đang ở trạng thái '{entry.EntryFeeStatus}', không thể xác nhận lại.");
+
+        var oldFeeStatus = entry.EntryFeeStatus;
         entry.EntryFeeStatus = "Paid";
         entry.EntryFeeConfirmedBy = adminId;
         entry.EntryFeeConfirmedAt = DateTime.UtcNow;
@@ -745,7 +847,7 @@ public class HorseService : IHorseService
         await _context.SaveChangesAsync();
 
         await _auditLog.LogAsync(adminId, "Update_Entry_Fee_Status", "RaceEntry",
-            raceEntryId.ToString(), "Unpaid", "Paid", null);
+            raceEntryId.ToString(), oldFeeStatus, "Paid", null);
 
         // Bao Owner: le phi da duoc xac nhan (email + in-app).
         await _notification.SendAsync(
@@ -838,11 +940,23 @@ public class HorseService : IHorseService
         if (entry.Status == "Cancelled") return ApiResponse<string>.Fail("Lượt đăng ký này đã bị hủy trước đó.");
 
         string oldStatus = entry.Status;
-        // CHK_RaceEntries_Status chỉ cho phép Pending/Confirmed/Cancelled/Disqualified
-        // → từ chối entry = "Cancelled" (trước đây set "Rejected" gây lỗi DB).
-        entry.Status = "Cancelled";
-        entry.UpdatedAt = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
+
+        // Từ chối = đi qua withdraw-flow dùng chung (CHK_RaceEntries_Status không có
+        // "Rejected"): fee Paid -> Refund Pending, hoàn điểm dự đoán, giải phóng
+        // PostPosition, notification — không set status tay nữa.
+        RaceEntryDtos.WithdrawResultDto result;
+        try
+        {
+            result = await _raceEntry.WithdrawAsync(adminId, raceEntryId,
+                new RaceEntryDtos.WithdrawEntryDto { Reason = reason.Trim() }, isSystem: true);
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "RACE_NOT_UPCOMING")
+        {
+            return ApiResponse<string>.Fail("Cuộc đua đã bắt đầu hoặc kết thúc, không thể từ chối đăng ký.");
+        }
+
+        if (result.AlreadyWithdrawn)
+            return ApiResponse<string>.Fail("Lượt đăng ký này đã bị hủy trước đó.");
 
         await _auditLog.LogAsync(adminId, "Reject_RaceEntry", "RaceEntry",
             raceEntryId.ToString(), oldStatus, $"Cancelled: {reason}", null);

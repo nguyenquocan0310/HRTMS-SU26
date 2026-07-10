@@ -26,6 +26,11 @@ public interface IRaceEntryService
     // Trả về số entry đã bị cancel.
     Task<int> AutoCancelOverdueAsync();
 
+    // Admin hủy một cuộc đua chưa Official (SCH.9): entry active đi qua withdraw-flow
+    // (fee Refund Pending, hoàn điểm dự đoán, giải phóng cổng, notification) trong
+    // một transaction. Throw "RACE_ALREADY_OFFICIAL" / "RACE_ALREADY_CANCELLED".
+    Task<CancelRaceResultDto> CancelRaceAsync(int adminId, int raceId, string? reason);
+
     // Guard đóng băng cấu hình Race. Gọi trước khi sửa ScheduledTime /
     // RaceDistanceOverride / TrackTypeOverride. Throw "RACE_CONFIG_FROZEN" nếu đã bốc thăm hoặc đã có Prediction.
     Task EnsureRaceConfigEditableAsync(int raceId);

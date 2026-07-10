@@ -50,6 +50,11 @@ public class SchedulingController : ControllerBase
         {
             return UnprocessableEntity(Err("INVALID_RACE_STATE", "Cuộc đua hiện không cho phép xếp ngựa vào."));
         }
+        catch (InvalidOperationException ex) when (ex.Message == "TOURNAMENT_NOT_OPEN_FOR_SCHEDULING")
+        {
+            return UnprocessableEntity(Err("TOURNAMENT_NOT_OPEN_FOR_SCHEDULING",
+                "Giải đấu chưa mở đăng ký hoặc đã kết thúc nên không thể xếp lịch thi đấu."));
+        }
         catch (InvalidOperationException ex) when (ex.Message == "PAIRING_TOURNAMENT_MISMATCH")
         {
             return UnprocessableEntity(Err("PAIRING_TOURNAMENT_MISMATCH", "The pairing does not belong to the race's tournament."));
@@ -68,9 +73,10 @@ public class SchedulingController : ControllerBase
             return UnprocessableEntity(Err("PAIRING_NOT_QUALIFIED",
                 "The pairing is not qualified (or also-eligible) from the previous round."));
         }
-        catch (InvalidOperationException ex) when (ex.Message == "HORSE_NOT_APPROVED")
+        catch (InvalidOperationException ex) when (ex.Message == "HORSE_NOT_APPROVED_IN_TOURNAMENT")
         {
-            return UnprocessableEntity(Err("HORSE_NOT_APPROVED", "Ngựa chưa được duyệt."));
+            return UnprocessableEntity(Err("HORSE_NOT_APPROVED_IN_TOURNAMENT",
+                "Ngựa chưa được duyệt tham gia giải này (duyệt theo từng giải)."));
         }
         catch (InvalidOperationException ex) when (ex.Message == "JOCKEY_EXPERIENCE_TOO_LOW")
         {
@@ -120,6 +126,11 @@ public class SchedulingController : ControllerBase
         {
             return UnprocessableEntity(Err("NO_ELIGIBLE_ENTRIES", "Chưa có ngựa hợp lệ để bốc thăm."));
         }
+        catch (InvalidOperationException ex) when (ex.Message == "TOURNAMENT_NOT_OPEN_FOR_SCHEDULING")
+        {
+            return UnprocessableEntity(Err("TOURNAMENT_NOT_OPEN_FOR_SCHEDULING",
+                "Giải đấu chưa mở đăng ký hoặc đã kết thúc nên không thể bốc thăm."));
+        }
         catch (InvalidOperationException ex) when (ex.Message == "DRAW_CONFLICT")
         {
             return Conflict(Err("DRAW_CONFLICT", "Có xung đột khi bốc thăm đồng thời. Vui lòng thử lại."));
@@ -155,6 +166,11 @@ public class SchedulingController : ControllerBase
         {
             return Conflict(Err("INVALID_STATUS", "Chỉ đăng ký đang chờ mới có thể xác nhận."));
         }
+        catch (InvalidOperationException ex) when (ex.Message == "HORSE_NOT_APPROVED_IN_TOURNAMENT")
+        {
+            return UnprocessableEntity(Err("HORSE_NOT_APPROVED_IN_TOURNAMENT",
+                "Ngựa không còn được duyệt tham gia giải này nên không thể xác nhận."));
+        }
         catch (InvalidOperationException ex) when (ex.Message == "CONFIRMATION_CLOSED")
         {
             return UnprocessableEntity(Err("CONFIRMATION_CLOSED", "Đã quá hạn xác nhận tham gia."));
@@ -185,6 +201,16 @@ public class SchedulingController : ControllerBase
             return StatusCode(StatusCodes.Status403Forbidden,
                 Err("FORBIDDEN", "Bạn không có quyền rút đăng ký này."));
         }
+        catch (InvalidOperationException ex) when (ex.Message == "RACE_NOT_UPCOMING")
+        {
+            return UnprocessableEntity(Err("RACE_NOT_UPCOMING",
+                "Cuộc đua đã bắt đầu hoặc kết thúc nên không thể rút đăng ký."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "WITHDRAW_AFTER_CUTOFF")
+        {
+            return UnprocessableEntity(Err("WITHDRAW_AFTER_CUTOFF",
+                "Đã quá hạn chốt xác nhận. Vui lòng liên hệ Ban tổ chức để rút đăng ký."));
+        }
     }
 
     // (Admin) Admin hủy race entry thay mặt Owner (điều phối khẩn cấp).
@@ -208,6 +234,41 @@ public class SchedulingController : ControllerBase
         catch (KeyNotFoundException ex) when (ex.Message == "ENTRY_NOT_FOUND")
         {
             return NotFound(Err("ENTRY_NOT_FOUND", "Race entry was not found."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "RACE_NOT_UPCOMING")
+        {
+            return UnprocessableEntity(Err("RACE_NOT_UPCOMING",
+                "The race has already started or finished; the entry cannot be cancelled."));
+        }
+    }
+
+    // (Admin) Hủy một cuộc đua chưa Official (SCH.9 — nhánh hủy race).
+    // Entry active đi qua withdraw-flow: fee Refund Pending, hoàn điểm dự đoán,
+    // giải phóng cổng xuất phát, notification — tất cả trong một transaction.
+    [HttpPatch("races/{id:int}/cancel")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> CancelRace(int id, [FromQuery] string? reason)
+    {
+        if (!TryGetUserId(out var adminId))
+            return UnauthorizedResult();
+
+        try
+        {
+            var result = await _service.CancelRaceAsync(adminId, id, reason);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex) when (ex.Message == "RACE_NOT_FOUND")
+        {
+            return NotFound(Err("RACE_NOT_FOUND", "Không tìm thấy cuộc đua."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "RACE_ALREADY_OFFICIAL")
+        {
+            return Conflict(Err("RACE_ALREADY_OFFICIAL",
+                "Cuộc đua đã công bố kết quả chính thức, không thể hủy."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "RACE_ALREADY_CANCELLED")
+        {
+            return Conflict(Err("RACE_ALREADY_CANCELLED", "Cuộc đua này đã bị hủy trước đó."));
         }
     }
 
