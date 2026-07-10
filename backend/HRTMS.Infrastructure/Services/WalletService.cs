@@ -18,6 +18,11 @@ public class WalletService : IWalletService
     private const string StatusRedeemed = "Redeemed";
     private const string TxnTypeTicketCodeBonus = "Ticket Code Bonus";
     private const string RefTypeTicketRewardCode = "TicketRewardCode";
+    private const int MaxBatchQuantity = 1000;
+
+    // Bộ ký tự Crockford base32 (bỏ I/L/O/U để tránh nhầm khi đọc/gõ mã).
+    private const string CodeAlphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+    private const int CodeBodyLength = 12;
 
     public WalletService(HRTMSDbContext context, IAuditLogService auditLog)
     {
@@ -112,6 +117,83 @@ public class WalletService : IWalletService
             await transaction.RollbackAsync();
             throw;
         }
+    }
+
+    public async Task<ApiResponse<CreateTicketCodesResponseDto>> CreateTicketCodesAsync(
+        int adminId, CreateTicketCodesDto dto, string? ipAddress)
+    {
+        if (dto.Quantity < 1 || dto.Quantity > MaxBatchQuantity)
+            return ApiResponse<CreateTicketCodesResponseDto>.Fail(
+                $"Số lượng mã phải từ 1 đến {MaxBatchQuantity}.");
+
+        if (dto.RewardAmount <= 0)
+            return ApiResponse<CreateTicketCodesResponseDto>.Fail("Điểm thưởng phải lớn hơn 0.");
+
+        var now = DateTime.UtcNow;
+        if (dto.ExpiresAt <= now)
+            return ApiResponse<CreateTicketCodesResponseDto>.Fail("Thời điểm hết hạn phải ở tương lai.");
+
+        // Sinh raw code duy nhất trong batch (secure RNG). HashSet chặn trùng trong batch.
+        var rawCodes = new List<string>(dto.Quantity);
+        var seen = new HashSet<string>();
+        while (seen.Count < dto.Quantity)
+        {
+            var code = GenerateRawCode();
+            if (seen.Add(code)) rawCodes.Add(code);
+        }
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            foreach (var raw in rawCodes)
+            {
+                _context.TicketRewardCodes.Add(new TicketRewardCode
+                {
+                    CodeHash = HashCode(raw),   // chỉ lưu hash, không lưu raw code
+                    PointAmount = dto.RewardAmount,
+                    Status = StatusActive,
+                    ExpiresAt = dto.ExpiresAt,
+                    CreatedAt = now
+                });
+            }
+
+            // UNIQUE(CodeHash) chặn trùng với code đã tồn tại; vi phạm → DbUpdateException → rollback cả batch.
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+
+        // Audit: KHÔNG ghi raw code, chỉ ghi metadata batch.
+        await _auditLog.LogAsync(
+            actorId: adminId,
+            action: "CreateTicketCodes",
+            entityName: "TicketRewardCode",
+            entityId: "batch",
+            newValue: $"count={dto.Quantity};reward={dto.RewardAmount};expiresAt={dto.ExpiresAt:o}",
+            ipAddress: ipAddress);
+
+        return ApiResponse<CreateTicketCodesResponseDto>.Ok(new CreateTicketCodesResponseDto
+        {
+            Count = rawCodes.Count,
+            RewardAmount = dto.RewardAmount,
+            ExpiresAt = dto.ExpiresAt,
+            Codes = rawCodes   // raw code trả về ĐÚNG MỘT LẦN tại đây
+        });
+    }
+
+    /// <summary>Sinh raw code dạng TKT-XXXXXXXXXXXX bằng RNG mật mã (khó đoán).</summary>
+    private static string GenerateRawCode()
+    {
+        var chars = new char[CodeBodyLength];
+        Span<byte> bytes = stackalloc byte[CodeBodyLength];
+        RandomNumberGenerator.Fill(bytes);
+        for (int i = 0; i < CodeBodyLength; i++)
+            chars[i] = CodeAlphabet[bytes[i] % CodeAlphabet.Length];
+        return $"TKT-{new string(chars)}";
     }
 
     private static byte[] HashCode(string rawCode)

@@ -11,4 +11,11 @@ public interface IWalletService
     /// </summary>
     Task<ApiResponse<RedeemTicketCodeResponseDto>> RedeemTicketCodeAsync(
         int spectatorId, RedeemTicketCodeDto dto, string? ipAddress);
+
+    /// <summary>
+    /// Admin tạo batch mã vé thưởng: sinh raw code an toàn, lưu SHA-256 hash, trả raw code
+    /// đúng một lần. Toàn bộ batch trong một transaction — lỗi bất kỳ code nào → rollback cả batch.
+    /// </summary>
+    Task<ApiResponse<CreateTicketCodesResponseDto>> CreateTicketCodesAsync(
+        int adminId, CreateTicketCodesDto dto, string? ipAddress);
 }
