@@ -3,37 +3,50 @@
 
 import { apiFetch } from './apiClient';
 
-// ── NGỰA ────────────────────────────────────────────────────────────────────
-export interface HorsePending {
+// ── NGỰA (Horse Entry / Enrollment) ─────────────────────────────────────────
+export interface HorseEnrollmentPending {
+  enrollmentId: number;
   horseId: number;
-  ownerId: number;
-  name: string;
-  breed: string;
-  vaccinationRecordRef: string;
-  dopingTestResult: string;
+  horseName: string;
+  tournamentId: number;
+  tournamentName: string;
+  status: string;
+  screeningStatus: string;
+  screeningReason: string | null;
   adminApprovalStatus: string;
+  rejectionReason: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
-export const getPendingHorses = async (): Promise<HorsePending[]> => {
-  try {
-    const res = await apiFetch<{ success: boolean; data: HorsePending[] }>(
-      '/admin/horses/pending?page=1&pageSize=50'
-    );
-    return res.data ?? [];
-  } catch {
-    return []; 
-  }
+export const getPendingHorses = async (): Promise<HorseEnrollmentPending[]> => {
+  const res = await apiFetch<{ success: boolean; message: string; data: HorseEnrollmentPending[] }>(
+    '/admin/horse-entries/pending?page=1&pageSize=50'
+  );
+  return res.data ?? [];
 };
 
-export const approveHorse = (id: number): Promise<unknown> =>
-  apiFetch(`/admin/horses-entries/${id}/approve`, { method: 'PATCH' });
+export const approveHorse = (enrollmentId: number): Promise<unknown> =>
+  apiFetch(`/admin/horse-entries/${enrollmentId}/approve`, { method: 'PATCH' });
 
-export const rejectHorse = (id: number, reason: string): Promise<unknown> =>
-  apiFetch(`/admin/horses-entries/${id}/reject`, {
+export const rejectHorse = (enrollmentId: number, reason: string): Promise<unknown> =>
+  apiFetch(`/admin/horse-entries/${enrollmentId}/reject`, {
     method: 'PATCH',
     body: JSON.stringify({ reason }),
   });
+
+export interface HorseDetail {
+  horseId: number;
+  breed: string;
+  vaccinationRecordRef: string;
+  dopingTestResult: string;
+}
+
+export const getHorseDetail = async (horseId: number): Promise<HorseDetail> => {
+  const res = await apiFetch<{ success: boolean; data: HorseDetail }>(`/admin/horses/${horseId}`);
+  if (!res.success || !res.data) throw new Error('Không tải được chi tiết ngựa.');
+  return res.data;
+};
 
 // ── JOCKEY / REFEREE / DOCTOR (personnel) ───────────────────────────────────
 export interface PersonPending {
