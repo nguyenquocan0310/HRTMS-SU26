@@ -47,7 +47,8 @@ Auth: JWT Bearer — toàn bộ endpoint **Role: Admin**. ActorId lấy từ cla
 ```
 Errors: `404 RACE_NOT_FOUND`.
 
-> `remainderAmount = purseAmount − totalAllocated`, **tính on-the-fly** (không lưu cột DB).
+> `remainderAmount = max(0, purseAmount − totalAllocated)`, **tính on-the-fly** (quyết định nhóm
+> 2026-07-11 — không lưu cột DB; clamp về 0 để không hiển thị số âm nếu dữ liệu payout bất thường).
 > EC-08/BR-26: phần dư phát sinh khi số ngựa về đích hợp lệ < số vị trí thưởng (`<5` ngựa) —
 > Admin xử lý thủ công ngoài hệ thống. Race chưa `Official` → `payouts` rỗng, `remainderAmount = purseAmount`.
 
@@ -104,7 +105,7 @@ Errors: không có (trả list rỗng nếu không có dữ liệu).
 |---|---|---|
 | PRZ.1 | Cấu hình `Race.PurseAmount` | Module B — `TournamentController` (đã có) |
 | PRZ.2 | Phân bổ theo `FinishPosition` (nạp `PrizeDistributions`) | Module J — `declare-official` (đã có) |
-| PRZ.3 | Chia nội bộ Jockey/Owner | Module J — `declare-official` (đã có) |
+| PRZ.3 | Chia nội bộ Jockey/Owner (10% Nhất / 5% Nhì–Tư; Owner phần còn lại). **"Phí cố định cho Jockey ngoài top": NGOÀI scope MVP** — quyết định nhóm 2026-07-11, SRS không nêu số tiền/nguồn quỹ | Module J — `declare-official` (đã có) |
 | PRZ.4 | Tổng = 100% & `Remainder` | Validate khi lưu (Module B) + hiển thị: **endpoint 1** |
 | PRZ.5 | ΣRace.Purse ≤ Tournament.Purse | Module B — `TournamentController` (đã có) |
 | **PRZ.6** | Lịch sử thưởng + trạng thái Paid/Unpaid + Audit | **endpoint 2 + 3** |
