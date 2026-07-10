@@ -619,6 +619,112 @@ public class RaceEntryService : IRaceEntryService
     }
 
     // =====================================================================
+    // Admin hủy một cuộc đua chưa Official (SCH.9 — nhánh hủy race)
+    // =====================================================================
+    public async Task<CancelRaceResultDto> CancelRaceAsync(int adminId, int raceId, string? reason)
+    {
+        var race = await _context.Races
+            .Include(r => r.RaceEntries).ThenInclude(e => e.Pairing).ThenInclude(p => p.Horse)
+            .FirstOrDefaultAsync(r => r.RaceId == raceId)
+            ?? throw new KeyNotFoundException("RACE_NOT_FOUND");
+
+        // Race Official la ket qua chinh thuc — khong duoc huy (bat bien du lieu lich su).
+        if (race.Status == "Official")
+            throw new InvalidOperationException("RACE_ALREADY_OFFICIAL");
+        if (race.Status == "Cancelled")
+            throw new InvalidOperationException("RACE_ALREADY_CANCELLED");
+
+        var cancelReason = string.IsNullOrWhiteSpace(reason) ? "Race cancelled by admin" : reason!;
+        var now = DateTime.UtcNow;
+
+        var ownsTransaction = _context.Database.CurrentTransaction == null;
+        var tx = ownsTransaction ? await _context.Database.BeginTransactionAsync() : null;
+        try
+        {
+            var cancelledEntries = 0;
+            foreach (var entry in race.RaceEntries
+                         .Where(e => e.Status is "Pending" or "Confirmed"))
+            {
+                // Guard nguyen tu tung entry (giong WithdrawAsync) — chong chay cheo
+                // voi mot withdraw song song tren cung entry.
+                var rows = await _context.RaceEntries
+                    .Where(e => e.RaceEntryId == entry.RaceEntryId &&
+                                (e.Status == "Pending" || e.Status == "Confirmed"))
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(e => e.Status, "Cancelled")
+                        .SetProperty(e => e.PostPosition, (int?)null)
+                        .SetProperty(e => e.IsWithdrawn, true)
+                        .SetProperty(e => e.WithdrawalReason, cancelReason)
+                        .SetProperty(e => e.UpdatedAt, now));
+                if (rows == 0) continue;
+                cancelledEntries++;
+
+                // HRS.8: entry Paid -> Refund Pending trong cung transaction huy.
+                if (entry.EntryFeeStatus == "Paid")
+                {
+                    await _context.RaceEntries
+                        .Where(e => e.RaceEntryId == entry.RaceEntryId)
+                        .ExecuteUpdateAsync(s => s.SetProperty(e => e.EntryFeeStatus, "Refund Pending"));
+                }
+
+                await _notification.SendAsync(
+                    entry.Pairing.Horse.OwnerId,
+                    "Cuộc đua bị hủy",
+                    $"Cuộc đua #{raceId} đã bị hủy. Đăng ký của ngựa '{entry.Pairing.Horse.Name}' được hủy kèm theo. Lý do: {cancelReason}.",
+                    type: "Both",
+                    relatedEntityType: "RaceEntry",
+                    relatedEntityId: entry.RaceEntryId);
+
+                await _notification.SendAsync(
+                    entry.Pairing.JockeyId,
+                    "Cuộc đua bị hủy",
+                    $"Cuộc đua #{raceId} đã bị hủy. Cặp đấu với ngựa '{entry.Pairing.Horse.Name}' được hủy kèm theo. Lý do: {cancelReason}.",
+                    type: "Both",
+                    relatedEntityType: "RaceEntry",
+                    relatedEntityId: entry.RaceEntryId);
+            }
+
+            // Hoan diem TOAN BO prediction Pending cua race — ke ca prediction con sot
+            // tren entry da Cancelled truoc do (du lieu cu truoc fix refund).
+            var pendingPredictions = await _context.Predictions
+                .Where(p => p.RaceId == raceId && p.Status == "Pending")
+                .ToListAsync();
+            var refunded = await RefundPredictionsAsync(
+                pendingPredictions,
+                $"Cuộc đua #{raceId} đã bị hủy. Điểm dự đoán đã được hoàn về ví.",
+                "Race", raceId, now);
+
+            var oldStatus = race.Status;
+            race.Status = "Cancelled";
+            race.IsPredictionGateClosed = true;
+            race.UpdatedAt = now;
+            await _context.SaveChangesAsync();
+
+            await _audit.LogAsync(adminId, "Cancel_Race", "Race", raceId.ToString(),
+                oldStatus, $"Cancelled;Entries={cancelledEntries};Refunded={refunded};Reason={cancelReason}");
+
+            if (tx != null) await tx.CommitAsync();
+
+            return new CancelRaceResultDto
+            {
+                RaceId = raceId,
+                Status = "Cancelled",
+                CancelledEntries = cancelledEntries,
+                RefundedPredictions = refunded
+            };
+        }
+        catch
+        {
+            if (tx != null) await tx.RollbackAsync();
+            throw;
+        }
+        finally
+        {
+            if (tx != null) await tx.DisposeAsync();
+        }
+    }
+
+    // =====================================================================
     // Guard đóng băng cấu hình Race
     // =====================================================================
     public async Task EnsureRaceConfigEditableAsync(int raceId)

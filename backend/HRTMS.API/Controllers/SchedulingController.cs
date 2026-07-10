@@ -242,6 +242,36 @@ public class SchedulingController : ControllerBase
         }
     }
 
+    // (Admin) Hủy một cuộc đua chưa Official (SCH.9 — nhánh hủy race).
+    // Entry active đi qua withdraw-flow: fee Refund Pending, hoàn điểm dự đoán,
+    // giải phóng cổng xuất phát, notification — tất cả trong một transaction.
+    [HttpPatch("races/{id:int}/cancel")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> CancelRace(int id, [FromQuery] string? reason)
+    {
+        if (!TryGetUserId(out var adminId))
+            return UnauthorizedResult();
+
+        try
+        {
+            var result = await _service.CancelRaceAsync(adminId, id, reason);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex) when (ex.Message == "RACE_NOT_FOUND")
+        {
+            return NotFound(Err("RACE_NOT_FOUND", "Không tìm thấy cuộc đua."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "RACE_ALREADY_OFFICIAL")
+        {
+            return Conflict(Err("RACE_ALREADY_OFFICIAL",
+                "Cuộc đua đã công bố kết quả chính thức, không thể hủy."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "RACE_ALREADY_CANCELLED")
+        {
+            return Conflict(Err("RACE_ALREADY_CANCELLED", "Cuộc đua này đã bị hủy trước đó."));
+        }
+    }
+
     // ---------------- helpers ----------------
 
     private bool TryGetUserId(out int userId)
