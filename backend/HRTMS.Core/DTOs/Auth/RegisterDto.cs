@@ -1,4 +1,5 @@
 using HRTMS.Core.DTOs.FamilyDeclaration;
+using Microsoft.AspNetCore.Http;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
@@ -38,17 +39,24 @@ public class RegisterDto
     public string? IdentityNumber { get; set; }
 
     // ── Jockey profile ──────────────────────────────────────────────────────
-    public string? LicenseCertificate { get; set; }
     public int? ExperienceYears { get; set; }
     public decimal? SelfDeclaredWeight { get; set; }
     public string? BloodType { get; set; }
     public string? HealthStatus { get; set; }
 
     // ── Referee profile ─────────────────────────────────────────────────────
-    public string? CertificationLevel { get; set; }
+    // (CertificationLevel dạng text đã bị thay bằng file upload — xem CertificateFile)
 
     // ── Doctor profile ──────────────────────────────────────────────────────
-    public string? MedicalLicenseNumber { get; set; }
+    // (MedicalLicenseNumber dạng text đã bị thay bằng file upload — xem CertificateFile)
+
+    /// <summary>
+    /// File chứng chỉ/bằng cấp — BẮT BUỘC với role Jockey/Referee/Doctor.
+    /// Thay thế cho việc gõ tay tên/số chứng chỉ như trước đây (ACC.1A).
+    /// Chấp nhận: .pdf, .jpg, .jpeg, .png, .webp — tối đa 10MB.
+    /// Gửi kèm dưới dạng multipart/form-data.
+    /// </summary>
+    public IFormFile? CertificateFile { get; set; }
 
     // ── FamilyRelationshipDeclarations ──────────────────────────────────────
     // Bắt buộc khai khi Role = Jockey hoặc Referee (EC-18)

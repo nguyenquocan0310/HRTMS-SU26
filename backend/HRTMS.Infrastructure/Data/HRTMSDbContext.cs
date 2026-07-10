@@ -14,6 +14,8 @@ public partial class HRTMSDbContext : DbContext
 
     public virtual DbSet<AuditLog> AuditLogs { get; set; }
 
+    public virtual DbSet<Certificate> Certificates { get; set; }
+
     public virtual DbSet<DoctorAssignment> DoctorAssignments { get; set; }
 
     public virtual DbSet<DoctorProfile> DoctorProfiles { get; set; }
@@ -104,7 +106,29 @@ public partial class HRTMSDbContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_AuditLogs_Actor");
         });
+        modelBuilder.Entity<Certificate>(entity =>
+        {
+            entity.HasKey(e => e.CertificateId);
 
+            entity.HasIndex(e => e.UserId, "UQ_Certificates_UserId").IsUnique();
+
+            entity.Property(e => e.CertificateType)
+                .HasMaxLength(20)
+                .IsUnicode(false);
+            entity.Property(e => e.FileName).HasMaxLength(255);
+            entity.Property(e => e.FilePath)
+                .HasMaxLength(500)
+                .IsUnicode(false);
+            entity.Property(e => e.ContentType)
+                .HasMaxLength(100)
+                .IsUnicode(false);
+            entity.Property(e => e.UploadedAt).HasDefaultValueSql("(getutcdate())");
+
+            entity.HasOne(d => d.User).WithMany(p => p.Certificates)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_Certificates_Users");
+        });
         modelBuilder.Entity<DoctorAssignment>(entity =>
         {
             entity.HasKey(e => new { e.RaceId, e.DoctorId });
@@ -132,7 +156,7 @@ public partial class HRTMSDbContext : DbContext
         {
             entity.HasKey(e => e.DoctorId);
 
-            entity.HasIndex(e => e.MedicalLicenseNumber, "UQ_DoctorProfiles_License").IsUnique();
+     
 
             entity.Property(e => e.DoctorId).ValueGeneratedNever();
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
@@ -287,8 +311,7 @@ public partial class HRTMSDbContext : DbContext
         {
             entity.HasKey(e => e.JockeyId);
 
-            entity.HasIndex(e => e.LicenseCertificate, "UQ_JockeyProfiles_License").IsUnique();
-
+        
             entity.Property(e => e.JockeyId).ValueGeneratedNever();
             entity.Property(e => e.BloodType)
                 .HasMaxLength(5)

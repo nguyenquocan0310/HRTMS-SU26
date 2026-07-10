@@ -26,6 +26,7 @@ public class AuthService : IAuthService
     private readonly ITokenBlacklistService _tokenBlacklistService;
     private readonly IEmailService _emailService;
     private readonly INotificationService _notificationService;
+    private readonly IFileStorageService _fileStorageService;
     private readonly IConfiguration _config;
     private readonly byte[] _encryptionKey;
 
@@ -42,6 +43,10 @@ public class AuthService : IAuthService
     private static readonly string[] RolesRequireFrdAtRegister =
         ["Owner", "Jockey", "Referee", "Doctor"];
 
+    // Role bắt buộc upload file chứng chỉ/bằng cấp khi đăng ký (ACC.1A).
+    private static readonly string[] RolesRequireCertificate =
+        ["Jockey", "Referee", "Doctor"];
+
     private const int MaxFailedAttempts = 5;
     private const int LockoutMinutes = 30;
 
@@ -56,6 +61,7 @@ public class AuthService : IAuthService
         ITokenBlacklistService tokenBlacklistService,
         IEmailService emailService,
         INotificationService notificationService,
+        IFileStorageService fileStorageService,
         IConfiguration configuration)
     {
         _context = context;
@@ -66,6 +72,7 @@ public class AuthService : IAuthService
         _tokenBlacklistService = tokenBlacklistService;
         _emailService = emailService;
         _notificationService = notificationService;
+        _fileStorageService = fileStorageService;
         _config = configuration;
 
         var keyHex = configuration["Security:IdentityEncryptionKeyHex"];
@@ -155,6 +162,13 @@ public class AuthService : IAuthService
                 return ApiResponse<int>.Fail(identityError);
         }
 
+        if (RolesRequireCertificate.Contains(dto.Role))
+        {
+            if (dto.CertificateFile == null || dto.CertificateFile.Length == 0)
+                return ApiResponse<int>.Fail(
+                    $"Role {dto.Role} bắt buộc phải upload file chứng chỉ/bằng cấp.");
+        }
+
         var normalizedEmail = dto.Email.Trim().ToLower();
         var normalizedPhone = dto.PhoneNumber?.Trim();
 
@@ -204,7 +218,7 @@ public class AuthService : IAuthService
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            await CreateRoleProfileAsync(user.UserId, dto.Role, dto, now);
+            await CreateRoleProfileAsync(user.UserId, dto.Role, dto, now, dto.CertificateFile);
 
             if (RolesRequireFrdAtRegister.Contains(dto.Role)
                 && dto.FamilyDeclarations != null
@@ -327,15 +341,19 @@ public class AuthService : IAuthService
             var registerDto = new RegisterDto
             {
                 Role = dto.Role,
-                LicenseCertificate = dto.LicenseCertificate,
                 ExperienceYears = dto.ExperienceYears,
                 SelfDeclaredWeight = dto.SelfDeclaredWeight,
                 BloodType = dto.BloodType,
-                HealthStatus = dto.HealthStatus,
-                CertificationLevel = dto.CertificationLevel,
-                MedicalLicenseNumber = dto.MedicalLicenseNumber
+                HealthStatus = dto.HealthStatus
             };
-            await CreateRoleProfileAsync(user.UserId, dto.Role, registerDto, now);
+            // Admin tạo tài khoản trực tiếp (đã được Admin xác thực thủ công) —
+            // không bắt buộc upload file chứng chỉ như luồng tự đăng ký (ACC.1A).
+            // Text gốc do Admin nhập (nếu có) vẫn được lưu tạm vào cột *Profiles.*
+            // để tương thích ngược; nếu cần minh chứng file, Admin có thể yêu cầu
+            // user bổ sung sau qua chức năng cập nhật hồ sơ.
+            await CreateRoleProfileAsync(
+                user.UserId, dto.Role, registerDto, now,
+                fallbackCertificateName: dto.LicenseCertificate ?? dto.CertificationLevel ?? dto.MedicalLicenseNumber);
 
             await transaction.CommitAsync();
 
@@ -478,10 +496,26 @@ public class AuthService : IAuthService
 
         return (result, hash);
     }
-
     private async Task CreateRoleProfileAsync(
-        int userId, string role, RegisterDto dto, DateTime now)
+        int userId, string role, RegisterDto dto, DateTime now,
+        Microsoft.AspNetCore.Http.IFormFile? certificateFile = null,
+        string? fallbackCertificateName = null)
     {
+        // Tên hiển thị lưu tạm vào cột text của *Profiles (tương thích ngược):
+        // ưu tiên tên file gốc do người dùng upload, nếu không có (vd Admin tạo
+        // tài khoản không kèm file) thì dùng fallback do Admin nhập tay.
+        // Cột đích là varchar(50) không hỗ trợ Unicode → phải strip ký tự có dấu.
+        string CertificateDisplayName(string defaultValue)
+        {
+            var name = certificateFile?.FileName ?? fallbackCertificateName;
+            if (string.IsNullOrWhiteSpace(name)) return defaultValue;
+
+            var asciiOnly = new string(name.Where(c => c < 128).ToArray()).Trim();
+            if (string.IsNullOrWhiteSpace(asciiOnly)) asciiOnly = $"certificate_{userId}";
+
+            return asciiOnly.Length > 50 ? asciiOnly[..50] : asciiOnly;
+        }
+
         switch (role)
         {
             case "Spectator":
@@ -521,7 +555,7 @@ public class AuthService : IAuthService
                 _context.JockeyProfiles.Add(new JockeyProfile
                 {
                     JockeyId = userId,
-                    LicenseCertificate = dto.LicenseCertificate ?? string.Empty,
+                    LicenseCertificate = CertificateDisplayName("Chưa cung cấp"),
                     ExperienceYears = dto.ExperienceYears ?? 0,
                     SelfDeclaredWeight = dto.SelfDeclaredWeight ?? 0,
                     BloodType = dto.BloodType,
@@ -537,7 +571,7 @@ public class AuthService : IAuthService
                 _context.RefereeProfiles.Add(new RefereeProfile
                 {
                     RefereeId = userId,
-                    CertificationLevel = dto.CertificationLevel ?? string.Empty,
+                    CertificationLevel = CertificateDisplayName("Chưa cung cấp"),
                     Status = "Pending",
                     CreatedAt = now,
                     UpdatedAt = now
@@ -549,7 +583,7 @@ public class AuthService : IAuthService
                 _context.DoctorProfiles.Add(new DoctorProfile
                 {
                     DoctorId = userId,
-                    MedicalLicenseNumber = dto.MedicalLicenseNumber ?? string.Empty,
+                    MedicalLicenseNumber = CertificateDisplayName("Chưa cung cấp"),
                     Status = "Pending",
                     CreatedAt = now,
                     UpdatedAt = now
@@ -559,6 +593,27 @@ public class AuthService : IAuthService
 
             case "Admin":
                 break;
+        }
+
+        // Lưu file chứng chỉ thật (nếu có) vào bảng Certificates — áp dụng cho
+        // Jockey/Referee/Doctor. Lưu file ra đĩa TRƯỚC, insert DB SAU; nếu insert
+        // lỗi thì transaction ngoài sẽ rollback DB (file mồ côi sẽ được dọn định kỳ).
+        if (certificateFile != null && certificateFile.Length > 0
+            && role is "Jockey" or "Referee" or "Doctor")
+        {
+            var saved = await _fileStorageService.SaveCertificateAsync(certificateFile, userId, role);
+
+            _context.Certificates.Add(new Certificate
+            {
+                UserId = userId,
+                CertificateType = role,
+                FileName = saved.FileName,
+                FilePath = saved.FilePath,
+                ContentType = saved.ContentType,
+                FileSizeBytes = saved.FileSizeBytes,
+                UploadedAt = now
+            });
+            await _context.SaveChangesAsync();
         }
     }
 

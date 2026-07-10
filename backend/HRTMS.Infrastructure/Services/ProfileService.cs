@@ -119,6 +119,24 @@ public class ProfileService : IProfileService
     // =========================================================
     private async Task<object?> GetRoleProfileAsync(int userId, string role)
     {
+        object? certificate = null;
+        if (role is "Jockey" or "Referee" or "Doctor")
+        {
+            certificate = await _context.Certificates
+                .AsNoTracking()
+                .Where(c => c.UserId == userId)
+                .Select(c => new
+                {
+                    c.CertificateId,
+                    c.FileName,
+                    c.ContentType,
+                    c.FileSizeBytes,
+                    c.UploadedAt,
+                    DownloadUrl = $"/api/certificates/{c.CertificateId}/download"
+                })
+                .FirstOrDefaultAsync();
+        }
+
         return role switch
         {
             "Jockey" => await _context.JockeyProfiles
@@ -130,7 +148,8 @@ public class ProfileService : IProfileService
                     j.SelfDeclaredWeight,
                     j.BloodType,
                     j.HealthStatus,
-                    j.Status
+                    j.Status,
+                    Certificate = certificate
                 })
                 .FirstOrDefaultAsync(),
 
@@ -151,7 +170,8 @@ public class ProfileService : IProfileService
                 .Where(r => r.RefereeId == userId)
                 .Select(r => new {
                     r.CertificationLevel,
-                    r.Status
+                    r.Status,
+                    Certificate = certificate
                 })
                 .FirstOrDefaultAsync(),
 
@@ -160,7 +180,8 @@ public class ProfileService : IProfileService
                 .Where(d => d.DoctorId == userId)
                 .Select(d => new {
                     d.MedicalLicenseNumber,
-                    d.Status
+                    d.Status,
+                    Certificate = certificate
                 })
                 .FirstOrDefaultAsync(),
 

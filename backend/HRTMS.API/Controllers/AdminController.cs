@@ -472,6 +472,18 @@ public class AdminController : ControllerBase
     [HttpGet("pending-approvals")]
     public async Task<IActionResult> GetPendingApprovals()
     {
+        var certificatesByUser = await _context.Certificates
+            .AsNoTracking()
+            .ToDictionaryAsync(c => c.UserId, c => new
+            {
+                c.CertificateId,
+                c.FileName,
+                c.ContentType,
+                c.FileSizeBytes,
+                c.UploadedAt,
+                DownloadUrl = $"/api/certificates/{c.CertificateId}/download"
+            });
+
         var referees = await _context.RefereeProfiles
             .Where(r => r.Status == "Pending")
             .Join(_context.Users,
@@ -526,14 +538,55 @@ public class AdminController : ControllerBase
                 })
             .ToListAsync();
 
+        // Đính kèm thông tin file chứng chỉ đã upload (nếu có) để Admin xem trực tiếp
+        // khi duyệt hồ sơ, thay vì chỉ thấy tên file dạng text.
+        var refereesWithCert = referees.Select(r => new
+        {
+            r.UserId,
+            r.Username,
+            r.FullName,
+            r.Email,
+            r.Role,
+            r.ProfileStatus,
+            r.CertificationLevel,
+            r.CreatedAt,
+            Certificate = certificatesByUser.GetValueOrDefault(r.UserId)
+        });
+
+        var doctorsWithCert = doctors.Select(d => new
+        {
+            d.UserId,
+            d.Username,
+            d.FullName,
+            d.Email,
+            d.Role,
+            d.ProfileStatus,
+            d.CertificationLevel,
+            d.CreatedAt,
+            Certificate = certificatesByUser.GetValueOrDefault(d.UserId)
+        });
+
+        var jockeysWithCert = jockeys.Select(j => new
+        {
+            j.UserId,
+            j.Username,
+            j.FullName,
+            j.Email,
+            j.Role,
+            j.ProfileStatus,
+            j.CertificationLevel,
+            j.CreatedAt,
+            Certificate = certificatesByUser.GetValueOrDefault(j.UserId)
+        });
+
         return Ok(new
         {
             success = true,
             data = new
             {
-                referees,
-                doctors,
-                jockeys,
+                referees = refereesWithCert,
+                doctors = doctorsWithCert,
+                jockeys = jockeysWithCert,
                 totalPending = referees.Count + doctors.Count + jockeys.Count
             }
         });

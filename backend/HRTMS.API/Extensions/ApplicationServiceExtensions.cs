@@ -13,6 +13,7 @@ public static class ApplicationServiceExtensions
         IConfiguration configuration)
     {
         services.AddScoped<JwtService>();
+        services.AddScoped<IFileStorageService, FileStorageService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IFamilyDeclarationValidator, FamilyDeclarationValidator>();
         services.AddScoped<IFamilyDeclarationService, FamilyDeclarationService>();
