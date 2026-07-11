@@ -21,6 +21,10 @@ public partial class Race
 
     public string Status { get; set; } = null!;
 
+    // Module H mở rộng (UI-S07 Live Race Simulation): thời điểm Referee thực sự
+    // bấm "Start Race" (Live), khác ScheduledTime (giờ dự kiến). NULL nếu chưa Live.
+    public DateTime? ActualStartTime { get; set; }
+
     public bool IsPostPositionDrawn { get; set; }
 
     public bool IsPredictionGateClosed { get; set; }
