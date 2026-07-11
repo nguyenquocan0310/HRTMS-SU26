@@ -160,11 +160,8 @@ export default function DoctorDashboard() {
           </div>
         </div>
 
-        {/* Thẻ 2: Chờ kiểm tra - Clickable */}
-        <button
-          onClick={() => navigate('/doctor/paddock')}
-          className="bg-white border border-gray-200 rounded-lg p-5 flex items-center justify-between shadow-sm transition-colors hover:border-blue-200 hover:bg-blue-50/30 text-left focus:outline-none focus:ring-2 focus:ring-blue-200"
-        >
+        {/* Thẻ 2: Sắp diễn ra */}
+        <div className="bg-white border border-gray-200 rounded-lg p-5 flex items-center justify-between shadow-sm transition-colors hover:border-blue-200 hover:bg-blue-50/30">
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sắp diễn ra</p>
             <p className="text-3xl font-bold text-gray-900 mt-2">
@@ -173,7 +170,7 @@ export default function DoctorDashboard() {
               ).length}
             </p>
           </div>
-        </button>
+        </div>
 
         {/* Thẻ 3: Đang diễn ra */}
         <div className="bg-white border border-gray-200 rounded-lg p-5 flex items-center justify-between shadow-sm transition-colors hover:border-blue-200 hover:bg-blue-50/30">
@@ -301,15 +298,6 @@ export default function DoctorDashboard() {
               </table>
             </div>
           )}
-
-          <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
-            <button
-              onClick={() => navigate('/doctor/paddock')}
-              className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1 focus:outline-none"
-            >
-              Xem bàn điều khiển Paddock
-            </button>
-          </div>
         </div>
       </div>
     </div>

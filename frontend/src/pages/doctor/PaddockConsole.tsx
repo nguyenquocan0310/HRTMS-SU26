@@ -243,7 +243,7 @@ export default function PaddockConsole() {
       const res = await updatePreRaceWeight(entry.raceEntryId, preRaceJockeyWeight)
       updateEntry(entry.raceEntryId, {
         selfDeclaredWeight: res.selfDeclaredWeight ?? entry.selfDeclaredWeight,
-        preRaceJockeyWeight: res.preRaceJockeyWeight ?? preRaceJockeyWeight,
+        preRaceJockeyWeight: res.preRaceJockeyWeight ?? res.preRaceWeight ?? preRaceJockeyWeight,
         weightDifference: res.weightDifference ?? entry.weightDifference,
         thresholdKg: res.thresholdKg ?? entry.thresholdKg,
         isWeightWarning: Boolean(res.isWeightWarning),
@@ -271,7 +271,8 @@ export default function PaddockConsole() {
     try {
       const res = await updateHorseIdentity(entry.raceEntryId, horseIdentityCheckStatus)
       updateEntry(entry.raceEntryId, {
-        horseIdentityCheckStatus: res.horseIdentityCheckStatus ?? horseIdentityCheckStatus,
+        horseIdentityCheckStatus:
+          res.horseIdentityCheckStatus ?? res.horseIdentityStatus ?? horseIdentityCheckStatus,
         isEmergencyDisqualified: Boolean(res.isEmergencyDisqualified),
         raceEntryStatus: res.raceEntryStatus ?? entry.raceEntryStatus,
         message: res.message,
