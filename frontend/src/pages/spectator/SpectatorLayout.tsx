@@ -1,4 +1,3 @@
-import React from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import useAuthStore from '../../store/authStore'
 
@@ -85,6 +84,7 @@ export default function SpectatorLayout() {
               <span className="text-lg">📋</span>
               <span>Lịch sử dự đoán</span>
             </NavLink>
+
           </nav>
         </div>
 
