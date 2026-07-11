@@ -454,12 +454,37 @@ public class HorseService : IHorseService
     // ADMIN
     // -------------------------------------------------------------------------
 
-    public async Task<ApiResponse<List<HorseEnrollmentResponseDto>>> GetPendingEnrollmentsAsync(int page, int pageSize)
+    public Task<ApiResponse<List<HorseEnrollmentResponseDto>>> GetPendingEnrollmentsAsync(int page, int pageSize)
+        => GetEnrollmentsAsync(null, "Pending", page, pageSize);
+
+    public async Task<ApiResponse<List<HorseEnrollmentResponseDto>>> GetEnrollmentsAsync(
+        int? tournamentId, string? status, int page, int pageSize)
     {
-        var entries = await _context.HorseTournamentEntries
+        page = page < 1 ? 1 : page;
+        pageSize = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
+
+        var validStatuses = new[] { "Pending", "Approved", "Rejected" };
+        string? normalizedStatus = null;
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            normalizedStatus = validStatuses.FirstOrDefault(
+                s => string.Equals(s, status.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (normalizedStatus == null)
+                throw new ArgumentException("INVALID_ENROLLMENT_STATUS");
+        }
+
+        var query = _context.HorseTournamentEntries
             .Include(e => e.Horse)
             .Include(e => e.Tournament)
-            .Where(e => e.AdminApprovalStatus == "Pending")
+            .AsQueryable();
+
+        if (tournamentId.HasValue)
+            query = query.Where(e => e.TournamentId == tournamentId.Value);
+
+        if (normalizedStatus != null)
+            query = query.Where(e => e.AdminApprovalStatus == normalizedStatus);
+
+        var entries = await query
             .OrderByDescending(e => e.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
