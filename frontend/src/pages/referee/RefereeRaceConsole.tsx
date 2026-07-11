@@ -305,7 +305,10 @@ export default function RefereeRaceConsole() {
 
   const liveState = liveStatus?.status?.toLowerCase() ?? '';
   const isLive = liveState === 'live';
-  const isFinished = liveState === 'finished' || liveState === 'completed';
+  const isUnofficial = liveState === 'unofficial';
+  const isOfficial = liveState === 'official';
+  const isFinished =
+    liveState === 'finished' || liveState === 'completed' || isUnofficial || isOfficial;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -381,12 +384,22 @@ export default function RefereeRaceConsole() {
                   className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
                     isLive
                       ? 'border-red-100 bg-red-50 text-red-700'
-                      : isFinished
+                      : isUnofficial
+                        ? 'border-amber-200 bg-amber-50 text-amber-700'
+                        : isFinished
                         ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
                         : 'border-blue-100 bg-blue-50 text-blue-700'
                   }`}
                 >
-                  {isLive ? 'Đang diễn ra' : isFinished ? 'Đã hoàn thành' : liveStatus.status}
+                  {isLive
+                    ? 'Đang diễn ra'
+                    : isUnofficial
+                      ? 'Kết quả tạm thời'
+                      : isOfficial
+                        ? 'Kết quả chính thức'
+                        : isFinished
+                          ? 'Đã hoàn thành'
+                          : liveStatus.status}
                 </span>
               )}
             </div>
