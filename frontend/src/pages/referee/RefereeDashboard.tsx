@@ -107,11 +107,6 @@ export default function RefereeDashboard() {
         ))}
       </div>
 
-      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-        Module H/I Live Race & Protest chưa có API trong Swagger, nên UI Referee hiện chỉ demo phần assignment,
-        COI, independence check và confirm starting list.
-      </div>
-
       <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
           <div>
