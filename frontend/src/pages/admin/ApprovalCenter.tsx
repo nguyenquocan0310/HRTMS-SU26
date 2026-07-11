@@ -7,7 +7,7 @@ import RosterApprovalTable from './RosterApprovalTable';
 import {
   getPendingHorses,
   getPendingApprovals,
-  type HorsePending,
+  type HorseEnrollmentPending,
   type PersonPending,
 } from '../../services/approvalService';
 import styles from './ApprovalCenter.module.scss';
@@ -18,12 +18,15 @@ export type AccountSubTab = 'jockey' | 'onboarding';
 
 export interface HorseApproval {
   id: string;
-  entityId: number;
+  entityId: number; // = enrollmentId, dùng để approve/reject
+  horseId: number;  // dùng để gọi chi tiết ngựa riêng (GET /admin/horses/{horseId})
   type: 'horse';
   subject: string;
   submittedDate: string;
   stable: string;
   status: StatusType;
+  // breed/dopingTestResult/vaccinationRecordRef không có sẵn từ danh sách
+  // pending nữa — load riêng ở Detail Panel qua getHorseDetail().
   breed: string;
   allowedBreed: string;
   dopingTestResult: 'Passed' | 'Failed' | 'Pending' | string;
@@ -62,18 +65,19 @@ export type ApprovalItem = HorseApproval | JockeyApproval | OnboardingApproval;
 const formatDate = (iso: string): string =>
   iso ? new Date(iso).toLocaleDateString('vi-VN') : '—';
 
-const mapHorse = (h: HorsePending): HorseApproval => ({
-  id: `h${h.horseId}`,
-  entityId: h.horseId,
+const mapHorse = (h: HorseEnrollmentPending): HorseApproval => ({
+  id: `h${h.enrollmentId}`,
+  entityId: h.enrollmentId,
+  horseId: h.horseId,
   type: 'horse',
-  subject: h.name,
+  subject: h.horseName,
   submittedDate: formatDate(h.createdAt),
-  stable: `Owner #${h.ownerId}`,
-  status: h.adminApprovalStatus as StatusType,
-  breed: h.breed,
-  allowedBreed: h.breed,
-  dopingTestResult: h.dopingTestResult || 'Pending',
-  vaccinationRecordRef: h.vaccinationRecordRef,
+  stable: h.tournamentName, // không có ownerId trong DTO này, dùng tên giải thay thế
+  status: h.adminApprovalStatus as StatusType, // đúng field duyệt, không dùng h.status
+  breed: '',
+  allowedBreed: '',
+  dopingTestResult: 'Pending',
+  vaccinationRecordRef: '',
   entryFeeStatus: 'Paid',
 });
 
@@ -177,7 +181,12 @@ const ApprovalCenter = () => {
     },
     {
       key: 'stable',
-      header: activeGroup === 'account' && accountSubTab === 'onboarding' ? 'Role' : 'Origin / Stable',
+      header:
+        activeGroup === 'account' && accountSubTab === 'onboarding'
+          ? 'Role'
+          : activeGroup === 'horse'
+          ? 'Tournament'
+          : 'Origin / Stable',
       render: (row) => row.stable,
     },
     {
