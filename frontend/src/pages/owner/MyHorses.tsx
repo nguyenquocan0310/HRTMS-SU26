@@ -118,8 +118,8 @@ const HorseRowCard: React.FC<HorseRowCardProps> = ({ horse, status, onViewDetail
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:border-blue-200 hover:shadow-sm transition-all">
-      <div className="px-4 py-3 border-b border-gray-100 flex items-start justify-between gap-2">
+    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden hover:border-blue-200 hover:shadow-sm transition-all">
+      <div className="px-5 py-4 border-b border-slate-100 flex items-start justify-between gap-2">
         <div>
           <h3 className="text-sm font-bold text-gray-900 leading-tight">{horse.name}</h3>
           <p className="text-xs text-gray-400 mt-0.5">Hồ sơ #{horseId || '—'}</p>
@@ -127,7 +127,7 @@ const HorseRowCard: React.FC<HorseRowCardProps> = ({ horse, status, onViewDetail
         <Badge {...profileBadge} />
       </div>
 
-      <div className="px-4 py-3 space-y-1.5">
+      <div className="px-5 py-4 space-y-2">
         {[
           { label: 'Giống', value: horse.breed || (horse as any).breedCode || '—' },
           { label: 'Giới tính', value: getGenderLabel(horse.gender) },
@@ -154,16 +154,16 @@ const HorseRowCard: React.FC<HorseRowCardProps> = ({ horse, status, onViewDetail
         )}
       </div>
 
-      <div className="px-4 pb-3 grid grid-cols-1 gap-2">
+      <div className="px-5 pb-5 grid grid-cols-1 gap-2">
         <button
           onClick={() => onEnroll(horse)}
-          className="w-full text-xs font-semibold text-green-700 border border-green-200 bg-green-50 hover:bg-green-100 py-1.5 rounded transition-colors"
+          className="w-full text-xs font-bold text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 py-2 rounded-xl transition-colors"
         >
           Đăng ký vào giải
         </button>
         <button
           onClick={() => onViewDetail(horseId)}
-          className="w-full text-xs font-semibold text-blue-600 border border-blue-200 bg-blue-50 hover:bg-blue-100 py-1.5 rounded transition-colors"
+          className="w-full text-xs font-bold text-blue-700 border border-blue-200 bg-blue-50 hover:bg-blue-100 py-2 rounded-xl transition-colors"
         >
           Xem chi tiết
         </button>
@@ -407,13 +407,13 @@ const MyHorses: React.FC = () => {
       <div>
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Ngựa của tôi</h1>
+            <h1 className="text-3xl font-black tracking-tight text-slate-950">Ngựa của tôi</h1>
             <p className="text-sm text-gray-500 mt-0.5">Danh sách hồ sơ ngựa trong kho</p>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="bg-white border border-gray-200 rounded-lg p-4 animate-pulse">
+            <div key={i} className="bg-white border border-slate-200 rounded-2xl p-5 animate-pulse">
               <div className="flex justify-between mb-3">
                 <div className="h-4 bg-gray-200 rounded w-1/2" />
                 <div className="h-4 bg-gray-100 rounded-full w-16" />
@@ -433,31 +433,31 @@ const MyHorses: React.FC = () => {
       <div>
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Ngựa của tôi</h1>
+            <h1 className="text-3xl font-black tracking-tight text-slate-950">Ngựa của tôi</h1>
             <p className="text-sm text-gray-500 mt-0.5">Danh sách hồ sơ ngựa trong kho</p>
           </div>
-          <button onClick={handleRegisterHorse} className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">+ Tạo hồ sơ ngựa</button>
+          <button onClick={handleRegisterHorse} className="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-full transition-colors">Tạo hồ sơ ngựa</button>
         </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-10 text-center">
+        <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center">
           <p className="text-sm font-semibold text-gray-700 mb-1">{error || 'Bạn chưa có hồ sơ ngựa nào.'}</p>
           <p className="text-xs text-gray-500 mb-4">Tạo hồ sơ ngựa trước, sau đó đăng ký ngựa vào giải tại màn này.</p>
-          <button onClick={handleRegisterHorse} className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">Tạo hồ sơ ngựa đầu tiên</button>
+          <button onClick={handleRegisterHorse} className="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-full transition-colors">Tạo hồ sơ ngựa đầu tiên</button>
         </div>
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-gray-900">Ngựa của tôi</h1>
+            <h1 className="text-3xl font-black tracking-tight text-slate-950">Ngựa của tôi</h1>
             <span className="px-2 py-0.5 text-xs font-semibold bg-gray-100 text-gray-600 rounded-full">{horses.length}</span>
           </div>
           <p className="text-sm text-gray-500 mt-0.5">Quản lý hồ sơ ngựa và đăng ký từng ngựa vào giải phù hợp.</p>
         </div>
-        <button onClick={handleRegisterHorse} className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">+ Tạo hồ sơ ngựa mới</button>
+        <button onClick={handleRegisterHorse} className="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-full transition-colors">Tạo hồ sơ ngựa mới</button>
       </div>
 
       {error && <div className="mb-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">{error}</div>}

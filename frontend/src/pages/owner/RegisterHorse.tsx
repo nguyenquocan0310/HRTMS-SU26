@@ -90,7 +90,7 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
 
 function CreatedResult({ result }: { result: HorseCreateResponse }) {
   return (
-    <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-3">
+    <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 space-y-3">
       <div className="flex items-center gap-2">
         <span className="w-2 h-2 rounded-full flex-shrink-0 bg-green-500" />
         <div>
@@ -166,7 +166,8 @@ export default function RegisterHorse() {
         weight: formData.weight as number,
         identifyingMarks: formData.identifyingMarks,
         breed: formData.breedCode,
-        vaccinationRecordRef: formData.vaccinationRecordRef || undefined,
+        // Backend hiện vẫn Required field này, nhưng nghiệp vụ Owner không bắt buộc nhập.
+        vaccinationRecordRef: formData.vaccinationRecordRef.trim() || 'Not provided',
         dopingTestDate: formData.dopingTestDate || undefined,
         dopingTestResult: formData.dopingTestResult,
         legalConsentAccepted: formData.legalConsentAccepted,
@@ -181,16 +182,16 @@ export default function RegisterHorse() {
   };
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-5xl">
       <div className="mb-6">
         <button
           onClick={() => navigate('/owner/horses')}
-          className="text-sm text-blue-600 hover:text-blue-700 font-medium mb-3 flex items-center gap-1"
+          className="text-sm text-blue-700 hover:text-blue-800 font-bold mb-4"
         >
-          ← Quay lại danh sách
+          Quay lại danh sách
         </button>
-        <h1 className="text-xl font-bold text-gray-900">Đăng ký ngựa mới</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
+        <h1 className="text-3xl font-black tracking-tight text-slate-950">Đăng ký hồ sơ ngựa</h1>
+        <p className="text-base text-slate-500 mt-2">
           Tạo hồ sơ ngựa dùng lại trong kho. Việc đăng ký ngựa vào giải thực hiện tại màn Ngựa của tôi.
         </p>
       </div>
@@ -202,7 +203,7 @@ export default function RegisterHorse() {
             <button
               type="button"
               onClick={() => navigate('/owner/horses')}
-              className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+              className="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-full transition-colors"
             >
               Xem danh sách ngựa →
             </button>
@@ -212,7 +213,7 @@ export default function RegisterHorse() {
                 setCreatedHorse(null);
                 setFormData(initialFormData);
               }}
-              className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-5 py-2.5 text-sm font-bold text-slate-700 border border-slate-300 rounded-full hover:bg-slate-50 transition-colors"
             >
               Tạo hồ sơ ngựa khác
             </button>
@@ -228,8 +229,8 @@ export default function RegisterHorse() {
 
       {!createdHorse && (
         <form onSubmit={handleSubmit}>
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+          <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden">
+            <div className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
               <SectionHeader>Thông tin cơ bản</SectionHeader>
 
               <Field label="Tên ngựa" required>
@@ -270,7 +271,7 @@ export default function RegisterHorse() {
 
               <SectionHeader>Thông tin y tế</SectionHeader>
 
-              <Field label="Mã tham chiếu hồ sơ tiêm chủng">
+              <Field label="Mã tham chiếu hồ sơ tiêm chủng" hint="Không bắt buộc. Nếu bỏ trống, hệ thống sẽ ghi nhận là chưa cung cấp.">
                 <input type="text" name="vaccinationRecordRef" value={formData.vaccinationRecordRef} onChange={handleInputChange} placeholder="Không bắt buộc" className={inputCls} />
               </Field>
 
@@ -291,11 +292,11 @@ export default function RegisterHorse() {
               </div>
             </div>
 
-            <div className="px-5 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
-              <button type="button" onClick={() => navigate('/owner/horses')} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-white transition-colors">
+            <div className="px-6 md:px-8 py-5 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
+              <button type="button" onClick={() => navigate('/owner/horses')} className="px-5 py-2.5 text-sm font-bold text-slate-700 border border-slate-300 rounded-full hover:bg-white transition-colors">
                 Hủy bỏ
               </button>
-              <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:bg-blue-300 disabled:cursor-not-allowed flex items-center gap-2">
+              <button type="submit" disabled={loading} className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-full transition-colors disabled:bg-blue-300 disabled:cursor-not-allowed flex items-center gap-2">
                 {loading && <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white" />}
                 {loading ? 'Đang tạo hồ sơ...' : 'Tạo hồ sơ ngựa'}
               </button>

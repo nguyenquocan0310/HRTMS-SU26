@@ -184,21 +184,21 @@ export default function HorseDetail() {
   ];
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-5xl">
       {/* Back link */}
       <button
         onClick={() => navigate('/owner/horses')}
-        className="text-sm text-blue-600 hover:text-blue-700 font-medium mb-4 flex items-center gap-1"
+        className="text-sm text-blue-700 hover:text-blue-800 font-bold mb-5"
       >
-        ← Quay lại danh sách
+        Quay lại danh sách
       </button>
 
       {/* Page header */}
-      <div className="flex items-start justify-between gap-4 mb-4">
+      <div className="flex items-start justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">{horse.name}</h1>
+          <h1 className="text-3xl font-black tracking-tight text-slate-950">{horse.name}</h1>
           {horse.identifyingMarks && (
-            <p className="text-xs text-gray-500 mt-0.5">{horse.identifyingMarks}</p>
+            <p className="text-sm text-slate-500 mt-2">{horse.identifyingMarks}</p>
           )}
         </div>
         {/* Hai badge riêng biệt: Hồ sơ và Trong giải */}
@@ -218,7 +218,7 @@ export default function HorseDetail() {
 
       {/* Rejection reason (hồ sơ bị từ chối) */}
       {profileStatus === 'Rejected' && horse.rejectionReason && (
-        <div className="mb-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-2xl px-5 py-4">
           <p className="text-xs font-semibold text-red-700 mb-0.5">Lý do từ chối hồ sơ</p>
           <p className="text-sm text-red-700">{horse.rejectionReason}</p>
         </div>
@@ -226,7 +226,7 @@ export default function HorseDetail() {
 
       {/* Rejection reason (enrollment bị từ chối) */}
       {latestEnrollment?.adminApprovalStatus === 'Rejected' && latestEnrollment.rejectionReason && (
-        <div className="mb-4 bg-orange-50 border border-orange-200 rounded-lg px-4 py-3">
+        <div className="mb-4 bg-orange-50 border border-orange-200 rounded-2xl px-5 py-4">
           <p className="text-xs font-semibold text-orange-700 mb-0.5">Lý do từ chối trong giải</p>
           <p className="text-sm text-orange-700">{latestEnrollment.rejectionReason}</p>
         </div>
@@ -234,7 +234,7 @@ export default function HorseDetail() {
 
       {/* Enrollment info panel (nếu có) */}
       {latestEnrollment && (
-        <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+        <div className="mb-5 bg-blue-50 border border-blue-200 rounded-2xl px-5 py-4">
           <p className="text-xs font-semibold text-blue-700 mb-1">Thông tin giải đang tham gia</p>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-blue-800">
             {latestEnrollment.tournamentName && (
@@ -254,13 +254,13 @@ export default function HorseDetail() {
       )}
 
       {/* Detail panel */}
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden mb-4">
-        <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
+      <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden mb-5">
+        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Thông tin chi tiết</p>
         </div>
         <div className="divide-y divide-gray-100">
           {fields.map((f) => (
-            <div key={f.label} className="flex items-center px-5 py-3 text-sm">
+            <div key={f.label} className="flex items-center px-6 py-4 text-sm">
               <span className="w-44 text-gray-500 flex-shrink-0">{f.label}</span>
               <span className="text-gray-800 font-medium">{f.value}</span>
             </div>
@@ -272,7 +272,7 @@ export default function HorseDetail() {
       <div className="flex gap-3 justify-end">
         <button
           onClick={() => navigate('/owner/horses')}
-          className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          className="px-5 py-2.5 text-sm font-bold text-slate-700 border border-slate-300 rounded-full hover:bg-slate-50 transition-colors"
         >
           Quay lại
         </button>
@@ -280,7 +280,7 @@ export default function HorseDetail() {
           onClick={() =>
             navigate(`/owner/horses/edit/${(horse as any).horseId || horse.horseID || id || ''}`)
           }
-          className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+          className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-full transition-colors"
         >
           Cập nhật thông tin
         </button>
