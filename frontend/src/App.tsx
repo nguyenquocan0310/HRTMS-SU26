@@ -60,6 +60,7 @@ import SpectatorHome from './pages/spectator/SpectatorHome'
 import PredictionPage from './pages/spectator/PredictionPage'
 import WalletTransactions from './pages/spectator/WalletTransactions'
 import MyPredictions from './pages/spectator/MyPredictions'
+import SpectatorLiveRace from './pages/spectator/SpectatorLiveRace'
 import RaceOperations from './pages/admin/RaceOperation'
 import EntryFees from './pages/admin/EntryFees'
 
@@ -178,6 +179,7 @@ export default function App() {
           <Route path="prediction" element={<PredictionPage />} />
           <Route path="wallet" element={<WalletTransactions />} />
           <Route path="my-predictions" element={<MyPredictions />} />
+          <Route path="live-race" element={<SpectatorLiveRace />} />
         </Route>
 
         {/* Admin */}
