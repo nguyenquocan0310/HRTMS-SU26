@@ -1,0 +1,331 @@
+using HRTMS.Core.DTOs.LiveRace;
+using HRTMS.Core.Entities;
+using HRTMS.Core.Interfaces.Services;
+using HRTMS.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
+
+namespace HRTMS.Infrastructure.Services;
+
+/// <summary>
+/// Module H mở rộng — UI-S07 Live Race Simulation.
+/// Theo live-race-simulation-guide.md:
+///   • Animation (vị trí % của ngựa trong lúc Live) là random walk client-side
+///     (setInterval 100ms), KHÔNG đồng bộ giữa các client, KHÔNG tính ở BE.
+///   • BE chỉ chịu trách nhiệm: (1) trạng thái + actualStartTime để FE biết khi
+///     nào bắt đầu chạy animation, (2) kết quả cuối (FinishPosition) để FE biết
+///     "về đích" đúng thứ tự khi status chuyển Unofficial, (3) Violation do
+///     Referee ghi nhận trong lúc Live (annotation layer độc lập, không ảnh
+///     hưởng thuật toán mô phỏng).
+///   • Owner/Jockey KHÔNG báo cáo vi phạm lúc Live — giữ nguyên Protest sau
+///     Unofficial (Phương án A, BR-16/EC-20/EC-27) — không đụng tới ở đây.
+/// </summary>
+public class LiveRaceService : ILiveRaceService
+{
+    private const string StatusUpcoming = "Upcoming";
+    private const string StatusPreRace = "Pre-Race";
+    private const string StatusLive = "Live";
+    private const string StatusUnofficial = "Unofficial";
+
+    private readonly HRTMSDbContext _context;
+
+    public LiveRaceService(HRTMSDbContext context)
+    {
+        _context = context;
+    }
+
+    // =====================================================================
+    // GET live status — public (mọi role đã đăng nhập đều xem được)
+    // =====================================================================
+    public async Task<LiveRaceStatusDto> GetLiveStatusAsync(int raceId)
+    {
+        var race = await _context.Races
+            .Include(r => r.RaceEntries).ThenInclude(e => e.Pairing).ThenInclude(p => p.Horse)
+            .Include(r => r.RaceEntries).ThenInclude(e => e.Pairing).ThenInclude(p => p.Jockey).ThenInclude(j => j.Jockey)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.RaceId == raceId)
+            ?? throw new KeyNotFoundException("RACE_NOT_FOUND");
+
+        var entries = race.RaceEntries
+            .Where(e => e.Status != "Cancelled")
+            .OrderBy(e => e.PostPosition ?? int.MaxValue)
+            .ThenBy(e => e.RaceEntryId)
+            .Select(e => new LiveRaceEntryDto
+            {
+                RaceEntryId = e.RaceEntryId,
+                PostPosition = e.PostPosition,
+                Status = e.Status,
+                IsWithdrawn = e.IsWithdrawn,
+                HorseId = e.Pairing.HorseId,
+                HorseName = e.Pairing.Horse.Name,
+                JockeyId = e.Pairing.JockeyId,
+                JockeyName = e.Pairing.Jockey.Jockey.FullName,
+                FinishPosition = e.FinishPosition,
+                FinishTime = e.FinishTime
+            })
+            .ToList();
+
+        return new LiveRaceStatusDto
+        {
+            RaceId = race.RaceId,
+            Status = race.Status,
+            ScheduledTime = race.ScheduledTime,
+            ActualStartTime = race.ActualStartTime,
+            Entries = entries
+        };
+    }
+
+    // =====================================================================
+    // Referee bấm Start Race: Upcoming/Pre-Race -> Live, set ActualStartTime
+    // =====================================================================
+    public async Task<StartRaceResultDto> StartRaceAsync(int raceId, int refereeId)
+    {
+        var race = await _context.Races.FirstOrDefaultAsync(r => r.RaceId == raceId)
+            ?? throw new KeyNotFoundException("RACE_NOT_FOUND");
+
+        await EnsureRefereeAssignedAsync(raceId, refereeId);
+
+        if (race.Status != StatusUpcoming && race.Status != StatusPreRace)
+            throw new InvalidOperationException("INVALID_RACE_STATE");
+
+        var now = DateTime.UtcNow;
+        race.Status = StatusLive;
+        race.ActualStartTime = now;
+        race.UpdatedAt = now;
+
+        await _context.SaveChangesAsync();
+
+        return new StartRaceResultDto
+        {
+            RaceId = race.RaceId,
+            Status = race.Status,
+            ActualStartTime = race.ActualStartTime!.Value
+        };
+    }
+
+    // =====================================================================
+    // Referee ghi nhận vi phạm trong lúc Live (Module H)
+    // =====================================================================
+    public async Task<ViolationDto> RecordViolationAsync(int raceId, int refereeId, CreateViolationDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.ViolationCode))
+            throw new ArgumentException("VIOLATION_CODE_REQUIRED");
+        if (string.IsNullOrWhiteSpace(dto.Description))
+            throw new ArgumentException("DESCRIPTION_REQUIRED");
+
+        var allowedPenalties = new[] { "Disqualified", "PlaceBehind", "Warning", "Scratch" };
+        if (!allowedPenalties.Contains(dto.Penalty))
+            throw new ArgumentException("INVALID_PENALTY");
+
+        if (dto.Penalty == "PlaceBehind" && dto.PlaceBehindEntryId == null)
+            throw new ArgumentException("PLACE_BEHIND_ENTRY_REQUIRED");
+
+        var race = await _context.Races.FirstOrDefaultAsync(r => r.RaceId == raceId)
+            ?? throw new KeyNotFoundException("RACE_NOT_FOUND");
+
+        var referee = await EnsureRefereeAssignedAsync(raceId, refereeId);
+
+        // Chỉ ghi nhận trong lúc Live — đúng nguyên tắc "vi phạm do Referee ghi
+        // nhận trong lúc đua". Sau khi race rời Live, dùng luồng Race Report /
+        // Protest thay vì API này.
+        if (race.Status != StatusLive)
+            throw new InvalidOperationException("RACE_NOT_LIVE");
+
+        var entry = await _context.RaceEntries
+            .Include(e => e.Pairing).ThenInclude(p => p.Horse)
+            .FirstOrDefaultAsync(e => e.RaceEntryId == dto.RaceEntryId && e.RaceId == raceId)
+            ?? throw new KeyNotFoundException("RACE_ENTRY_NOT_FOUND");
+
+        if (dto.PlaceBehindEntryId.HasValue)
+        {
+            var placeBehindExists = await _context.RaceEntries
+                .AnyAsync(e => e.RaceEntryId == dto.PlaceBehindEntryId.Value && e.RaceId == raceId);
+            if (!placeBehindExists)
+                throw new KeyNotFoundException("PLACE_BEHIND_ENTRY_NOT_FOUND");
+        }
+
+        // RaceReport chính thức chỉ được submit khi Live -> Unofficial
+        // (SubmitFinishResultsAsync). Trong lúc Live chưa có RaceReport, nên ở
+        // đây tìm-hoặc-tạo 1 RaceReport CHƯA KHÓA (IsLocked=false) làm nơi neo
+        // (anchor) cho các Violation ghi nhận sớm — khớp UNIQUE(RaceId) đã
+        // định nghĩa trong DB. Khi Referee submit kết quả cuối, RaceReport này
+        // được tái sử dụng (không tạo trùng).
+        var report = await _context.RaceReports.FirstOrDefaultAsync(r => r.RaceId == raceId);
+        if (report == null)
+        {
+            report = new RaceReport
+            {
+                RaceId = raceId,
+                LeadRefereeId = referee.RefereeId,
+                IsLocked = false,
+                SubmittedAt = DateTime.UtcNow
+            };
+            _context.RaceReports.Add(report);
+            await _context.SaveChangesAsync();
+        }
+        else if (report.IsLocked)
+        {
+            throw new InvalidOperationException("RACE_REPORT_LOCKED");
+        }
+
+        var violation = new Violation
+        {
+            RaceReportId = report.RaceReportId,
+            RaceEntryId = entry.RaceEntryId,
+            ViolationCode = dto.ViolationCode.Trim(),
+            Penalty = dto.Penalty,
+            PlaceBehindEntryId = dto.PlaceBehindEntryId,
+            Description = dto.Description.Trim(),
+            LoggedAt = DateTime.UtcNow
+        };
+        _context.Violations.Add(violation);
+        await _context.SaveChangesAsync();
+
+        return new ViolationDto
+        {
+            ViolationId = violation.ViolationId,
+            RaceEntryId = violation.RaceEntryId,
+            HorseName = entry.Pairing.Horse.Name,
+            ViolationCode = violation.ViolationCode,
+            Penalty = violation.Penalty,
+            PlaceBehindEntryId = violation.PlaceBehindEntryId,
+            Description = violation.Description,
+            LoggedAt = violation.LoggedAt
+        };
+    }
+
+    // =====================================================================
+    // GET violations — poll riêng (3-5s), tách khỏi tick animation 100ms
+    // =====================================================================
+    public async Task<List<ViolationDto>> GetViolationsAsync(int raceId)
+    {
+        var raceExists = await _context.Races.AnyAsync(r => r.RaceId == raceId);
+        if (!raceExists)
+            throw new KeyNotFoundException("RACE_NOT_FOUND");
+
+        return await _context.Violations
+            .AsNoTracking()
+            .Where(v => v.RaceReport.RaceId == raceId)
+            .OrderBy(v => v.LoggedAt)
+            .Select(v => new ViolationDto
+            {
+                ViolationId = v.ViolationId,
+                RaceEntryId = v.RaceEntryId,
+                HorseName = v.RaceEntry.Pairing.Horse.Name,
+                ViolationCode = v.ViolationCode,
+                Penalty = v.Penalty,
+                PlaceBehindEntryId = v.PlaceBehindEntryId,
+                Description = v.Description,
+                LoggedAt = v.LoggedAt
+            })
+            .ToListAsync();
+    }
+
+    // =====================================================================
+    // Referee chốt sơ bộ FinishPosition, chuyển Live -> Unofficial
+    // =====================================================================
+    public async Task<SubmitFinishResultsResultDto> SubmitFinishResultsAsync(int raceId, int refereeId, SubmitFinishResultsDto dto)
+    {
+        if (dto.Results == null || dto.Results.Count == 0)
+            throw new ArgumentException("RESULTS_REQUIRED");
+
+        var race = await _context.Races
+            .Include(r => r.RaceEntries)
+            .FirstOrDefaultAsync(r => r.RaceId == raceId)
+            ?? throw new KeyNotFoundException("RACE_NOT_FOUND");
+
+        var referee = await EnsureRefereeAssignedAsync(raceId, refereeId);
+
+        if (race.Status != StatusLive)
+            throw new InvalidOperationException("RACE_NOT_LIVE");
+
+        var eligibleEntryIds = race.RaceEntries
+            .Where(e => e.Status != "Cancelled" && !e.IsWithdrawn)
+            .Select(e => e.RaceEntryId)
+            .ToHashSet();
+
+        var submittedIds = dto.Results.Select(r => r.RaceEntryId).ToList();
+        if (submittedIds.Distinct().Count() != submittedIds.Count)
+            throw new ArgumentException("DUPLICATE_RACE_ENTRY_IN_RESULTS");
+
+        foreach (var r in dto.Results)
+        {
+            if (!eligibleEntryIds.Contains(r.RaceEntryId))
+                throw new KeyNotFoundException("RACE_ENTRY_NOT_FOUND");
+            if (r.FinishPosition <= 0)
+                throw new ArgumentException("INVALID_FINISH_POSITION");
+        }
+
+        var positions = dto.Results.Select(r => r.FinishPosition).ToList();
+        if (positions.Distinct().Count() != positions.Count)
+            throw new ArgumentException("DUPLICATE_FINISH_POSITION");
+
+        using var transaction = await _context.Database.BeginTransactionAsync();
+
+        var now = DateTime.UtcNow;
+
+        foreach (var r in dto.Results)
+        {
+            var entry = race.RaceEntries.First(e => e.RaceEntryId == r.RaceEntryId);
+            entry.FinishPosition = r.FinishPosition;
+            entry.FinishTime = r.FinishTime;
+            entry.UpdatedAt = now;
+        }
+
+        // Tái sử dụng RaceReport đã tạo lúc ghi violation trong Live (nếu có),
+        // tránh vi phạm UNIQUE(RaceId) trên RaceReports.
+        var report = await _context.RaceReports.FirstOrDefaultAsync(rr => rr.RaceId == raceId);
+        if (report == null)
+        {
+            report = new RaceReport
+            {
+                RaceId = raceId,
+                LeadRefereeId = referee.RefereeId,
+                IsLocked = false,
+                SubmittedAt = now
+            };
+            _context.RaceReports.Add(report);
+        }
+        else if (report.IsLocked)
+        {
+            throw new InvalidOperationException("RACE_REPORT_LOCKED");
+        }
+        else
+        {
+            report.LeadRefereeId = referee.RefereeId;
+            report.SubmittedAt = now;
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.Notes))
+            report.Notes = dto.Notes;
+
+        race.Status = StatusUnofficial;
+        race.UpdatedAt = now;
+
+        await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return new SubmitFinishResultsResultDto
+        {
+            RaceId = race.RaceId,
+            Status = race.Status,
+            RaceReportId = report.RaceReportId
+        };
+    }
+
+    // =====================================================================
+    // Helpers
+    // =====================================================================
+    private async Task<RefereeProfile> EnsureRefereeAssignedAsync(int raceId, int refereeId)
+    {
+        var referee = await _context.RefereeProfiles
+            .FirstOrDefaultAsync(r => r.RefereeId == refereeId)
+            ?? throw new KeyNotFoundException("REFEREE_NOT_FOUND");
+
+        var assigned = await _context.RefereeAssignments
+            .AnyAsync(a => a.RaceId == raceId && a.RefereeId == refereeId);
+        if (!assigned)
+            throw new InvalidOperationException("REFEREE_NOT_ASSIGNED_TO_RACE");
+
+        return referee;
+    }
+}
