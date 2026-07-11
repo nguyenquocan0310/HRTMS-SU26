@@ -593,6 +593,31 @@ public class AdminController : ControllerBase
     }
     // ── MODULE C: Horse Enrollment Approval (duyệt ngựa theo từng giải) ────────
 
+    [HttpGet("horse-entries")]
+    [ProducesResponseType(typeof(ApiResponse<List<HorseEnrollmentResponseDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetEnrollments(
+        [FromQuery] int? tournamentId,
+        [FromQuery] string? status,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        try
+        {
+            var result = await _horseService.GetEnrollmentsAsync(tournamentId, status, page, pageSize);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+            when (ex.Message == "INVALID_ENROLLMENT_STATUS")
+        {
+            return BadRequest(new
+            {
+                error = "VALIDATION_ERROR",
+                message = "Status must be Pending, Approved, or Rejected."
+            });
+        }
+    }
+
     [HttpGet("horse-entries/pending")]
     [ProducesResponseType(typeof(ApiResponse<List<HorseEnrollmentResponseDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPendingEnrollments(

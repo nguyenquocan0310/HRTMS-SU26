@@ -49,7 +49,8 @@
 | 6 | GET | `/api/horses/{horseId}/enrollments` | Owner | Danh sách enrollment của một con ngựa |
 | 7 | GET | `/api/horses/my/enrollments` | Owner | Tất cả enrollment của Owner (lọc theo `tournamentId`) |
 | 7b | DELETE | `/api/horses/{horseId}/enrollments/{id}` | Owner | **Rút ngựa khỏi giải** (soft-withdraw, chỉ khi chưa pairing) |
-| 8 | GET | `/api/admin/horse-entries/pending` | Admin | Danh sách enrollment chờ duyệt |
+| 8 | GET | `/api/admin/horse-entries` | Admin | Danh sách enrollment theo filter `tournamentId`/`status` (trống = tất cả) |
+| 8b | GET | `/api/admin/horse-entries/pending` | Admin | **Alias tương thích ngược** của #8 với `status=Pending` cố định |
 | 9 | GET | `/api/admin/horses/{id}` | Admin | Chi tiết hồ sơ ngựa (Admin view) |
 | 10 | PATCH | `/api/admin/horse-entries/{id}/approve` | Admin | Phê duyệt enrollment (ngựa vào giải) |
 | 11 | PATCH | `/api/admin/horse-entries/{id}/reject` | Admin | Từ chối enrollment |
@@ -496,13 +497,13 @@ Chỉ gửi các trường cần cập nhật.
 
 ---
 
-## 5. Danh sách enrollment chờ duyệt (Admin)
+## 5. Danh sách enrollment theo filter (Admin)
 
 ```
-GET /api/admin/horse-entries/pending
+GET /api/admin/horse-entries
 ```
 
-Admin xem tất cả **enrollment** (`HorseTournamentEntry`) có `AdminApprovalStatus = "Pending"`. Mỗi phần tử `data` theo cấu trúc `HorseEnrollmentResponseDto` (xem §1b).
+Admin xem **enrollment** (`HorseTournamentEntry`) lọc theo giải và/hoặc trạng thái duyệt. Mỗi phần tử `data` theo cấu trúc `HorseEnrollmentResponseDto` (xem §1b).
 
 **Auth:** Admin
 
@@ -512,8 +513,18 @@ Admin xem tất cả **enrollment** (`HorseTournamentEntry`) có `AdminApprovalS
 
 | Tham số | Kiểu | Mặc định | Ghi chú |
 | --- | --- | --- | --- |
+| tournamentId | int? | (trống) | Trống = lấy enrollment của **mọi** giải |
+| status | string? | (trống) | `Pending` \| `Approved` \| `Rejected`, case-insensitive. **Trống = lấy tất cả trạng thái** (không mặc định `Pending`) |
 | page | int | 1 |  |
 | pageSize | int | 20 | Tối đa 100 |
+
+### Alias tương thích ngược
+
+```
+GET /api/admin/horse-entries/pending
+```
+
+Tương đương `GET /api/admin/horse-entries?status=Pending` (luôn `tournamentId=null`, `status="Pending"` cố định — không nhận query `status`/`tournamentId`). Giữ nguyên để không phá client cũ; dùng chung logic/service với route #8, không duplicate query.
 
 ---
 
@@ -552,6 +563,7 @@ Admin xem tất cả **enrollment** (`HorseTournamentEntry`) có `AdminApprovalS
 
 | HTTP | Mã lỗi | Khi nào xảy ra |
 | --- | --- | --- |
+| 400 | `VALIDATION_ERROR` | `status` không thuộc `Pending`/`Approved`/`Rejected` |
 | 401 | `UNAUTHORIZED` | Token thiếu hoặc hết hạn |
 | 403 | `FORBIDDEN` | Role không phải Admin |
 
