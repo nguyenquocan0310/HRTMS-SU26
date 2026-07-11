@@ -2,6 +2,7 @@ import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../../services/apiClient';
 import { logout } from '../../services/authService';
+import { getRefereeProfile, type RefereeProfile } from '../../services/refereeService';
 import useAuthStore from '../../store/authStore';
 
 interface RefereeAuthProfile {
@@ -35,14 +36,45 @@ export default function RefereeLayout() {
   const clearAuth = useAuthStore((state) => state.clearAuth);
 
   useEffect(() => {
-    apiFetch<ProfileApiResponse>('/auth/profile')
-      .then((res) => {
-        if (res.success && res.data) setProfile(res.data);
-      })
-      .catch(() => {
+    const normalizeProfile = (
+      data: RefereeProfile | RefereeAuthProfile | null | undefined
+    ): RefereeAuthProfile | null => {
+      if (!data) return null;
+      return {
+        userId: 'userId' in data ? data.userId : data.refereeId,
+        username: data.username,
+        fullName: data.fullName,
+        email: data.email,
+        role: 'role' in data ? data.role : 'Referee',
+        status: data.status,
+      };
+    };
+
+    const loadProfile = async () => {
+      try {
+        const refereeProfile = await getRefereeProfile();
+        setProfile(normalizeProfile(refereeProfile));
+      } catch {
+        try {
+          const fallback = await apiFetch<ProfileApiResponse | RefereeAuthProfile>('/auth/profile');
+          const fallbackData =
+            fallback && typeof fallback === 'object' && 'data' in fallback
+              ? fallback.data
+              : fallback;
+          setProfile(normalizeProfile(fallbackData));
+        } catch {
+          setProfile(null);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProfile().catch(() => {
         // Vẫn render navigation nếu profile không tải được.
-      })
-      .finally(() => setLoading(false));
+        setProfile(null);
+        setLoading(false);
+      });
   }, []);
 
   const currentNav = navItems.find((item) => {
@@ -95,7 +127,7 @@ export default function RefereeLayout() {
               </div>
             </div>
           ) : (
-            <p className="text-xs text-red-500">Không tải được thông tin</p>
+            <p className="text-xs text-gray-400">Thông tin tài khoản chưa sẵn sàng</p>
           )}
         </div>
 

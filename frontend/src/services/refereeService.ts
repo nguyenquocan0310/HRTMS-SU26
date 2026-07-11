@@ -96,6 +96,60 @@ export interface ConfirmStartingListResult {
   message: string;
 }
 
+export interface LiveRaceEntry {
+  raceEntryId: number;
+  postPosition: number | null;
+  status: string;
+  isWithdrawn: boolean;
+  horseId: number | null;
+  horseName: string;
+  jockeyId: number | null;
+  jockeyName: string;
+  finishPosition: number | null;
+  finishTime: number | null;
+}
+
+export interface RaceLiveStatus {
+  raceId: number;
+  status: string;
+  scheduledTime: string | null;
+  actualStartTime: string | null;
+  raceDurationSeconds: number | null;
+  entries: LiveRaceEntry[];
+}
+
+export interface RaceViolation {
+  violationId?: number;
+  raceEntryId: number | null;
+  horseName?: string | null;
+  jockeyName?: string | null;
+  violationCode: string;
+  penalty: string;
+  placeBehindEntryId?: number | null;
+  description?: string | null;
+  recordedAt?: string | null;
+  refereeName?: string | null;
+}
+
+export interface CreateViolationPayload {
+  raceEntryId: number;
+  violationCode: string;
+  penalty: string;
+  placeBehindEntryId?: number;
+  description: string;
+}
+
+export interface FinishRaceResult {
+  raceEntryId: number;
+  finishPosition: number;
+  finishTime: number;
+}
+
+export interface FinishRacePayload {
+  notes: string;
+  results: FinishRaceResult[];
+}
+
 const extractArray = (res: any): any[] => {
   if (Array.isArray(res)) return res;
   if (Array.isArray(res?.data)) return res.data;
@@ -205,4 +259,48 @@ export const confirmStartingList = async (
     `/referee/races/${raceId}/confirm-starting-list`,
     { method: 'POST' }
   );
+};
+
+export const getRaceLiveStatus = async (raceId: number): Promise<RaceLiveStatus> => {
+  const res = await apiFetch<ApiResponse<RaceLiveStatus> | RaceLiveStatus>(
+    `/races/${raceId}/live-status`
+  );
+  return unwrapData(res);
+};
+
+export const getRaceViolations = async (raceId: number): Promise<RaceViolation[]> => {
+  const res = await apiFetch<ApiResponse<RaceViolation[]> | RaceViolation[]>(
+    `/races/${raceId}/violations`
+  );
+  return unwrapData(res);
+};
+
+export const startRace = async (raceId: number): Promise<Partial<RaceLiveStatus>> => {
+  const res = await apiFetch<ApiResponse<Partial<RaceLiveStatus>> | Partial<RaceLiveStatus>>(
+    `/referees/races/${raceId}/start`,
+    { method: 'POST' }
+  );
+  return unwrapData(res);
+};
+
+export const createRaceViolation = async (
+  raceId: number,
+  payload: CreateViolationPayload
+): Promise<RaceViolation> => {
+  const res = await apiFetch<ApiResponse<RaceViolation> | RaceViolation>(
+    `/referees/races/${raceId}/violations`,
+    { method: 'POST', body: JSON.stringify(payload) }
+  );
+  return unwrapData(res);
+};
+
+export const finishRace = async (
+  raceId: number,
+  payload: FinishRacePayload
+): Promise<Partial<RaceLiveStatus>> => {
+  const res = await apiFetch<ApiResponse<Partial<RaceLiveStatus>> | Partial<RaceLiveStatus>>(
+    `/referees/races/${raceId}/finish`,
+    { method: 'POST', body: JSON.stringify(payload) }
+  );
+  return unwrapData(res);
 };
