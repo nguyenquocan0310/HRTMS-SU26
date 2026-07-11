@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { RaceEntry } from '../../types/owner.types';
 import { getMyRaceEntries, confirmRaceEntry, withdrawRaceEntry } from '../../services/ownerService';
@@ -160,10 +160,10 @@ export default function RaceEntries() {
 
   // Page header
   const PageHeader = (
-    <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Đăng ký cuộc đua</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Quản lý các đăng ký tham gia cuộc đua</p>
+        <h1 className="text-3xl font-black tracking-tight text-slate-950">Đăng ký cuộc đua</h1>
+        <p className="text-base text-slate-500 mt-2">Quản lý các đăng ký tham gia cuộc đua</p>
       </div>
       {!loading && !error && (
         <span className="px-3 py-1 text-xs font-semibold bg-gray-100 text-gray-600 rounded-full self-start">
@@ -175,7 +175,7 @@ export default function RaceEntries() {
 
   // Filters bar
   const FiltersBar = (
-    <div className="flex flex-col sm:flex-row gap-2 mb-4">
+    <div className="flex flex-col sm:flex-row gap-2 mb-5">
       <select
         value={statusFilter}
         onChange={(e) => setStatusFilter(e.target.value)}
@@ -217,7 +217,7 @@ export default function RaceEntries() {
           <p className="text-xs text-gray-500 mb-4">{error}</p>
           <button
             onClick={fetchEntries}
-            className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+          className="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-full transition-colors"
           >
             Thử lại
           </button>
@@ -242,7 +242,7 @@ export default function RaceEntries() {
       {PageHeader}
       {FiltersBar}
 
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
@@ -274,7 +274,7 @@ export default function RaceEntries() {
                     {!statusFilter && !feeStatusFilter && (
                       <button
                         onClick={() => navigate('/owner/horses')}
-                        className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                        className="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-full transition-colors"
                       >
                         Xem danh sách ngựa
                       </button>

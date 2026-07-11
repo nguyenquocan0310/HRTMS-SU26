@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import type { JockeyInvitation, Horse } from '../../types/owner.types';
-import { getAvailableJockeys, getMyHorses, getOwnerPairings, inviteJockey, acceptPairing, confirmPairing } from '../../services/ownerService';
+import { getAvailableJockeys, getMyHorses, getOwnerPairings, inviteJockey, confirmPairing } from '../../services/ownerService';
 import { getMyTournamentParticipations, type ParticipationResponse } from '../../services/tournamentService';
 
 // Status badge for invitation status
@@ -236,10 +236,10 @@ export default function JockeyInvite() {
   return (
     <div>
       {/* Page header */}
-      <div className="mb-5 flex items-center justify-between">
+      <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Mời Jockey</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Quản lý lời mời và tìm kỵ sĩ khả dụng</p>
+          <h1 className="text-3xl font-black tracking-tight text-slate-950">Mời Jockey</h1>
+          <p className="text-base text-slate-500 mt-2">Quản lý lời mời và tìm kỵ sĩ khả dụng</p>
         </div>
         <button
           onClick={() => {
@@ -247,7 +247,7 @@ export default function JockeyInvite() {
             setJockeyName('');
             setShowModal(true);
           }}
-          className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+          className="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-full transition-colors"
         >
           + Gửi lời mời mới
         </button>
@@ -279,7 +279,7 @@ export default function JockeyInvite() {
       {activeTab === 'available' ? (
         <div className="space-y-3">
           {/* Tournament picker */}
-          <div className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex flex-wrap items-center gap-3">
+          <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4 flex flex-wrap items-center gap-3">
             <label className="text-xs font-semibold text-gray-500 whitespace-nowrap">Giải đấu:</label>
             {loadingTournaments ? (
               <span className="text-sm text-gray-400 italic">Đang tải giải đấu...</span>
@@ -302,7 +302,7 @@ export default function JockeyInvite() {
             )}
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden">
           {!selectedTournamentId ? (
             <div className="py-12 text-center text-gray-400 text-sm">
               Chọn một giải đấu để xem kỵ sĩ khả dụng
@@ -353,7 +353,7 @@ export default function JockeyInvite() {
                               setJockeyName(j.fullName || '');
                               setShowModal(true);
                             }}
-                            className="px-3 py-1.5 text-xs font-semibold text-blue-600 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                            className="px-3.5 py-2 text-xs font-bold text-blue-700 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-full transition-colors"
                           >
                             Mời tham gia
                           </button>
@@ -371,7 +371,7 @@ export default function JockeyInvite() {
         /* Tab: Invitation History */
         <div className="space-y-3">
           {/* Filters */}
-          <div className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex flex-wrap items-center gap-4">
+          <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4 flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <label className="text-xs font-semibold text-gray-500">Ngựa:</label>
               <select
@@ -422,7 +422,7 @@ export default function JockeyInvite() {
             </div>
           )}
 
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden">
             {loadingInvitations ? (
               <div className="py-14 text-center">
                 <div className="inline-block animate-spin rounded-full h-7 w-7 border-b-2 border-blue-600 mb-3" />
@@ -470,7 +470,7 @@ export default function JockeyInvite() {
                               <button
                                 onClick={() => handleConfirmPairing(invitation.invitationID)}
                                 disabled={isConfirming}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-full transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                               >
                                 {isConfirming && (
                                   <span className="inline-block animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent" />

@@ -67,6 +67,7 @@ const normalizeRaceEntry = (item: any): DoctorRaceEntry | null => {
   const rawId = item?.raceEntryId ?? item?.id;
   const raceEntryId = Number(rawId);
   if (!Number.isFinite(raceEntryId)) return null;
+  const selfDeclaredWeight = item?.selfDeclaredWeight ?? item?.jockey?.selfDeclaredWeight ?? null;
 
   return {
     raceEntryId,
@@ -76,7 +77,7 @@ const normalizeRaceEntry = (item: any): DoctorRaceEntry | null => {
     horseName: item?.horse?.name ?? item?.horseName ?? 'Chưa có tên',
     horseBreed: item?.horse?.breed ?? item?.horseBreed ?? null,
     jockeyName: item?.jockey?.fullName ?? item?.jockeyName ?? 'Chưa có tên',
-    selfDeclaredWeight: item?.selfDeclaredWeight ?? null,
+    selfDeclaredWeight,
     preRaceJockeyWeight: item?.preRaceJockeyWeight ?? null,
     weightDifference: item?.weightDifference ?? null,
     thresholdKg: item?.thresholdKg ?? null,
