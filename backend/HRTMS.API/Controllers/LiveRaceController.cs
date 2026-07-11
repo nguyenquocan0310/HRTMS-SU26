@@ -11,7 +11,7 @@ namespace HRTMS.API.Controllers;
 // Animation vị trí % là random walk thuần client-side (không WebSocket/SSE),
 // controller này chỉ cấp dữ liệu thật: trạng thái/actualStartTime, kết quả cuối
 // (FinishPosition) và violation ghi nhận trong lúc Live.
-[Tags("live-race")]
+[Tags("race")]
 [ApiController]
 [Authorize]
 public class LiveRaceController : ControllerBase
