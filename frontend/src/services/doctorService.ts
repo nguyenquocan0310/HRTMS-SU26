@@ -40,6 +40,7 @@ export interface PreRaceWeightResponse {
   raceEntryId: number;
   selfDeclaredWeight?: number | null;
   preRaceJockeyWeight?: number | null;
+  preRaceWeight?: number | null;
   weightDifference?: number | null;
   thresholdKg?: number | null;
   isWeightWarning?: boolean;
@@ -49,6 +50,7 @@ export interface PreRaceWeightResponse {
 export interface HorseIdentityResponse {
   raceEntryId: number;
   horseIdentityCheckStatus?: string | null;
+  horseIdentityStatus?: string | null;
   isEmergencyDisqualified?: boolean;
   raceEntryStatus?: string | null;
   message?: string;
@@ -68,25 +70,31 @@ const normalizeRaceEntry = (item: any): DoctorRaceEntry | null => {
   const raceEntryId = Number(rawId);
   if (!Number.isFinite(raceEntryId)) return null;
   const selfDeclaredWeight = item?.selfDeclaredWeight ?? item?.jockey?.selfDeclaredWeight ?? null;
+  const preRaceJockeyWeight = item?.preRaceJockeyWeight ?? item?.preRaceWeight ?? null;
+  const computedWeightDifference =
+    item?.weightDifference ??
+    (typeof preRaceJockeyWeight === 'number' && typeof selfDeclaredWeight === 'number'
+      ? Number((preRaceJockeyWeight - selfDeclaredWeight).toFixed(1))
+      : null);
 
   return {
     raceEntryId,
     postPosition: item?.postPosition ?? null,
-    status: item?.status ?? item?.raceEntryStatus ?? 'Unknown',
+    status: item?.status ?? item?.raceEntryStatus ?? 'Confirmed',
     entryFeeStatus: item?.entryFeeStatus ?? null,
     horseName: item?.horse?.name ?? item?.horseName ?? 'Chưa có tên',
     horseBreed: item?.horse?.breed ?? item?.horseBreed ?? null,
     jockeyName: item?.jockey?.fullName ?? item?.jockeyName ?? 'Chưa có tên',
     selfDeclaredWeight,
-    preRaceJockeyWeight: item?.preRaceJockeyWeight ?? null,
-    weightDifference: item?.weightDifference ?? null,
+    preRaceJockeyWeight,
+    weightDifference: computedWeightDifference,
     thresholdKg: item?.thresholdKg ?? null,
     isWeightWarning: Boolean(item?.isWeightWarning),
-    horseIdentityCheckStatus: item?.horseIdentityCheckStatus ?? null,
+    horseIdentityCheckStatus: item?.horseIdentityCheckStatus ?? item?.horseIdentityStatus ?? null,
     clinicalStatus: item?.clinicalStatus ?? null,
     unfitReason: item?.unfitReason ?? null,
     isEmergencyDisqualified: Boolean(item?.isEmergencyDisqualified),
-    raceEntryStatus: item?.raceEntryStatus ?? item?.status ?? null,
+    raceEntryStatus: item?.raceEntryStatus ?? item?.status ?? 'Confirmed',
   };
 };
 
@@ -120,11 +128,11 @@ export const getMyDoctorRaceAssignments = async (): Promise<DoctorRaceAssignment
 };
 
 /**
- * GET /api/races/{raceId}/entries
+ * GET /api/doctor/race-entries/races/{raceId}/entries
  * Lấy danh sách RaceEntry thật để Doctor thao tác trong Paddock.
  */
 export const getDoctorRaceEntries = async (raceId: number): Promise<DoctorRaceEntry[]> => {
-  const res = await apiFetch<any>(`/races/${raceId}/entries`);
+  const res = await apiFetch<any>(`/doctor/race-entries/races/${raceId}/entries`);
   return extractArray(res)
     .map(normalizeRaceEntry)
     .filter((item): item is DoctorRaceEntry => item !== null);

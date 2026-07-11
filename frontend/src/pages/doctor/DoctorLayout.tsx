@@ -5,12 +5,14 @@ import { logout } from '../../services/authService'
 import useAuthStore from '../../store/authStore'
 
 interface DoctorProfile {
-  userId: number
+  userId?: number
+  doctorId?: number
   username: string
   fullName: string
   email: string
   role: string
   status: string
+  medicalLicenseNumber?: string
 }
 
 interface ProfileApiResponse {
@@ -22,9 +24,19 @@ interface ProfileApiResponse {
 const navItems = [
   { to: '/doctor', label: 'Tổng quan', end: true },
   { to: '/doctor/tournaments', label: 'Đăng ký giải đấu', end: false },
-  { to: '/doctor/paddock', label: 'Bảng điều khiển Paddock', end: false },
   { to: '/doctor/coi', label: 'Khai báo COI', end: false },
 ]
+
+const normalizeDoctorProfile = (res: DoctorProfile | ProfileApiResponse | null): DoctorProfile | null => {
+  if (!res) return null
+  const data = 'data' in res ? res.data : res
+  if (!data) return null
+  return {
+    ...data,
+    role: data.role ?? 'Doctor',
+    status: data.status ?? '',
+  }
+}
 
 export default function DoctorLayout() {
   const [profile, setProfile] = useState<DoctorProfile | null>(null)
@@ -35,14 +47,30 @@ export default function DoctorLayout() {
   const clearAuth = useAuthStore((state) => state.clearAuth)
 
   useEffect(() => {
-    apiFetch<ProfileApiResponse>('/auth/profile')
-      .then((res) => {
-        if (res.success && res.data) setProfile(res.data)
-      })
-      .catch(() => {
-        // Sidebar vẫn render navigation nếu profile không tải được.
-      })
-      .finally(() => setLoading(false))
+    const loadProfile = async () => {
+      try {
+        const doctorProfile = await apiFetch<DoctorProfile>('/doctors/profile')
+        const normalized = normalizeDoctorProfile(doctorProfile)
+        if (normalized) {
+          setProfile(normalized)
+          setLoading(false)
+          return
+        }
+      } catch {
+        // Fallback xuống profile dùng chung nếu endpoint riêng không khả dụng.
+      }
+
+      try {
+        const authProfile = await apiFetch<ProfileApiResponse>('/auth/profile')
+        setProfile(normalizeDoctorProfile(authProfile))
+      } catch {
+        setProfile(null)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadProfile()
   }, [])
 
   const currentNav = navItems.find((item) => {
@@ -133,7 +161,6 @@ export default function DoctorLayout() {
           >
             {isLoggingOut ? 'Đang đăng xuất...' : 'Đăng xuất'}
           </button>
-          <p className="text-xs text-gray-400 text-center">Horse Racing TMS &copy; 2026</p>
         </div>
       </aside>
 
