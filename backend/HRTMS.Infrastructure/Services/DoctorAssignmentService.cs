@@ -154,7 +154,9 @@ public class DoctorAssignmentService : IDoctorAssignmentService
             RaceId = raceId,
             DoctorId = dto.DoctorId,
             AssignedAt = now,
-            CertifiedAt = now
+            CertifiedAt = now,
+            CoiCheckStatus = "Passed",
+            CoiCheckedAt = now
         };
 
         _context.DoctorAssignments.Add(assignment);
