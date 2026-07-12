@@ -37,6 +37,11 @@ public partial class Race
 
     public DateTime UpdatedAt { get; set; }
 
+    // Optimistic concurrency token (SQL Server ROWVERSION, patch 005) — chặn
+    // last-write-wins khi nhiều actor cùng ghi 1 race. NULL trên provider không
+    // hỗ trợ rowversion (SQLite trong test).
+    public byte[]? RowVersion { get; set; }
+
     public virtual ICollection<DoctorAssignment> DoctorAssignments { get; set; } = new List<DoctorAssignment>();
 
     public virtual ICollection<Prediction> Predictions { get; set; } = new List<Prediction>();
