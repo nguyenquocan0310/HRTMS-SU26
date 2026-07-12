@@ -170,4 +170,60 @@ public class IndependenceCheckService : IIndependenceCheckService
                 : "Jockey independence check passed."
         };
     }
+    public async Task<List<IndependenceCheckListDto>> GetRaceEntriesAsync(
+        int refereeId,
+        int raceId)
+    {
+        // Kiem tra Referee co ton tai va dang Active hay khong
+        var referee = await _context.RefereeProfiles
+            .Include(r => r.Referee)
+            .FirstOrDefaultAsync(r => r.RefereeId == refereeId);
+
+        if (referee == null)
+        {
+            throw new KeyNotFoundException("REFEREE_NOT_FOUND");
+        }
+
+        if (referee.Referee.Role != "Referee")
+        {
+            throw new InvalidOperationException("USER_NOT_REFEREE");
+        }
+
+        if (referee.Status != "Active")
+        {
+            throw new InvalidOperationException("REFEREE_NOT_ACTIVE");
+        }
+
+        // Referee phai duoc phan cong vao Race nay moi duoc xem danh sach
+        var refereeAssigned = await _context.RefereeAssignments
+            .AnyAsync(a =>
+                a.RaceId == raceId &&
+                a.RefereeId == refereeId);
+
+        if (!refereeAssigned)
+        {
+            throw new InvalidOperationException("REFEREE_NOT_ASSIGNED_TO_RACE");
+        }
+
+        var entries = await _context.RaceEntries
+            .Where(x => x.RaceId == raceId)
+            .Include(x => x.Pairing)
+                .ThenInclude(p => p.Horse)
+            .Include(x => x.Pairing)
+                .ThenInclude(p => p.Jockey)
+                    .ThenInclude(j => j.Jockey)
+            .Select(x => new IndependenceCheckListDto
+            {
+                RaceEntryId = x.RaceEntryId,
+                PairingId = x.PairingId,
+                HorseName = x.Pairing.Horse.Name,
+                JockeyName = x.Pairing.Jockey.Jockey.FullName,
+                IndependenceCheckStatus = x.IndependenceCheckStatus,
+                IndependenceViolationReason = x.IndependenceViolationReason,
+                RaceEntryStatus = x.Status
+            })
+            .ToListAsync();
+
+        return entries;
+    }
 }
