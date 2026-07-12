@@ -248,6 +248,39 @@ export const confirmPairing = async (pairingId: string | number): Promise<any> =
   return res?.data ?? res;
 };
 
+/**
+ * PATCH /api/pairings/{id}/cancel
+ * Owner chỉ có thể hủy lời mời đang Pending hoặc Accepted.
+ */
+export const cancelPairing = async (pairingId: string | number): Promise<any> => {
+  try {
+    const res = await apiFetch<any>(`/pairings/${pairingId}/cancel`, {
+      method: 'PATCH',
+    });
+
+    if (res?.success === false) {
+      throw new Error(res.message || 'Hủy lời mời ghép cặp thất bại.');
+    }
+
+    return res?.data ?? res;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    const normalized = message.toLowerCase();
+
+    if (normalized.includes('pairing was not found') || normalized.includes('pairing_not_found')) {
+      throw new Error('Không tìm thấy lời mời ghép cặp.');
+    }
+    if (normalized.includes('does not belong') || normalized.includes('horse_not_owned')) {
+      throw new Error('Bạn không có quyền hủy lời mời này.');
+    }
+    if (normalized.includes('only pending or accepted') || normalized.includes('invalid_status')) {
+      throw new Error('Chỉ có thể hủy lời mời đang chờ hoặc đã được Jockey chấp nhận nhưng chưa xác nhận ghép cặp.');
+    }
+
+    throw error instanceof Error ? error : new Error('Hủy lời mời ghép cặp thất bại.');
+  }
+};
+
 // ─── Horse + Tournament Registration (dùng apiFetch — không hard-code localhost) ───
 
 interface ApiResponse<T> {

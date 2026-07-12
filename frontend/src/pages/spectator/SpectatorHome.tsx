@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getTournaments, type TournamentResponse } from '../../services/tournamentService'
-import { getMyPredictions, getSpectatorWallet, type SpectatorPrediction } from '../../services/spectatorService'
+import {
+  getMyPredictions,
+  getPredictionGateStatus,
+  getSpectatorWallet,
+  type PredictionGateStatus,
+  type SpectatorPrediction,
+} from '../../services/spectatorService'
 
 export default function SpectatorHome() {
   const navigate = useNavigate()
   const [tournaments, setTournaments] = useState<TournamentResponse[]>([])
   const [predictions, setPredictions] = useState<SpectatorPrediction[]>([])
+  const [predictionGates, setPredictionGates] = useState<Record<number, PredictionGateStatus | null>>({})
+  const [gateErrors, setGateErrors] = useState<Record<number, boolean>>({})
   const [balance, setBalance] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -21,9 +29,33 @@ export default function SpectatorHome() {
           getSpectatorWallet(),
           getMyPredictions(),
         ])
+
+        const upcomingRaceIds = tournamentList.flatMap((tournament) =>
+          tournament.rounds.flatMap((round) =>
+            round.races
+              .filter((race) => race.status.toLowerCase() === 'upcoming')
+              .map((race) => race.raceId)
+          )
+        )
+        const gateResults = await Promise.all(upcomingRaceIds.map(async (raceId) => {
+          try {
+            return { raceId, gate: await getPredictionGateStatus(raceId), failed: false }
+          } catch {
+            return { raceId, gate: null, failed: true }
+          }
+        }))
+        const gates: Record<number, PredictionGateStatus | null> = {}
+        const failedGates: Record<number, boolean> = {}
+        gateResults.forEach(({ raceId, gate, failed }) => {
+          gates[raceId] = gate
+          failedGates[raceId] = failed
+        })
+
         setTournaments(tournamentList)
         setBalance(wallet.balance)
         setPredictions(predictionList)
+        setPredictionGates(gates)
+        setGateErrors(failedGates)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Không tải được dữ liệu khán giả.')
       } finally {
@@ -69,13 +101,31 @@ export default function SpectatorHome() {
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {races.map((race) => {
               const isUpcoming = race.status.toLowerCase() === 'upcoming'
+              const gate = predictionGates[race.raceId]
+              const gateFailed = gateErrors[race.raceId]
+              const canPredict = isUpcoming
+                && gate?.canPredict === true
+                && gate.isPostPositionDrawn === true
+                && gate.isPredictionGateClosed === false
+                && gate.raceStatus.toLowerCase() === 'upcoming'
+              const predictionLabel = !isUpcoming
+                ? 'Không khả dụng'
+                : gateFailed
+                  ? 'Không tải được cổng'
+                  : !gate
+                    ? 'Đang kiểm tra...'
+                    : !gate.isPostPositionDrawn
+                      ? 'Chưa bốc thăm'
+                      : gate.isPredictionGateClosed || !gate.canPredict
+                        ? 'Cổng đã đóng'
+                        : 'Dự đoán'
               return (
                 <article key={race.raceId} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
                   <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase text-amber-700">{race.tournamentName} · {race.roundName}</p><h3 className="mt-1 text-lg font-black text-gray-900">Race #{race.raceNumber}</h3></div><span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-bold text-gray-600">{race.status}</span></div>
                   <p className="mt-3 text-sm text-gray-500">{new Date(race.scheduledTime).toLocaleString('vi-VN')}</p>
                   <div className="mt-5 flex flex-wrap gap-2">
                     <button type="button" onClick={() => navigate(`/spectator/live-race?raceId=${race.raceId}`)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50">Theo dõi</button>
-                    <button type="button" onClick={() => navigate(`/spectator/prediction?raceId=${race.raceId}`)} disabled={!isUpcoming} className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500">Dự đoán</button>
+                    <button type="button" onClick={() => navigate(`/spectator/prediction?raceId=${race.raceId}`)} disabled={!canPredict} title={canPredict ? 'Mở sảnh dự đoán' : predictionLabel} className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500">{predictionLabel}</button>
                   </div>
                 </article>
               )
