@@ -88,11 +88,7 @@ function TournamentCard({
           <p className="text-[10px] uppercase tracking-wide text-gray-400">Cự ly</p>
           <p className="mt-0.5 text-xs font-semibold text-gray-800">{tournament.raceDistance} m</p>
         </div>
-        <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
-          <p className="text-[10px] uppercase tracking-wide text-gray-400">Phí tham dự</p>
-          <p className="mt-0.5 text-xs font-semibold text-gray-800">{formatCurrency(tournament.entryFeeAmount)}</p>
-        </div>
-        <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+        <div className="col-span-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
           <p className="text-[10px] uppercase tracking-wide text-gray-400">Giải thưởng</p>
           <p className="mt-0.5 text-xs font-semibold text-emerald-700">{formatCurrency(tournament.purseAmount)}</p>
         </div>

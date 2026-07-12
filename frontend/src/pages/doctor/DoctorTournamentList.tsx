@@ -163,9 +163,8 @@ function TournamentDetailModal({ tournament, participation, onClose, onRegister 
               { label: 'KN jockey tối thiểu',   value: `${tournament.minJockeyExperienceYears} năm` },
               { label: 'Số ngựa tối đa',        value: tournament.maxHorses },
               { label: 'Tổng giải thưởng',      value: formatCurrency(tournament.purseAmount) },
-              { label: 'Phí tham dự',           value: formatCurrency(tournament.entryFeeAmount) },
             ].map(({ label, value }) => (
-              <div key={label} className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100">
+              <div key={label} className={`bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100 ${label === 'Tổng giải thưởng' ? 'col-span-2' : ''}`}>
                 <p className="text-xs text-gray-400 mb-0.5">{label}</p>
                 <p className="text-sm font-semibold text-gray-800">{value}</p>
               </div>
@@ -307,11 +306,7 @@ function TournamentCard({ tournament, participation, onDetail }: TournamentCardP
           <p className="text-[10px] text-gray-400 uppercase tracking-wide">Cự ly</p>
           <p className="text-xs font-semibold text-gray-800 mt-0.5">{tournament.raceDistance} m</p>
         </div>
-        <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-          <p className="text-[10px] text-gray-400 uppercase tracking-wide">Phí tham dự</p>
-          <p className="text-xs font-semibold text-gray-800 mt-0.5">{formatCurrency(tournament.entryFeeAmount)}</p>
-        </div>
-        <div className="bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+        <div className="col-span-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
           <p className="text-[10px] text-gray-400 uppercase tracking-wide">Giải thưởng</p>
           <p className="text-xs font-semibold text-emerald-700 mt-0.5">{formatCurrency(tournament.purseAmount)}</p>
         </div>
