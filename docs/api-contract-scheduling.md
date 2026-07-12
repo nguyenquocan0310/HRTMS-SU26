@@ -91,6 +91,14 @@ Errors: `404 ENTRY_NOT_FOUND`.
 
 ## Tích hợp
 - **SCH.5 (auto-cancel) — ĐÃ WIRE:** `IRaceEntryService.AutoCancelOverdueAsync()` được đăng ký làm recurring job **Hangfire** qua `HangfireExtensions.UseHangfireRecurringJobs()` (gọi trong `Program.cs` sau `app.Build()`, lịch `*/15 * * * *` — BR-08).
+  - **Audit actor (patch 006):** job dùng system user chuẩn (`Username = "system"`, `Role = "System"`) làm `AuditLog.ActorId` — không còn mượn tài khoản Admin thật. Môi trường chưa chạy patch 006 → job fail rõ ràng `SYSTEM_USER_NOT_FOUND`. User system không thể đăng nhập (AuthService chặn `Role = "System"`; PasswordHash không phải BCrypt hash hợp lệ).
+
+## Optimistic concurrency (patch 005)
+`Races` và `RaceEntries` có cột `RowVersion` (ROWVERSION, EF `IsRowVersion`). Hai request cùng sửa 1 bản ghi qua change tracker → request sau nhận:
+
+`409 Conflict` — `{ "error": "CONCURRENCY_CONFLICT", "message": "Dữ liệu vừa bị người khác thay đổi, vui lòng tải lại rồi thử lại." }`
+
+Áp dụng cho MỌI endpoint ghi Race/RaceEntry qua `SaveChanges` (xử lý tập trung ở `ExceptionMiddleware`). FE nhận 409 này → tải lại dữ liệu rồi cho user thao tác lại. Các path atomic dùng `ExecuteUpdateAsync` (withdraw, hoàn điểm...) tự bảo vệ bằng UPDATE có điều kiện, không đi qua RowVersion — hành vi có chủ đích.
 - **SCH.9 (freeze config) — ĐÃ WIRE:** `TournamentSevice.UpdateRace` gọi `IRaceEntryService.EnsureRaceConfigEditableAsync(raceId)` khi phát hiện thay đổi trường nhạy cảm (`ScheduledTime` / `RaceDistanceOverride` / `TrackTypeOverride`) → throw `RACE_CONFIG_FROZEN` nếu đã bốc thăm hoặc đã có Prediction. Trường không nhạy cảm (`PurseAmount`, cutoff…) vẫn sửa được sau khi đóng băng.
 - **Refund điểm thực tế (còn lại):** Module N (`VirtualPointsTransaction` + `Wallet`) — hiện chỉ đánh dấu Prediction = `Refunded`.
 
