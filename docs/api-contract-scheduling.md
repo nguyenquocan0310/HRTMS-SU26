@@ -62,7 +62,13 @@ Service `IRaceEntryService.GetRaceScheduleAsync` (trả `RaceScheduleDto` có `c
 `PATCH /api/race-entries/{id}/confirm` · Role: **Owner**
 
 `200 OK` → `RaceEntryResponseDto` (status = `Confirmed`).
-Errors: `404 ENTRY_NOT_FOUND` · `403 FORBIDDEN` · `409 INVALID_STATUS` · `422 CONFIRMATION_CLOSED` (quá cut-off).
+Errors: `404 ENTRY_NOT_FOUND` · `403 FORBIDDEN` · `409 INVALID_STATUS` · `422 ENTRY_FEE_NOT_PAID` (lệ phí chưa được Admin xác nhận) · `422 CONFIRMATION_CLOSED` (quá cut-off).
+
+**Luật lệ phí ("Paid trước, Confirmed sau")** — chuẩn hóa từ behavior hệ thống, SRS chưa mô tả bằng câu chữ:
+- Giải thu phí (`EntryFeeAmount > 0`): Owner đóng phí offline → Admin xác nhận (`PATCH /api/admin/entries/{id}/fee-status`, `Unpaid → Paid`) → Owner mới confirm được. Entry `Unpaid` → `422 ENTRY_FEE_NOT_PAID`.
+- Giải miễn phí (`EntryFeeAmount == 0`): entry được auto-set `EntryFeeStatus = Paid` ngay khi allocate → Owner confirm bình thường.
+- Chỉ entry `Pending` mới confirm được; mọi trạng thái khác (kể cả `Cancelled`) → `409 INVALID_STATUS`, không "hồi sinh" entry đã hủy.
+- Phía Admin: xác nhận lệ phí và duyệt entry đều chỉ áp dụng cho entry `Pending`.
 
 ## 5. Rút lui — SCH.5
 `DELETE /api/race-entries/{id}` · Role: **Owner** · lý do (tùy chọn) qua query: `?reason=Ngựa chấn thương`

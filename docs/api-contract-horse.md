@@ -912,9 +912,10 @@ Admin xác nhận đã nhận tiền lệ phí ngoài hệ thống, cập nhật
 ### Business rules
 
 1. Load RaceEntry, kiểm tra `EntryFeeStatus = "Unpaid"` — nếu đã `"Paid"` → 409.
-2. Set `EntryFeeStatus = "Paid"`, `EntryFeeConfirmedBy = currentAdminId`, `EntryFeeConfirmedAt = UTC now`.
-3. Ghi `AuditLog`: `action = "Update_Entry_Fee_Status"`, `oldValue = "Unpaid"`, `newValue = "Paid"`.
-4. Gửi Notification đến Owner **(in-app + email)**: `title = "Lệ phí tham gia đã được xác nhận"`.
+2. Kiểm tra `RaceEntry.Status = "Pending"` — chỉ entry còn chờ xác nhận mới được xác nhận lệ phí; entry `Confirmed`/`Cancelled` hoặc trạng thái kết thúc khác → từ chối (không xác nhận phí cho entry đã hủy/đã chốt).
+3. Set `EntryFeeStatus = "Paid"`, `EntryFeeConfirmedBy = currentAdminId`, `EntryFeeConfirmedAt = UTC now`.
+4. Ghi `AuditLog`: `action = "Update_Entry_Fee_Status"`, `oldValue = "Unpaid"`, `newValue = "Paid"`.
+5. Gửi Notification đến Owner **(in-app + email)**: `title = "Lệ phí tham gia đã được xác nhận"`.
 
 ---
 
@@ -943,6 +944,7 @@ Admin xác nhận đã nhận tiền lệ phí ngoài hệ thống, cập nhật
 | 403 | `FORBIDDEN` | Role không phải Admin |
 | 404 | `RACE_ENTRY_NOT_FOUND` | `raceEntryId` không tồn tại |
 | 409 | `FEE_ALREADY_CONFIRMED` | `EntryFeeStatus` đã là `Paid` |
+| 409 | `ENTRY_NOT_PENDING` | `RaceEntry.Status ≠ Pending` (đã Confirmed/Cancelled — không xác nhận phí cho entry đã chốt/hủy) |
 
 ---
 
@@ -968,7 +970,7 @@ Thực hiện theo thứ tự:
 
 1. **Gate cứng — EntryFeeStatus:** Nếu `RaceEntry.EntryFeeStatus ≠ "Paid"` → **400, không thể override**. Admin phải xác nhận phí trước (endpoint 11).
 2. Kiểm tra **enrollment** của ngựa trong ĐÚNG giải đã `Approved` (`HorseTournamentEntry` theo `Pairing.HorseId` + `Pairing.TournamentId`) — nếu không → 422 `HORSE_ENROLLMENT_NOT_APPROVED`.
-3. Kiểm tra `RaceEntry.Status = "Pending"` — nếu đã `"Confirmed"` → 409.
+3. Kiểm tra `RaceEntry.Status = "Pending"` — mọi trạng thái khác đều bị chặn: đã `"Confirmed"` → 409; đã `"Cancelled"` (Owner rút / Admin từ chối) → từ chối, **không "hồi sinh"** entry đã hủy (tránh lệch `IsWithdrawn`/refund).
 4. Set `RaceEntry.Status = "Confirmed"`.
 5. Ghi `AuditLog`: `action = "Approve_RaceEntry"`.
 6. Gửi Notification đến Owner **(in-app + email)**: `title = "Đăng ký race được xác nhận"`.
@@ -995,6 +997,7 @@ Thực hiện theo thứ tự:
 | 403 | `FORBIDDEN` | Role không phải Admin |
 | 404 | `RACE_ENTRY_NOT_FOUND` | `raceEntryId` không tồn tại |
 | 409 | `ENTRY_ALREADY_CONFIRMED` | `RaceEntry.Status` đã là `Confirmed` |
+| 409 | `ENTRY_NOT_PENDING` | `RaceEntry.Status = Cancelled` hoặc trạng thái kết thúc khác — không được duyệt lại entry đã hủy |
 | 422 | `HORSE_ENROLLMENT_NOT_APPROVED` | Enrollment của ngựa trong giải này chưa được Admin duyệt |
 
 ---
