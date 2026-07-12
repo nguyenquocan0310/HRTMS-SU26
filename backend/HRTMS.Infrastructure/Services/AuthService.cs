@@ -39,7 +39,9 @@ public class AuthService : IAuthService
     private static readonly string[] ProfessionalRoles =
         ["Owner", "Jockey", "Referee", "Doctor"];
 
-    // 4 role bắt buộc khai báo người thân (FRD) — trừ Admin và Spectator.
+    // Cả 4 role (Owner/Jockey/Referee/Doctor) khai báo người thân (FRD)
+    // NGAY LÚC ĐĂNG KÝ — quyết định cập nhật: Doctor KHÔNG còn hoãn khai báo
+    // sang Dashboard (UI-S30) nữa; Owner cũng khai (dù là phía hay bị match).
     private static readonly string[] RolesRequireFrdAtRegister =
         ["Owner", "Jockey", "Referee", "Doctor"];
 
@@ -180,8 +182,18 @@ public class AuthService : IAuthService
         if (await _context.Users.AnyAsync(u => u.Email == normalizedEmail || u.Username == dto.Username))
             return ApiResponse<int>.Fail("Email hoặc Username đã tồn tại.");
 
+        if (RolesRequireFrdAtRegister.Contains(dto.Role) && dto.FamilyDeclarations == null)
+            return ApiResponse<int>.Fail(
+                $"Role {dto.Role} bắt buộc phải khai báo mục người thân (gửi mảng rỗng nếu không có người thân nào trong ngành).");
+
         if (dto.FamilyDeclarations != null && dto.FamilyDeclarations.Count > 0)
         {
+            // Cả 4 role Owner/Jockey/Referee/Doctor được khai FRD lúc đăng ký.
+            // Admin/Spectator không thuộc diện này — từ chối nếu lỡ gửi kèm.
+            if (!RolesRequireFrdAtRegister.Contains(dto.Role))
+                return ApiResponse<int>.Fail(
+                    $"Role {dto.Role} không khai báo người thân lúc đăng ký.");
+
             var frdValidation = await _frdValidator.ValidateAsync(
                 dto.FamilyDeclarations, declarantUserId: 0, isRegister: true);
             if (frdValidation != null)
