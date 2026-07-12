@@ -31,7 +31,7 @@ namespace HRTMS.Infrastructure.Services
             var race = await _context.Races
                 .Include(r => r.Round).ThenInclude(rd => rd.Tournament)
                 .FirstOrDefaultAsync(r => r.RaceId == raceId)
-                ?? throw new KeyNotFoundException($"Không tìm thấy Race #{raceId}");
+                ?? throw new KeyNotFoundException("Không tìm thấy cuộc đua.");
 
             var payouts = await _context.PursePayouts
                 .Include(p => p.RecipientUser)
@@ -74,7 +74,7 @@ namespace HRTMS.Infrastructure.Services
                 .Include(p => p.RecipientUser)
                 .Include(p => p.RaceEntry).ThenInclude(re => re.Pairing).ThenInclude(pa => pa.Horse)
                 .FirstOrDefaultAsync(p => p.PursePayoutId == payoutId)
-                ?? throw new KeyNotFoundException($"Không tìm thấy PursePayout #{payoutId}");
+                ?? throw new KeyNotFoundException("Không tìm thấy khoản chi thưởng.");
 
             var oldStatus = payout.PayoutStatus;
 
