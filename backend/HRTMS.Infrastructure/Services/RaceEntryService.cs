@@ -596,15 +596,16 @@ public class RaceEntryService : IRaceEntryService
         if (overdueIds.Count == 0)
             return 0;
 
-        // Actor cho job nen: he thong CHUA co system user chuan (AuditLog.ActorId la FK
-        // NOT NULL toi Users) nen tam dung Admin Active dau tien. Audit phan biet duoc
-        // qua action AUTO_CANCEL_RACE_ENTRY + reason "Auto-cancelled: confirmation
-        // cut-off passed" — khong nham voi thao tac tay cua admin. Blocker: muon actor
-        // rieng phai seed system user (quyet dinh cap nhom, ngoai scope PR nay).
+        // Actor cho job nen: user he thong chuan (patch 006 seed Username = 'system',
+        // Role = 'System') — audit ghi dung "he thong tu dong huy", khong muon
+        // tai khoan Admin that. Thieu system user = moi truong chua chay patch 006
+        // → fail ro rang thay vi ghi audit sai actor.
         var systemActorId = await _context.Users
-            .Where(u => u.Role == "Admin" && u.Status == "Active")
+            .Where(u => u.Role == "System" && u.Status == "Active")
             .Select(u => u.UserId)
             .FirstOrDefaultAsync();
+        if (systemActorId == 0)
+            throw new InvalidOperationException("SYSTEM_USER_NOT_FOUND");
 
         var count = 0;
         foreach (var id in overdueIds)
