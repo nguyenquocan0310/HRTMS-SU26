@@ -281,7 +281,7 @@ namespace HRTMS.Infrastructure.Services
             // Chỉ cho sửa khi còn ở Draft hoặc Open Registration
             if (tournament.Status != "Draft" && tournament.Status != "Open Registration")
                 throw new InvalidOperationException(
-                    $"Không thể sửa giải ở trạng thái '{tournament.Status}'");
+                    "Chỉ có thể chỉnh sửa thông tin giải đấu khi giải đang ở giai đoạn nháp hoặc chưa đóng đăng ký.");
 
             // Field-lock khi giải đang Open Registration (TRN.9.1): enrollment screening
             // (AllowedBreed), fee flow (EntryFeeAmount), pairing validation
@@ -457,20 +457,20 @@ namespace HRTMS.Infrastructure.Services
             if (RaceLevelStatuses.Contains(targetStatus))
             {
                 throw new InvalidOperationException(
-                    $"'{targetStatus}' là trạng thái cấp Race, không áp dụng cho Tournament (TRN.8).");
+                    "Trạng thái được chọn không hợp lệ đối với giải đấu.");
             }
 
             // Guard: chỉ cho phép transition hợp lệ
             if (!ValidTransitions.TryGetValue(tournament.Status, out var allowedNext) || allowedNext != targetStatus)
             {
-                // Bug 5 fix — thêm dấu ' đóng sau {targetStatus}
-                throw new InvalidOperationException($"Không thể chuyển từ '{tournament.Status}' sang '{targetStatus}'");
+                throw new InvalidOperationException(
+                    $"Không thể chuyển giải đấu từ trạng thái {StatusLabel(tournament.Status)} sang {StatusLabel(targetStatus)}.");
             }
 
             // Guard đặc biệt: chuyển sang Open Registration phải có PrizeDistributions
             if (targetStatus == "Open Registration" && tournament.PrizeDistributions.Count < 5)
             {
-                throw new InvalidOperationException("Phải cấu hình đủ 5 tỷ lệ PrizeDistributions trước khi đăng ký");
+                throw new InvalidOperationException("Vui lòng thiết lập đủ 5 mức tỷ lệ trao thưởng trước khi mở đăng ký.");
             }
 
             // Đóng đăng ký: validate nhẹ để giải chạy được từ vòng loại tới chung kết.
@@ -489,7 +489,7 @@ namespace HRTMS.Infrastructure.Services
                 if (confirmedPairings == 0)
                 {
                     throw new InvalidOperationException(
-                        "Chưa có cặp Ngựa–Nài nào được xác nhận (Confirmed). Không thể đóng đăng ký");
+                        "Chưa có cặp Ngựa–Nài nào được xác nhận. Không thể đóng đăng ký khi giải chưa có cặp thi đấu.");
                 }
             }
 
@@ -503,7 +503,7 @@ namespace HRTMS.Infrastructure.Services
                 if (unfinished.Count > 0)
                 {
                     throw new InvalidOperationException(
-                        "Chỉ có thể hoàn thành giải khi mọi cuộc đua đã ở trạng thái Official hoặc Cancelled (TRN.8).");
+                        "Chỉ có thể hoàn tất giải đấu sau khi tất cả cuộc đua đã có kết quả chính thức hoặc đã được hủy.");
                 }
             }
 
@@ -598,7 +598,7 @@ namespace HRTMS.Infrastructure.Services
                                 {
                                     RecipientId = ownerId,
                                     Title = "Hoàn lệ phí tham gia",
-                                    Message = $"Giải đấu '{tournament.Name}' đã bị hủy. Lệ phí của lượt đăng ký #{entry.RaceEntryId} được chuyển sang 'Refund Pending'.",
+                                    Message = $"Giải đấu \"{tournament.Name}\" đã bị hủy. Lệ phí của mã đăng ký {entry.RaceEntryId} đang được xử lý hoàn lại. Bạn sẽ nhận được thông báo khi quá trình hoàn tất.",
                                     Type = "In-app",
                                     IsRead = false,
                                     RelatedEntityType = "RaceEntry",
@@ -692,7 +692,7 @@ namespace HRTMS.Infrastructure.Services
                     {
                         RecipientId = userId,
                         Title = "Giải đấu bị hủy",
-                        Message = $"Giải đấu '{tournament.Name}' đã bị hủy bởi Ban tổ chức.",
+                        Message = $"Giải đấu \"{tournament.Name}\" đã bị hủy. Điểm dự đoán liên quan của bạn đã được hoàn về ví.",
                         Type = "In-app",
                         IsRead = false,
                         RelatedEntityType = "Tournament",
@@ -729,8 +729,20 @@ namespace HRTMS.Infrastructure.Services
         {
             if (tournamentStatus == "Completed" || tournamentStatus == "Cancelled")
                 throw new InvalidOperationException(
-                    $"Giải đấu đang ở trạng thái '{tournamentStatus}' — không thể tạo/sửa vòng đấu hoặc cuộc đua.");
+                    $"Giải đấu {StatusLabel(tournamentStatus)} nên không thể tạo hoặc chỉnh sửa vòng đấu và cuộc đua.");
         }
+
+        // Nhãn trạng thái giải đấu bằng tiếng Việt cho thông báo/lỗi hiển thị cho người dùng.
+        // Không thay giá trị enum lưu DB (Draft/Open Registration/...) — chỉ dùng khi render text.
+        private static string StatusLabel(string status) => status switch
+        {
+            "Draft" => "đang ở giai đoạn nháp",
+            "Open Registration" => "đang mở đăng ký",
+            "Closed Registration" => "đã đóng đăng ký",
+            "Completed" => "đã hoàn tất",
+            "Cancelled" => "đã bị hủy",
+            _ => status
+        };
 
         public async Task<List<PrizeDistributionResponseDto>> SetPrizeDistributionsAsync(int tournamentId, SetPrizeDistributionDto dto, int adminUserId)
         {
@@ -744,7 +756,7 @@ namespace HRTMS.Infrastructure.Services
             // đóng đăng ký (PursePayout có thể đã tính theo tỷ lệ cũ).
             if (tournament.Status != "Draft" && tournament.Status != "Open Registration")
                 throw new InvalidOperationException(
-                    $"Không thể sửa tỷ lệ thưởng khi giải ở trạng thái '{tournament.Status}'");
+                    "Chỉ có thể điều chỉnh tỷ lệ trao thưởng khi giải đấu đang ở giai đoạn nháp hoặc chưa đóng đăng ký.");
 
             // 1. Validate đủ 5 position không trùng
             var positions = dto.Distributions.Select(d => d.Position).OrderBy(p => p).ToList();
