@@ -13,15 +13,12 @@ namespace HRTMS.Tests;
 
 /// <summary>
 /// Khóa hành vi tham gia nhiều giải (Module B roster + C horse + E scheduling).
-/// Quyết định thiết kế MVP (SRS TRN.11 chỉ yêu cầu unique-trong-giải, KHÔNG bắt
-/// Jockey single-tournament):
-///   • Jockey/Owner/Doctor/Referee: đăng ký nhiều giải song song — CHO PHÉP;
-///     chỉ chặn trùng roster trong CÙNG 1 giải (UQ_TP_TourUser + app check).
+/// Quyết định nghiệp vụ (nhóm chốt):
+///   • Jockey: CHỈ được tham gia 1 giải chưa kết thúc tại một thời điểm — guard
+///     trong RegisterAsync (Open/Closed Registration; Rejected không tính).
+///   • Owner/Doctor/Referee: đăng ký nhiều giải song song — CHO PHÉP.
 ///   • Horse: chặn tham gia >1 giải chưa kết thúc (vật lý, SRS Module C).
-///   • Ràng buộc vật lý của Jockey = trùng giờ ở cấp RACE (SCH.8 DOUBLE_BOOKED),
-///     không phải ở cấp roster.
-/// Nếu về sau nhóm chốt Jockey single-tournament, guard thêm CHỈ cho Role=Jockey
-/// trong RegisterAsync và các test "multi-tournament" của Jockey sẽ được đảo lại.
+///   • Ràng buộc vật lý của Jockey ở cấp RACE (SCH.8 DOUBLE_BOOKED) vẫn giữ song song.
 /// SQLite in-memory theo cùng pattern các test hiện có.
 /// </summary>
 public sealed class RosterMultiTournamentTests : IDisposable
@@ -113,12 +110,13 @@ public sealed class RosterMultiTournamentTests : IDisposable
     // Roster: Jockey/Owner/Doctor/Referee đăng ký NHIỀU giải — CHO PHÉP
     // =====================================================================
 
+    // ── Owner/Doctor/Referee: nhiều giải song song — CHO PHÉP ────────────────
+
     [Theory]
-    [InlineData(JockeyId, "Jockey")]
     [InlineData(OwnerId, "Owner")]
     [InlineData(DoctorId, "Doctor")]
     [InlineData(RefereeId, "Referee")]
-    public async Task Roster_AnyRole_CanRegisterMultipleTournaments(int userId, string role)
+    public async Task Roster_NonJockeyRole_CanRegisterMultipleTournaments(int userId, string role)
     {
         SeedBase();
 
@@ -147,6 +145,81 @@ public sealed class RosterMultiTournamentTests : IDisposable
 
         using var verify = NewContext();
         Assert.Equal(1, await verify.TournamentParticipants.CountAsync(p => p.UserId == JockeyId && p.TournamentId == T1));
+    }
+
+    // ── Jockey: chỉ 1 giải chưa kết thúc tại một thời điểm (nhóm chốt) ────────
+
+    [Theory]
+    [InlineData("Open Registration")]
+    [InlineData("Closed Registration")]
+    public async Task Jockey_SecondUnfinishedTournament_Blocked(string firstTournamentStatus)
+    {
+        SeedBase();
+        // Đặt giải 1 ở trạng thái "chưa kết thúc" cần kiểm.
+        using (var ctx = NewContext())
+        {
+            var t1 = await ctx.Tournaments.SingleAsync(t => t.TournamentId == T1);
+            t1.Status = firstTournamentStatus;
+            await ctx.SaveChangesAsync();
+        }
+        // Đăng ký giải 1 trực tiếp (bỏ qua guard khi giải Closed Registration
+        // không nhận đăng ký mới — seed thẳng bản ghi roster).
+        using (var ctx = NewContext())
+        {
+            ctx.TournamentParticipants.Add(new TournamentParticipant
+            {
+                TournamentId = T1, UserId = JockeyId, Role = "Jockey",
+                Status = "Approved", ScreeningStatus = "AutoEligible", RegisteredAt = DateTime.UtcNow
+            });
+            await ctx.SaveChangesAsync();
+        }
+
+        using (var ctx = NewContext())
+        {
+            var second = await NewRosterService(ctx).RegisterAsync(JockeyId, "Jockey", T2);
+            Assert.False(second.Success);
+        }
+
+        using var verify = NewContext();
+        Assert.Equal(0, await verify.TournamentParticipants.CountAsync(p => p.UserId == JockeyId && p.TournamentId == T2));
+    }
+
+    [Fact]
+    public async Task Jockey_AfterPreviousTournamentCompleted_Allowed()
+    {
+        SeedBase();
+        // Giải cũ (TDone) đã Completed → không tính là đang tham gia.
+        using (var ctx = NewContext())
+        {
+            ctx.TournamentParticipants.Add(new TournamentParticipant
+            {
+                TournamentId = TDone, UserId = JockeyId, Role = "Jockey",
+                Status = "Approved", ScreeningStatus = "AutoEligible", RegisteredAt = DateTime.UtcNow
+            });
+            await ctx.SaveChangesAsync();
+        }
+
+        using (var ctx = NewContext())
+            Assert.True((await NewRosterService(ctx).RegisterAsync(JockeyId, "Jockey", T1)).Success);
+    }
+
+    [Fact]
+    public async Task Jockey_PreviousRejected_Allowed()
+    {
+        SeedBase();
+        // Bị Rejected ở giải khác đang Open → KHÔNG chặn đăng ký giải mới.
+        using (var ctx = NewContext())
+        {
+            ctx.TournamentParticipants.Add(new TournamentParticipant
+            {
+                TournamentId = T2, UserId = JockeyId, Role = "Jockey",
+                Status = "Rejected", ScreeningStatus = "AutoRejected", RegisteredAt = DateTime.UtcNow
+            });
+            await ctx.SaveChangesAsync();
+        }
+
+        using (var ctx = NewContext())
+            Assert.True((await NewRosterService(ctx).RegisterAsync(JockeyId, "Jockey", T1)).Success);
     }
 
     // =====================================================================
