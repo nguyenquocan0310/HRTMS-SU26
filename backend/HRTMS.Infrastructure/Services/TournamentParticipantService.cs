@@ -49,6 +49,26 @@ public class TournamentParticipantService : ITournamentParticipantService
         if (existing != null)
             return ApiResponse<ParticipantResponseDto>.Fail("Bạn đã đăng ký tham gia giải này rồi.");
 
+        // Jockey chỉ được tham gia 1 giải chưa kết thúc tại một thời điểm (nhóm chốt).
+        // CHỈ áp cho Jockey — Owner/Doctor/Referee được phục vụ nhiều giải song song.
+        // Bản ghi 'Rejected' không tính là đang tham gia; chỉ giải Open/Closed
+        // Registration mới là "chưa kết thúc" (Completed/Cancelled = đã xong).
+        if (role == "Jockey")
+        {
+            var activeElsewhere = await _context.TournamentParticipants
+                .Include(p => p.Tournament)
+                .AnyAsync(p =>
+                    p.UserId == userId &&
+                    p.Role == "Jockey" &&
+                    p.TournamentId != tournamentId &&
+                    p.Status != "Rejected" &&
+                    (p.Tournament.Status == "Open Registration" ||
+                     p.Tournament.Status == "Closed Registration"));
+            if (activeElsewhere)
+                return ApiResponse<ParticipantResponseDto>.Fail(
+                    "Bạn đang tham gia một giải chưa kết thúc nên chưa thể đăng ký thêm giải mới.");
+        }
+
         var now = DateTime.UtcNow;
         var decision = await BuildScreeningDecisionAsync(userId, role, tournament);
         if (decision == null)
