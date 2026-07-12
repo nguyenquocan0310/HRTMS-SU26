@@ -20,4 +20,8 @@ public interface IMedicalCheckService
     Task<List<MedicalCheckListDto>> GetRaceEntriesAsync(
         int doctorId,
         int raceId);
+
+    Task<RaceEntryHealthProfileDto> GetRaceEntryHealthProfileAsync(
+        int doctorId,
+        int raceEntryId);
 }

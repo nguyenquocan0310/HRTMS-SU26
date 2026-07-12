@@ -353,4 +353,102 @@ public class MedicalCheckService : IMedicalCheckService
 
     return entries;
 }
+    public async Task<RaceEntryHealthProfileDto> GetRaceEntryHealthProfileAsync(
+        int doctorId,
+        int raceEntryId)
+    {
+        // Kiem tra Doctor co ton tai va dang Active hay khong
+        await ValidateDoctorAsync(doctorId);
+
+        var raceEntry = await _context.RaceEntries
+            .Include(e => e.Race)
+                .ThenInclude(r => r.Round)
+                    .ThenInclude(round => round.Tournament)
+            .Include(e => e.Pairing)
+                .ThenInclude(p => p.Jockey)
+                    .ThenInclude(j => j.Jockey)
+            .Include(e => e.Pairing)
+                .ThenInclude(p => p.Horse)
+            .Include(e => e.PreRaceWeightByDoctor)
+                .ThenInclude(d => d!.Doctor)
+            .Include(e => e.PostRaceWeightByDoctor)
+                .ThenInclude(d => d!.Doctor)
+            .Include(e => e.HorseIdentityCheckedByDoctor)
+                .ThenInclude(d => d!.Doctor)
+            .Include(e => e.ClinicalCheckedByDoctor)
+                .ThenInclude(d => d!.Doctor)
+            .FirstOrDefaultAsync(e => e.RaceEntryId == raceEntryId);
+
+        if (raceEntry == null)
+        {
+            throw new KeyNotFoundException("RACE_ENTRY_NOT_FOUND");
+        }
+
+        // Doctor phai duoc phan cong vao Race nay moi duoc xem ho so
+        var doctorAssigned = await _context.DoctorAssignments
+            .AnyAsync(a =>
+                a.RaceId == raceEntry.RaceId &&
+                a.DoctorId == doctorId);
+
+        if (!doctorAssigned)
+        {
+            throw new InvalidOperationException("DOCTOR_NOT_ASSIGNED_TO_RACE");
+        }
+
+        var jockeyProfile = raceEntry.Pairing.Jockey;
+        var horse = raceEntry.Pairing.Horse;
+        var thresholdKg = raceEntry.Race.Round.Tournament.PreRaceWeightThresholdKg;
+
+        decimal? preRaceWeightDifference = raceEntry.PreRaceJockeyWeight.HasValue
+            ? Math.Abs(raceEntry.PreRaceJockeyWeight.Value - jockeyProfile.SelfDeclaredWeight)
+            : null;
+
+        return new RaceEntryHealthProfileDto
+        {
+            RaceEntryId = raceEntry.RaceEntryId,
+            RaceId = raceEntry.RaceId,
+
+            // Jockey
+            JockeyId = jockeyProfile.JockeyId,
+            JockeyName = jockeyProfile.Jockey.FullName,
+            LicenseCertificate = jockeyProfile.LicenseCertificate,
+            ExperienceYears = jockeyProfile.ExperienceYears,
+            BloodType = jockeyProfile.BloodType,
+            HealthStatus = jockeyProfile.HealthStatus,
+            SelfDeclaredWeight = jockeyProfile.SelfDeclaredWeight,
+            PreRaceWeightThresholdKg = thresholdKg,
+            PreRaceJockeyWeight = raceEntry.PreRaceJockeyWeight,
+            PreRaceWeightByDoctorId = raceEntry.PreRaceWeightByDoctorId,
+            PreRaceWeightByDoctorName = raceEntry.PreRaceWeightByDoctor?.Doctor.FullName,
+            PreRaceWeightDifference = preRaceWeightDifference,
+            IsPreRaceWeightWarning = preRaceWeightDifference.HasValue
+                ? preRaceWeightDifference.Value > thresholdKg
+                : null,
+            PostRaceJockeyWeight = raceEntry.PostRaceJockeyWeight,
+            PostRaceWeightByDoctorId = raceEntry.PostRaceWeightByDoctorId,
+            PostRaceWeightByDoctorName = raceEntry.PostRaceWeightByDoctor?.Doctor.FullName,
+            PostRaceWeightFlagged = raceEntry.PostRaceWeightFlagged,
+
+            // Horse
+            HorseId = horse.HorseId,
+            HorseName = horse.Name,
+            Breed = horse.Breed,
+            Color = horse.Color,
+            Gender = horse.Gender,
+            BirthYear = horse.BirthYear,
+            IdentifyingMarks = horse.IdentifyingMarks,
+            VaccinationRecordRef = horse.VaccinationRecordRef,
+            DopingTestDate = horse.DopingTestDate,
+            DopingTestResult = horse.DopingTestResult,
+            HorseIdentityCheckStatus = raceEntry.HorseIdentityCheckStatus,
+            HorseIdentityCheckedByDoctorId = raceEntry.HorseIdentityCheckedByDoctorId,
+            HorseIdentityCheckedByDoctorName = raceEntry.HorseIdentityCheckedByDoctor?.Doctor.FullName,
+            HorseIdentityCheckedAt = raceEntry.HorseIdentityCheckedAt,
+            ClinicalStatus = raceEntry.ClinicalStatus,
+            ClinicalCheckedByDoctorId = raceEntry.ClinicalCheckedByDoctorId,
+            ClinicalCheckedByDoctorName = raceEntry.ClinicalCheckedByDoctor?.Doctor.FullName,
+            ClinicalCheckedAt = raceEntry.ClinicalCheckedAt,
+            UnfitReason = raceEntry.UnfitReason
+        };
+    }
 }
