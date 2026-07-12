@@ -1,19 +1,27 @@
 import { useState, useEffect } from 'react';
 import type { JockeyInvitation, Horse } from '../../types/owner.types';
-import { getAvailableJockeys, getMyHorses, getOwnerPairings, inviteJockey, confirmPairing } from '../../services/ownerService';
+import { cancelPairing, getAvailableJockeys, getMyHorses, getOwnerPairings, inviteJockey, confirmPairing } from '../../services/ownerService';
 import { getMyTournamentParticipations, type ParticipationResponse } from '../../services/tournamentService';
 
-// Status badge for invitation status
-const INVITE_STATUS: Record<string, { label: string; cls: string; dot: string }> = {
-  Pending:   { label: 'Chờ phản hồi',            cls: 'bg-yellow-50 text-yellow-700 border-yellow-200',   dot: 'bg-yellow-500'  },
-  Accepted:  { label: 'Jockey đã chấp nhận',      cls: 'bg-blue-50 text-blue-700 border-blue-200',        dot: 'bg-blue-500'    },
-  Confirmed: { label: 'Đã xác nhận ghép cặp',     cls: 'bg-green-50 text-green-700 border-green-200',     dot: 'bg-green-500'   },
-  Declined:  { label: 'Jockey từ chối',            cls: 'bg-red-50 text-red-700 border-red-200',           dot: 'bg-red-500'     },
-  Cancelled: { label: 'Đã hủy',                   cls: 'bg-gray-50 text-gray-500 border-gray-200',        dot: 'bg-gray-400'    },
+const PAIRING_STATUS: Record<string, { label: string; cls: string; dot: string }> = {
+  Pending:   { label: 'Chờ xác nhận',          cls: 'bg-yellow-50 text-yellow-700 border-yellow-200', dot: 'bg-yellow-500' },
+  Accepted:  { label: 'Chờ xác nhận',          cls: 'bg-blue-50 text-blue-700 border-blue-200',       dot: 'bg-blue-500' },
+  Confirmed: { label: 'Đã xác nhận ghép cặp',  cls: 'bg-green-50 text-green-700 border-green-200',    dot: 'bg-green-500' },
+  Declined:  { label: 'Bị từ chối',            cls: 'bg-red-50 text-red-700 border-red-200',          dot: 'bg-red-500' },
+  Cancelled: { label: 'Đã hủy',                cls: 'bg-gray-50 text-gray-500 border-gray-200',       dot: 'bg-gray-400' },
 };
 
-function InviteStatusBadge({ status }: { status: JockeyInvitation['status'] }) {
-  const cfg = INVITE_STATUS[status] ?? { label: status, cls: 'bg-gray-50 text-gray-600 border-gray-200', dot: 'bg-gray-400' };
+const JOCKEY_RESPONSE: Record<string, { label: string; cls: string; dot: string }> = {
+  Pending:   { label: 'Chờ phản hồi',   cls: 'bg-yellow-50 text-yellow-700 border-yellow-200', dot: 'bg-yellow-500' },
+  Accepted:  { label: 'Đã chấp nhận',   cls: 'bg-blue-50 text-blue-700 border-blue-200',       dot: 'bg-blue-500' },
+  Confirmed: { label: 'Đã chấp nhận',   cls: 'bg-green-50 text-green-700 border-green-200',    dot: 'bg-green-500' },
+  Declined:  { label: 'Đã từ chối',     cls: 'bg-red-50 text-red-700 border-red-200',          dot: 'bg-red-500' },
+  Cancelled: { label: 'Đã hủy',         cls: 'bg-gray-50 text-gray-500 border-gray-200',       dot: 'bg-gray-400' },
+};
+
+function StatusBadge({ status, kind }: { status: JockeyInvitation['status']; kind: 'pairing' | 'response' }) {
+  const cfg = (kind === 'pairing' ? PAIRING_STATUS : JOCKEY_RESPONSE)[status];
+  if (!cfg) return <span className="text-xs text-gray-400">—</span>;
   return (
     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium rounded border ${cfg.cls}`}>
       <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
@@ -45,6 +53,7 @@ export default function JockeyInvite() {
   const [activeTab, setActiveTab] = useState<'available' | 'history'>('available');
   // Track which pairing is being confirmed (shows spinner on that row only)
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [confirmSuccess, setConfirmSuccess] = useState<string | null>(null);
 
@@ -142,6 +151,7 @@ export default function JockeyInvite() {
             respondedAt: item.respondedAt ? new Date(item.respondedAt) : undefined,
             horseID: String(item.horse?.horseId || item.horseId || item.horseID || ''),
             horseName: item.horse?.name || '',
+            requestMessage: item.requestMessage || '',
           };
         });
         setInvitations(mapped);
@@ -229,6 +239,29 @@ export default function JockeyInvite() {
       setConfirmError(err?.message || 'Đã xảy ra lỗi khi xác nhận ghép cặp. Vui lòng thử lại.');
     } finally {
       setConfirmingId(null);
+    }
+  };
+
+  const handleCancelPairing = async (invitationID: string) => {
+    if (cancellingId === invitationID) return;
+    if (!window.confirm('Bạn có chắc muốn hủy lời mời ghép cặp này không?')) return;
+
+    setConfirmError(null);
+    setConfirmSuccess(null);
+    setCancellingId(invitationID);
+    try {
+      await cancelPairing(invitationID);
+      setInvitations((prev) =>
+        prev.map((inv) =>
+          inv.invitationID === invitationID ? { ...inv, status: 'Cancelled' as const } : inv
+        )
+      );
+      setConfirmSuccess('Hủy lời mời ghép cặp thành công!');
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (err) {
+      setConfirmError(err instanceof Error ? err.message : 'Hủy lời mời ghép cặp thất bại.');
+    } finally {
+      setCancellingId(null);
     }
   };
 
@@ -434,13 +467,14 @@ export default function JockeyInvite() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[1080px] text-sm">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Jockey</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Ngựa</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Lời nhắn</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Trạng thái</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Trạng thái ghép cặp</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Phản hồi Jockey</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Ngày mời</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Hành động</th>
                     </tr>
@@ -448,6 +482,8 @@ export default function JockeyInvite() {
                   <tbody className="divide-y divide-gray-100">
                     {filteredInvitations.map((invitation) => {
                       const isConfirming = confirmingId === invitation.invitationID;
+                      const isCancelling = cancellingId === invitation.invitationID;
+                      const canCancel = invitation.status === 'Pending' || invitation.status === 'Accepted';
                       return (
                         <tr key={invitation.invitationID} className="hover:bg-gray-50 transition-colors">
                           <td className="px-4 py-3 font-medium text-gray-800">{invitation.jockeyName || 'N/A'}</td>
@@ -460,28 +496,42 @@ export default function JockeyInvite() {
                             {invitation.requestMessage || '—'}
                           </td>
                           <td className="px-4 py-3">
-                            <InviteStatusBadge status={invitation.status} />
+                            <StatusBadge status={invitation.status} kind="pairing" />
+                          </td>
+                          <td className="px-4 py-3">
+                            <StatusBadge status={invitation.status} kind="response" />
                           </td>
                           <td className="px-4 py-3 text-gray-500 text-xs">
                             {new Date(invitation.invitedAt).toLocaleDateString('vi-VN')}
                           </td>
                           <td className="px-4 py-3">
-                            {invitation.status === 'Accepted' ? (
-                              <button
-                                onClick={() => handleConfirmPairing(invitation.invitationID)}
-                                disabled={isConfirming}
-                                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-full transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                              >
-                                {isConfirming && (
-                                  <span className="inline-block animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent" />
+                            {invitation.status === 'Accepted' || canCancel ? (
+                              <div className="flex flex-wrap items-center gap-2">
+                                {invitation.status === 'Accepted' && (
+                                  <button
+                                    onClick={() => handleConfirmPairing(invitation.invitationID)}
+                                    disabled={isConfirming || isCancelling}
+                                    className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                  >
+                                    {isConfirming && (
+                                      <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                    )}
+                                    {isConfirming ? 'Đang xác nhận...' : 'Xác nhận ghép cặp'}
+                                  </button>
                                 )}
-                                {isConfirming ? 'Đang xác nhận...' : 'Xác nhận ghép cặp'}
-                              </button>
-                            ) : invitation.status === 'Confirmed' ? (
-                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded">
-                                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                                Đã xác nhận
-                              </span>
+                                {canCancel && (
+                                  <button
+                                    onClick={() => handleCancelPairing(invitation.invitationID)}
+                                    disabled={isConfirming || isCancelling}
+                                    className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-bold text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                  >
+                                    {isCancelling && (
+                                      <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+                                    )}
+                                    {isCancelling ? 'Đang hủy...' : 'Hủy lời mời'}
+                                  </button>
+                                )}
+                              </div>
                             ) : (
                               <span className="text-xs text-gray-400">—</span>
                             )}
