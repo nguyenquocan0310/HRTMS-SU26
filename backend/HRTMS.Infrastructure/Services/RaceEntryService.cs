@@ -454,7 +454,7 @@ public class RaceEntryService : IRaceEntryService
                 .ToListAsync();
             var refunded = await RefundPredictionsAsync(
                 pendingPredictions,
-                $"Ngựa bạn dự đoán ở lượt đăng ký #{raceEntryId} đã rút khỏi cuộc đua. Điểm dự đoán đã được hoàn về ví.",
+                $"Ngựa bạn dự đoán ở cuộc đua #{entry.RaceId} đã rút khỏi cuộc đua. Điểm dự đoán đã được hoàn về ví.",
                 "RaceEntry", raceEntryId, now);
 
             // Thong bao khan URGENT cho tat ca Admin de dieu phoi phuong an du phong.
@@ -468,7 +468,7 @@ public class RaceEntryService : IRaceEntryService
                 await _notification.SendBulkAsync(
                     adminIds,
                     "Khẩn: Có ngựa rút khỏi cuộc đua",
-                    $"Đăng ký #{raceEntryId} ở cuộc đua #{entry.RaceId} đã bị hủy. Lý do: {reason}. " +
+                    $"Mã đăng ký {raceEntryId} ở cuộc đua #{entry.RaceId} đã bị hủy. Lý do: {reason}. " +
                     $"Vị trí xuất phát đã được giải phóng.",
                     type: "Both",
                     relatedEntityType: "RaceEntry",
