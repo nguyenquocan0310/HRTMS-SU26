@@ -114,7 +114,7 @@ public class ReportService : IReportService
     private async Task<string> RequireTournamentNameAsync(int tournamentId)
     {
         if (tournamentId <= 0)
-            throw new ArgumentException("tournamentId không hợp lệ.");
+            throw new ArgumentException("Mã giải đấu không hợp lệ.");
 
         var name = await _context.Tournaments.AsNoTracking()
             .Where(t => t.TournamentId == tournamentId)

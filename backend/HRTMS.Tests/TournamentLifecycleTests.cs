@@ -252,7 +252,7 @@ public sealed class TournamentLifecycleTests : IDisposable
             {
                 RaceNumber = 2, ScheduledTime = DateTime.UtcNow.AddDays(2), PurseAmount = 100m
             }, AdminId));
-        Assert.Contains("Cancelled", ex.Message);
+        Assert.Contains("đã bị hủy", ex.Message);
     }
 
     [Fact]
@@ -265,7 +265,7 @@ public sealed class TournamentLifecycleTests : IDisposable
             {
                 ScheduledTime = DateTime.UtcNow.AddDays(2), PurseAmount = 100m
             }, AdminId));
-        Assert.Contains("Cancelled", ex.Message);
+        Assert.Contains("đã bị hủy", ex.Message);
     }
 
     [Fact]

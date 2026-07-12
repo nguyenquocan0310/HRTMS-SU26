@@ -32,7 +32,7 @@ public class PairingController : ControllerBase
             return Unauthorized(new
             {
                 error = "UNAUTHORIZED",
-                message = "Invalid or missing user identity."
+                message = "Phiên đăng nhập không hợp lệ."
             });
         }
 
@@ -53,7 +53,7 @@ public class PairingController : ControllerBase
             return NotFound(new
             {
                 error = "HORSE_NOT_FOUND",
-                message = "Horse was not found."
+                message = "Không tìm thấy hồ sơ ngựa."
             });
         }
         catch (KeyNotFoundException ex)
@@ -62,7 +62,7 @@ public class PairingController : ControllerBase
             return NotFound(new
             {
                 error = "JOCKEY_NOT_FOUND",
-                message = "Jockey was not found."
+                message = "Không tìm thấy nài ngựa."
             });
         }
         catch (UnauthorizedAccessException ex)
@@ -73,7 +73,7 @@ public class PairingController : ControllerBase
                 new
                 {
                     error = "HORSE_NOT_OWNED",
-                    message = "The horse does not belong to the current owner."
+                    message = "Ngựa này không thuộc quyền sở hữu của bạn."
                 });
         }
         catch (InvalidOperationException ex)
@@ -82,7 +82,7 @@ public class PairingController : ControllerBase
             return UnprocessableEntity(new
             {
                 error = "JOCKEY_NOT_ACTIVE",
-                message = "The jockey is not active."
+                message = "Nài ngựa hiện không hoạt động."
             });
         }
         catch (InvalidOperationException ex)
@@ -91,7 +91,7 @@ public class PairingController : ControllerBase
             return UnprocessableEntity(new
             {
                 error = "HORSE_NOT_APPROVED",
-                message = "The horse has not been approved."
+                message = "Ngựa chưa được phê duyệt tham gia."
             });
         }
         catch (InvalidOperationException ex)
@@ -101,7 +101,7 @@ public class PairingController : ControllerBase
             return Conflict(new
             {
                 error = "HORSE_ALREADY_HAS_ACCEPTED_JOCKEY",
-                message = "This horse already has an accepted jockey."
+                message = "Ngựa này đã có nài ngựa nhận ghép cặp."
             });
         }
         catch (InvalidOperationException ex)
@@ -111,7 +111,7 @@ public class PairingController : ControllerBase
             return Conflict(new
             {
                 error = "JOCKEY_ALREADY_HAS_ACCEPTED_HORSE",
-                message = "This jockey already has an accepted horse."
+                message = "Nài ngựa này đã nhận ghép cặp với một ngựa khác."
             });
         }
         catch (InvalidOperationException ex)
@@ -121,7 +121,7 @@ public class PairingController : ControllerBase
             return Conflict(new
             {
                 error = "PAIRING_ALREADY_EXISTS",
-                message = "A pending or accepted pairing already exists for this horse and jockey."
+                message = "Đã tồn tại lời mời ghép cặp đang chờ hoặc đã được chấp nhận cho ngựa và nài này."
             });
         }
     }
@@ -139,7 +139,7 @@ public class PairingController : ControllerBase
             return Unauthorized(new
             {
                 error = "UNAUTHORIZED",
-                message = "Invalid or missing user identity."
+                message = "Phiên đăng nhập không hợp lệ."
             });
         }
 
@@ -157,7 +157,7 @@ public class PairingController : ControllerBase
             return NotFound(new
             {
                 error = "PAIRING_NOT_FOUND",
-                message = "Pairing was not found."
+                message = "Không tìm thấy cặp thi đấu."
             });
         }
         catch (UnauthorizedAccessException ex)
@@ -168,7 +168,7 @@ public class PairingController : ControllerBase
                 new
                 {
                     error = "FORBIDDEN",
-                    message = "You are not allowed to accept this pairing."
+                    message = "Bạn không có quyền chấp nhận lời mời ghép cặp này."
                 });
         }
         catch (InvalidOperationException ex)
@@ -177,7 +177,7 @@ public class PairingController : ControllerBase
             return Conflict(new
             {
                 error = "HORSE_ALREADY_ACCEPTED",
-                message = "This horse already has an accepted jockey."
+                message = "Ngựa này đã có nài ngựa nhận ghép cặp."
             });
         }
         catch (InvalidOperationException ex)
@@ -186,7 +186,7 @@ public class PairingController : ControllerBase
             return UnprocessableEntity(new
             {
                 error = "HORSE_NOT_APPROVED",
-                message = "Horse is still waiting for admin approval."
+                message = "Ngựa đang chờ Ban tổ chức phê duyệt."
             });
         }
     }
@@ -206,7 +206,7 @@ public class PairingController : ControllerBase
             return Unauthorized(new
             {
                 error = "UNAUTHORIZED",
-                message = "Invalid or missing user identity."
+                message = "Phiên đăng nhập không hợp lệ."
             });
         }
 
@@ -225,7 +225,7 @@ public class PairingController : ControllerBase
             return NotFound(new
             {
                 error = "PAIRING_NOT_FOUND",
-                message = "Pairing was not found."
+                message = "Không tìm thấy cặp thi đấu."
             });
         }
         catch (UnauthorizedAccessException ex)
@@ -236,7 +236,7 @@ public class PairingController : ControllerBase
                 new
                 {
                     error = "FORBIDDEN",
-                    message = "You are not allowed to decline this pairing."
+                    message = "Bạn không có quyền từ chối lời mời ghép cặp này."
                 });
         }
         catch (InvalidOperationException ex)
@@ -245,7 +245,7 @@ public class PairingController : ControllerBase
             return Conflict(new
             {
                 error = "INVALID_STATUS",
-                message = "Only pending pairings can be declined."
+                message = "Chỉ có thể từ chối lời mời đang chờ phản hồi."
             });
         }
     }
@@ -267,7 +267,7 @@ public class PairingController : ControllerBase
             return Unauthorized(new
             {
                 error = "UNAUTHORIZED",
-                message = "Invalid or missing user identity."
+                message = "Phiên đăng nhập không hợp lệ."
             });
         }
 
@@ -289,7 +289,7 @@ public class PairingController : ControllerBase
             return BadRequest(new
             {
                 error = "VALIDATION_ERROR",
-                message = "Status must be Pending, Accepted, Declined, Confirmed, or Cancelled."
+                message = "Trạng thái lọc không hợp lệ."
             });
         }
     }
@@ -321,7 +321,7 @@ public class PairingController : ControllerBase
             return BadRequest(new
             {
                 error = "VALIDATION_ERROR",
-                message = "Status must be Pending, Accepted, Declined, Confirmed, or Cancelled."
+                message = "Trạng thái lọc không hợp lệ."
             });
         }
     }
@@ -339,7 +339,7 @@ public class PairingController : ControllerBase
             return Unauthorized(new
             {
                 error = "UNAUTHORIZED",
-                message = "Token khong hop le"
+                message = "Phiên đăng nhập không hợp lệ."
             });
         }
 
@@ -357,7 +357,7 @@ public class PairingController : ControllerBase
             return NotFound(new
             {
                 error = "PAIRING_NOT_FOUND",
-                message = "Pairing was not found."
+                message = "Không tìm thấy cặp thi đấu."
             });
         }
         catch (UnauthorizedAccessException ex)
@@ -368,7 +368,7 @@ public class PairingController : ControllerBase
                 new
                 {
                     error = "HORSE_NOT_OWNED",
-                    message = "The horse does not belong to the current owner."
+                    message = "Ngựa này không thuộc quyền sở hữu của bạn."
                 });
         }
         catch (InvalidOperationException ex)
@@ -377,7 +377,7 @@ public class PairingController : ControllerBase
             return Conflict(new
             {
                 error = "INVALID_STATUS",
-                message = "Only accepted pairings can be confirmed."
+                message = "Chỉ có thể xác nhận cặp đã được nài ngựa chấp nhận."
             });
         }
         catch (InvalidOperationException ex)
@@ -386,7 +386,7 @@ public class PairingController : ControllerBase
             return UnprocessableEntity(new
             {
                 error = "HORSE_NOT_APPROVED",
-                message = "Horse is still waiting for admin approval."
+                message = "Ngựa đang chờ Ban tổ chức phê duyệt."
             });
         }
         catch (InvalidOperationException ex)
@@ -395,7 +395,7 @@ public class PairingController : ControllerBase
             return UnprocessableEntity(new
             {
                 error = "JOCKEY_NOT_ACTIVE",
-                message = "The jockey is not active."
+                message = "Nài ngựa hiện không hoạt động."
             });
         }
         catch (InvalidOperationException ex)
@@ -404,7 +404,7 @@ public class PairingController : ControllerBase
             return UnprocessableEntity(new
             {
                 error = "JOCKEY_NOT_APPROVED_FOR_TOURNAMENT",
-                message = "The jockey has not been approved for this tournament."
+                message = "Nài ngựa chưa được phê duyệt tham gia giải đấu này."
             });
         }
     }
@@ -421,7 +421,7 @@ public async Task<IActionResult> CancelPairing(int id)
         return Unauthorized(new
         {
             error = "UNAUTHORIZED",
-            message = "Token khong hop le"
+            message = "Phiên đăng nhập không hợp lệ."
         });
     }
 
@@ -439,7 +439,7 @@ public async Task<IActionResult> CancelPairing(int id)
         return NotFound(new
         {
             error = "PAIRING_NOT_FOUND",
-            message = "Pairing was not found."
+            message = "Không tìm thấy cặp thi đấu."
         });
     }
     catch (UnauthorizedAccessException ex)
@@ -450,7 +450,7 @@ public async Task<IActionResult> CancelPairing(int id)
             new
             {
                 error = "HORSE_NOT_OWNED",
-                message = "The horse does not belong to the current owner."
+                message = "Ngựa này không thuộc quyền sở hữu của bạn."
             });
     }
     catch (InvalidOperationException ex)
@@ -459,7 +459,7 @@ public async Task<IActionResult> CancelPairing(int id)
         return Conflict(new
         {
             error = "INVALID_STATUS",
-            message = "Only pending or accepted pairings can be cancelled."
+            message = "Chỉ có thể hủy lời mời đang chờ phản hồi hoặc đã được chấp nhận."
         });
     }
 }

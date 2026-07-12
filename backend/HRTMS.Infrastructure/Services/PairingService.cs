@@ -170,8 +170,8 @@ public class PairingService : IPairingService
         // Tao thong bao cho Jockey khi co loi moi moi (email + in-app — SRS Module O)
         await _notification.SendAsync(
             dto.JockeyId,
-            "New pairing invitation",
-            $"You have received a pairing invitation for horse {horse.Name}.",
+            "Lời mời ghép cặp thi đấu",
+            $"Bạn nhận được lời mời ghép cặp thi đấu cùng ngựa '{horse.Name}'. Vui lòng phản hồi lời mời.",
             type: "Both",
             relatedEntityType: "Pairing",
             relatedEntityId: pairing.PairingId);
@@ -225,8 +225,8 @@ public class PairingService : IPairingService
         // Gui thong bao cho Owner de vao xac nhan cuoi cung (email + in-app)
         await _notification.SendAsync(
             pairing.Horse.OwnerId,
-            "Pairing invitation accepted",
-            $"The jockey accepted the pairing invitation for horse {pairing.Horse.Name}. Please confirm the pairing.",
+            "Nài ngựa đã chấp nhận lời mời",
+            $"Nài ngựa đã chấp nhận ghép cặp cùng ngựa '{pairing.Horse.Name}'. Vui lòng xác nhận cặp thi đấu.",
             type: "Both",
             relatedEntityType: "Pairing",
             relatedEntityId: pairing.PairingId);
@@ -236,7 +236,7 @@ public class PairingService : IPairingService
             PairingId = pairing.PairingId,
             Status = pairing.Status,
             Message =
-                "Pairing invitation accepted successfully. Waiting for owner confirmation."
+                "Đã chấp nhận lời mời ghép cặp. Đang chờ chủ ngựa xác nhận."
         };
     }
 
@@ -323,8 +323,8 @@ public class PairingService : IPairingService
         // Gui thong bao cho Jockey sau khi commit (email + in-app)
         await _notification.SendAsync(
             pairing.JockeyId,
-            "Pairing confirmed",
-            $"Owner confirmed your pairing with horse {pairing.Horse.Name}.",
+            "Cặp thi đấu đã được xác nhận",
+            $"Chủ ngựa đã xác nhận cặp thi đấu của bạn cùng ngựa '{pairing.Horse.Name}'.",
             type: "Both",
             relatedEntityType: "Pairing",
             relatedEntityId: pairing.PairingId);
@@ -333,7 +333,7 @@ public class PairingService : IPairingService
         {
             PairingId = pairing.PairingId,
             Status = pairing.Status,
-            Message = "Pairing confirmed successfully."
+            Message = "Đã xác nhận cặp thi đấu thành công."
         };
     }
 
@@ -373,8 +373,8 @@ public class PairingService : IPairingService
         // Gui thong bao cho Owner (email + in-app)
         await _notification.SendAsync(
             pairing.Horse.OwnerId,
-            "Pairing invitation declined",
-            $"The jockey declined the pairing invitation for horse {pairing.Horse.Name}.",
+            "Nài ngựa đã từ chối lời mời",
+            $"Nài ngựa đã từ chối ghép cặp cùng ngựa '{pairing.Horse.Name}'.",
             type: "Both",
             relatedEntityType: "Pairing",
             relatedEntityId: pairing.PairingId);
@@ -383,7 +383,7 @@ public class PairingService : IPairingService
         {
             PairingId = pairing.PairingId,
             Status = pairing.Status,
-            Message = "Pairing invitation declined successfully."
+            Message = "Đã từ chối lời mời ghép cặp."
         };
     }
 
@@ -653,7 +653,7 @@ public class PairingService : IPairingService
         {
             PairingId = pairing.PairingId,
             Status = pairing.Status,
-            Message = "Pairing invitation cancelled successfully."
+            Message = "Đã hủy lời mời ghép cặp."
         };
     }
 }

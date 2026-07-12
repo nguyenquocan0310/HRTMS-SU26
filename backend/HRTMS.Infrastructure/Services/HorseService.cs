@@ -206,7 +206,7 @@ public class HorseService : IHorseService
                 await _notification.SendAsync(
                     horse.OwnerId,
                     "Ngựa được phê duyệt vào giải",
-                    $"Ngựa '{horse.Name}' đã được tự động phê duyệt vào giải '{tournament.Name}' (enrollment #{entry.EnrollmentId}).",
+                    $"Ngựa '{horse.Name}' đã được tự động phê duyệt vào giải '{tournament.Name}' (mã đăng ký {entry.EnrollmentId}).",
                     type: "Both",
                     relatedEntityType: "HorseTournamentEntry", relatedEntityId: entry.EnrollmentId);
                 return ApiResponse<HorseEnrollmentResponseDto>.Ok(MapToEnrollmentDto(entry, horse, tournament),
@@ -552,7 +552,7 @@ public class HorseService : IHorseService
         await _notification.SendAsync(
             entry.Horse.OwnerId,
             "Ngựa được phê duyệt vào giải",
-            $"Ngựa '{entry.Horse.Name}' đã được Admin phê duyệt tham gia giải '{entry.Tournament.Name}'.",
+            $"Ngựa '{entry.Horse.Name}' đã được Ban tổ chức phê duyệt tham gia giải '{entry.Tournament.Name}'.",
             type: "Both",
             relatedEntityType: "HorseTournamentEntry", relatedEntityId: enrollmentId);
 
@@ -862,7 +862,7 @@ public class HorseService : IHorseService
             return ApiResponse<string>.Fail("Lượt đăng ký đã bị hủy, không thể xác nhận lệ phí.");
         if (entry.EntryFeeStatus != "Unpaid")
             return ApiResponse<string>.Fail(
-                $"Lệ phí đang ở trạng thái '{entry.EntryFeeStatus}', không thể xác nhận lại.");
+                "Lệ phí của lượt đăng ký này không còn ở trạng thái chờ thu nên không thể xác nhận lại.");
 
         var oldFeeStatus = entry.EntryFeeStatus;
         entry.EntryFeeStatus = "Paid";
@@ -878,7 +878,7 @@ public class HorseService : IHorseService
         await _notification.SendAsync(
             entry.Pairing.Horse.OwnerId,
             "Lệ phí tham gia đã được xác nhận",
-            $"Lệ phí cho ngựa '{entry.Pairing.Horse.Name}' (đăng ký #{raceEntryId}) đã được xác nhận.",
+            $"Lệ phí cho ngựa '{entry.Pairing.Horse.Name}' (mã đăng ký {raceEntryId}) đã được xác nhận.",
             type: "Both",
             relatedEntityType: "RaceEntry", relatedEntityId: raceEntryId);
 
@@ -904,7 +904,7 @@ public class HorseService : IHorseService
         await _notification.SendAsync(
             entry.Pairing.Horse.OwnerId,
             "Đã hoàn phí tham gia",
-            $"Lệ phí cho ngựa '{entry.Pairing.Horse.Name}' (đăng ký #{raceEntryId}) đã được hoàn.",
+            $"Lệ phí cho ngựa '{entry.Pairing.Horse.Name}' (mã đăng ký {raceEntryId}) đã được hoàn.",
             type: "Both",
             relatedEntityType: "RaceEntry", relatedEntityId: raceEntryId);
 
@@ -945,8 +945,8 @@ public class HorseService : IHorseService
 
         await _notification.SendAsync(
             entry.Pairing.Horse.OwnerId,
-            "Đăng ký race được xác nhận",
-            $"Đăng ký #{raceEntryId} cho ngựa '{entry.Pairing.Horse.Name}' đã được Admin xác nhận tham gia cuộc đua.",
+            "Đăng ký cuộc đua được xác nhận",
+            $"Mã đăng ký {raceEntryId} cho ngựa '{entry.Pairing.Horse.Name}' đã được Ban tổ chức xác nhận tham gia cuộc đua.",
             type: "Both",
             relatedEntityType: "RaceEntry", relatedEntityId: raceEntryId);
 
@@ -988,8 +988,8 @@ public class HorseService : IHorseService
 
         await _notification.SendAsync(
             entry.Pairing.Horse.OwnerId,
-            "Đăng ký race bị từ chối",
-            $"Đăng ký #{raceEntryId} cho ngựa '{entry.Pairing.Horse.Name}' bị từ chối. Lý do: {reason}",
+            "Đăng ký cuộc đua bị từ chối",
+            $"Mã đăng ký {raceEntryId} cho ngựa '{entry.Pairing.Horse.Name}' bị từ chối. Lý do: {reason}",
             type: "Both",
             relatedEntityType: "RaceEntry", relatedEntityId: raceEntryId);
 
