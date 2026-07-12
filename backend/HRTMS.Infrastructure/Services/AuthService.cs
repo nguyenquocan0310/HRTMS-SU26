@@ -93,6 +93,11 @@ public class AuthService : IAuthService
         if (user == null)
             return ApiResponse<AuthResponseDto>.Fail("Email hoặc mật khẩu không đúng.");
 
+        // Tài khoản hệ thống (actor cho job tự động — patch 006) không được đăng nhập.
+        // Chặn trước bước verify: PasswordHash của user này không phải BCrypt hash hợp lệ.
+        if (user.Role == "System")
+            return ApiResponse<AuthResponseDto>.Fail("Email hoặc mật khẩu không đúng.");
+
         if (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTime.UtcNow)
             return ApiResponse<AuthResponseDto>.Fail(
                 $"Tài khoản đang bị khóa tạm thời. Vui lòng thử lại sau {user.LockoutEnd.Value:HH:mm dd/MM/yyyy} UTC.");
