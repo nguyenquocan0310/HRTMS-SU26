@@ -335,6 +335,12 @@ public class RaceEntryService : IRaceEntryService
         if (entry.Status != "Pending")
             throw new InvalidOperationException("INVALID_STATUS");
 
+        // Giai thu phi: Admin phai xac nhan le phi (Unpaid -> Paid) truoc khi Owner
+        // duoc confirm. Giai mien phi (EntryFeeAmount == 0) da duoc auto-set Paid
+        // ngay khi tao entry (AllocateAsync) nen khong can check EntryFeeAmount o day.
+        if (entry.EntryFeeStatus != "Paid")
+            throw new InvalidOperationException("ENTRY_FEE_NOT_PAID");
+
         // Enrollment cua ngua trong giai nay phai con Approved tai thoi diem xac nhan
         // (Admin co the reject enrollment sau khi entry duoc tao).
         var enrollmentApproved = await _context.HorseTournamentEntries.AnyAsync(e =>

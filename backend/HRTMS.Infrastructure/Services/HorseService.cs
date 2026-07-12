@@ -856,10 +856,13 @@ public class HorseService : IHorseService
         if (entry == null) return ApiResponse<string>.Fail("Không tìm thấy lượt đăng ký thi đấu này.");
         if (entry.EntryFeeStatus == "Paid") return ApiResponse<string>.Fail("Lệ phí tham gia đã được xác nhận trước đó.");
 
-        // Chỉ xác nhận được lệ phí đang Unpaid của entry còn hiệu lực — không ghi đè
-        // trạng thái hoàn phí (Refund Pending/Refunded) và không xác nhận entry đã hủy.
-        if (entry.Status == "Cancelled")
-            return ApiResponse<string>.Fail("Lượt đăng ký đã bị hủy, không thể xác nhận lệ phí.");
+        // Chỉ xác nhận được lệ phí đang Unpaid của entry còn chờ xác nhận (Pending) —
+        // không ghi đè trạng thái hoàn phí (Refund Pending/Refunded), không xác nhận
+        // entry đã hủy hay đã Confirmed (entry Confirmed luôn đã Paid từ trước).
+        if (entry.Status != "Pending")
+            return ApiResponse<string>.Fail(entry.Status == "Cancelled"
+                ? "Lượt đăng ký đã bị hủy, không thể xác nhận lệ phí."
+                : "Lượt đăng ký không ở trạng thái chờ xác nhận nên không thể xác nhận lệ phí.");
         if (entry.EntryFeeStatus != "Unpaid")
             return ApiResponse<string>.Fail(
                 "Lệ phí của lượt đăng ký này không còn ở trạng thái chờ thu nên không thể xác nhận lại.");
@@ -929,7 +932,12 @@ public class HorseService : IHorseService
         if (!enrollmentApproved)
             return ApiResponse<string>.Fail("Ngựa chưa được duyệt tham gia giải này.");
 
-        if (entry.Status == "Confirmed") return ApiResponse<string>.Fail("Lượt đăng ký này đã được xác nhận trước đó.");
+        // Chỉ entry đang Pending mới được duyệt — chặn cả entry đã Cancelled
+        // (không "hồi sinh" đăng ký đã hủy/rút, tránh lệch IsWithdrawn/refund).
+        if (entry.Status != "Pending")
+            return ApiResponse<string>.Fail(entry.Status == "Confirmed"
+                ? "Lượt đăng ký này đã được xác nhận trước đó."
+                : "Lượt đăng ký không ở trạng thái chờ xác nhận nên không thể duyệt.");
 
         // Breed check — có Tournament context tại đây
         string allowedBreed = entry.Race.Round.Tournament.AllowedBreed;

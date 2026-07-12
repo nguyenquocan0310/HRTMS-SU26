@@ -166,6 +166,11 @@ public class SchedulingController : ControllerBase
         {
             return Conflict(Err("INVALID_STATUS", "Chỉ đăng ký đang chờ mới có thể xác nhận."));
         }
+        catch (InvalidOperationException ex) when (ex.Message == "ENTRY_FEE_NOT_PAID")
+        {
+            return UnprocessableEntity(Err("ENTRY_FEE_NOT_PAID",
+                "Lệ phí tham gia chưa được Ban tổ chức xác nhận nên chưa thể xác nhận tham gia."));
+        }
         catch (InvalidOperationException ex) when (ex.Message == "HORSE_NOT_APPROVED_IN_TOURNAMENT")
         {
             return UnprocessableEntity(Err("HORSE_NOT_APPROVED_IN_TOURNAMENT",
