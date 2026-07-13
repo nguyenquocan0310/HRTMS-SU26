@@ -28,6 +28,10 @@ export interface DoctorRaceEntry {
   weightDifference: number | null;
   thresholdKg: number | null;
   isWeightWarning: boolean;
+  postRaceJockeyWeight: number | null;
+  postRaceWeightDifference: number | null;
+  postRaceWeightThresholdKg: number | null;
+  isPostRaceWeightFlagged: boolean;
   horseIdentityCheckStatus: string | null;
   clinicalStatus: string | null;
   unfitReason: string | null;
@@ -65,16 +69,49 @@ export interface ClinicalCheckResponse {
   message?: string;
 }
 
+export interface PostRaceWeightResponse {
+  raceEntryId: number;
+  preRaceJockeyWeight?: number | null;
+  postRaceJockeyWeight?: number | null;
+  weightDifference?: number | null;
+  thresholdKg?: number | null;
+  isWeightFlagged?: boolean;
+  message?: string;
+}
+
 export interface DoctorRaceEntryHealthProfile extends Partial<Omit<DoctorRaceEntry, 'raceEntryId'>> {
   raceEntryId: number;
   raceId?: number;
+  postPosition?: number | null;
   jockeyId?: number;
   jockeyName?: string;
+  licenseCertificate?: string | null;
+  experienceYears?: number | null;
+  bloodType?: string | null;
+  healthStatus?: string | null;
   horseId?: number;
   horseName?: string;
+  breed?: string | null;
+  color?: string | null;
+  gender?: string | null;
+  birthYear?: number | null;
+  identifyingMarks?: string | null;
+  vaccinationRecordRef?: string | null;
+  dopingTestDate?: string | null;
+  dopingTestResult?: string | null;
   preRaceWeightThresholdKg?: number | null;
+  preRaceWeightByDoctorId?: number | null;
+  preRaceWeightByDoctorName?: string | null;
   preRaceWeightDifference?: number | null;
   isPreRaceWeightWarning?: boolean | null;
+  postRaceWeightByDoctorId?: number | null;
+  postRaceWeightByDoctorName?: string | null;
+  horseIdentityCheckedByDoctorId?: number | null;
+  horseIdentityCheckedByDoctorName?: string | null;
+  horseIdentityCheckedAt?: string | null;
+  clinicalCheckedByDoctorId?: number | null;
+  clinicalCheckedByDoctorName?: string | null;
+  clinicalCheckedAt?: string | null;
 }
 
 const normalizeRaceEntry = (item: any): DoctorRaceEntry | null => {
@@ -102,6 +139,12 @@ const normalizeRaceEntry = (item: any): DoctorRaceEntry | null => {
     weightDifference: computedWeightDifference,
     thresholdKg: item?.thresholdKg ?? null,
     isWeightWarning: Boolean(item?.isWeightWarning),
+    postRaceJockeyWeight: item?.postRaceJockeyWeight ?? null,
+    postRaceWeightDifference: item?.postRaceWeightDifference ?? null,
+    postRaceWeightThresholdKg: item?.postRaceWeightThresholdKg ?? null,
+    isPostRaceWeightFlagged: Boolean(
+      item?.isPostRaceWeightFlagged ?? item?.postRaceWeightFlagged
+    ),
     horseIdentityCheckStatus: item?.horseIdentityCheckStatus ?? item?.horseIdentityStatus ?? null,
     clinicalStatus: item?.clinicalStatus ?? null,
     unfitReason: item?.unfitReason ?? null,
@@ -183,15 +226,49 @@ export const getDoctorRaceEntryHealthProfile = async (
     raceId: payload.raceId,
     jockeyId: payload.jockeyId,
     jockeyName: payload.jockeyName,
+    licenseCertificate: payload.licenseCertificate ?? null,
+    experienceYears: payload.experienceYears ?? null,
+    bloodType: payload.bloodType ?? null,
+    healthStatus: payload.healthStatus ?? null,
     horseId: payload.horseId,
     horseName: payload.horseName,
+    horseBreed: payload.breed ?? payload.horseBreed ?? null,
+    breed: payload.breed ?? payload.horseBreed ?? null,
+    color: payload.color ?? null,
+    gender: payload.gender ?? null,
+    birthYear: payload.birthYear ?? null,
+    identifyingMarks: payload.identifyingMarks ?? null,
+    vaccinationRecordRef: payload.vaccinationRecordRef ?? null,
+    dopingTestDate: payload.dopingTestDate ?? null,
+    dopingTestResult: payload.dopingTestResult ?? null,
     selfDeclaredWeight,
     preRaceJockeyWeight,
     weightDifference,
     thresholdKg: payload.thresholdKg ?? payload.preRaceWeightThresholdKg ?? null,
     preRaceWeightThresholdKg: payload.preRaceWeightThresholdKg ?? null,
+    preRaceWeightByDoctorId: payload.preRaceWeightByDoctorId ?? null,
+    preRaceWeightByDoctorName: payload.preRaceWeightByDoctorName ?? null,
     preRaceWeightDifference: payload.preRaceWeightDifference ?? null,
     isPreRaceWeightWarning: payload.isPreRaceWeightWarning ?? null,
+    postRaceJockeyWeight: payload.postRaceJockeyWeight ?? null,
+    postRaceWeightDifference:
+      payload.postRaceWeightDifference ??
+      (typeof payload.postRaceJockeyWeight === 'number' &&
+      typeof preRaceJockeyWeight === 'number'
+        ? Number((preRaceJockeyWeight - payload.postRaceJockeyWeight).toFixed(1))
+        : null),
+    postRaceWeightThresholdKg: payload.postRaceWeightThresholdKg ?? null,
+    isPostRaceWeightFlagged: Boolean(
+      payload.isPostRaceWeightFlagged ?? payload.postRaceWeightFlagged
+    ),
+    postRaceWeightByDoctorId: payload.postRaceWeightByDoctorId ?? null,
+    postRaceWeightByDoctorName: payload.postRaceWeightByDoctorName ?? null,
+    horseIdentityCheckedByDoctorId: payload.horseIdentityCheckedByDoctorId ?? null,
+    horseIdentityCheckedByDoctorName: payload.horseIdentityCheckedByDoctorName ?? null,
+    horseIdentityCheckedAt: payload.horseIdentityCheckedAt ?? null,
+    clinicalCheckedByDoctorId: payload.clinicalCheckedByDoctorId ?? null,
+    clinicalCheckedByDoctorName: payload.clinicalCheckedByDoctorName ?? null,
+    clinicalCheckedAt: payload.clinicalCheckedAt ?? null,
   };
 
   if ('isWeightWarning' in payload || 'isPreRaceWeightWarning' in payload) {
@@ -199,6 +276,7 @@ export const getDoctorRaceEntryHealthProfile = async (
       payload.isWeightWarning ?? payload.isPreRaceWeightWarning
     );
   }
+  if ('postPosition' in payload) profile.postPosition = payload.postPosition ?? null;
   if ('horseIdentityCheckStatus' in payload || 'horseIdentityStatus' in payload) {
     profile.horseIdentityCheckStatus =
       payload.horseIdentityCheckStatus ?? payload.horseIdentityStatus ?? null;
@@ -237,5 +315,15 @@ export const updateClinicalCheck = async (
   return apiFetch<ClinicalCheckResponse>(`/doctor/race-entries/${raceEntryId}/clinical-check`, {
     method: 'PATCH',
     body: JSON.stringify({ clinicalStatus, unfitReason }),
+  });
+};
+
+export const updatePostRaceWeight = async (
+  raceEntryId: number,
+  postRaceJockeyWeight: number
+): Promise<PostRaceWeightResponse> => {
+  return apiFetch<PostRaceWeightResponse>(`/doctor/race-entries/${raceEntryId}/post-race-weight`, {
+    method: 'PATCH',
+    body: JSON.stringify({ postRaceJockeyWeight }),
   });
 };
