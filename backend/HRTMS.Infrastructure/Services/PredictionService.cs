@@ -15,6 +15,9 @@ public class PredictionService : IPredictionService
 
     private const string PredictionTypeWin = "Win";
     private const string RaceStatusUpcoming = "Upcoming";
+    // Cong du doan mo tu sau khi boc tham (Draw) va van mo sau khi confirm starting
+    // list (Race -> "Pre-Race"), chi dong khi race chuyen Live tro di.
+    private const string RaceStatusPreRace = "Pre-Race";
     private const string TxnTypePredictionPlaced = "Prediction Placed";
 
     public PredictionService(
@@ -75,7 +78,7 @@ public class PredictionService : IPredictionService
             RaceStatus = race.Status,
             CanPredict = race.IsPostPositionDrawn
                          && !race.IsPredictionGateClosed
-                         && race.Status == RaceStatusUpcoming
+                         && (race.Status == RaceStatusUpcoming || race.Status == RaceStatusPreRace)
         };
 
         return ApiResponse<PredictionGateStatusDto>.Ok(status);
@@ -216,7 +219,7 @@ public class PredictionService : IPredictionService
             if (race == null)
                 return ApiResponse<PredictionResponseDto>.Fail("Không tìm thấy cuộc đua.");
 
-            if (race.Status != RaceStatusUpcoming)
+            if (race.Status != RaceStatusUpcoming && race.Status != RaceStatusPreRace)
                 return ApiResponse<PredictionResponseDto>.Fail("Cuộc đua đã bắt đầu hoặc kết thúc, không thể đặt dự đoán.");
 
             if (race.IsPredictionGateClosed)

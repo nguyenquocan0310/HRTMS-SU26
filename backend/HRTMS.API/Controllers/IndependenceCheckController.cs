@@ -93,6 +93,15 @@ public class IndependenceCheckController : ControllerBase
             });
         }
         catch (InvalidOperationException ex)
+            when (ex.Message == "STARTING_LIST_ALREADY_CONFIRMED")
+        {
+            return Conflict(new
+            {
+                error = "STARTING_LIST_ALREADY_CONFIRMED",
+                message = "Starting list has been confirmed; pre-race data can no longer be modified."
+            });
+        }
+        catch (InvalidOperationException ex)
             when (ex.Message == "RACE_NOT_UPCOMING")
         {
             return Conflict(new

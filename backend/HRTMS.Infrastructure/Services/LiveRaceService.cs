@@ -21,7 +21,6 @@ namespace HRTMS.Infrastructure.Services;
 /// </summary>
 public class LiveRaceService : ILiveRaceService
 {
-    private const string StatusUpcoming = "Upcoming";
     private const string StatusPreRace = "Pre-Race";
     private const string StatusLive = "Live";
     private const string StatusUnofficial = "Unofficial";
@@ -46,7 +45,7 @@ public class LiveRaceService : ILiveRaceService
             ?? throw new KeyNotFoundException("RACE_NOT_FOUND");
 
         var entries = race.RaceEntries
-            .Where(e => e.Status != "Cancelled")
+            .Where(e => e.Status != "Cancelled" && !e.IsWithdrawn)
             .OrderBy(e => e.PostPosition ?? int.MaxValue)
             .ThenBy(e => e.RaceEntryId)
             .Select(e => new LiveRaceEntryDto
@@ -75,7 +74,10 @@ public class LiveRaceService : ILiveRaceService
     }
 
     // =====================================================================
-    // Referee bấm Start Race: Upcoming/Pre-Race -> Live, set ActualStartTime
+    // Referee bấm Start Race: Pre-Race -> Live, set ActualStartTime
+    // Bat buoc da confirm official starting list (Status == "Pre-Race").
+    // Khong cho start truc tiep tu "Upcoming" de tranh bo qua 4 buoc
+    // medical/independence check + buoc confirm starting list.
     // =====================================================================
     public async Task<StartRaceResultDto> StartRaceAsync(int raceId, int refereeId)
     {
@@ -84,8 +86,8 @@ public class LiveRaceService : ILiveRaceService
 
         await EnsureRefereeAssignedAsync(raceId, refereeId);
 
-        if (race.Status != StatusUpcoming && race.Status != StatusPreRace)
-            throw new InvalidOperationException("INVALID_RACE_STATE");
+        if (race.Status != StatusPreRace)
+            throw new InvalidOperationException("STARTING_LIST_NOT_CONFIRMED");
 
         var now = DateTime.UtcNow;
         race.Status = StatusLive;

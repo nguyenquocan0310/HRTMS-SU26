@@ -47,6 +47,8 @@ public class MedicalCheckController : ControllerBase
         { return Forbid(); }
         catch (InvalidOperationException ex) when (ex.Message == "RACE_ENTRY_NOT_ELIGIBLE")
         { return Conflict(new { error = "RACE_ENTRY_NOT_ELIGIBLE", message = "Race entry is cancelled, withdrawn, or disqualified." }); }
+        catch (InvalidOperationException ex) when (ex.Message == "STARTING_LIST_ALREADY_CONFIRMED")
+        { return Conflict(new { error = "STARTING_LIST_ALREADY_CONFIRMED", message = "Starting list has been confirmed; pre-race data can no longer be modified." }); }
         catch (InvalidOperationException ex) when (ex.Message == "RACE_NOT_UPCOMING")
         { return Conflict(new { error = "RACE_NOT_UPCOMING", message = "Pre-race weight can only be recorded before the race starts." }); }
     }
@@ -78,6 +80,8 @@ public class MedicalCheckController : ControllerBase
         { return Forbid(); }
         catch (InvalidOperationException ex) when (ex.Message == "RACE_ENTRY_NOT_ELIGIBLE")
         { return Conflict(new { error = "RACE_ENTRY_NOT_ELIGIBLE", message = "Race entry is cancelled, withdrawn, or disqualified." }); }
+        catch (InvalidOperationException ex) when (ex.Message == "STARTING_LIST_ALREADY_CONFIRMED")
+        { return Conflict(new { error = "STARTING_LIST_ALREADY_CONFIRMED", message = "Starting list has been confirmed; pre-race data can no longer be modified." }); }
         catch (InvalidOperationException ex) when (ex.Message == "RACE_NOT_UPCOMING")
         { return Conflict(new { error = "RACE_NOT_UPCOMING", message = "Horse identity can only be checked before the race starts." }); }
     }
@@ -109,6 +113,8 @@ public class MedicalCheckController : ControllerBase
         { return Forbid(); }
         catch (InvalidOperationException ex) when (ex.Message == "RACE_ENTRY_NOT_ELIGIBLE")
         { return Conflict(new { error = "RACE_ENTRY_NOT_ELIGIBLE", message = "Race entry is cancelled, withdrawn, or disqualified." }); }
+        catch (InvalidOperationException ex) when (ex.Message == "STARTING_LIST_ALREADY_CONFIRMED")
+        { return Conflict(new { error = "STARTING_LIST_ALREADY_CONFIRMED", message = "Starting list has been confirmed; pre-race data can no longer be modified." }); }
         catch (InvalidOperationException ex) when (ex.Message == "RACE_NOT_UPCOMING")
         { return Conflict(new { error = "RACE_NOT_UPCOMING", message = "Clinical check can only be recorded before the race starts." }); }
         catch (InvalidOperationException ex) when (ex.Message == "UNFIT_REASON_REQUIRED")
