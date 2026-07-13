@@ -52,6 +52,8 @@ namespace HRTMS.Infrastructure.Services
                 var prizeOk = await IsPrizeDistributionsValidAsync(race.Round.TournamentId);
                 var rankingOk = IsRankingIntegrityValid(race.RaceEntries);
                 var weighOutOk = IsPostRaceWeighInComplete(race.RaceEntries);
+                var protestDeadline = ProtestWindowPolicy.GetDeadline(race);
+                var protestWindowClosed = ProtestWindowPolicy.IsClosed(race, DateTime.UtcNow);
 
                 result.Add(new UnofficialRaceListItemDto
                 {
@@ -66,7 +68,9 @@ namespace HRTMS.Infrastructure.Services
                     HasPendingProtests = hasPendingProtests,
                     PrizeDistributionsConfigured = prizeOk,
                     RankingIntegrityValid = rankingOk,
-                    PostRaceWeighInComplete = weighOutOk
+                    PostRaceWeighInComplete = weighOutOk,
+                    ProtestWindowClosed = protestWindowClosed,
+                    ProtestDeadlineAt = protestDeadline
                 });
             }
 
@@ -126,6 +130,16 @@ namespace HRTMS.Infrastructure.Services
             if (!IsPostRaceWeighInComplete(race.RaceEntries))
                 throw new InvalidOperationException(
                     "Còn cặp đấu chưa được cân sau đua.");
+
+            // Đối xứng với ProtestService.EnsureSubmissionWindowOpen: Owner/Jockey
+            // còn quyền nộp Protest tới khi hết ProtestDeadlineMinutes, nên Admin
+            // không được Declare Official sớm hơn mốc đó (tránh khóa RaceReport
+            // và tước quyền khiếu nại của họ).
+            if (!ProtestWindowPolicy.IsClosed(race, DateTime.UtcNow))
+                throw new InvalidOperationException(
+                    $"Cửa sổ khiếu nại vẫn còn hiệu lực đến " +
+                    $"{ProtestWindowPolicy.GetDeadline(race):yyyy-MM-dd HH:mm} UTC, " +
+                    "chưa thể công bố kết quả chính thức.");
 
             // ---------------------------------------------------------------
             // ACID TRANSACTION — 6 BƯỚC

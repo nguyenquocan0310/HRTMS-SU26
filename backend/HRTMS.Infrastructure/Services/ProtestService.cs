@@ -181,7 +181,7 @@ public class ProtestService : IProtestService
     private static void EnsureSubmissionWindowOpen(Race race)
     {
         EnsureRaceReportOpen(race);
-        if (DateTime.UtcNow > race.RaceReport!.SubmittedAt.AddMinutes(race.ProtestDeadlineMinutes))
+        if (ProtestWindowPolicy.IsClosed(race, DateTime.UtcNow))
             throw new InvalidOperationException("PROTEST_WINDOW_CLOSED");
     }
 
