@@ -226,7 +226,11 @@ public class IndependenceCheckService : IIndependenceCheckService
                 JockeyName = x.Pairing.Jockey.Jockey.FullName,
                 IndependenceCheckStatus = x.IndependenceCheckStatus,
                 IndependenceViolationReason = x.IndependenceViolationReason,
-                RaceEntryStatus = x.Status
+                RaceEntryStatus = x.Status,
+                PreRaceJockeyWeight = x.PreRaceJockeyWeight,
+                HorseIdentityCheckStatus = x.HorseIdentityCheckStatus,
+                ClinicalStatus = x.ClinicalStatus,
+                IsEmergencyDisqualified = x.Status == "Disqualified"
             })
             .ToListAsync();
 
