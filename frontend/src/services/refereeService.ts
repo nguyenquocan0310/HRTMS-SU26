@@ -48,9 +48,11 @@ export interface RefereeRaceEntry {
   horseName: string;
   jockeyName: string;
   ownerName: string | null;
-  preRaceJockeyWeight: number | null;
-  horseIdentityCheckStatus: string | null;
-  clinicalStatus: string | null;
+  selfDeclaredWeight?: number | null;
+  preRaceJockeyWeight?: number | null;
+  horseIdentityCheckStatus?: string | null;
+  clinicalStatus?: string | null;
+  isEmergencyDisqualified?: boolean;
   independenceCheckStatus: string | null;
   independenceViolationReason: string | null;
   hasIndependenceWarning: boolean;
@@ -195,7 +197,7 @@ const normalizeRaceEntry = (item: any): RefereeRaceEntry | null => {
   const raceEntryId = Number(item?.raceEntryId ?? item?.id);
   if (!Number.isFinite(raceEntryId)) return null;
 
-  return {
+  const normalized: RefereeRaceEntry = {
     raceEntryId,
     raceId: item?.raceId ?? null,
     pairingId: item?.pairingId ?? null,
@@ -205,13 +207,25 @@ const normalizeRaceEntry = (item: any): RefereeRaceEntry | null => {
     horseName: item?.horse?.name ?? item?.horseName ?? 'Chưa có tên',
     jockeyName: item?.jockey?.fullName ?? item?.jockeyName ?? 'Chưa có kỵ sĩ',
     ownerName: item?.owner?.fullName ?? item?.ownerName ?? null,
-    preRaceJockeyWeight: item?.preRaceJockeyWeight ?? null,
-    horseIdentityCheckStatus: item?.horseIdentityCheckStatus ?? null,
-    clinicalStatus: item?.clinicalStatus ?? null,
     independenceCheckStatus: item?.independenceCheckStatus ?? null,
     independenceViolationReason: item?.independenceViolationReason ?? item?.violationReason ?? null,
     hasIndependenceWarning: Boolean(item?.hasIndependenceWarning ?? item?.hasWarning),
   };
+
+  if ('selfDeclaredWeight' in item) normalized.selfDeclaredWeight = item.selfDeclaredWeight ?? null;
+  if ('preRaceJockeyWeight' in item || 'preRaceWeight' in item) {
+    normalized.preRaceJockeyWeight = item.preRaceJockeyWeight ?? item.preRaceWeight ?? null;
+  }
+  if ('horseIdentityCheckStatus' in item || 'horseIdentityStatus' in item) {
+    normalized.horseIdentityCheckStatus =
+      item.horseIdentityCheckStatus ?? item.horseIdentityStatus ?? null;
+  }
+  if ('clinicalStatus' in item) normalized.clinicalStatus = item.clinicalStatus ?? null;
+  if ('isEmergencyDisqualified' in item) {
+    normalized.isEmergencyDisqualified = Boolean(item.isEmergencyDisqualified);
+  }
+
+  return normalized;
 };
 
 export const getRefereeProfile = async (): Promise<RefereeProfile> => {
@@ -236,8 +250,10 @@ export const getMyRefereeRaceAssignments = async (): Promise<RefereeRaceAssignme
     .filter((item): item is RefereeRaceAssignment => item !== null);
 };
 
-export const getRefereeRaceEntries = async (raceId: number): Promise<RefereeRaceEntry[]> => {
-  const res = await apiFetch<any>(`/races/${raceId}/entries`);
+export const getRefereeRaceEntries = async (
+  raceId: number | string
+): Promise<RefereeRaceEntry[]> => {
+  const res = await apiFetch<any>(`/referee/race-entries/races/${raceId}/entries`);
   return extractArray(res)
     .map(normalizeRaceEntry)
     .filter((item): item is RefereeRaceEntry => item !== null);

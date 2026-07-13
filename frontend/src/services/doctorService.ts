@@ -65,6 +65,18 @@ export interface ClinicalCheckResponse {
   message?: string;
 }
 
+export interface DoctorRaceEntryHealthProfile extends Partial<Omit<DoctorRaceEntry, 'raceEntryId'>> {
+  raceEntryId: number;
+  raceId?: number;
+  jockeyId?: number;
+  jockeyName?: string;
+  horseId?: number;
+  horseName?: string;
+  preRaceWeightThresholdKg?: number | null;
+  preRaceWeightDifference?: number | null;
+  isPreRaceWeightWarning?: boolean | null;
+}
+
 const normalizeRaceEntry = (item: any): DoctorRaceEntry | null => {
   const rawId = item?.raceEntryId ?? item?.id;
   const raceEntryId = Number(rawId);
@@ -136,6 +148,65 @@ export const getDoctorRaceEntries = async (raceId: number): Promise<DoctorRaceEn
   return extractArray(res)
     .map(normalizeRaceEntry)
     .filter((item): item is DoctorRaceEntry => item !== null);
+};
+
+/**
+ * GET /api/doctor/race-entries/{raceEntryId}/health-profile
+ * Lấy trạng thái y tế mới nhất của một entry sau khi Doctor cập nhật.
+ */
+export const getDoctorRaceEntryHealthProfile = async (
+  raceEntryId: number | string
+): Promise<DoctorRaceEntryHealthProfile> => {
+  const res = await apiFetch<any>(`/doctor/race-entries/${raceEntryId}/health-profile`);
+  const payload = res && typeof res === 'object' && 'data' in res ? res.data : res;
+
+  if (res?.success === false || !payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error(res?.message || 'Không tải được hồ sơ sức khỏe race entry.');
+  }
+
+  const resolvedRaceEntryId = Number(payload.raceEntryId ?? raceEntryId);
+  if (!Number.isFinite(resolvedRaceEntryId)) {
+    throw new Error('Hồ sơ sức khỏe không có raceEntryId hợp lệ.');
+  }
+
+  const selfDeclaredWeight = payload.selfDeclaredWeight ?? null;
+  const preRaceJockeyWeight = payload.preRaceJockeyWeight ?? payload.preRaceWeight ?? null;
+  const weightDifference =
+    payload.weightDifference ??
+    payload.preRaceWeightDifference ??
+    (typeof preRaceJockeyWeight === 'number' && typeof selfDeclaredWeight === 'number'
+      ? Number((preRaceJockeyWeight - selfDeclaredWeight).toFixed(1))
+      : null);
+
+  const profile: DoctorRaceEntryHealthProfile = {
+    raceEntryId: resolvedRaceEntryId,
+    raceId: payload.raceId,
+    jockeyId: payload.jockeyId,
+    jockeyName: payload.jockeyName,
+    horseId: payload.horseId,
+    horseName: payload.horseName,
+    selfDeclaredWeight,
+    preRaceJockeyWeight,
+    weightDifference,
+    thresholdKg: payload.thresholdKg ?? payload.preRaceWeightThresholdKg ?? null,
+    preRaceWeightThresholdKg: payload.preRaceWeightThresholdKg ?? null,
+    preRaceWeightDifference: payload.preRaceWeightDifference ?? null,
+    isPreRaceWeightWarning: payload.isPreRaceWeightWarning ?? null,
+  };
+
+  if ('isWeightWarning' in payload || 'isPreRaceWeightWarning' in payload) {
+    profile.isWeightWarning = Boolean(
+      payload.isWeightWarning ?? payload.isPreRaceWeightWarning
+    );
+  }
+  if ('horseIdentityCheckStatus' in payload || 'horseIdentityStatus' in payload) {
+    profile.horseIdentityCheckStatus =
+      payload.horseIdentityCheckStatus ?? payload.horseIdentityStatus ?? null;
+  }
+  if ('clinicalStatus' in payload) profile.clinicalStatus = payload.clinicalStatus ?? null;
+  if ('unfitReason' in payload) profile.unfitReason = payload.unfitReason ?? null;
+
+  return profile;
 };
 
 export const updatePreRaceWeight = async (
