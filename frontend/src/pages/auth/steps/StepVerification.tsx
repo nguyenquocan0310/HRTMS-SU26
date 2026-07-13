@@ -21,8 +21,8 @@ const StepVerification = ({ role, formData, onChange }: Props) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ─── Khối khai báo gia đình dùng chung cho cả 4 role ───────────────────────
-  const renderFamilyDeclarationBlock = 
-    K extends 'ownerVerification' | 'jockeyVerification' | 'refereeVerification' | 'doctorVerification'
+  const renderFamilyDeclarationBlock  = <
+    K extends 'ownerVerification' | 'jockeyVerification' | 'refereeVerification' | 'doctorVerification',
   >(
     key: K,
     verification: { hasNoFamilyInIndustry: boolean; familyDeclarations: FamilyDeclarationItem[] }
