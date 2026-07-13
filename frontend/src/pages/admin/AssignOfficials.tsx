@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FiChevronDown, FiX, FiSearch, FiCheckCircle, FiUserMinus } from 'react-icons/fi';
 import { getTournaments } from '../../services/tournamentService';
-import { getPendingApprovals, type PersonPending } from '../../services/approvalService';
+import { getActiveUsersByRole, type ActiveUser } from '../../services/approvalService';
 import {
   getRefereesByRace, assignReferee, removeReferee,
   getDoctorsByRace, assignDoctor, removeDoctor,
@@ -30,8 +30,8 @@ const AssignOfficials = () => {
   const [loadingAssignments, setLoadingAssignments] = useState(false);
 
   // Available personnel from pending-approvals (approved ones)
-  const [availableReferees, setAvailableReferees] = useState<PersonPending[]>([]);
-  const [availableDoctors, setAvailableDoctors] = useState<PersonPending[]>([]);
+  const [availableReferees, setAvailableReferees] = useState<ActiveUser[]>([]);
+  const [availableDoctors, setAvailableDoctors] = useState<ActiveUser[]>([]);
 
   const [modal, setModal] = useState<ModalType>(null);
   const [search, setSearch] = useState('');
@@ -82,11 +82,10 @@ const AssignOfficials = () => {
   }, [selectedRace]);
 
   // Load available personnel
+// Load available personnel (Active referees/doctors, không phải danh sách chờ duyệt)
   useEffect(() => {
-    getPendingApprovals().then(({ referees: r, doctors: d }) => {
-      setAvailableReferees(r);
-      setAvailableDoctors(d);
-    }).catch(() => {});
+    getActiveUsersByRole('Referee').then(setAvailableReferees).catch(() => {});
+    getActiveUsersByRole('Doctor').then(setAvailableDoctors).catch(() => {});
   }, []);
 
   const reloadAssignments = async () => {
@@ -99,7 +98,7 @@ const AssignOfficials = () => {
     setDoctors(d);
   };
 
-  const handleAssignReferee = async (person: PersonPending) => {
+  const handleAssignReferee = async (person: ActiveUser) => {
     if (!selectedRace) return;
     setActionLoading(true);
     setError(''); setMsg('');
@@ -113,7 +112,7 @@ const AssignOfficials = () => {
     } finally { setActionLoading(false); }
   };
 
-  const handleAssignDoctor = async (person: PersonPending) => {
+  const handleAssignDoctor = async (person: ActiveUser) => {
     if (!selectedRace) return;
     setActionLoading(true);
     setError(''); setMsg('');
@@ -350,8 +349,8 @@ const AssignOfficials = () => {
                   <div className={styles.personInfo}>
                     <span className={styles.personName}>{p.fullName}</span>
                     <span className={styles.personMeta}>{p.email}</span>
-                    <span className={`${styles.personStatus} ${p.profileStatus === 'Approved' ? styles.statusApproved : styles.statusOtherBadge}`}>
-                      {p.profileStatus}
+                    <span className={`${styles.personStatus} ${styles.statusApproved}`}>
+                      {p.status}
                     </span>
                   </div>
                   <button
