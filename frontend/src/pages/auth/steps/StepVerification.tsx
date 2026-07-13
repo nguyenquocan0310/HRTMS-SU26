@@ -194,10 +194,26 @@ const StepVerification = ({ role, formData, onChange }: Props) => {
             onChange({ [key]: { ...(formData[key] as object), certificateFile: selected } } as Partial<RegisterFormData>);
           }}
         />
-        {file && (
-          <span style={{ fontSize: '12px', color: '#4caf50' }}>
-            Đã chọn: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
-          </span>
+{file && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
+            <span style={{ fontSize: '12px', color: '#4caf50' }}>
+              Đã chọn: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                const url = URL.createObjectURL(file);
+                window.open(url, '_blank');
+              }}
+              style={{
+                fontSize: '12px', color: '#2563eb', background: 'none',
+                border: '1px solid #2563eb', borderRadius: '6px',
+                padding: '2px 8px', cursor: 'pointer',
+              }}
+            >
+              Xem file
+            </button>
+          </div>
         )}
       </div>
     );
