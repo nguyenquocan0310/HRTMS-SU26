@@ -333,8 +333,11 @@ public class LiveRaceService : ILiveRaceService
         if (race.Status != StatusLive)
             throw new InvalidOperationException("RACE_NOT_LIVE");
 
+        // Disqualified đã bị loại khỏi cuộc đua — không cần FinishPosition lẫn
+        // cân sau đua, khớp với quy tắc DeclareOfficialAsync (IsRankingIntegrityValid /
+        // IsPostRaceWeighInComplete) vốn cũng loại trừ Disqualified.
         var eligibleEntryIds = race.RaceEntries
-            .Where(e => e.Status != "Cancelled" && !e.IsWithdrawn)
+            .Where(e => e.Status != "Cancelled" && e.Status != "Disqualified" && !e.IsWithdrawn)
             .Select(e => e.RaceEntryId)
             .ToHashSet();
 
