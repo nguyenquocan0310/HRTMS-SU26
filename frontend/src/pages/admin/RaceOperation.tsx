@@ -4,7 +4,8 @@ import { Link } from 'react-router-dom';
 import { getTournaments, type TournamentResponse } from '../../services/tournamentService';
 import {
   getRaceEntries, allocateEntry, drawPostPositions, getAdminPairings,
-  type RaceScheduleEntry, type AdminPairing,
+  getUnofficialRaces, declareOfficial,
+  type RaceScheduleEntry, type AdminPairing, type UnofficialRaceItem,
 } from '../../services/raceOperationService';
 import styles from './RaceOperation.module.scss';
 
@@ -28,6 +29,11 @@ const RaceOperations = () => {
   const [drawing, setDrawing] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
   const [actionError, setActionError] = useState('');
+  const [unofficialRaces, setUnofficialRaces] = useState<UnofficialRaceItem[]>([]);
+  const [loadingUnofficialRaces, setLoadingUnofficialRaces] = useState(false);
+  const [declaringRaceId, setDeclaringRaceId] = useState<number | null>(null);
+  const [unofficialMsg, setUnofficialMsg] = useState('');
+  const [unofficialError, setUnofficialError] = useState('');
 
   useEffect(() => {
     getTournaments().then((list) => {
@@ -74,8 +80,22 @@ const RaceOperations = () => {
       .finally(() => setLoadingPairings(false));
   };
 
+  const reloadUnofficialRaces = () => {
+    if (!selectedTournamentId) {
+      setUnofficialRaces([]);
+      return;
+    }
+
+    setLoadingUnofficialRaces(true);
+    getUnofficialRaces(selectedTournamentId)
+      .then(setUnofficialRaces)
+      .catch(() => setUnofficialRaces([]))
+      .finally(() => setLoadingUnofficialRaces(false));
+  };
+
   useEffect(() => {
     reloadUnallocatedPairings();
+    reloadUnofficialRaces();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTournamentId]);
 
@@ -111,9 +131,26 @@ const RaceOperations = () => {
       setActionMsg('Bốc thăm thành công!');
       reloadEntries(selectedRaceId);
       await reloadTournamentList();
+      reloadUnofficialRaces();
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Bốc thăm thất bại.');
     } finally { setDrawing(false); }
+  };
+
+  const handleDeclareOfficial = async (raceId: number) => {
+    setDeclaringRaceId(raceId);
+    setUnofficialMsg('');
+    setUnofficialError('');
+    try {
+      await declareOfficial(raceId);
+      setUnofficialMsg('Race đã được xác nhận Official.');
+      await reloadTournamentList();
+      reloadUnofficialRaces();
+    } catch (e) {
+      setUnofficialError(e instanceof Error ? e.message : 'Xác nhận Official thất bại.');
+    } finally {
+      setDeclaringRaceId(null);
+    }
   };
 
   const currentRace = races.find((r) => r.id === selectedRaceId);
@@ -170,6 +207,47 @@ const RaceOperations = () => {
               {drawing ? 'Đang bốc...' : 'Draw post positions'}
             </button>
           )}
+        </div>
+
+        <div className={styles.unofficialCard}>
+          <div className={styles.tableCardHeader}>
+            <h3 className={styles.tableTitle}>Race List</h3>
+            <span className={styles.countBadge}>{unofficialRaces.length}</span>
+          </div>
+          <p className={styles.tableSubtext}>Danh sách các race Unofficial của tournament được chọn.</p>
+
+          {loadingUnofficialRaces ? (
+            <p className={styles.emptyCell}>Đang tải danh sách race...</p>
+          ) : unofficialRaces.length === 0 ? (
+            <p className={styles.emptyCell}>Không có race Unofficial trong tournament này.</p>
+          ) : (
+            <div className={styles.unofficialList}>
+              {unofficialRaces.map((race) => (
+                <div key={race.raceId} className={styles.unofficialItem}>
+                  <div>
+                    <div className={styles.raceLabel}>{race.roundName} · Race #{race.raceNumber}</div>
+                    <div className={styles.raceMeta}>{formatDateTime(race.scheduledTime)}</div>
+                    <span className={styles.statusFlag}>Unofficial</span>
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.declareBtn}
+                    disabled={!race.canDeclareOfficial || declaringRaceId === race.raceId}
+                    onClick={() => handleDeclareOfficial(race.raceId)}
+                  >
+                    {declaringRaceId === race.raceId
+                      ? 'Đang xử lý...'
+                      : race.canDeclareOfficial
+                        ? 'Confirm Official'
+                        : 'Waiting checks'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {unofficialMsg && <p className={styles.successMsg}>{unofficialMsg}</p>}
+          {unofficialError && <p className={styles.errorMsg}>{unofficialError}</p>}
         </div>
 
         {actionMsg && <p className={styles.successMsg}>{actionMsg}</p>}
