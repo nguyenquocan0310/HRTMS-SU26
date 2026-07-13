@@ -383,6 +383,23 @@ public class AuthService : IAuthService
                 ipAddress: ipAddress,
                 userAgent: userAgent);
 
+            // Welcome email — KHÔNG echo mật khẩu (bảo mật); chỉ báo tài khoản đã
+            // được Admin tạo, dùng đúng email/username đã cung cấp để đăng nhập.
+            // Gửi SAU khi transaction đã commit, không để lỗi email ảnh hưởng flow tạo user.
+            var welcomeMessage = initialStatus == "Active"
+                ? $"Tài khoản {dto.Role} của bạn đã được Admin tạo và kích hoạt sẵn. " +
+                  $"Đăng nhập bằng email {normalizedEmail} và mật khẩu đã được cung cấp cho bạn."
+                : $"Tài khoản {dto.Role} của bạn đã được Admin tạo, đang chờ duyệt hồ sơ chuyên môn " +
+                  $"trước khi kích hoạt. Đăng nhập bằng email {normalizedEmail} khi tài khoản được duyệt.";
+
+            await _notificationService.SendAsync(
+                user.UserId,
+                "Tài khoản HRTMS của bạn đã được Admin tạo",
+                welcomeMessage,
+                type: "Both",
+                relatedEntityType: "Users",
+                relatedEntityId: user.UserId);
+
             return ApiResponse<int>.Ok(user.UserId, "Tạo tài khoản thành công.");
         }
         catch
@@ -464,10 +481,26 @@ public class AuthService : IAuthService
             return ApiResponse<bool>.Fail("Mật khẩu mới phải có ít nhất 6 ký tự.");
 
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword, workFactor: 12);
-        user.UpdatedAt = DateTime.UtcNow;
+        var resetAt = DateTime.UtcNow;
+        user.UpdatedAt = resetAt;
         await _context.SaveChangesAsync();
 
         await _tokenBlacklistService.BlacklistUserAsync(userId);
+
+        await _auditLog.LogAsync(
+            actorId: userId,
+            action: "Reset_Password",
+            entityName: "Users",
+            entityId: userId.ToString());
+
+        // Cảnh báo bảo mật: xác nhận mật khẩu đã được đặt lại qua luồng quên mật khẩu.
+        await _emailService.SendAsync(
+            user.Email, user.FullName,
+            "Mật khẩu tài khoản HRTMS đã được đặt lại",
+            $"<p>Mật khẩu tài khoản <b>{System.Net.WebUtility.HtmlEncode(user.FullName)}</b> " +
+            $"vừa được đặt lại thành công lúc {resetAt:HH:mm dd/MM/yyyy} (UTC) qua chức năng quên mật khẩu.</p>" +
+            "<p>Nếu đây không phải do bạn thực hiện, vui lòng liên hệ Admin ngay lập tức — " +
+            "toàn bộ phiên đăng nhập cũ đã bị vô hiệu hoá.</p>");
 
         return ApiResponse<bool>.Ok(true, "Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.");
     }

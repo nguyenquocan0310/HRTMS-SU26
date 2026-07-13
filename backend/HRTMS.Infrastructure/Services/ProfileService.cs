@@ -10,11 +10,19 @@ public class ProfileService : IProfileService
 {
     private readonly HRTMSDbContext _context;
     private readonly IAuditLogService _auditLog;
+    private readonly INotificationService _notificationService;
+    private readonly IEmailService _emailService;
 
-    public ProfileService(HRTMSDbContext context, IAuditLogService auditLog)
+    public ProfileService(
+        HRTMSDbContext context,
+        IAuditLogService auditLog,
+        INotificationService notificationService,
+        IEmailService emailService)
     {
         _context = context;
         _auditLog = auditLog;
+        _notificationService = notificationService;
+        _emailService = emailService;
     }
 
     public async Task<ApiResponse<UserProfileDto>> GetProfileAsync(int userId)
@@ -67,6 +75,8 @@ public class ProfileService : IProfileService
 
         await _context.SaveChangesAsync();
 
+        var emailChanged = !string.Equals(oldEmail, user.Email, StringComparison.OrdinalIgnoreCase);
+
         await _auditLog.LogAsync(
             actorId: userId,
             action: "Update_Profile",
@@ -76,6 +86,28 @@ public class ProfileService : IProfileService
             newValue: $"FullName={user.FullName}, Email={user.Email}",
             ipAddress: ipAddress
         );
+
+        if (emailChanged)
+        {
+            // Cảnh báo bảo mật gửi tới CẢ email cũ lẫn mới — nếu không phải chính chủ
+            // thực hiện, chủ tài khoản thật (đang còn quyền truy cập email cũ) cần biết
+            // ngay để phát hiện chiếm đoạt tài khoản.
+            await _emailService.SendAsync(
+                oldEmail, oldFullName,
+                "Email tài khoản HRTMS của bạn vừa được thay đổi",
+                $"<p>Email đăng nhập của tài khoản <b>{System.Net.WebUtility.HtmlEncode(oldFullName)}</b> " +
+                $"vừa được đổi từ <b>{System.Net.WebUtility.HtmlEncode(oldEmail)}</b> sang " +
+                $"<b>{System.Net.WebUtility.HtmlEncode(user.Email)}</b> lúc {now:HH:mm dd/MM/yyyy} (UTC).</p>" +
+                "<p>Nếu đây không phải do bạn thực hiện, vui lòng liên hệ Admin ngay lập tức.</p>");
+
+            await _notificationService.SendAsync(
+                user.UserId,
+                "Email tài khoản đã được cập nhật",
+                $"Email đăng nhập của bạn đã được đổi thành công sang {user.Email} lúc {now:HH:mm dd/MM/yyyy}.",
+                type: "Both",
+                relatedEntityType: "Users",
+                relatedEntityId: user.UserId);
+        }
 
         return ApiResponse<bool>.Ok(true, "Cập nhật thông tin thành công.");
     }
@@ -99,7 +131,8 @@ public class ProfileService : IProfileService
             return ApiResponse<bool>.Fail("Mật khẩu mới phải khác mật khẩu hiện tại.");
 
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword, workFactor: 12);
-        user.UpdatedAt = DateTime.UtcNow;
+        var changedAt = DateTime.UtcNow;
+        user.UpdatedAt = changedAt;
 
         await _context.SaveChangesAsync();
 
@@ -110,6 +143,16 @@ public class ProfileService : IProfileService
             entityId: userId.ToString(),
             ipAddress: ipAddress
         );
+
+        // Cảnh báo bảo mật: nếu không phải chính chủ đổi, họ cần biết ngay.
+        await _notificationService.SendAsync(
+            userId,
+            "Mật khẩu tài khoản vừa được thay đổi",
+            $"Mật khẩu đăng nhập của bạn vừa được thay đổi thành công lúc {changedAt:HH:mm dd/MM/yyyy} (UTC). " +
+            "Nếu đây không phải do bạn thực hiện, vui lòng liên hệ Admin ngay lập tức.",
+            type: "Both",
+            relatedEntityType: "Users",
+            relatedEntityId: userId);
 
         return ApiResponse<bool>.Ok(true, "Đổi mật khẩu thành công.");
     }
