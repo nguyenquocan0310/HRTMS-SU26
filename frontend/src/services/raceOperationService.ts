@@ -26,26 +26,41 @@ export interface RaceScheduleEntry {
   raceEntryId: number;
   postPosition: number | null;
   status: string;
+  entryFeeStatus: string;
   horseId: number;
   horseName: string;
+  horseBreed: string;
   jockeyId: number;
   jockeyName: string;
 }
 
-export interface RaceSchedule {
-  raceId: number;
-  roundId: number;
-  raceNumber: number;
-  scheduledTime: string;
+interface RawRaceEntryApiItem {
+  raceEntryId: number;
+  postPosition: number | null;
   status: string;
-  isPostPositionDrawn: boolean;
-  entries: RaceScheduleEntry[];
+  entryFeeStatus: string;
+  horse: { horseId: number; name: string; breed: string };
+  jockey: { jockeyId: number; fullName: string };
 }
 
-// GET /api/races/{raceId}/entries — starting list
-export const getRaceEntries = (raceId: number): Promise<RaceSchedule> =>
-  apiFetch<{ success: boolean; data: RaceSchedule }>(`/races/${raceId}/entries`)
-    .then((res) => res.data!);
+// GET /api/races/{raceId}/entries — trả về { success, data: [...] } với data LÀ MẢNG PHẲNG
+// các entry (mỗi entry lồng object horse/jockey), KHÔNG có object race bao ngoài
+// (không có raceId/roundId/isPostPositionDrawn ở tầng này — lấy isDrawn từ race list thay thế).
+export const getRaceEntries = (raceId: number): Promise<RaceScheduleEntry[]> =>
+  apiFetch<{ success: boolean; data: RawRaceEntryApiItem[] }>(`/races/${raceId}/entries`)
+    .then((res) =>
+      (res.data ?? []).map((e) => ({
+        raceEntryId: e.raceEntryId,
+        postPosition: e.postPosition,
+        status: e.status,
+        entryFeeStatus: e.entryFeeStatus,
+        horseId: e.horse?.horseId,
+        horseName: e.horse?.name,
+        horseBreed: e.horse?.breed,
+        jockeyId: e.jockey?.jockeyId,
+        jockeyName: e.jockey?.fullName,
+      }))
+    );
 
 // POST /api/admin/races/{raceId}/entries — allocate pairing
 export const allocateEntry = (raceId: number, pairingId: number): Promise<RaceEntryResponse> =>

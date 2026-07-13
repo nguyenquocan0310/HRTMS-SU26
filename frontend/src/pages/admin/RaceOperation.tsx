@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { getTournaments, type TournamentResponse } from '../../services/tournamentService';
 import {
   getRaceEntries, allocateEntry, drawPostPositions, getAdminPairings,
-  type RaceSchedule, type AdminPairing,
+  type RaceScheduleEntry, type AdminPairing,
 } from '../../services/raceOperationService';
 import styles from './RaceOperation.module.scss';
 
@@ -20,7 +20,7 @@ const RaceOperations = () => {
   const [selectedTournamentId, setSelectedTournamentId] = useState<number | null>(null);
   const [races, setRaces] = useState<RaceOption[]>([]);
   const [selectedRaceId, setSelectedRaceId] = useState<number | null>(null);
-  const [schedule, setSchedule] = useState<RaceSchedule | null>(null);
+  const [entries, setEntries] = useState<RaceScheduleEntry[]>([]);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [unallocatedPairings, setUnallocatedPairings] = useState<AdminPairing[]>([]);
   const [loadingPairings, setLoadingPairings] = useState(false);
@@ -29,7 +29,6 @@ const RaceOperations = () => {
   const [actionMsg, setActionMsg] = useState('');
   const [actionError, setActionError] = useState('');
 
-  // Load tournament list once
   useEffect(() => {
     getTournaments().then((list) => {
       setTournamentList(list);
@@ -37,7 +36,6 @@ const RaceOperations = () => {
     }).catch(() => {});
   }, []);
 
-  // Build race options from cached tournamentList
   useEffect(() => {
     if (!selectedTournamentId || tournamentList.length === 0) return;
     const t = tournamentList.find((x) => x.tournamentId === selectedTournamentId);
@@ -54,18 +52,19 @@ const RaceOperations = () => {
     else setSelectedRaceId(null);
   }, [selectedTournamentId, tournamentList]);
 
-  // Load starting list when race changes
-  useEffect(() => {
-    if (!selectedRaceId) return;
+  const reloadEntries = (raceId: number) => {
     setLoadingSchedule(true);
-    setSchedule(null);
-    getRaceEntries(selectedRaceId)
-      .then(setSchedule)
-      .catch(() => {})
+    getRaceEntries(raceId)
+      .then(setEntries)
+      .catch(() => setEntries([]))
       .finally(() => setLoadingSchedule(false));
+  };
+
+  useEffect(() => {
+    if (!selectedRaceId) { setEntries([]); return; }
+    reloadEntries(selectedRaceId);
   }, [selectedRaceId]);
 
-  // Load danh sách pairing Confirmed chưa allocate — theo tournament đang chọn
   const reloadUnallocatedPairings = () => {
     if (!selectedTournamentId) return;
     setLoadingPairings(true);
@@ -80,6 +79,15 @@ const RaceOperations = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTournamentId]);
 
+  // Sau khi tournament/race đổi, cần tải lại danh sách round/race từ BE (không chỉ dùng cache
+  // tournamentList) để cập nhật đúng isDrawn — tránh trạng thái cũ sau khi Draw xong.
+  const reloadTournamentList = async () => {
+    try {
+      const list = await getTournaments();
+      setTournamentList(list);
+    } catch { /* giữ nguyên state cũ nếu lỗi mạng */ }
+  };
+
   const handleAllocate = async (pairingId: number) => {
     if (!selectedRaceId) return;
     setAllocatingId(pairingId);
@@ -87,8 +95,7 @@ const RaceOperations = () => {
     try {
       await allocateEntry(selectedRaceId, pairingId);
       setActionMsg('Allocate thành công!');
-      const updated = await getRaceEntries(selectedRaceId);
-      setSchedule(updated);
+      reloadEntries(selectedRaceId);
       reloadUnallocatedPairings();
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Allocate thất bại.');
@@ -102,15 +109,15 @@ const RaceOperations = () => {
     try {
       await drawPostPositions(selectedRaceId);
       setActionMsg('Bốc thăm thành công!');
-      const updated = await getRaceEntries(selectedRaceId);
-      setSchedule(updated);
+      reloadEntries(selectedRaceId);
+      await reloadTournamentList();
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Bốc thăm thất bại.');
     } finally { setDrawing(false); }
   };
 
   const currentRace = races.find((r) => r.id === selectedRaceId);
-  const isDrawn = schedule?.isPostPositionDrawn ?? currentRace?.isDrawn ?? false;
+  const isDrawn = currentRace?.isDrawn ?? false;
 
   return (
     <div className={styles.container}>
@@ -211,17 +218,17 @@ const RaceOperations = () => {
         <div className={styles.tableCard}>
           <div className={styles.tableCardHeader}>
             <h3 className={styles.tableTitle}>Pairing đã allocate vào race hiện tại</h3>
-            <span className={styles.countBadge}>{schedule?.entries.length ?? 0}</span>
+            <span className={styles.countBadge}>{entries.length}</span>
           </div>
           <p className={styles.tableSubtext}>{currentRace?.label ?? '—'}</p>
 
           {loadingSchedule ? (
             <p className={styles.emptyCell}>Đang tải...</p>
-          ) : !schedule || schedule.entries.length === 0 ? (
+          ) : entries.length === 0 ? (
             <p className={styles.emptyCell}>Chưa có pairing nào được allocate vào race này.</p>
           ) : (
             <div className={styles.pairingList}>
-              {schedule.entries.map((entry) => (
+              {entries.map((entry) => (
                 <div key={entry.raceEntryId} className={styles.pairingItem}>
                   <div>
                     <div className={styles.pairingHorse}>{entry.horseName}</div>
@@ -250,10 +257,10 @@ const RaceOperations = () => {
             <tbody>
               {loadingSchedule ? (
                 <tr><td colSpan={6} className={styles.emptyCell}>Đang tải...</td></tr>
-              ) : !schedule || schedule.entries.length === 0 ? (
+              ) : entries.length === 0 ? (
                 <tr><td colSpan={6} className={styles.emptyCell}>Chưa có entry nào.</td></tr>
               ) : (
-                schedule.entries.map((entry) => (
+                entries.map((entry) => (
                   <tr key={entry.raceEntryId}>
                     <td className={styles.gate}>{entry.postPosition ?? '—'}</td>
                     <td className={styles.name}>{entry.horseName}</td>
@@ -264,7 +271,7 @@ const RaceOperations = () => {
                         {entry.status}
                       </span>
                     </td>
-                    <td>—</td>
+                    <td>{entry.entryFeeStatus}</td>
                   </tr>
                 ))
               )}
