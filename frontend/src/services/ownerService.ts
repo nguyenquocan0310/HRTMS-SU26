@@ -381,13 +381,31 @@ export const createHorseProfile = async (
 /**
  * PATCH /api/race-entries/{id}/confirm
  */
-export const confirmRaceEntry = async (id: number): Promise<any> => {
-  interface ApiResponse<T> { success: boolean; message: string; data: T | null }
-  const res = await apiFetch<ApiResponse<any>>(`/race-entries/${id}/confirm`, {
+interface RaceEntryConfirmationResult {
+  raceEntryId: number;
+  status: string;
+}
+
+export const confirmRaceEntry = async (id: number): Promise<RaceEntryConfirmationResult | null> => {
+  type ConfirmResponse =
+    | RaceEntryConfirmationResult
+    | ApiResponse<RaceEntryConfirmationResult>
+    | undefined;
+
+  const res = await apiFetch<ConfirmResponse>(`/race-entries/${id}/confirm`, {
     method: 'PATCH',
   });
-  if (!res.success) throw new Error(res.message || 'Xác nhận tham gia thất bại.');
-  return res.data;
+
+  if (res === undefined) return null;
+
+  if ('success' in res) {
+    if (!res.success) {
+      throw new Error(res.message || 'Xác nhận tham gia thất bại.');
+    }
+    return res.data;
+  }
+
+  return res;
 };
 
 /**
