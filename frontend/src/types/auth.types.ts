@@ -29,7 +29,7 @@ export interface OwnerVerification {
   phoneNumber: string;
   identityNumber: string;
   dateOfBirth: string;
-  hasNoFamilyInIndustry: boolean;
+  hasNoFamilyInIndustry: String;
   familyDeclarations: FamilyDeclarationItem[];
 }
 
@@ -42,7 +42,7 @@ export interface JockeyVerification {
   bloodType: string;
   healthStatus: string;
   certificateFile: File | null;
-  hasNoFamilyInIndustry: boolean;
+  hasNoFamilyInIndustry: String;
   familyDeclaration: string; // giữ lại cho backward compat, KHÔNG dùng để submit nữa
   familyDeclarations: FamilyDeclarationItem[];
 }
@@ -52,7 +52,7 @@ export interface RefereeVerification {
   identityNumber: string;
   dateOfBirth: string;
   certificateFile: File | null;
-  hasNoFamilyInIndustry: boolean;
+  hasNoFamilyInIndustry: String;
   familyDeclaration: string; // giữ lại cho backward compat, KHÔNG dùng để submit nữa
   familyDeclarations: FamilyDeclarationItem[];
 }
@@ -62,7 +62,7 @@ export interface DoctorVerification {
   identityNumber: string;
   dateOfBirth: string;
   certificateFile: File | null;
-  hasNoFamilyInIndustry: boolean;
+  hasNoFamilyInIndustry: String;
   familyDeclarations: FamilyDeclarationItem[];
 }
 
@@ -95,7 +95,7 @@ export const initialFormData: RegisterFormData = {
     phoneNumber: '',
     identityNumber: '',
     dateOfBirth: '',
-    hasNoFamilyInIndustry: false,
+    hasNoFamilyInIndustry: '',
     familyDeclarations: [],
   },
   jockeyVerification: {
@@ -107,7 +107,7 @@ export const initialFormData: RegisterFormData = {
     bloodType: '',
     healthStatus: '',
     certificateFile: null,
-    hasNoFamilyInIndustry: false,
+    hasNoFamilyInIndustry: '',
     familyDeclaration: '',
     familyDeclarations: [],
   },
@@ -116,7 +116,7 @@ export const initialFormData: RegisterFormData = {
     identityNumber: '',
     dateOfBirth: '',
     certificateFile: null,
-    hasNoFamilyInIndustry: false,
+    hasNoFamilyInIndustry: '',
     familyDeclaration: '',
     familyDeclarations: [],
   },
@@ -125,7 +125,7 @@ export const initialFormData: RegisterFormData = {
     identityNumber: '',
     dateOfBirth: '',
     certificateFile: null,
-    hasNoFamilyInIndustry: false,
+    hasNoFamilyInIndustry: '',
     familyDeclarations: [],
   },
 };
