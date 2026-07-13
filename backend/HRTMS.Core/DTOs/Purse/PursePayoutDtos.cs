@@ -71,4 +71,19 @@ namespace HRTMS.Core.DTOs.Purse
 		public decimal UnpaidAmount { get; set; }               // SUM còn Unpaid
 		public int PayoutCount { get; set; }
 	}
+
+	// ===========================================================================
+	// Owner tự xem tiền thưởng của mình (self-scoped) — tổng hợp + chi tiết từng
+	// dòng thưởng (ngựa nào, về hạng mấy, bao nhiêu, đã trả chưa). Chỉ payout
+	// Role = "Owner" của chính user hiện tại; race đã Official mới sinh payout.
+	// ===========================================================================
+	public class OwnerEarningsDto
+	{
+		public int OwnerUserId { get; set; }
+		public decimal TotalEarnings { get; set; }              // SUM tất cả payout Owner
+		public decimal PaidAmount { get; set; }                 // SUM đã Paid
+		public decimal UnpaidAmount { get; set; }               // SUM còn Unpaid
+		public int PayoutCount { get; set; }
+		public List<PursePayoutItemDto> Payouts { get; set; } = new();
+	}
 }
