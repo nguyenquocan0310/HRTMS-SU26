@@ -58,6 +58,14 @@ namespace HRTMS.Core.DTOs.LiveRace
 		public string Description { get; set; } = string.Empty;
 	}
 
+	public class UpdateViolationDto
+	{
+		public string ViolationCode { get; set; } = string.Empty;
+		public string Penalty { get; set; } = string.Empty;
+		public int? PlaceBehindEntryId { get; set; }
+		public string Description { get; set; } = string.Empty;
+	}
+
 	// GET /api/races/{raceId}/violations (poll riêng, tách khỏi tick animation 100ms)
 	public class ViolationDto
 	{

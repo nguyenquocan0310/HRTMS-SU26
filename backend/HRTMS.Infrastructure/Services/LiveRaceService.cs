@@ -81,7 +81,9 @@ public class LiveRaceService : ILiveRaceService
     // =====================================================================
     public async Task<StartRaceResultDto> StartRaceAsync(int raceId, int refereeId)
     {
-        var race = await _context.Races.FirstOrDefaultAsync(r => r.RaceId == raceId)
+        var race = await _context.Races
+            .Include(r => r.RaceEntries)
+            .FirstOrDefaultAsync(r => r.RaceId == raceId)
             ?? throw new KeyNotFoundException("RACE_NOT_FOUND");
 
         await EnsureRefereeAssignedAsync(raceId, refereeId);
@@ -90,8 +92,39 @@ public class LiveRaceService : ILiveRaceService
             throw new InvalidOperationException("STARTING_LIST_NOT_CONFIRMED");
 
         var now = DateTime.UtcNow;
+
+        // EC-17: mọi entry Pending phải được hủy đồng bộ, không phụ thuộc scheduler.
+        foreach (var entry in race.RaceEntries.Where(e => e.Status == "Pending" && !e.IsWithdrawn))
+        {
+            entry.Status = "Cancelled";
+            entry.IsWithdrawn = true;
+            entry.PostPosition = null;
+            entry.WithdrawalReason = "Automatically cancelled when race went live.";
+            entry.UpdatedAt = now;
+        }
+
+        var eligibleEntries = race.RaceEntries
+            .Where(e => e.Status != "Cancelled" && e.Status != "Disqualified" && !e.IsWithdrawn)
+            .ToList();
+
+        if (eligibleEntries.Count == 0)
+            throw new InvalidOperationException("NO_ELIGIBLE_STARTING_ENTRIES");
+
+        // Re-check tại thời điểm chuyển Live để không dựa hoàn toàn vào bước
+        // confirm starting list trước đó.
+        if (eligibleEntries.Any(e =>
+                e.Status != "Confirmed" ||
+                e.PreRaceJockeyWeight == null ||
+                e.ClinicalStatus != "Fit" ||
+                e.HorseIdentityCheckStatus != "Matched" ||
+                e.IndependenceCheckStatus != "Passed"))
+        {
+            throw new InvalidOperationException("STARTING_LIST_INVALID");
+        }
+
         race.Status = StatusLive;
         race.ActualStartTime = now;
+        race.IsPredictionGateClosed = true;
         race.UpdatedAt = now;
 
         await _context.SaveChangesAsync();
@@ -111,6 +144,8 @@ public class LiveRaceService : ILiveRaceService
     {
         if (string.IsNullOrWhiteSpace(dto.ViolationCode))
             throw new ArgumentException("VIOLATION_CODE_REQUIRED");
+        if (!ViolationCodeCatalog.Contains(dto.ViolationCode))
+            throw new ArgumentException("INVALID_VIOLATION_CODE");
         if (string.IsNullOrWhiteSpace(dto.Description))
             throw new ArgumentException("DESCRIPTION_REQUIRED");
 
@@ -137,10 +172,14 @@ public class LiveRaceService : ILiveRaceService
             .FirstOrDefaultAsync(e => e.RaceEntryId == dto.RaceEntryId && e.RaceId == raceId)
             ?? throw new KeyNotFoundException("RACE_ENTRY_NOT_FOUND");
 
+        if (entry.Status is "Cancelled" or "Disqualified" || entry.IsWithdrawn)
+            throw new InvalidOperationException("RACE_ENTRY_NOT_ELIGIBLE");
+
         if (dto.PlaceBehindEntryId.HasValue)
         {
             var placeBehindExists = await _context.RaceEntries
-                .AnyAsync(e => e.RaceEntryId == dto.PlaceBehindEntryId.Value && e.RaceId == raceId);
+                .AnyAsync(e => e.RaceEntryId == dto.PlaceBehindEntryId.Value && e.RaceId == raceId &&
+                    e.Status != "Cancelled" && e.Status != "Disqualified" && !e.IsWithdrawn);
             if (!placeBehindExists)
                 throw new KeyNotFoundException("PLACE_BEHIND_ENTRY_NOT_FOUND");
         }
@@ -173,7 +212,7 @@ public class LiveRaceService : ILiveRaceService
         {
             RaceReportId = report.RaceReportId,
             RaceEntryId = entry.RaceEntryId,
-            ViolationCode = dto.ViolationCode.Trim(),
+            ViolationCode = dto.ViolationCode.Trim().ToUpperInvariant(),
             Penalty = dto.Penalty,
             PlaceBehindEntryId = dto.PlaceBehindEntryId,
             Description = dto.Description.Trim(),
@@ -222,6 +261,60 @@ public class LiveRaceService : ILiveRaceService
             .ToListAsync();
     }
 
+    public Task<IReadOnlyList<ViolationCodeOptionDto>> GetViolationCodesAsync() =>
+        Task.FromResult(ViolationCodeCatalog.All);
+
+    public async Task<ViolationDto> UpdateViolationAsync(
+        int raceId,
+        int violationId,
+        int refereeId,
+        UpdateViolationDto dto)
+    {
+        ValidateViolationPayload(dto.ViolationCode, dto.Penalty, dto.PlaceBehindEntryId, dto.Description);
+
+        var race = await _context.Races.FirstOrDefaultAsync(r => r.RaceId == raceId)
+            ?? throw new KeyNotFoundException("RACE_NOT_FOUND");
+        await EnsureRefereeAssignedAsync(raceId, refereeId);
+        EnsureViolationsEditable(race);
+
+        var violation = await _context.Violations
+            .Include(v => v.RaceEntry).ThenInclude(e => e.Pairing).ThenInclude(p => p.Horse)
+            .FirstOrDefaultAsync(v => v.ViolationId == violationId && v.RaceReport.RaceId == raceId)
+            ?? throw new KeyNotFoundException("VIOLATION_NOT_FOUND");
+
+        if (dto.PlaceBehindEntryId.HasValue)
+        {
+            var placeBehindExists = await _context.RaceEntries
+                .AnyAsync(e => e.RaceEntryId == dto.PlaceBehindEntryId.Value && e.RaceId == raceId &&
+                    e.Status != "Cancelled" && e.Status != "Disqualified" && !e.IsWithdrawn);
+            if (!placeBehindExists)
+                throw new KeyNotFoundException("PLACE_BEHIND_ENTRY_NOT_FOUND");
+        }
+
+        violation.ViolationCode = dto.ViolationCode.Trim().ToUpperInvariant();
+        violation.Penalty = dto.Penalty;
+        violation.PlaceBehindEntryId = dto.PlaceBehindEntryId;
+        violation.Description = dto.Description.Trim();
+        await _context.SaveChangesAsync();
+
+        return ToViolationDto(violation);
+    }
+
+    public async Task DeleteViolationAsync(int raceId, int violationId, int refereeId)
+    {
+        var race = await _context.Races.FirstOrDefaultAsync(r => r.RaceId == raceId)
+            ?? throw new KeyNotFoundException("RACE_NOT_FOUND");
+        await EnsureRefereeAssignedAsync(raceId, refereeId);
+        EnsureViolationsEditable(race);
+
+        var violation = await _context.Violations
+            .FirstOrDefaultAsync(v => v.ViolationId == violationId && v.RaceReport.RaceId == raceId)
+            ?? throw new KeyNotFoundException("VIOLATION_NOT_FOUND");
+
+        _context.Violations.Remove(violation);
+        await _context.SaveChangesAsync();
+    }
+
     // =====================================================================
     // Referee chốt sơ bộ FinishPosition, chuyển Live -> Unofficial
     // =====================================================================
@@ -249,6 +342,16 @@ public class LiveRaceService : ILiveRaceService
         if (submittedIds.Distinct().Count() != submittedIds.Count)
             throw new ArgumentException("DUPLICATE_RACE_ENTRY_IN_RESULTS");
 
+        if (submittedIds.Count != eligibleEntryIds.Count || !eligibleEntryIds.SetEquals(submittedIds))
+            throw new ArgumentException("RESULTS_MUST_INCLUDE_ALL_ELIGIBLE_ENTRIES");
+
+        if (race.RaceEntries
+            .Where(e => eligibleEntryIds.Contains(e.RaceEntryId))
+            .Any(e => e.PostRaceJockeyWeight == null))
+        {
+            throw new InvalidOperationException("POST_RACE_WEIGH_IN_INCOMPLETE");
+        }
+
         foreach (var r in dto.Results)
         {
             if (!eligibleEntryIds.Contains(r.RaceEntryId))
@@ -257,9 +360,7 @@ public class LiveRaceService : ILiveRaceService
                 throw new ArgumentException("INVALID_FINISH_POSITION");
         }
 
-        var positions = dto.Results.Select(r => r.FinishPosition).ToList();
-        if (positions.Distinct().Count() != positions.Count)
-            throw new ArgumentException("DUPLICATE_FINISH_POSITION");
+        ValidateStandardCompetitionRanking(dto.Results.Select(r => r.FinishPosition));
 
         using var transaction = await _context.Database.BeginTransactionAsync();
 
@@ -329,5 +430,50 @@ public class LiveRaceService : ILiveRaceService
             throw new InvalidOperationException("REFEREE_NOT_ASSIGNED_TO_RACE");
 
         return referee;
+    }
+
+    private static void ValidateViolationPayload(string violationCode, string penalty, int? placeBehindEntryId, string description)
+    {
+        if (string.IsNullOrWhiteSpace(violationCode))
+            throw new ArgumentException("VIOLATION_CODE_REQUIRED");
+        if (!ViolationCodeCatalog.Contains(violationCode))
+            throw new ArgumentException("INVALID_VIOLATION_CODE");
+        if (string.IsNullOrWhiteSpace(description))
+            throw new ArgumentException("DESCRIPTION_REQUIRED");
+
+        var allowedPenalties = new[] { "Disqualified", "PlaceBehind", "Warning", "Scratch" };
+        if (!allowedPenalties.Contains(penalty))
+            throw new ArgumentException("INVALID_PENALTY");
+        if (penalty == "PlaceBehind" && placeBehindEntryId == null)
+            throw new ArgumentException("PLACE_BEHIND_ENTRY_REQUIRED");
+    }
+
+    private static void EnsureViolationsEditable(Race race)
+    {
+        if (race.Status != StatusLive)
+            throw new InvalidOperationException("RACE_NOT_LIVE");
+    }
+
+    private static ViolationDto ToViolationDto(Violation violation) => new()
+    {
+        ViolationId = violation.ViolationId,
+        RaceEntryId = violation.RaceEntryId,
+        HorseName = violation.RaceEntry.Pairing.Horse.Name,
+        ViolationCode = violation.ViolationCode,
+        Penalty = violation.Penalty,
+        PlaceBehindEntryId = violation.PlaceBehindEntryId,
+        Description = violation.Description,
+        LoggedAt = violation.LoggedAt
+    };
+
+    private static void ValidateStandardCompetitionRanking(IEnumerable<int> positions)
+    {
+        var expectedPosition = 1;
+        foreach (var group in positions.GroupBy(position => position).OrderBy(group => group.Key))
+        {
+            if (group.Key != expectedPosition)
+                throw new ArgumentException("INVALID_STANDARD_RANKING");
+            expectedPosition += group.Count();
+        }
     }
 }

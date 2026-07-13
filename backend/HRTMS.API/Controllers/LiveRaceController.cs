@@ -90,6 +90,14 @@ public class LiveRaceController : ControllerBase
             return StatusCode(StatusCodes.Status403Forbidden,
                 ApiResponse<StartRaceResultDto>.Fail("Bạn không được phân công cho cuộc đua này."));
         }
+        catch (InvalidOperationException ex) when (ex.Message == "NO_ELIGIBLE_STARTING_ENTRIES")
+        {
+            return Conflict(ApiResponse<StartRaceResultDto>.Fail("No eligible race entries remain for the starting list."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "STARTING_LIST_INVALID")
+        {
+            return Conflict(ApiResponse<StartRaceResultDto>.Fail("Starting list is no longer eligible to go live."));
+        }
         catch (InvalidOperationException ex) when (ex.Message == "STARTING_LIST_NOT_CONFIRMED")
         {
             return Conflict(ApiResponse<StartRaceResultDto>.Fail("Chưa xác nhận danh sách xuất phát chính thức (race phải ở trạng thái Pre-Race)."));
@@ -97,6 +105,14 @@ public class LiveRaceController : ControllerBase
     }
 
     // Referee ghi nhận vi phạm trong lúc race đang Live.
+    [HttpGet("api/violations/codes")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ViolationCodeOptionDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetViolationCodes()
+    {
+        var result = await _service.GetViolationCodesAsync();
+        return Ok(ApiResponse<IReadOnlyList<ViolationCodeOptionDto>>.Ok(result));
+    }
+
     [HttpPost("api/referees/races/{raceId:int}/violations")]
     [Authorize(Roles = "Referee")]
     [ProducesResponseType(typeof(ApiResponse<ViolationDto>), StatusCodes.Status201Created)]
@@ -135,6 +151,10 @@ public class LiveRaceController : ControllerBase
             return StatusCode(StatusCodes.Status403Forbidden,
                 ApiResponse<ViolationDto>.Fail("Bạn không được phân công cho cuộc đua này."));
         }
+        catch (InvalidOperationException ex) when (ex.Message == "RACE_ENTRY_NOT_ELIGIBLE")
+        {
+            return Conflict(ApiResponse<ViolationDto>.Fail("Race entry is cancelled, withdrawn, or disqualified."));
+        }
         catch (InvalidOperationException ex) when (ex.Message == "RACE_NOT_LIVE")
         {
             return Conflict(ApiResponse<ViolationDto>.Fail("Chỉ có thể ghi nhận vi phạm khi cuộc đua đang Live."));
@@ -146,6 +166,64 @@ public class LiveRaceController : ControllerBase
     }
 
     // Referee chốt sơ bộ FinishPosition (kết thúc màn Live), chuyển Live -> Unofficial.
+    [HttpPatch("api/referees/races/{raceId:int}/violations/{violationId:int}")]
+    [Authorize(Roles = "Referee")]
+    [ProducesResponseType(typeof(ApiResponse<ViolationDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdateViolation(int raceId, int violationId, [FromBody] UpdateViolationDto dto)
+    {
+        if (!TryGetUserId(out var refereeId))
+            return Unauthorized(ApiResponse<ViolationDto>.Fail("Invalid session."));
+
+        try
+        {
+            var result = await _service.UpdateViolationAsync(raceId, violationId, refereeId, dto);
+            return Ok(ApiResponse<ViolationDto>.Ok(result, "Violation updated."));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ApiResponse<ViolationDto>.Fail(MapValidationMessage(ex.Message)));
+        }
+        catch (KeyNotFoundException ex) when (ex.Message is "RACE_NOT_FOUND" or "VIOLATION_NOT_FOUND" or "PLACE_BEHIND_ENTRY_NOT_FOUND")
+        {
+            return NotFound(ApiResponse<ViolationDto>.Fail("Violation or race entry was not found."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "REFEREE_NOT_ASSIGNED_TO_RACE")
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<ViolationDto>.Fail("Referee is not assigned to this race."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "RACE_NOT_LIVE")
+        {
+            return Conflict(ApiResponse<ViolationDto>.Fail("Violations can only be changed before unofficial results are submitted."));
+        }
+    }
+
+    [HttpDelete("api/referees/races/{raceId:int}/violations/{violationId:int}")]
+    [Authorize(Roles = "Referee")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteViolation(int raceId, int violationId)
+    {
+        if (!TryGetUserId(out var refereeId))
+            return Unauthorized();
+
+        try
+        {
+            await _service.DeleteViolationAsync(raceId, violationId, refereeId);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex) when (ex.Message is "RACE_NOT_FOUND" or "VIOLATION_NOT_FOUND")
+        {
+            return NotFound(ApiResponse<object>.Fail("Violation was not found."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "REFEREE_NOT_ASSIGNED_TO_RACE")
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.Fail("Referee is not assigned to this race."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "RACE_NOT_LIVE")
+        {
+            return Conflict(ApiResponse<object>.Fail("Violations can only be deleted before unofficial results are submitted."));
+        }
+    }
+
     [HttpPost("api/referees/races/{raceId:int}/finish")]
     [Authorize(Roles = "Referee")]
     [ProducesResponseType(typeof(ApiResponse<SubmitFinishResultsResultDto>), StatusCodes.Status200OK)]
@@ -184,6 +262,10 @@ public class LiveRaceController : ControllerBase
         {
             return Conflict(ApiResponse<SubmitFinishResultsResultDto>.Fail("Chỉ có thể chốt kết quả khi cuộc đua đang Live."));
         }
+        catch (InvalidOperationException ex) when (ex.Message == "POST_RACE_WEIGH_IN_INCOMPLETE")
+        {
+            return Conflict(ApiResponse<SubmitFinishResultsResultDto>.Fail("Post-race weigh-out is incomplete."));
+        }
         catch (InvalidOperationException ex) when (ex.Message == "RACE_REPORT_LOCKED")
         {
             return Conflict(ApiResponse<SubmitFinishResultsResultDto>.Fail("Biên bản thi đấu của cuộc đua này đã bị khóa."));
@@ -193,12 +275,14 @@ public class LiveRaceController : ControllerBase
     private static string MapValidationMessage(string code) => code switch
     {
         "VIOLATION_CODE_REQUIRED" => "Vui lòng nhập mã vi phạm.",
+        "INVALID_VIOLATION_CODE" => "Mã vi phạm không nằm trong danh mục đã công bố.",
         "DESCRIPTION_REQUIRED" => "Vui lòng nhập mô tả vi phạm.",
         "INVALID_PENALTY" => "Hình thức xử phạt không hợp lệ (Disqualified/PlaceBehind/Warning/Scratch).",
         "PLACE_BEHIND_ENTRY_REQUIRED" => "Vui lòng chọn race entry bị xếp phía sau khi hình phạt là PlaceBehind.",
         "RESULTS_REQUIRED" => "Vui lòng nhập kết quả về đích.",
         "DUPLICATE_RACE_ENTRY_IN_RESULTS" => "Một race entry không được xuất hiện nhiều lần trong kết quả.",
-        "DUPLICATE_FINISH_POSITION" => "Không được có 2 race entry cùng một thứ hạng về đích.",
+        "RESULTS_MUST_INCLUDE_ALL_ELIGIBLE_ENTRIES" => "Phải nhập kết quả cho tất cả race entry hợp lệ.",
+        "INVALID_STANDARD_RANKING" => "Thứ hạng không hợp lệ; cho phép đồng hạng theo dạng 1,1,3.",
         "INVALID_FINISH_POSITION" => "Thứ hạng về đích phải lớn hơn 0.",
         _ => "Dữ liệu không hợp lệ."
     };
