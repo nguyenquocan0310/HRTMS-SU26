@@ -208,13 +208,27 @@ namespace HRTMS.API.Controllers
             if (race == null)
                 return NotFound(new { success = false, message = "RACE_NOT_FOUND" });
 
-            // Chỉ public sau khi đã draw post position, Admin thấy luôn
+            // Chỉ public entries sau khi đã draw post position, Admin thấy luôn.
             bool isAdmin = User.IsInRole("Admin");
             if (!race.IsPostPositionDrawn && !isAdmin)
-                return Ok(new { success = true, message = "Kết quả bốc thăm chưa được công bố.", data = Array.Empty<object>() });
+                return Ok(new
+                {
+                    success = true,
+                    message = "Kết quả bốc thăm chưa được công bố.",
+                    data = new
+                    {
+                        race.RaceId,
+                        race.RoundId,
+                        race.RaceNumber,
+                        race.ScheduledTime,
+                        race.Status,
+                        race.IsPostPositionDrawn,
+                        Entries = Array.Empty<object>()
+                    }
+                });
 
             var entries = await _context.RaceEntries
-                .Include(e => e.Pairing).ThenInclude(p => p.Horse)
+                .Include(e => e.Pairing).ThenInclude(p => p.Horse).ThenInclude(h => h.Owner).ThenInclude(o => o.Owner)
                 .Include(e => e.Pairing).ThenInclude(p => p.Jockey).ThenInclude(j => j.Jockey)
                 .Where(e => e.RaceId == raceId && e.Status != "Cancelled" && e.Status != "Disqualified")
                 .OrderBy(e => e.PostPosition)
@@ -224,12 +238,28 @@ namespace HRTMS.API.Controllers
                     e.PostPosition,
                     e.Status,
                     e.EntryFeeStatus,
-                    Horse = new { e.Pairing.Horse.HorseId, e.Pairing.Horse.Name, e.Pairing.Horse.Breed },
-                    Jockey = new { e.Pairing.Jockey.JockeyId, e.Pairing.Jockey.Jockey.FullName }
+                    HorseId = e.Pairing.Horse.HorseId,
+                    HorseName = e.Pairing.Horse.Name,
+                    JockeyId = e.Pairing.Jockey.JockeyId,
+                    JockeyName = e.Pairing.Jockey.Jockey.FullName,
+                    OwnerName = e.Pairing.Horse.Owner.Owner.FullName
                 })
                 .ToListAsync();
 
-            return Ok(new { success = true, data = entries });
+            return Ok(new
+            {
+                success = true,
+                data = new
+                {
+                    race.RaceId,
+                    race.RoundId,
+                    race.RaceNumber,
+                    race.ScheduledTime,
+                    race.Status,
+                    race.IsPostPositionDrawn,
+                    Entries = entries
+                }
+            });
         }
 
         // Cập nhật cấu hình Race; đóng băng trường nhạy cảm sau bốc thăm / có Prediction.
