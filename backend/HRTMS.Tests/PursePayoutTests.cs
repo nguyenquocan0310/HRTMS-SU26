@@ -312,6 +312,45 @@ public sealed class PursePayoutTests : IDisposable
     }
 
     // =====================================================================
+    // PRZ.6 — Owner tự xem tiền thưởng của mình (self-scoped)
+    // =====================================================================
+
+    [Fact]
+    public async Task GetMyEarnings_ReturnsOnlyOwnerPayouts_WithDetailAndTotals()
+    {
+        SeedRaceReadyForDeclare(1000m, [1, 2]);
+        using (var ctx = NewContext())
+            await DeclareAsync(ctx);
+
+        using var ctx2 = NewContext();
+        var result = await new PursePayoutService(ctx2, new NoOpAuditLog()).GetMyEarningsAsync(OwnerId);
+
+        Assert.Equal(OwnerId, result.OwnerUserId);
+        Assert.NotEmpty(result.Payouts);
+        Assert.All(result.Payouts, p => Assert.Equal("Owner", p.Role));         // loại payout Jockey
+        Assert.All(result.Payouts, p => Assert.Equal(OwnerId, p.RecipientUserId));
+        Assert.Equal(result.Payouts.Count, result.PayoutCount);
+        // Tổng = SUM chi tiết = Paid + Unpaid
+        Assert.True(Math.Abs(result.TotalEarnings - result.Payouts.Sum(p => p.CalculatedAmount)) < 0.01m);
+        Assert.True(Math.Abs(result.TotalEarnings - (result.PaidAmount + result.UnpaidAmount)) < 0.01m);
+        Assert.Equal(0m, result.PaidAmount);                                    // vừa declare → chưa Paid
+        // Chi tiết có bối cảnh ngựa để hiển thị "con ngựa nào thắng bao nhiêu"
+        Assert.All(result.Payouts, p => Assert.False(string.IsNullOrEmpty(p.HorseName)));
+    }
+
+    [Fact]
+    public async Task GetMyEarnings_NoPayouts_ReturnsZero()
+    {
+        SeedRaceReadyForDeclare(1000m, [1]); // KHÔNG declare → chưa sinh payout
+        using var ctx = NewContext();
+        var result = await new PursePayoutService(ctx, new NoOpAuditLog()).GetMyEarningsAsync(OwnerId);
+
+        Assert.Equal(0m, result.TotalEarnings);
+        Assert.Empty(result.Payouts);
+        Assert.Equal(0, result.PayoutCount);
+    }
+
+    // =====================================================================
     // Stubs & helpers
     // =====================================================================
 
