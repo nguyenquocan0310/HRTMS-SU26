@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import {
+  getDoctorRaceEntryHealthProfile,
   getDoctorRaceEntries,
   getMyDoctorRaceAssignments,
   updateClinicalCheck,
@@ -229,6 +230,46 @@ export default function PaddockConsole() {
     )
   }
 
+  const refreshEntryHealthProfile = async (raceEntryId: number) => {
+    try {
+      const profile = await getDoctorRaceEntryHealthProfile(raceEntryId)
+      updateEntry(raceEntryId, profile)
+
+      if (profile.preRaceJockeyWeight !== undefined) {
+        setWeightInputs((prev) => ({
+          ...prev,
+          [raceEntryId]:
+            profile.preRaceJockeyWeight != null ? String(profile.preRaceJockeyWeight) : '',
+        }))
+      }
+      if (
+        profile.horseIdentityCheckStatus === 'Matched' ||
+        profile.horseIdentityCheckStatus === 'Mismatch'
+      ) {
+        setIdentityInputs((prev) => ({
+          ...prev,
+          [raceEntryId]: profile.horseIdentityCheckStatus as IdentityStatus,
+        }))
+      }
+      if (profile.clinicalStatus === 'Fit' || profile.clinicalStatus === 'Unfit') {
+        setClinicalInputs((prev) => ({
+          ...prev,
+          [raceEntryId]: profile.clinicalStatus as ClinicalStatus,
+        }))
+      }
+      if (profile.unfitReason !== undefined) {
+        setUnfitReasons((prev) => ({
+          ...prev,
+          [raceEntryId]: profile.unfitReason ?? '',
+        }))
+      }
+
+      return null
+    } catch (err) {
+      return getFriendlyError(err)
+    }
+  }
+
   const handleWeighInConfirm = async (entry: DoctorRaceEntry) => {
     const rawValue = weightInputs[entry.raceEntryId]
     const preRaceJockeyWeight = rawValue === '' ? Number.NaN : Number(rawValue)
@@ -249,7 +290,12 @@ export default function PaddockConsole() {
         isWeightWarning: Boolean(res.isWeightWarning),
         message: res.message,
       })
-      showToast(res.message ?? `Đã xác nhận Weigh-In cho ${entry.jockeyName}.`)
+      const syncError = await refreshEntryHealthProfile(entry.raceEntryId)
+      showToast(
+        syncError
+          ? `Đã lưu Weigh-In nhưng chưa đồng bộ được hồ sơ sức khỏe: ${syncError}`
+          : res.message ?? `Đã xác nhận Weigh-In cho ${entry.jockeyName}.`
+      )
     } catch (err) {
       showToast(getFriendlyError(err))
     } finally {
@@ -277,7 +323,12 @@ export default function PaddockConsole() {
         raceEntryStatus: res.raceEntryStatus ?? entry.raceEntryStatus,
         message: res.message,
       })
-      showToast(res.message ?? `Đã cập nhật danh tính ngựa ${entry.horseName}.`)
+      const syncError = await refreshEntryHealthProfile(entry.raceEntryId)
+      showToast(
+        syncError
+          ? `Đã lưu danh tính nhưng chưa đồng bộ được hồ sơ sức khỏe: ${syncError}`
+          : res.message ?? `Đã cập nhật danh tính ngựa ${entry.horseName}.`
+      )
     } catch (err) {
       showToast(getFriendlyError(err))
     } finally {
@@ -315,7 +366,12 @@ export default function PaddockConsole() {
         raceEntryStatus: res.raceEntryStatus ?? entry.raceEntryStatus,
         message: res.message,
       })
-      showToast(res.message ?? `Đã cập nhật khám lâm sàng cho ${entry.horseName}.`)
+      const syncError = await refreshEntryHealthProfile(entry.raceEntryId)
+      showToast(
+        syncError
+          ? `Đã lưu khám lâm sàng nhưng chưa đồng bộ được hồ sơ sức khỏe: ${syncError}`
+          : res.message ?? `Đã cập nhật khám lâm sàng cho ${entry.horseName}.`
+      )
     } catch (err) {
       showToast(getFriendlyError(err))
     } finally {
