@@ -377,54 +377,62 @@ public class MedicalCheckService : IMedicalCheckService
     public async Task<List<MedicalCheckListDto>> GetRaceEntriesAsync(
     int doctorId,
     int raceId)
-{
-    // Kiem tra doctor
-    await ValidateDoctorAsync(doctorId);
-
-    // Kiem tra doctor co duoc phan cong race khong
-    var assigned = await _context.DoctorAssignments.AnyAsync(x =>
-        x.DoctorId == doctorId &&
-        x.RaceId == raceId);
-
-    if (!assigned)
     {
-        throw new InvalidOperationException(
-            "DOCTOR_NOT_ASSIGNED_TO_RACE");
-    }
+        // Kiem tra doctor
+        await ValidateDoctorAsync(doctorId);
 
-    var entries = await _context.RaceEntries
-        .Where(x => x.RaceId == raceId)
-        .Include(x => x.Pairing)
-            .ThenInclude(p => p.Horse)
-        .Include(x => x.Pairing)
-            .ThenInclude(p => p.Jockey)
-                .ThenInclude(j => j.Jockey)
-        .Select(x => new MedicalCheckListDto
+        // Kiem tra doctor co duoc phan cong race khong
+        var assigned = await _context.DoctorAssignments.AnyAsync(x =>
+            x.DoctorId == doctorId &&
+            x.RaceId == raceId);
+
+        if (!assigned)
         {
-            RaceEntryId = x.RaceEntryId,
+            throw new InvalidOperationException(
+                "DOCTOR_NOT_ASSIGNED_TO_RACE");
+        }
 
-            PairingId = x.PairingId,
+        var entries = await _context.RaceEntries
+            .Where(x => x.RaceId == raceId)
+            .Include(x => x.Pairing)
+                .ThenInclude(p => p.Horse)
+                    .ThenInclude(h => h.Owner)
+                        .ThenInclude(o => o.Owner)
+            .Include(x => x.Pairing)
+                .ThenInclude(p => p.Jockey)
+                    .ThenInclude(j => j.Jockey)
+            .Select(x => new MedicalCheckListDto
+            {
+                RaceEntryId = x.RaceEntryId,
 
-            HorseName = x.Pairing.Horse.Name,
+                PairingId = x.PairingId,
 
-            JockeyName = x.Pairing.Jockey.Jockey.FullName,
+                PostPosition = x.PostPosition,
 
-            SelfDeclaredWeight =
-                x.Pairing.Jockey.SelfDeclaredWeight,
+                HorseName = x.Pairing.Horse.Name,
 
-            PreRaceWeight =
-                x.PreRaceJockeyWeight,
+                OwnerName = x.Pairing.Horse.Owner.Owner.FullName,
 
-            HorseIdentityStatus =
-                x.HorseIdentityCheckStatus ?? "Pending",
+                JockeyName = x.Pairing.Jockey.Jockey.FullName,
 
-            ClinicalStatus =
-                x.ClinicalStatus ?? "Pending"
-        })
-        .ToListAsync();
+                RaceEntryStatus = x.Status,
 
-    return entries;
-}
+                SelfDeclaredWeight =
+                    x.Pairing.Jockey.SelfDeclaredWeight,
+
+                PreRaceWeight =
+                    x.PreRaceJockeyWeight,
+
+                HorseIdentityStatus =
+                    x.HorseIdentityCheckStatus ?? "Pending",
+
+                ClinicalStatus =
+                    x.ClinicalStatus ?? "Pending"
+            })
+            .ToListAsync();
+
+        return entries;
+    }
     public async Task<RaceEntryHealthProfileDto> GetRaceEntryHealthProfileAsync(
         int doctorId,
         int raceEntryId)

@@ -23,4 +23,6 @@ public class IndependenceCheckListDto
     public string? ClinicalStatus { get; set; }
 
     public bool IsEmergencyDisqualified { get; set; }
+    public int? PostPosition { get; set; }
+    public string OwnerName { get; set; } = string.Empty;
 }

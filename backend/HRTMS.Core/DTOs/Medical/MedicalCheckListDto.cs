@@ -6,9 +6,15 @@ public class MedicalCheckListDto
 
     public int PairingId { get; set; }
 
+    public int? PostPosition { get; set; }
+
     public string HorseName { get; set; } = string.Empty;
 
+    public string OwnerName { get; set; } = string.Empty;
+
     public string JockeyName { get; set; } = string.Empty;
+
+    public string RaceEntryStatus { get; set; } = string.Empty;
 
     public decimal SelfDeclaredWeight { get; set; }
 
