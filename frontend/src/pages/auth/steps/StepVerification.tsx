@@ -38,26 +38,20 @@ const StepVerification = ({ role, formData, onChange }: Props) => {
           Khai báo quan hệ gia đình với các thành viên khác trong ngành. Nếu không có, tick vào ô bên dưới.
         </p>
 
-        <div className={styles.field} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <input
-            type="checkbox"
-            id={`hasNoFamily-${key}`}
-            checked={verification.hasNoFamilyInIndustry}
-            onChange={(e) => {
-              const checked = e.target.checked;
-              updateVerification({
-                hasNoFamilyInIndustry: checked,
-                // Nếu tick "không có" thì xóa luôn danh sách đang nhập dở để tránh gửi nhầm
-                familyDeclarations: checked ? [] : verification.familyDeclarations,
-              });
-            }}
-          />
-          <label htmlFor={`hasNoFamily-${key}`} className={styles.label} style={{ marginBottom: 0 }}>
-            Tôi không có người thân làm việc trong ngành
+<div className={styles.field}>
+          <label className={styles.label}>
+            Nếu không có người thân trong ngành, nhập xác nhận bên dưới
           </label>
+          <input
+            type="text"
+            className={styles.input}
+            placeholder='Nhập: "Không có người thân làm trong ngành này"'
+            value={verification.noFamilyDeclarationNote}
+            onChange={(e) => updateVerification({ noFamilyDeclarationNote: e.target.value })}
+          />
         </div>
 
-        {!verification.hasNoFamilyInIndustry && (
+        {verification.noFamilyDeclarationNote.trim().length === 0 && (
           <>
             {verification.familyDeclarations.map((decl, idx) => (
               <div key={idx} className={styles.coiItem}>
@@ -194,10 +188,26 @@ const StepVerification = ({ role, formData, onChange }: Props) => {
             onChange({ [key]: { ...(formData[key] as object), certificateFile: selected } } as Partial<RegisterFormData>);
           }}
         />
-        {file && (
-          <span style={{ fontSize: '12px', color: '#4caf50' }}>
-            Đã chọn: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
-          </span>
+{file && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
+            <span style={{ fontSize: '12px', color: '#4caf50' }}>
+              Đã chọn: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                const url = URL.createObjectURL(file);
+                window.open(url, '_blank');
+              }}
+              style={{
+                fontSize: '12px', color: '#2563eb', background: 'none',
+                border: '1px solid #2563eb', borderRadius: '6px',
+                padding: '2px 8px', cursor: 'pointer',
+              }}
+            >
+              Xem file
+            </button>
+          </div>
         )}
       </div>
     );
