@@ -53,6 +53,38 @@ public class MedicalCheckController : ControllerBase
         { return Conflict(new { error = "RACE_NOT_UPCOMING", message = "Pre-race weight can only be recorded before the race starts." }); }
     }
 
+    [HttpPatch("{raceEntryId:int}/post-race-weight")]
+    public async Task<IActionResult> RecordPostRaceWeight(
+        int raceEntryId,
+        [FromBody] RecordPostRaceWeightDto dto)
+    {
+        var doctorIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(doctorIdClaim, out var doctorId))
+            return Unauthorized(new { error = "INVALID_TOKEN", message = "Invalid doctor token." });
+
+        try
+        {
+            var result = await _medicalCheckService.RecordPostRaceWeightAsync(doctorId, raceEntryId, dto);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex) when (ex.Message == "DOCTOR_NOT_FOUND")
+        { return NotFound(new { error = "DOCTOR_NOT_FOUND", message = "Doctor was not found." }); }
+        catch (KeyNotFoundException ex) when (ex.Message == "RACE_ENTRY_NOT_FOUND")
+        { return NotFound(new { error = "RACE_ENTRY_NOT_FOUND", message = "Race entry was not found." }); }
+        catch (InvalidOperationException ex) when (ex.Message == "USER_NOT_DOCTOR")
+        { return UnprocessableEntity(new { error = "USER_NOT_DOCTOR", message = "The current user is not a doctor." }); }
+        catch (InvalidOperationException ex) when (ex.Message == "DOCTOR_NOT_ACTIVE")
+        { return UnprocessableEntity(new { error = "DOCTOR_NOT_ACTIVE", message = "The doctor is not active." }); }
+        catch (InvalidOperationException ex) when (ex.Message == "DOCTOR_NOT_ASSIGNED_TO_RACE")
+        { return Forbid(); }
+        catch (InvalidOperationException ex) when (ex.Message == "RACE_ENTRY_NOT_ELIGIBLE")
+        { return Conflict(new { error = "RACE_ENTRY_NOT_ELIGIBLE", message = "Race entry is cancelled, withdrawn, or disqualified." }); }
+        catch (InvalidOperationException ex) when (ex.Message == "RACE_NOT_LIVE")
+        { return Conflict(new { error = "RACE_NOT_LIVE", message = "Post-race weight can only be recorded while the race is Live." }); }
+        catch (InvalidOperationException ex) when (ex.Message == "PRE_RACE_WEIGHT_REQUIRED")
+        { return Conflict(new { error = "PRE_RACE_WEIGHT_REQUIRED", message = "Pre-race weight must exist before recording weigh-out." }); }
+    }
+
     [HttpPatch("{raceEntryId:int}/horse-identity")]
     public async Task<IActionResult> RecordHorseIdentity(
         int raceEntryId,

@@ -125,6 +125,60 @@ public class MedicalCheckService : IMedicalCheckService
                 : "Pre-race weight recorded successfully."
         };
     }
+    public async Task<PostRaceWeightResultDto> RecordPostRaceWeightAsync(
+        int doctorId,
+        int raceEntryId,
+        RecordPostRaceWeightDto dto)
+    {
+        var doctor = await ValidateDoctorAsync(doctorId);
+        var raceEntry = await _context.RaceEntries
+            .Include(e => e.Race)
+                .ThenInclude(r => r.Round)
+                    .ThenInclude(round => round.Tournament)
+            .FirstOrDefaultAsync(e => e.RaceEntryId == raceEntryId)
+            ?? throw new KeyNotFoundException("RACE_ENTRY_NOT_FOUND");
+
+        if (raceEntry.Status == "Cancelled" || raceEntry.Status == "Disqualified" || raceEntry.IsWithdrawn)
+            throw new InvalidOperationException("RACE_ENTRY_NOT_ELIGIBLE");
+
+        var doctorAssigned = await _context.DoctorAssignments
+            .AnyAsync(a => a.RaceId == raceEntry.RaceId && a.DoctorId == doctorId);
+        if (!doctorAssigned)
+            throw new InvalidOperationException("DOCTOR_NOT_ASSIGNED_TO_RACE");
+
+        // Weigh-out must happen while the race is still Live, before the referee
+        // can finalize the Unofficial report.
+        if (raceEntry.Race.Status != "Live")
+            throw new InvalidOperationException("RACE_NOT_LIVE");
+        if (!raceEntry.PreRaceJockeyWeight.HasValue)
+            throw new InvalidOperationException("PRE_RACE_WEIGHT_REQUIRED");
+
+        var thresholdKg = raceEntry.Race.Round.Tournament.PostRaceWeightDiffThresholdKg;
+        var difference = Math.Abs(dto.PostRaceJockeyWeight - raceEntry.PreRaceJockeyWeight.Value);
+        var flagged = difference > thresholdKg;
+
+        raceEntry.PostRaceJockeyWeight = dto.PostRaceJockeyWeight;
+        raceEntry.PostRaceWeightByDoctorId = doctorId;
+        raceEntry.PostRaceWeightFlagged = flagged;
+        raceEntry.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        return new PostRaceWeightResultDto
+        {
+            RaceEntryId = raceEntry.RaceEntryId,
+            RaceId = raceEntry.RaceId,
+            DoctorId = doctor.DoctorId,
+            PreRaceJockeyWeight = raceEntry.PreRaceJockeyWeight.Value,
+            PostRaceJockeyWeight = dto.PostRaceJockeyWeight,
+            WeightDifference = difference,
+            ThresholdKg = thresholdKg,
+            IsWeightFlagged = flagged,
+            Message = flagged
+                ? "Post-race weight difference exceeds the configured threshold."
+                : "Post-race weight recorded successfully."
+        };
+    }
+
     public async Task<HorseIdentityResultDto> RecordHorseIdentityAsync(
      int doctorId,
      int raceEntryId,
