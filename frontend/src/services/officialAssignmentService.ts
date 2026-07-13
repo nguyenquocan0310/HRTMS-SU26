@@ -13,8 +13,7 @@ export interface RefereeAssignment {
 }
 
 export const getRefereesByRace = (raceId: number): Promise<RefereeAssignment[]> =>
-  apiFetch<{ data: RefereeAssignment[] }>(`/admin/races/${raceId}/referees`)
-    .then((res) => res.data ?? [])
+  apiFetch<RefereeAssignment[]>(`/admin/races/${raceId}/referees`)
     .catch(() => []);
 
 export const assignReferee = (raceId: number, refereeId: number, role: string): Promise<RefereeAssignment> =>
@@ -39,8 +38,7 @@ export interface DoctorAssignment {
 }
 
 export const getDoctorsByRace = (raceId: number): Promise<DoctorAssignment[]> =>
-  apiFetch<{ data: DoctorAssignment[] }>(`/admin/races/${raceId}/doctors`)
-    .then((res) => res.data ?? [])
+  apiFetch<DoctorAssignment[]>(`/admin/races/${raceId}/doctors`)
     .catch(() => []);
 
 export const assignDoctor = (raceId: number, doctorId: number): Promise<DoctorAssignment> =>
