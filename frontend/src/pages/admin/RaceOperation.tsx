@@ -3,7 +3,8 @@ import { FiChevronDown } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
 import { getTournaments, type TournamentResponse } from '../../services/tournamentService';
 import {
-  getRaceEntries, allocateEntry, drawPostPositions, type RaceSchedule,
+  getRaceEntries, allocateEntry, drawPostPositions, getAdminPairings,
+  type RaceSchedule, type AdminPairing,
 } from '../../services/raceOperationService';
 import styles from './RaceOperation.module.scss';
 
@@ -21,8 +22,9 @@ const RaceOperations = () => {
   const [selectedRaceId, setSelectedRaceId] = useState<number | null>(null);
   const [schedule, setSchedule] = useState<RaceSchedule | null>(null);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
-  const [pairingId, setPairingId] = useState('');
-  const [allocating, setAllocating] = useState(false);
+  const [unallocatedPairings, setUnallocatedPairings] = useState<AdminPairing[]>([]);
+  const [loadingPairings, setLoadingPairings] = useState(false);
+  const [allocatingId, setAllocatingId] = useState<number | null>(null);
   const [drawing, setDrawing] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
   const [actionError, setActionError] = useState('');
@@ -63,19 +65,34 @@ const RaceOperations = () => {
       .finally(() => setLoadingSchedule(false));
   }, [selectedRaceId]);
 
-  const handleAllocate = async () => {
-    if (!selectedRaceId || !pairingId.trim()) return;
-    setAllocating(true);
+  // Load danh sách pairing Confirmed chưa allocate — theo tournament đang chọn
+  const reloadUnallocatedPairings = () => {
+    if (!selectedTournamentId) return;
+    setLoadingPairings(true);
+    getAdminPairings(selectedTournamentId, true)
+      .then(setUnallocatedPairings)
+      .catch(() => setUnallocatedPairings([]))
+      .finally(() => setLoadingPairings(false));
+  };
+
+  useEffect(() => {
+    reloadUnallocatedPairings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTournamentId]);
+
+  const handleAllocate = async (pairingId: number) => {
+    if (!selectedRaceId) return;
+    setAllocatingId(pairingId);
     setActionMsg(''); setActionError('');
     try {
-      await allocateEntry(selectedRaceId, Number(pairingId));
+      await allocateEntry(selectedRaceId, pairingId);
       setActionMsg('Allocate thành công!');
-      setPairingId('');
       const updated = await getRaceEntries(selectedRaceId);
       setSchedule(updated);
+      reloadUnallocatedPairings();
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Allocate thất bại.');
-    } finally { setAllocating(false); }
+    } finally { setAllocatingId(null); }
   };
 
   const handleDraw = async () => {
@@ -104,7 +121,7 @@ const RaceOperations = () => {
 
       <div className={styles.sectionHeader}>
         <h2 className={styles.sectionTitle}>Race Operations</h2>
-        <p className={styles.sectionDesc}>Allocate Pairing vào RaceEntry và bốc thăm post position theo Module E.</p>
+        <p className={styles.sectionDesc}>Allocate pairing đã confirmed vào race và bốc thăm post position theo Module E.</p>
       </div>
 
       <div className={styles.filterCard}>
@@ -121,7 +138,7 @@ const RaceOperations = () => {
           </div>
 
           <div className={styles.filterGroup}>
-            <label className={styles.filterLabel}>Race</label>
+            <label className={styles.filterLabel}>Race hiện tại</label>
             <div className={styles.selectWrap}>
               <select className={styles.select} value={selectedRaceId ?? ''}
                 onChange={(e) => setSelectedRaceId(Number(e.target.value))}>
@@ -136,16 +153,6 @@ const RaceOperations = () => {
         </div>
 
         <div className={styles.actionRow}>
-          <div className={styles.inputGroup}>
-            <label className={styles.filterLabel}>Confirmed Pairing ID</label>
-            <input className={styles.input} type="number"
-              placeholder="Nhập Pairing ID..."
-              value={pairingId} onChange={(e) => setPairingId(e.target.value)} />
-          </div>
-          <button type="button" className={styles.allocateBtn} onClick={handleAllocate}
-            disabled={allocating || !pairingId.trim() || !selectedRaceId}>
-            {allocating ? 'Đang xử lý...' : 'Allocate'}
-          </button>
           {isDrawn ? (
             <Link to="/admin/assign-officials" className={styles.assignOfficialsBtn}>
               Assign Officials →
@@ -160,6 +167,76 @@ const RaceOperations = () => {
 
         {actionMsg && <p className={styles.successMsg}>{actionMsg}</p>}
         {actionError && <p className={styles.errorMsg}>{actionError}</p>}
+      </div>
+
+      {/* Allocation picker — 2 cột */}
+      <div className={styles.allocationGrid}>
+        <div className={styles.tableCard}>
+          <div className={styles.tableCardHeader}>
+            <h3 className={styles.tableTitle}>Pairing chưa allocate</h3>
+            <span className={styles.countBadge}>{unallocatedPairings.length}</span>
+          </div>
+          <p className={styles.tableSubtext}>Confirmed, cùng tournament, chưa nằm trong race active nào.</p>
+
+          {loadingPairings ? (
+            <p className={styles.emptyCell}>Đang tải...</p>
+          ) : unallocatedPairings.length === 0 ? (
+            <p className={styles.emptyCell}>Không còn pairing nào chưa allocate.</p>
+          ) : (
+            <div className={styles.pairingList}>
+              {unallocatedPairings.map((p) => (
+                <div key={p.pairingId} className={styles.pairingItem}>
+                  <div>
+                    <div className={styles.pairingHorse}>
+                      {p.horseName} <span className={styles.pairingBreed}>{p.horseBreed}</span>
+                    </div>
+                    <div className={styles.pairingMeta}>
+                      Jockey {p.jockeyName} · Owner {p.ownerName} · Pairing #{p.pairingId}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.allocateBtn}
+                    onClick={() => handleAllocate(p.pairingId)}
+                    disabled={allocatingId === p.pairingId || !selectedRaceId}
+                  >
+                    {allocatingId === p.pairingId ? 'Đang xử lý...' : 'Allocate'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className={styles.tableCard}>
+          <div className={styles.tableCardHeader}>
+            <h3 className={styles.tableTitle}>Pairing đã allocate vào race hiện tại</h3>
+            <span className={styles.countBadge}>{schedule?.entries.length ?? 0}</span>
+          </div>
+          <p className={styles.tableSubtext}>{currentRace?.label ?? '—'}</p>
+
+          {loadingSchedule ? (
+            <p className={styles.emptyCell}>Đang tải...</p>
+          ) : !schedule || schedule.entries.length === 0 ? (
+            <p className={styles.emptyCell}>Chưa có pairing nào được allocate vào race này.</p>
+          ) : (
+            <div className={styles.pairingList}>
+              {schedule.entries.map((entry) => (
+                <div key={entry.raceEntryId} className={styles.pairingItem}>
+                  <div>
+                    <div className={styles.pairingHorse}>{entry.horseName}</div>
+                    <div className={styles.pairingMeta}>
+                      Jockey {entry.jockeyName} · Gate {entry.postPosition ?? '—'}
+                    </div>
+                  </div>
+                  <span className={`${styles.badge} ${entry.status === 'Confirmed' ? styles.confirmed : styles.pending}`}>
+                    {entry.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Starting list */}
