@@ -610,6 +610,94 @@ public class AdminController : ControllerBase
             }
         });
     }
+    // Danh sách cán bộ đủ điều kiện để phân công cho một Race cụ thể.
+    // Hồ sơ phải Active và đã được duyệt trong roster của đúng Tournament.
+    [HttpGet("races/{raceId:int}/available-officials")]
+    public async Task<IActionResult> GetAvailableOfficials(int raceId)
+    {
+        var race = await _context.Races
+            .AsNoTracking()
+            .Where(r => r.RaceId == raceId)
+            .Select(r => new
+            {
+                r.RaceId,
+                TournamentId = r.Round.TournamentId,
+                r.ScheduledTime
+            })
+            .FirstOrDefaultAsync();
+
+        if (race is null)
+            return NotFound(new { success = false, message = "Không tìm thấy Race." });
+
+        var referees = await (
+            from profile in _context.RefereeProfiles.AsNoTracking()
+            join user in _context.Users.AsNoTracking()
+                on profile.RefereeId equals user.UserId
+            where profile.Status == "Active"
+                && _context.TournamentParticipants.Any(p =>
+                    p.TournamentId == race.TournamentId
+                    && p.UserId == profile.RefereeId
+                    && p.Role == "Referee"
+                    && p.Status == "Approved")
+                && !_context.RefereeAssignments.Any(a =>
+                    a.RaceId == raceId && a.RefereeId == profile.RefereeId)
+                && !_context.RefereeAssignments.Any(a =>
+                    a.RefereeId == profile.RefereeId
+                    && a.RaceId != raceId
+                    && a.Race.ScheduledTime == race.ScheduledTime
+                    && a.Race.Status != "Cancelled")
+            orderby user.FullName
+            select new
+            {
+                UserId = user.UserId,
+                user.Username,
+                user.FullName,
+                user.Email,
+                Role = "Referee",
+                ProfileStatus = profile.Status,
+                CertificationLevel = profile.CertificationLevel,
+                profile.CreatedAt
+            })
+            .ToListAsync();
+
+        var doctors = await (
+            from profile in _context.DoctorProfiles.AsNoTracking()
+            join user in _context.Users.AsNoTracking()
+                on profile.DoctorId equals user.UserId
+            where profile.Status == "Active"
+                && _context.TournamentParticipants.Any(p =>
+                    p.TournamentId == race.TournamentId
+                    && p.UserId == profile.DoctorId
+                    && p.Role == "Doctor"
+                    && p.Status == "Approved")
+                && !_context.DoctorAssignments.Any(a =>
+                    a.RaceId == raceId && a.DoctorId == profile.DoctorId)
+                && !_context.DoctorAssignments.Any(a =>
+                    a.DoctorId == profile.DoctorId
+                    && a.RaceId != raceId
+                    && a.Race.ScheduledTime == race.ScheduledTime
+                    && a.Race.Status != "Cancelled")
+            orderby user.FullName
+            select new
+            {
+                UserId = user.UserId,
+                user.Username,
+                user.FullName,
+                user.Email,
+                Role = "Doctor",
+                ProfileStatus = profile.Status,
+                CertificationLevel = profile.MedicalLicenseNumber,
+                profile.CreatedAt
+            })
+            .ToListAsync();
+
+        return Ok(new
+        {
+            success = true,
+            data = new { referees, doctors }
+        });
+    }
+
     // ── MODULE C: Horse Enrollment Approval (duyệt ngựa theo từng giải) ────────
 
     [HttpGet("horse-entries")]
