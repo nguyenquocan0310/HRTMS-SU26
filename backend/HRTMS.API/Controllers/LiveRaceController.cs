@@ -90,9 +90,9 @@ public class LiveRaceController : ControllerBase
             return StatusCode(StatusCodes.Status403Forbidden,
                 ApiResponse<StartRaceResultDto>.Fail("Bạn không được phân công cho cuộc đua này."));
         }
-        catch (InvalidOperationException ex) when (ex.Message == "INVALID_RACE_STATE")
+        catch (InvalidOperationException ex) when (ex.Message == "STARTING_LIST_NOT_CONFIRMED")
         {
-            return Conflict(ApiResponse<StartRaceResultDto>.Fail("Cuộc đua hiện không ở trạng thái có thể bắt đầu."));
+            return Conflict(ApiResponse<StartRaceResultDto>.Fail("Chưa xác nhận danh sách xuất phát chính thức (race phải ở trạng thái Pre-Race)."));
         }
     }
 

@@ -76,6 +76,12 @@ public class IndependenceCheckService : IIndependenceCheckService
         }
 
         // Chi cho check truoc khi Race bat dau
+        if (raceEntry.Race.Status == "Pre-Race")
+        {
+            // Starting list da duoc confirm chinh thuc -> khong cho sua du lieu tien dua nua.
+            throw new InvalidOperationException("STARTING_LIST_ALREADY_CONFIRMED");
+        }
+
         if (raceEntry.Race.Status != "Upcoming")
         {
             throw new InvalidOperationException("RACE_NOT_UPCOMING");
