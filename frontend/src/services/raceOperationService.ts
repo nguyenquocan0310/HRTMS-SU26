@@ -43,6 +43,22 @@ interface RawRaceEntryApiItem {
   jockey: { jockeyId: number; fullName: string };
 }
 
+export interface UnofficialRaceItem {
+  raceId: number;
+  tournamentId: number;
+  tournamentName: string;
+  roundName: string;
+  raceNumber: number;
+  scheduledTime: string;
+  hasRaceReport: boolean;
+  isRaceReportLocked: boolean;
+  hasPendingProtests: boolean;
+  prizeDistributionsConfigured: boolean;
+  rankingIntegrityValid: boolean;
+  postRaceWeighInComplete: boolean;
+  canDeclareOfficial: boolean;
+}
+
 // GET /api/races/{raceId}/entries — trả về { success, data: [...] } với data LÀ MẢNG PHẲNG
 // các entry (mỗi entry lồng object horse/jockey), KHÔNG có object race bao ngoài
 // (không có raceId/roundId/isPostPositionDrawn ở tầng này — lấy isDrawn từ race list thay thế).
@@ -61,6 +77,18 @@ export const getRaceEntries = (raceId: number): Promise<RaceScheduleEntry[]> =>
         jockeyName: e.jockey?.fullName,
       }))
     );
+
+export const getUnofficialRaces = (tournamentId?: number): Promise<UnofficialRaceItem[]> => {
+  const query = tournamentId ? `?tournamentId=${tournamentId}` : '';
+  return apiFetch<{ success: boolean; data: UnofficialRaceItem[] }>(`/races/unofficial${query}`)
+    .then((res) => res.data ?? []);
+};
+
+export const declareOfficial = (raceId: number): Promise<unknown> =>
+  apiFetch<{ success: boolean; data: unknown }>(`/races/${raceId}/declare-official`, {
+    method: 'POST',
+    body: JSON.stringify({ confirmedByAdmin: true }),
+  }).then((res) => res.data);
 
 // POST /api/admin/races/{raceId}/entries — allocate pairing
 export const allocateEntry = (raceId: number, pairingId: number): Promise<RaceEntryResponse> =>
