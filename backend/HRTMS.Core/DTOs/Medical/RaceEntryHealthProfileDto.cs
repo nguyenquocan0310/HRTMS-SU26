@@ -6,7 +6,8 @@ public class RaceEntryHealthProfileDto
 
     public int RaceId { get; set; }
 
-    // --- Jockey ---
+    public int? PostPosition { get; set; }
+
     public int JockeyId { get; set; }
 
     public string JockeyName { get; set; } = null!;

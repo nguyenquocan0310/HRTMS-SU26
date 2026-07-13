@@ -479,6 +479,7 @@ public class MedicalCheckService : IMedicalCheckService
         {
             RaceEntryId = raceEntry.RaceEntryId,
             RaceId = raceEntry.RaceId,
+            PostPosition = raceEntry.PostPosition,
 
             // Jockey
             JockeyId = jockeyProfile.JockeyId,
