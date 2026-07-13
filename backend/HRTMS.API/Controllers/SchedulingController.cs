@@ -57,7 +57,7 @@ public class SchedulingController : ControllerBase
         }
         catch (InvalidOperationException ex) when (ex.Message == "PAIRING_TOURNAMENT_MISMATCH")
         {
-            return UnprocessableEntity(Err("PAIRING_TOURNAMENT_MISMATCH", "The pairing does not belong to the race's tournament."));
+            return UnprocessableEntity(Err("PAIRING_TOURNAMENT_MISMATCH", "Cặp đấu không thuộc giải đấu của cuộc đua này."));
         }
         catch (InvalidOperationException ex) when (ex.Message == "PAIRING_NOT_CONFIRMED")
         {
@@ -66,12 +66,12 @@ public class SchedulingController : ControllerBase
         catch (InvalidOperationException ex) when (ex.Message == "PREVIOUS_ROUND_NOT_COMPLETED")
         {
             return UnprocessableEntity(Err("PREVIOUS_ROUND_NOT_COMPLETED",
-                "The previous round has not been completed yet; allocation for this round is not open."));
+                "Vòng đấu trước chưa hoàn tất nên chưa thể xếp ngựa vào vòng này."));
         }
         catch (InvalidOperationException ex) when (ex.Message == "PAIRING_NOT_QUALIFIED")
         {
             return UnprocessableEntity(Err("PAIRING_NOT_QUALIFIED",
-                "The pairing is not qualified (or also-eligible) from the previous round."));
+                "Cặp đấu chưa đủ điều kiện đi tiếp từ vòng trước nên không thể xếp vào vòng này."));
         }
         catch (InvalidOperationException ex) when (ex.Message == "HORSE_NOT_APPROVED_IN_TOURNAMENT")
         {
@@ -166,6 +166,11 @@ public class SchedulingController : ControllerBase
         {
             return Conflict(Err("INVALID_STATUS", "Chỉ đăng ký đang chờ mới có thể xác nhận."));
         }
+        catch (InvalidOperationException ex) when (ex.Message == "ENTRY_FEE_NOT_PAID")
+        {
+            return UnprocessableEntity(Err("ENTRY_FEE_NOT_PAID",
+                "Lệ phí tham gia chưa được Ban tổ chức xác nhận nên chưa thể xác nhận tham gia."));
+        }
         catch (InvalidOperationException ex) when (ex.Message == "HORSE_NOT_APPROVED_IN_TOURNAMENT")
         {
             return UnprocessableEntity(Err("HORSE_NOT_APPROVED_IN_TOURNAMENT",
@@ -226,19 +231,19 @@ public class SchedulingController : ControllerBase
         {
             var dto = new WithdrawEntryDto
             {
-                Reason = string.IsNullOrWhiteSpace(reason) ? "Cancelled by admin" : reason
+                Reason = string.IsNullOrWhiteSpace(reason) ? "Ban tổ chức điều phối" : reason
             };
             var result = await _service.WithdrawAsync(adminId, id, dto, isSystem: true);
             return Ok(result);
         }
         catch (KeyNotFoundException ex) when (ex.Message == "ENTRY_NOT_FOUND")
         {
-            return NotFound(Err("ENTRY_NOT_FOUND", "Race entry was not found."));
+            return NotFound(Err("ENTRY_NOT_FOUND", "Không tìm thấy đăng ký cuộc đua."));
         }
         catch (InvalidOperationException ex) when (ex.Message == "RACE_NOT_UPCOMING")
         {
             return UnprocessableEntity(Err("RACE_NOT_UPCOMING",
-                "The race has already started or finished; the entry cannot be cancelled."));
+                "Cuộc đua đã bắt đầu hoặc kết thúc nên không thể hủy đăng ký."));
         }
     }
 

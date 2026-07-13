@@ -22,28 +22,82 @@ const StepFinalize = ({ role, formData }: Props) => {
   const [errorMsg, setErrorMsg] = useState('');
   const [resultMessage, setResultMessage] = useState('');
 
+  // Validate trước khi gửi API — tránh gọi API rồi mới báo lỗi, đỡ tốn round-trip
+  // và cho thông báo rõ ràng hơn message chung chung của BE.
+  const validateBeforeSubmit = (): string | null => {
+    if (!role) return 'Vui lòng chọn vai trò.';
+
+    if (role === RegRole.Owner) {
+      const v = formData.ownerVerification;
+      if (!v.hasNoFamilyInIndustry && v.familyDeclarations.length === 0) {
+        return 'Vui lòng khai báo người thân trong ngành, hoặc tick "Tôi không có người thân làm việc trong ngành".';
+      }
+    }
+
+    if (role === RegRole.Jockey) {
+      const v = formData.jockeyVerification;
+      if (!v.certificateFile) {
+        return 'Vui lòng upload file chứng chỉ/bằng cấp.';
+      }
+      if (!v.hasNoFamilyInIndustry && v.familyDeclarations.length === 0) {
+        return 'Vui lòng khai báo người thân trong ngành, hoặc tick "Tôi không có người thân làm việc trong ngành".';
+      }
+    }
+
+    if (role === RegRole.Referee) {
+      const v = formData.refereeVerification;
+      if (!v.certificateFile) {
+        return 'Vui lòng upload file chứng chỉ/bằng cấp.';
+      }
+      if (!v.hasNoFamilyInIndustry && v.familyDeclarations.length === 0) {
+        return 'Vui lòng khai báo người thân trong ngành, hoặc tick "Tôi không có người thân làm việc trong ngành".';
+      }
+    }
+
+    if (role === RegRole.Doctor) {
+      const v = formData.doctorVerification;
+      if (!v.certificateFile) {
+        return 'Vui lòng upload file chứng chỉ/bằng cấp.';
+      }
+      if (!v.hasNoFamilyInIndustry && v.familyDeclarations.length === 0) {
+        return 'Vui lòng khai báo người thân trong ngành, hoặc tick "Tôi không có người thân làm việc trong ngành".';
+      }
+    }
+
+    return null;
+  };
+
+  const buildVerificationData = (): Record<string, unknown> => {
+    if (role === RegRole.Owner) return { ...formData.ownerVerification };
+    if (role === RegRole.Jockey) return { ...formData.jockeyVerification };
+    if (role === RegRole.Referee) return { ...formData.refereeVerification };
+    if (role === RegRole.Doctor) return { ...formData.doctorVerification };
+    return {};
+  };
+
   const handleSubmit = async () => {
     if (!role) return;
+
+    const validationError = validateBeforeSubmit();
+    if (validationError) {
+      setErrorMsg(validationError);
+      return;
+    }
 
     setIsSubmitting(true);
     setErrorMsg('');
 
     try {
-      // Gom verification data theo role để gửi kèm (BE thật sẽ dùng các field này)
-      let verificationData: Record<string, unknown> = {};
-      if (role === RegRole.Owner) verificationData = formData.ownerVerification;
-      if (role === RegRole.Jockey) verificationData = formData.jockeyVerification;
-      if (role === RegRole.Referee) verificationData = formData.refereeVerification;
-      if (role === RegRole.Doctor) verificationData = formData.doctorVerification;
+      const verificationData = buildVerificationData();
 
       const result = await authService.register({
-  role: mapRegRoleToRole(role),
-  username: formData.identity.username,
-  fullName: formData.identity.fullName,
-  email: formData.identity.email,
-  password: formData.credentials.password,
-  verificationData,
-});
+        role: mapRegRoleToRole(role),
+        username: formData.identity.username,
+        fullName: formData.identity.fullName,
+        email: formData.identity.email,
+        password: formData.credentials.password,
+        verificationData,
+      });
 
       setResultMessage(result.message);
       setSubmitted(true);
@@ -54,16 +108,16 @@ const StepFinalize = ({ role, formData }: Props) => {
     }
   };
 
-  // ─── Sau khi submit ───────────────────────────────────────────────────────
+  // ─── Sau khi submit ─────────────────────────────────────────────────────────
   if (submitted) {
-    const isInstantActive  = role === RegRole.Spectator || role === RegRole.Owner;
+    const isInstantActive = role === RegRole.Spectator || role === RegRole.Owner;
 
     return (
       <div className={styles.container}>
         <div className={styles.successBox}>
           <div className={styles.successIcon}>✅</div>
 
-          {isInstantActive  ? (
+          {isInstantActive ? (
             <>
               <h2 className={styles.successTitle}>Đăng ký thành công!</h2>
               <p className={styles.successMsg}>{resultMessage}</p>
@@ -75,10 +129,7 @@ const StepFinalize = ({ role, formData }: Props) => {
             </>
           )}
 
-          <button
-            className={styles.loginBtn}
-            onClick={() => navigate('/login')}
-          >
+          <button className={styles.loginBtn} onClick={() => navigate('/login')}>
             Đến trang đăng nhập →
           </button>
         </div>
@@ -86,7 +137,7 @@ const StepFinalize = ({ role, formData }: Props) => {
     );
   }
 
-  // ─── Trước khi submit ─────────────────────────────────────────────────────
+  // ─── Trước khi submit ───────────────────────────────────────────────────────
   return (
     <div className={styles.container}>
       <h2 className={styles.title}>Finalize Registration</h2>
@@ -106,11 +157,7 @@ const StepFinalize = ({ role, formData }: Props) => {
 
       {errorMsg && <div className={styles.errorMsg}>{errorMsg}</div>}
 
-      <button
-        className={styles.submitBtn}
-        onClick={handleSubmit}
-        disabled={isSubmitting}
-      >
+      <button className={styles.submitBtn} onClick={handleSubmit} disabled={isSubmitting}>
         {isSubmitting ? 'Đang xử lý...' : 'Hoàn tất đăng ký'}
       </button>
     </div>

@@ -39,7 +39,9 @@ public class AuthService : IAuthService
     private static readonly string[] ProfessionalRoles =
         ["Owner", "Jockey", "Referee", "Doctor"];
 
-    // 4 role bắt buộc khai báo người thân (FRD) — trừ Admin và Spectator.
+    // Cả 4 role (Owner/Jockey/Referee/Doctor) khai báo người thân (FRD)
+    // NGAY LÚC ĐĂNG KÝ — quyết định cập nhật: Doctor KHÔNG còn hoãn khai báo
+    // sang Dashboard (UI-S30) nữa; Owner cũng khai (dù là phía hay bị match).
     private static readonly string[] RolesRequireFrdAtRegister =
         ["Owner", "Jockey", "Referee", "Doctor"];
 
@@ -91,6 +93,11 @@ public class AuthService : IAuthService
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
 
         if (user == null)
+            return ApiResponse<AuthResponseDto>.Fail("Email hoặc mật khẩu không đúng.");
+
+        // Tài khoản hệ thống (actor cho job tự động — patch 006) không được đăng nhập.
+        // Chặn trước bước verify: PasswordHash của user này không phải BCrypt hash hợp lệ.
+        if (user.Role == "System")
             return ApiResponse<AuthResponseDto>.Fail("Email hoặc mật khẩu không đúng.");
 
         if (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTime.UtcNow)
@@ -175,8 +182,18 @@ public class AuthService : IAuthService
         if (await _context.Users.AnyAsync(u => u.Email == normalizedEmail || u.Username == dto.Username))
             return ApiResponse<int>.Fail("Email hoặc Username đã tồn tại.");
 
+        if (RolesRequireFrdAtRegister.Contains(dto.Role) && dto.FamilyDeclarations == null)
+            return ApiResponse<int>.Fail(
+                $"Role {dto.Role} bắt buộc phải khai báo mục người thân (gửi mảng rỗng nếu không có người thân nào trong ngành).");
+
         if (dto.FamilyDeclarations != null && dto.FamilyDeclarations.Count > 0)
         {
+            // Cả 4 role Owner/Jockey/Referee/Doctor được khai FRD lúc đăng ký.
+            // Admin/Spectator không thuộc diện này — từ chối nếu lỡ gửi kèm.
+            if (!RolesRequireFrdAtRegister.Contains(dto.Role))
+                return ApiResponse<int>.Fail(
+                    $"Role {dto.Role} không khai báo người thân lúc đăng ký.");
+
             var frdValidation = await _frdValidator.ValidateAsync(
                 dto.FamilyDeclarations, declarantUserId: 0, isRegister: true);
             if (frdValidation != null)
@@ -366,6 +383,23 @@ public class AuthService : IAuthService
                 ipAddress: ipAddress,
                 userAgent: userAgent);
 
+            // Welcome email — KHÔNG echo mật khẩu (bảo mật); chỉ báo tài khoản đã
+            // được Admin tạo, dùng đúng email/username đã cung cấp để đăng nhập.
+            // Gửi SAU khi transaction đã commit, không để lỗi email ảnh hưởng flow tạo user.
+            var welcomeMessage = initialStatus == "Active"
+                ? $"Tài khoản {dto.Role} của bạn đã được Admin tạo và kích hoạt sẵn. " +
+                  $"Đăng nhập bằng email {normalizedEmail} và mật khẩu đã được cung cấp cho bạn."
+                : $"Tài khoản {dto.Role} của bạn đã được Admin tạo, đang chờ duyệt hồ sơ chuyên môn " +
+                  $"trước khi kích hoạt. Đăng nhập bằng email {normalizedEmail} khi tài khoản được duyệt.";
+
+            await _notificationService.SendAsync(
+                user.UserId,
+                "Tài khoản HRTMS của bạn đã được Admin tạo",
+                welcomeMessage,
+                type: "Both",
+                relatedEntityType: "Users",
+                relatedEntityId: user.UserId);
+
             return ApiResponse<int>.Ok(user.UserId, "Tạo tài khoản thành công.");
         }
         catch
@@ -447,10 +481,26 @@ public class AuthService : IAuthService
             return ApiResponse<bool>.Fail("Mật khẩu mới phải có ít nhất 6 ký tự.");
 
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword, workFactor: 12);
-        user.UpdatedAt = DateTime.UtcNow;
+        var resetAt = DateTime.UtcNow;
+        user.UpdatedAt = resetAt;
         await _context.SaveChangesAsync();
 
         await _tokenBlacklistService.BlacklistUserAsync(userId);
+
+        await _auditLog.LogAsync(
+            actorId: userId,
+            action: "Reset_Password",
+            entityName: "Users",
+            entityId: userId.ToString());
+
+        // Cảnh báo bảo mật: xác nhận mật khẩu đã được đặt lại qua luồng quên mật khẩu.
+        await _emailService.SendAsync(
+            user.Email, user.FullName,
+            "Mật khẩu tài khoản HRTMS đã được đặt lại",
+            $"<p>Mật khẩu tài khoản <b>{System.Net.WebUtility.HtmlEncode(user.FullName)}</b> " +
+            $"vừa được đặt lại thành công lúc {resetAt:HH:mm dd/MM/yyyy} (UTC) qua chức năng quên mật khẩu.</p>" +
+            "<p>Nếu đây không phải do bạn thực hiện, vui lòng liên hệ Admin ngay lập tức — " +
+            "toàn bộ phiên đăng nhập cũ đã bị vô hiệu hoá.</p>");
 
         return ApiResponse<bool>.Ok(true, "Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.");
     }

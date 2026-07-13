@@ -46,6 +46,8 @@ public class StartingListController : ControllerBase
         { return Forbid(); }
         catch (InvalidOperationException ex) when (ex.Message == "RACE_NOT_UPCOMING")
         { return Conflict(new { error = "RACE_NOT_UPCOMING", message = "Starting list can only be confirmed before the race starts." }); }
+        catch (InvalidOperationException ex) when (ex.Message == "RACE_NOT_DRAWN")
+        { return Conflict(new { error = "RACE_NOT_DRAWN", message = "Post positions must be drawn before confirming the starting list." }); }
         catch (InvalidOperationException ex) when (ex.Message == "NO_RACE_ENTRIES")
         { return Conflict(new { error = "NO_RACE_ENTRIES", message = "Race has no race entries." }); }
         catch (InvalidOperationException ex) when (ex.Message == "NO_ELIGIBLE_STARTING_ENTRIES")

@@ -103,72 +103,70 @@ const mapApiRoleToRole = (apiRole: string): Role => {
   return mapping[apiRole] ?? 'Spectator';
 };
 
-interface RegisterApiPayload {
-  username: string;
-  fullName: string;
-  email: string;
-  password: string;
-  role: string;
-  phoneNumber?: string;
-  identityNumber?: string;
-  dateOfBirth?: string;
-  licenseCertificate?: string;
-  experienceYears?: number;
-  selfDeclaredWeight?: number;
-  certificationLevel?: string;
-  medicalLicenseNumber?: string;
-  bloodType?: string;
-  healthStatus?: string;
-  familyDeclarations?: {
-    relatedPersonName: string;
-    relatedUserId?: number;
-    relationType: string;
-    relatedIdentityNumber: string;
-    industryRole?: string;
-    notes?: string;
-  }[];
+interface FamilyDeclarationPayload {
+  relatedPersonName: string;
+  relationType: string;
+  relatedIdentityNumber: string;
+  industryRole?: string;
+  notes?: string;
 }
 
+/**
+ * Đăng ký giờ dùng multipart/form-data (BE yêu cầu, xem api-contract-certificate-upload.md)
+ * vì có thể kèm file certificateFile (Jockey/Referee/Doctor). KHÔNG còn gửi JSON thuần.
+ */
 export const register = async (payload: RegisterPayload): Promise<RegisterResult> => {
   const v = payload.verificationData ?? {};
 
-  const apiPayload: RegisterApiPayload = {
-    username: payload.username,
-    fullName: payload.fullName,
-    email: payload.email,
-    password: payload.password,
-    role: mapRoleToApiRole(payload.role),
-    phoneNumber: v.phoneNumber as string | undefined,
-    identityNumber: v.identityNumber as string | undefined,
-    dateOfBirth: v.dateOfBirth as string | undefined,
-    licenseCertificate: v.licenseCertificate as string | undefined,
-    experienceYears: v.experienceYears as number | undefined,
-    selfDeclaredWeight: v.selfDeclaredWeight as number | undefined,
-    certificationLevel: v.certificationLevel as string | undefined,
-    medicalLicenseNumber: v.medicalLicenseNumber as string | undefined,
-    bloodType: (v.bloodType as string) || undefined,
-    healthStatus: (v.healthStatus as string) || undefined,
+  const formData = new FormData();
+  formData.append('username', payload.username);
+  formData.append('fullName', payload.fullName);
+  formData.append('email', payload.email);
+  formData.append('password', payload.password);
+  formData.append('role', mapRoleToApiRole(payload.role));
+
+  const appendIfPresent = (key: string, value: unknown) => {
+    if (value !== undefined && value !== null && value !== '') {
+      formData.append(key, String(value));
+    }
   };
 
-  // familyDeclarations giờ luôn là mảng có cấu trúc (Jockey & Referee dùng
-  // chung form StepVerification), field familyDeclaration (string) cũ chỉ
-  // còn giữ lại ở type cho tương thích ngược, không dùng để submit nữa.
-  const familyDeclarations = v.familyDeclarations as {
-    relatedPersonName: string;
-    relatedUserId?: number;
-    relationType: string;
-    relatedIdentityNumber: string;
-    industryRole?: string;
-    notes?: string;
-  }[] | undefined;
+  appendIfPresent('phoneNumber', v.phoneNumber);
+  appendIfPresent('identityNumber', v.identityNumber);
+  appendIfPresent('dateOfBirth', v.dateOfBirth);
+  appendIfPresent('experienceYears', v.experienceYears);
+  appendIfPresent('selfDeclaredWeight', v.selfDeclaredWeight);
+  appendIfPresent('bloodType', v.bloodType);
+  appendIfPresent('healthStatus', v.healthStatus);
+
+  // File chứng chỉ — chỉ Jockey/Referee/Doctor có, Owner không có field này.
+  const certificateFile = v.certificateFile as File | null | undefined;
+  if (certificateFile) {
+    formData.append('certificateFile', certificateFile);
+  }
+
+  // familyDeclarations gửi dạng mảng theo chỉ số như api-contract yêu cầu.
+  // Nếu người dùng tick "không có người thân trong ngành" thì familyDeclarations
+  // rỗng — không gửi field này lên, BE hiểu là không khai báo.
+  const familyDeclarations = v.familyDeclarations as FamilyDeclarationPayload[] | undefined;
 
   if (familyDeclarations && familyDeclarations.length > 0) {
-    apiPayload.familyDeclarations = familyDeclarations;
+    familyDeclarations.forEach((decl, idx) => {
+      formData.append(`familyDeclarations[${idx}].relatedPersonName`, decl.relatedPersonName);
+      formData.append(`familyDeclarations[${idx}].relationType`, decl.relationType);
+      formData.append(`familyDeclarations[${idx}].relatedIdentityNumber`, decl.relatedIdentityNumber);
+      if (decl.industryRole) {
+        formData.append(`familyDeclarations[${idx}].industryRole`, decl.industryRole);
+      }
+      if (decl.notes) {
+        formData.append(`familyDeclarations[${idx}].notes`, decl.notes);
+      }
+    });
   }
 
   const res = await apiFetch<ApiResponse<unknown>>('/auth/register', {
     method: 'POST',
-    body: JSON.stringify(apiPayload),
+    body: formData,
   });
 
   if (!res.success) {

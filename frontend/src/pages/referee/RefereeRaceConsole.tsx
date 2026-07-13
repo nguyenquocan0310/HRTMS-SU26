@@ -55,6 +55,36 @@ function independenceLabel(entry: RefereeRaceEntry) {
   return 'Chưa kiểm tra';
 }
 
+function DoctorChecks({ entry }: { entry: RefereeRaceEntry }) {
+  const hasDoctorData =
+    entry.selfDeclaredWeight !== undefined ||
+    entry.preRaceJockeyWeight !== undefined ||
+    entry.horseIdentityCheckStatus !== undefined ||
+    entry.clinicalStatus !== undefined ||
+    entry.isEmergencyDisqualified !== undefined;
+
+  if (!hasDoctorData) {
+    return <p className="text-xs text-amber-700">Chưa có dữ liệu từ API</p>;
+  }
+
+  return (
+    <div className="space-y-1 text-xs text-gray-500">
+      <p>
+        Danh tính:{' '}
+        {entry.horseIdentityCheckStatus || '—'}
+      </p>
+      <p>Khám: {entry.clinicalStatus || '—'}</p>
+      <p>
+        Cân trước đua:{' '}
+        {entry.preRaceJockeyWeight ?? '—'}
+      </p>
+      {entry.isEmergencyDisqualified && (
+        <p className="font-semibold text-red-700">Đã loại khẩn cấp</p>
+      )}
+    </div>
+  );
+}
+
 function ResultTable({ title, items }: { title: string; items: StartingListEntry[] }) {
   if (items.length === 0) return null;
 
@@ -192,6 +222,11 @@ export default function RefereeRaceConsole() {
   );
 
   const handleIndependenceCheck = async (entry: RefereeRaceEntry) => {
+    if (!raceId) {
+      showToast('Không tìm thấy raceId để đồng bộ Independence Check.');
+      return;
+    }
+
     const key = `check-${entry.raceEntryId}`;
     try {
       setSavingKey(key);
@@ -210,7 +245,14 @@ export default function RefereeRaceConsole() {
             : item
         )
       );
-      showToast(result.message || 'Đã kiểm tra độc lập Jockey.');
+      try {
+        setEntries(await getRefereeRaceEntries(raceId));
+        showToast(result.message || 'Đã kiểm tra độc lập Jockey.');
+      } catch {
+        showToast(
+          `${result.message || 'Đã kiểm tra độc lập Jockey.'} Chưa thể làm mới danh sách từ API.`
+        );
+      }
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Không thể kiểm tra độc lập.');
     } finally {
@@ -661,11 +703,7 @@ export default function RefereeRaceConsole() {
                       <td className="px-5 py-4 text-gray-700">{entry.ownerName ?? '-'}</td>
                       <td className="px-5 py-4">{statusBadge(entry.raceEntryStatus ?? entry.status)}</td>
                       <td className="px-5 py-4">
-                        <div className="space-y-1 text-xs text-gray-500">
-                          <p>Danh tính: {entry.horseIdentityCheckStatus || 'Chưa kiểm tra'}</p>
-                          <p>Khám: {entry.clinicalStatus || 'Chưa khám'}</p>
-                          <p>Cân trước đua: {entry.preRaceJockeyWeight ?? 'Chưa cân'}</p>
-                        </div>
+                        <DoctorChecks entry={entry} />
                       </td>
                       <td className="px-5 py-4">
                         <div className="space-y-1.5">

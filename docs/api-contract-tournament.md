@@ -802,6 +802,20 @@ POST /api/tournament/{tournamentId}/participants
 - Giải phải đang ở `Open Registration` → nếu không: 400.
 - Mỗi user chỉ 1 bản ghi/giải (UNIQUE `TournamentId + UserId`) → đăng ký lại: 400.
 - Profile phải hợp lệ: Owner cần `OwnerProfile`; Jockey/Doctor/Referee cần profile `Status = Active` (đã duyệt global) → nếu chưa: 400.
+
+#### Phạm vi ràng buộc "tham gia nhiều giải"
+
+Ràng buộc unique DB áp trong **cùng 1 giải** (SRS TRN.11 tiêu chí #2). Ngoài ra, **nhóm chốt** Jockey chỉ được 1 giải chưa kết thúc tại một thời điểm (app-layer guard):
+
+| Đối tượng | Nhiều giải song song? | Chặn ở đâu |
+| --- | --- | --- |
+| **Jockey** | ❌ Chặn | Guard trong `RegisterAsync`: nếu đã có bản ghi roster Jockey (≠ `Rejected`) ở giải khác đang `Open`/`Closed Registration` → **400** `"Bạn đang tham gia một giải chưa kết thúc nên chưa thể đăng ký thêm giải mới."`. Song song, ràng buộc vật lý trùng giờ vẫn giữ ở cấp **race**: `SCH.8 DOUBLE_BOOKED`. |
+| **Owner** | ✅ Cho phép | Việc Owner có ngựa đang thi đấu bị kiểm soát **gián tiếp** qua rule Horse (mỗi ngựa chỉ 1 giải chưa kết thúc). Roster Owner không chặn. |
+| **Doctor** | ✅ Cho phép | Trùng giờ xử lý ở cấp assignment: `DOCTOR_DOUBLE_BOOKED` (DoctorAssignmentService). |
+| **Referee** | ✅ Cho phép | Trùng giờ xử lý ở cấp assignment: `REFEREE_DOUBLE_BOOKED` + 1 Lead Referee/race (RefereeAssignmentService). |
+| **Horse** | ❌ Chặn | Mỗi ngựa chỉ tham gia 1 giải `Open`/`Closed Registration` tại một thời điểm ([HorseService.cs:155-168](../backend/HRTMS.Infrastructure/Services/HorseService.cs)) — vật lý, có cơ sở SRS Module C. |
+
+> Guard Jockey **chỉ** áp cho `Role == "Jockey"` — Owner/Doctor/Referee được phục vụ nhiều giải. Bản ghi `Rejected` không tính là đang tham gia; giải `Completed`/`Cancelled` đã kết thúc nên Jockey đăng ký giải mới được. Không cần DB patch (unique per-giải vẫn đúng). SRS chưa mô tả rule này bằng câu chữ — ghi nhận là quyết định nhóm, cần bổ sung SRS/BR sau.
 - **Kết quả screening:**
   - **Owner Active** → `screeningStatus = "AutoEligible"`, `status = "Approved"` ngay (KHÔNG vào queue duyệt).
   - **Jockey/Doctor/Referee Active** → `screeningStatus = "AutoEligible"`, `status = "Pending"` → vào **bulk approval queue** chờ Admin duyệt.

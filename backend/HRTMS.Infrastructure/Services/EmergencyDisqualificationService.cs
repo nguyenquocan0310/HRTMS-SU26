@@ -10,10 +10,12 @@ namespace HRTMS.Infrastructure.Services;
 public class EmergencyDisqualificationService : IEmergencyDisqualificationService
 {
     private readonly HRTMSDbContext _context;
+    private readonly INotificationService _notificationService;
 
-    public EmergencyDisqualificationService(HRTMSDbContext context)
+    public EmergencyDisqualificationService(HRTMSDbContext context, INotificationService notificationService)
     {
         _context = context;
+        _notificationService = notificationService;
     }
 
     public async Task<EmergencyDisqualificationResultDto> DisqualifyAsync(
@@ -66,17 +68,25 @@ public class EmergencyDisqualificationService : IEmergencyDisqualificationServic
 
             foreach (var prediction in pendingPredictions)
             {
-                var wallet = await _context.Wallets
-                    .FirstOrDefaultAsync(w =>
-                        w.SpectatorId == prediction.SpectatorId);
+                // FIX: dùng ExecuteUpdateAsync (cộng nguyên tử theo điều kiện WHERE)
+                // thay vì đọc entity rồi += và SaveChanges — tránh lost-update nếu
+                // ví đang bị PlacePredictionAsync/redeem khác thao tác đồng thời
+                // (Wallet không có RowVersion nên EF không tự phát hiện conflict).
+                var updated = await _context.Wallets
+                    .Where(w => w.SpectatorId == prediction.SpectatorId)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(w => w.Balance, w => w.Balance + prediction.PointsPlaced)
+                        .SetProperty(w => w.UpdatedAt, now));
 
-                if (wallet == null)
+                if (updated == 0)
                 {
                     throw new InvalidOperationException("WALLET_NOT_FOUND");
                 }
 
-                wallet.Balance += prediction.PointsPlaced;
-                wallet.UpdatedAt = now;
+                var walletId = await _context.Wallets
+                    .Where(w => w.SpectatorId == prediction.SpectatorId)
+                    .Select(w => w.WalletId)
+                    .FirstAsync();
 
                 prediction.Status = "Refunded";
                 prediction.PointsAwarded = 0;
@@ -84,7 +94,7 @@ public class EmergencyDisqualificationService : IEmergencyDisqualificationServic
                 _context.VirtualPointsTransactions.Add(
                     new VirtualPointsTransaction
                     {
-                        WalletId = wallet.WalletId,
+                        WalletId = walletId,
                         Amount = prediction.PointsPlaced,
                         Type = "Prediction Refund",
                         ReferenceId = $"Prediction:{prediction.PredictionId}",
@@ -119,23 +129,17 @@ public class EmergencyDisqualificationService : IEmergencyDisqualificationServic
                 notificationRecipients.Add(actorId);
             }
 
-            foreach (var recipientId in notificationRecipients)
-            {
-                _context.Notifications.Add(
-                    new Notification
-                    {
-                        RecipientId = recipientId,
-                        Title = "URGENT: Race entry disqualified",
-                        Message =
-                            $"RaceEntry #{raceEntryId} has been emergency disqualified. " +
-                            $"Reason: {reason}",
-                        Type = "In-app",
-                        IsRead = false,
-                        RelatedEntityType = "RaceEntry",
-                        RelatedEntityId = raceEntryId,
-                        SentAt = now
-                    });
-            }
+            // Dùng INotificationService.SendBulkAsync thay vì insert thẳng Entity —
+            // đây là cách DUY NHẤT để email thực sự được gửi (logic dispatch email
+            // nằm trong NotificationService, insert thẳng DB sẽ bỏ qua bước đó).
+            // "Both" vì đây là sự kiện khẩn cấp (URGENT), cần cả in-app lẫn email.
+            await _notificationService.SendBulkAsync(
+                notificationRecipients,
+                "URGENT: Race entry disqualified",
+                $"RaceEntry #{raceEntryId} has been emergency disqualified. Reason: {reason}",
+                type: "Both",
+                relatedEntityType: "RaceEntry",
+                relatedEntityId: raceEntryId);
 
             // 4. Ghi AuditLog
             var oldValue = JsonSerializer.Serialize(new

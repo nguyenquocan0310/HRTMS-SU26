@@ -206,7 +206,7 @@ public class HorseService : IHorseService
                 await _notification.SendAsync(
                     horse.OwnerId,
                     "Ngựa được phê duyệt vào giải",
-                    $"Ngựa '{horse.Name}' đã được tự động phê duyệt vào giải '{tournament.Name}' (enrollment #{entry.EnrollmentId}).",
+                    $"Ngựa '{horse.Name}' đã được tự động phê duyệt vào giải '{tournament.Name}' (mã đăng ký {entry.EnrollmentId}).",
                     type: "Both",
                     relatedEntityType: "HorseTournamentEntry", relatedEntityId: entry.EnrollmentId);
                 return ApiResponse<HorseEnrollmentResponseDto>.Ok(MapToEnrollmentDto(entry, horse, tournament),
@@ -277,18 +277,13 @@ public class HorseService : IHorseService
         await _auditLog.LogAsync(ownerId, "Withdraw_Enrollment", "HorseTournamentEntry",
             enrollmentId.ToString(), "Enrolled", "Withdrawn", null);
 
-        _context.Notifications.Add(new Notification
-        {
-            RecipientId = ownerId,
-            Title = "Đã rút ngựa khỏi giải",
-            Message = $"Ngựa '{entry.Horse.Name}' đã được rút khỏi giải '{entry.Tournament.Name}'.",
-            Type = "In-app",
-            IsRead = false,
-            RelatedEntityType = "HorseTournamentEntry",
-            RelatedEntityId = enrollmentId,
-            SentAt = DateTime.UtcNow
-        });
-        await _context.SaveChangesAsync();
+        await _notification.SendAsync(
+            ownerId,
+            "Đã rút ngựa khỏi giải",
+            $"Ngựa '{entry.Horse.Name}' đã được rút khỏi giải '{entry.Tournament.Name}'.",
+            type: "In-app",
+            relatedEntityType: "HorseTournamentEntry",
+            relatedEntityId: enrollmentId);
 
         return ApiResponse<string>.Ok("Đã rút ngựa khỏi giải.");
     }
@@ -372,10 +367,13 @@ public class HorseService : IHorseService
             // Toàn bộ re-screen + hủy pairing + withdraw entry trong MỘT transaction —
             // withdraw-flow của Module E ambient-aware nên không mở transaction lồng.
             await using var transaction = await _context.Database.BeginTransactionAsync();
+            var wasApproved = horse.AdminApprovalStatus != "Rejected";
+            var justRejected = false;
             try
             {
                 // Baseline profile (doping có thể đổi sang Failed → khóa hồ sơ).
                 ApplyProfileScreening(horse);
+                justRejected = wasApproved && horse.AdminApprovalStatus == "Rejected";
 
                 var cancelledPairingIds = new List<int>();
 
@@ -436,6 +434,21 @@ public class HorseService : IHorseService
             {
                 await transaction.RollbackAsync();
                 throw;
+            }
+
+            // Gửi SAU khi transaction đã commit — hồ sơ ngựa vừa bị khóa do
+            // sửa trường nhạy cảm (VD: doping chuyển Failed). Owner cần biết
+            // ngay, không chỉ thấy các enrollment/pairing bị hủy mà không hiểu vì sao.
+            if (justRejected)
+            {
+                await _notification.SendAsync(
+                    ownerId,
+                    "Hồ sơ ngựa bị khóa",
+                    $"Hồ sơ ngựa '{horse.Name}' vừa bị khóa sau khi cập nhật thông tin. " +
+                    $"Lý do: {horse.RejectionReason}",
+                    type: "Both",
+                    relatedEntityType: "Horse",
+                    relatedEntityId: horse.HorseId);
             }
         }
         else
@@ -552,7 +565,7 @@ public class HorseService : IHorseService
         await _notification.SendAsync(
             entry.Horse.OwnerId,
             "Ngựa được phê duyệt vào giải",
-            $"Ngựa '{entry.Horse.Name}' đã được Admin phê duyệt tham gia giải '{entry.Tournament.Name}'.",
+            $"Ngựa '{entry.Horse.Name}' đã được Ban tổ chức phê duyệt tham gia giải '{entry.Tournament.Name}'.",
             type: "Both",
             relatedEntityType: "HorseTournamentEntry", relatedEntityId: enrollmentId);
 
@@ -724,35 +737,22 @@ public class HorseService : IHorseService
         }
     }
 
-    private void NotifyOwnerHorseApproved(Horse horse) =>
-        _context.Notifications.Add(new Notification
-        {
-            RecipientId = horse.OwnerId,
-            Title = "Hồ sơ ngựa được phê duyệt",
-            Message = $"Hồ sơ ngựa '{horse.Name}' đã được phê duyệt.",
-            Type = "In-app",
-            IsRead = false,
-            RelatedEntityType = "Horse",
-            RelatedEntityId = horse.HorseId,
-            SentAt = DateTime.UtcNow
-        });
-
     private static HorseEnrollmentResponseDto MapToEnrollmentDto(
         HorseTournamentEntry e, Horse horse, Tournament? tournament) => new()
-    {
-        EnrollmentId = e.EnrollmentId,
-        HorseId = e.HorseId,
-        HorseName = horse.Name,
-        TournamentId = e.TournamentId,
-        TournamentName = tournament?.Name,
-        Status = e.Status,
-        ScreeningStatus = e.ScreeningStatus,
-        ScreeningReason = e.ScreeningReason,
-        AdminApprovalStatus = e.AdminApprovalStatus,
-        RejectionReason = e.RejectionReason,
-        CreatedAt = e.CreatedAt,
-        UpdatedAt = e.UpdatedAt
-    };
+        {
+            EnrollmentId = e.EnrollmentId,
+            HorseId = e.HorseId,
+            HorseName = horse.Name,
+            TournamentId = e.TournamentId,
+            TournamentName = tournament?.Name,
+            Status = e.Status,
+            ScreeningStatus = e.ScreeningStatus,
+            ScreeningReason = e.ScreeningReason,
+            AdminApprovalStatus = e.AdminApprovalStatus,
+            RejectionReason = e.RejectionReason,
+            CreatedAt = e.CreatedAt,
+            UpdatedAt = e.UpdatedAt
+        };
 
     private static HorseResponseDto MapToDto(Horse h) => new()
     {
@@ -856,13 +856,16 @@ public class HorseService : IHorseService
         if (entry == null) return ApiResponse<string>.Fail("Không tìm thấy lượt đăng ký thi đấu này.");
         if (entry.EntryFeeStatus == "Paid") return ApiResponse<string>.Fail("Lệ phí tham gia đã được xác nhận trước đó.");
 
-        // Chỉ xác nhận được lệ phí đang Unpaid của entry còn hiệu lực — không ghi đè
-        // trạng thái hoàn phí (Refund Pending/Refunded) và không xác nhận entry đã hủy.
-        if (entry.Status == "Cancelled")
-            return ApiResponse<string>.Fail("Lượt đăng ký đã bị hủy, không thể xác nhận lệ phí.");
+        // Chỉ xác nhận được lệ phí đang Unpaid của entry còn chờ xác nhận (Pending) —
+        // không ghi đè trạng thái hoàn phí (Refund Pending/Refunded), không xác nhận
+        // entry đã hủy hay đã Confirmed (entry Confirmed luôn đã Paid từ trước).
+        if (entry.Status != "Pending")
+            return ApiResponse<string>.Fail(entry.Status == "Cancelled"
+                ? "Lượt đăng ký đã bị hủy, không thể xác nhận lệ phí."
+                : "Lượt đăng ký không ở trạng thái chờ xác nhận nên không thể xác nhận lệ phí.");
         if (entry.EntryFeeStatus != "Unpaid")
             return ApiResponse<string>.Fail(
-                $"Lệ phí đang ở trạng thái '{entry.EntryFeeStatus}', không thể xác nhận lại.");
+                "Lệ phí của lượt đăng ký này không còn ở trạng thái chờ thu nên không thể xác nhận lại.");
 
         var oldFeeStatus = entry.EntryFeeStatus;
         entry.EntryFeeStatus = "Paid";
@@ -878,7 +881,7 @@ public class HorseService : IHorseService
         await _notification.SendAsync(
             entry.Pairing.Horse.OwnerId,
             "Lệ phí tham gia đã được xác nhận",
-            $"Lệ phí cho ngựa '{entry.Pairing.Horse.Name}' (đăng ký #{raceEntryId}) đã được xác nhận.",
+            $"Lệ phí cho ngựa '{entry.Pairing.Horse.Name}' (mã đăng ký {raceEntryId}) đã được xác nhận.",
             type: "Both",
             relatedEntityType: "RaceEntry", relatedEntityId: raceEntryId);
 
@@ -904,7 +907,7 @@ public class HorseService : IHorseService
         await _notification.SendAsync(
             entry.Pairing.Horse.OwnerId,
             "Đã hoàn phí tham gia",
-            $"Lệ phí cho ngựa '{entry.Pairing.Horse.Name}' (đăng ký #{raceEntryId}) đã được hoàn.",
+            $"Lệ phí cho ngựa '{entry.Pairing.Horse.Name}' (mã đăng ký {raceEntryId}) đã được hoàn.",
             type: "Both",
             relatedEntityType: "RaceEntry", relatedEntityId: raceEntryId);
 
@@ -929,7 +932,12 @@ public class HorseService : IHorseService
         if (!enrollmentApproved)
             return ApiResponse<string>.Fail("Ngựa chưa được duyệt tham gia giải này.");
 
-        if (entry.Status == "Confirmed") return ApiResponse<string>.Fail("Lượt đăng ký này đã được xác nhận trước đó.");
+        // Chỉ entry đang Pending mới được duyệt — chặn cả entry đã Cancelled
+        // (không "hồi sinh" đăng ký đã hủy/rút, tránh lệch IsWithdrawn/refund).
+        if (entry.Status != "Pending")
+            return ApiResponse<string>.Fail(entry.Status == "Confirmed"
+                ? "Lượt đăng ký này đã được xác nhận trước đó."
+                : "Lượt đăng ký không ở trạng thái chờ xác nhận nên không thể duyệt.");
 
         // Breed check — có Tournament context tại đây
         string allowedBreed = entry.Race.Round.Tournament.AllowedBreed;
@@ -945,8 +953,8 @@ public class HorseService : IHorseService
 
         await _notification.SendAsync(
             entry.Pairing.Horse.OwnerId,
-            "Đăng ký race được xác nhận",
-            $"Đăng ký #{raceEntryId} cho ngựa '{entry.Pairing.Horse.Name}' đã được Admin xác nhận tham gia cuộc đua.",
+            "Đăng ký cuộc đua được xác nhận",
+            $"Mã đăng ký {raceEntryId} cho ngựa '{entry.Pairing.Horse.Name}' đã được Ban tổ chức xác nhận tham gia cuộc đua.",
             type: "Both",
             relatedEntityType: "RaceEntry", relatedEntityId: raceEntryId);
 
@@ -988,8 +996,8 @@ public class HorseService : IHorseService
 
         await _notification.SendAsync(
             entry.Pairing.Horse.OwnerId,
-            "Đăng ký race bị từ chối",
-            $"Đăng ký #{raceEntryId} cho ngựa '{entry.Pairing.Horse.Name}' bị từ chối. Lý do: {reason}",
+            "Đăng ký cuộc đua bị từ chối",
+            $"Mã đăng ký {raceEntryId} cho ngựa '{entry.Pairing.Horse.Name}' bị từ chối. Lý do: {reason}",
             type: "Both",
             relatedEntityType: "RaceEntry", relatedEntityId: raceEntryId);
 

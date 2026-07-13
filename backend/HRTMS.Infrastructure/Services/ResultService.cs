@@ -370,31 +370,39 @@ namespace HRTMS.Infrastructure.Services
         /// <summary>
         /// Cộng/trừ ví Spectator + ghi 1 dòng sổ cái trong cùng transaction.
         /// Giữ bất biến Balance = SUM(VirtualPointsTransactions.Amount).
-        /// Pattern Include(s => s.Wallet) giống CancelTournamentAsync (Bug 2 fix gốc).
+        /// FIX: dùng ExecuteUpdateAsync (cộng nguyên tử theo điều kiện WHERE) thay vì
+        /// đọc entity rồi += và SaveChanges — tránh lost-update khi 2 race cùng ảnh
+        /// hưởng 1 Spectator được Declare Official gần như đồng thời (Wallet không có
+        /// RowVersion nên EF không tự phát hiện conflict). Đồng bộ pattern với
+        /// EmergencyDisqualificationService / TournamentSevice.CancelTournamentAsync.
         /// </summary>
         private async Task ApplyWalletTransactionAsync(int spectatorId, int amount, string type, DateTime now)
         {
             if (amount == 0) return;
 
-            var spectator = await _context.SpectatorProfiles
-                .Include(s => s.Wallet)
-                .FirstOrDefaultAsync(s => s.SpectatorId == spectatorId);
+            var updated = await _context.Wallets
+                .Where(w => w.SpectatorId == spectatorId)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(w => w.Balance, w => w.Balance + amount)
+                    .SetProperty(w => w.UpdatedAt, now));
 
-            if (spectator?.Wallet == null)
+            if (updated == 0)
             {
                 // Ví thiếu là lỗi dữ liệu nghiêm trọng (mọi Spectator có Wallet từ lúc
                 // đăng ký). Throw để transaction Declare Official ROLLBACK toàn bộ —
-                // nhất quán với EmergencyDisqualificationService; tuyệt đối không
-                // đánh dấu prediction Won/Refunded mà không cộng điểm (mất thưởng im lặng).
+                // tuyệt đối không đánh dấu prediction Won/Refunded mà không cộng điểm
+                // (mất thưởng im lặng).
                 throw new InvalidOperationException("WALLET_NOT_FOUND");
             }
 
-            spectator.Wallet.Balance += amount;
-            spectator.Wallet.UpdatedAt = now;
+            var walletId = await _context.Wallets
+                .Where(w => w.SpectatorId == spectatorId)
+                .Select(w => w.WalletId)
+                .FirstAsync();
 
             _context.VirtualPointsTransactions.Add(new VirtualPointsTransaction
             {
-                WalletId = spectator.Wallet.WalletId,
+                WalletId = walletId,
                 Amount = amount,
                 Type = type,
                 CreatedAt = now

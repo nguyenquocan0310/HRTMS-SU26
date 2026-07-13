@@ -552,6 +552,8 @@ public partial class HRTMSDbContext : DbContext
                 .HasMaxLength(20)
                 .IsUnicode(false);
             entity.Property(e => e.UpdatedAt).HasDefaultValueSql("(getutcdate())");
+            // Concurrency token do DB sinh (ROWVERSION) — xem patch 005.
+            entity.Property(e => e.RowVersion).IsRowVersion();
 
             entity.HasOne(d => d.Round).WithMany(p => p.Races)
                 .HasForeignKey(d => d.RoundId)
@@ -605,6 +607,8 @@ public partial class HRTMSDbContext : DbContext
             entity.Property(e => e.UnfitReason).HasMaxLength(255);
             entity.Property(e => e.UpdatedAt).HasDefaultValueSql("(getutcdate())");
             entity.Property(e => e.WithdrawalReason).HasMaxLength(255);
+            // Concurrency token do DB sinh (ROWVERSION) — xem patch 005.
+            entity.Property(e => e.RowVersion).IsRowVersion();
 
             entity.HasOne(d => d.ClinicalCheckedByDoctor).WithMany(p => p.RaceEntryClinicalCheckedByDoctors)
                 .HasForeignKey(d => d.ClinicalCheckedByDoctorId)

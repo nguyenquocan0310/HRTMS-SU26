@@ -93,6 +93,15 @@ public class IndependenceCheckController : ControllerBase
             });
         }
         catch (InvalidOperationException ex)
+            when (ex.Message == "STARTING_LIST_ALREADY_CONFIRMED")
+        {
+            return Conflict(new
+            {
+                error = "STARTING_LIST_ALREADY_CONFIRMED",
+                message = "Starting list has been confirmed; pre-race data can no longer be modified."
+            });
+        }
+        catch (InvalidOperationException ex)
             when (ex.Message == "RACE_NOT_UPCOMING")
         {
             return Conflict(new
@@ -100,6 +109,58 @@ public class IndependenceCheckController : ControllerBase
                 error = "RACE_NOT_UPCOMING",
                 message = "Independence check can only be performed before the race starts."
             });
+        }
+    }
+    [HttpGet("races/{raceId:int}/entries")]
+    public async Task<IActionResult> GetRaceEntries(int raceId)
+    {
+        var refereeIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (!int.TryParse(refereeIdClaim, out var refereeId))
+        {
+            return Unauthorized(new
+            {
+                error = "INVALID_TOKEN",
+                message = "Invalid referee token."
+            });
+        }
+
+        try
+        {
+            var result = await _independenceCheckService.GetRaceEntriesAsync(refereeId, raceId);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+            when (ex.Message == "REFEREE_NOT_FOUND")
+        {
+            return NotFound(new
+            {
+                error = "REFEREE_NOT_FOUND",
+                message = "Referee was not found."
+            });
+        }
+        catch (InvalidOperationException ex)
+            when (ex.Message == "USER_NOT_REFEREE")
+        {
+            return UnprocessableEntity(new
+            {
+                error = "USER_NOT_REFEREE",
+                message = "The current user is not a referee."
+            });
+        }
+        catch (InvalidOperationException ex)
+            when (ex.Message == "REFEREE_NOT_ACTIVE")
+        {
+            return UnprocessableEntity(new
+            {
+                error = "REFEREE_NOT_ACTIVE",
+                message = "The referee is not active."
+            });
+        }
+        catch (InvalidOperationException ex)
+            when (ex.Message == "REFEREE_NOT_ASSIGNED_TO_RACE")
+        {
+            return Forbid();
         }
     }
 }

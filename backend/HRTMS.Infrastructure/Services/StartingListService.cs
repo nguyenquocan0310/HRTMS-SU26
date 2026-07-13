@@ -64,6 +64,13 @@ public class StartingListService : IStartingListService
             throw new InvalidOperationException("RACE_NOT_UPCOMING");
         }
 
+        // Phai da boc tham cong (Draw Post Position) truoc khi chot starting list.
+        // Chan kich ban confirm official starting list khi race chua tung boc tham.
+        if (!race.IsPostPositionDrawn)
+        {
+            throw new InvalidOperationException("RACE_NOT_DRAWN");
+        }
+
         var entries = await _context.RaceEntries
             .Include(e => e.Pairing)
                 .ThenInclude(p => p.Horse)
@@ -113,6 +120,16 @@ public class StartingListService : IStartingListService
             else
             {
                 rejectedEntries.Add(dto);
+
+                // Persist viec loai entry khong du dieu kien y te/eligibility khoi race that.
+                // Chi withdraw entry dang con hieu luc (Confirmed & chua withdrawn) -> tranh
+                // hoi sinh entry da Cancelled hoac withdraw nham entry chi thieu buoc khac.
+                if (entry.Status == "Confirmed" && !entry.IsWithdrawn)
+                {
+                    entry.IsWithdrawn = true;
+                    entry.WithdrawalReason = rejectionReason;
+                    entry.UpdatedAt = DateTime.UtcNow;
+                }
             }
         }
 
@@ -121,12 +138,25 @@ public class StartingListService : IStartingListService
             throw new InvalidOperationException("NO_ELIGIBLE_STARTING_ENTRIES");
         }
 
-        // Danh sach xuat phat da duoc confirm.
-        // Hien schema chua co bang StartingList rieng, nen cap nhat Race flag/status toi muc an toan.
-        race.IsPostPositionDrawn = true;
-        race.UpdatedAt = DateTime.UtcNow;
+        // Danh sach xuat phat da duoc confirm chinh thuc -> KHOA lai bang cach chuyen
+        // Race sang "Pre-Race". Tu day 4 buoc check (weight/identity/clinical/independence)
+        // va Withdraw deu bi chan (guard != "Upcoming"), chi con Start Race di tiep.
+        // Bọc transaction de update reject entries + doi status la nguyen tu.
+        await using var tx = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            race.Status = "Pre-Race";
+            race.IsPostPositionDrawn = true;
+            race.UpdatedAt = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync();
+            await tx.CommitAsync();
+        }
+        catch
+        {
+            await tx.RollbackAsync();
+            throw;
+        }
 
         return new ConfirmStartingListResultDto
         {

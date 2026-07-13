@@ -335,6 +335,12 @@ public class RaceEntryService : IRaceEntryService
         if (entry.Status != "Pending")
             throw new InvalidOperationException("INVALID_STATUS");
 
+        // Giai thu phi: Admin phai xac nhan le phi (Unpaid -> Paid) truoc khi Owner
+        // duoc confirm. Giai mien phi (EntryFeeAmount == 0) da duoc auto-set Paid
+        // ngay khi tao entry (AllocateAsync) nen khong can check EntryFeeAmount o day.
+        if (entry.EntryFeeStatus != "Paid")
+            throw new InvalidOperationException("ENTRY_FEE_NOT_PAID");
+
         // Enrollment cua ngua trong giai nay phai con Approved tai thoi diem xac nhan
         // (Admin co the reject enrollment sau khi entry duoc tao).
         var enrollmentApproved = await _context.HorseTournamentEntries.AnyAsync(e =>
@@ -454,7 +460,7 @@ public class RaceEntryService : IRaceEntryService
                 .ToListAsync();
             var refunded = await RefundPredictionsAsync(
                 pendingPredictions,
-                $"Ngựa bạn dự đoán ở lượt đăng ký #{raceEntryId} đã rút khỏi cuộc đua. Điểm dự đoán đã được hoàn về ví.",
+                $"Ngựa bạn dự đoán ở cuộc đua #{entry.RaceId} đã rút khỏi cuộc đua. Điểm dự đoán đã được hoàn về ví.",
                 "RaceEntry", raceEntryId, now);
 
             // Thong bao khan URGENT cho tat ca Admin de dieu phoi phuong an du phong.
@@ -468,7 +474,7 @@ public class RaceEntryService : IRaceEntryService
                 await _notification.SendBulkAsync(
                     adminIds,
                     "Khẩn: Có ngựa rút khỏi cuộc đua",
-                    $"Đăng ký #{raceEntryId} ở cuộc đua #{entry.RaceId} đã bị hủy. Lý do: {reason}. " +
+                    $"Mã đăng ký {raceEntryId} ở cuộc đua #{entry.RaceId} đã bị hủy. Lý do: {reason}. " +
                     $"Vị trí xuất phát đã được giải phóng.",
                     type: "Both",
                     relatedEntityType: "RaceEntry",
@@ -596,15 +602,16 @@ public class RaceEntryService : IRaceEntryService
         if (overdueIds.Count == 0)
             return 0;
 
-        // Actor cho job nen: he thong CHUA co system user chuan (AuditLog.ActorId la FK
-        // NOT NULL toi Users) nen tam dung Admin Active dau tien. Audit phan biet duoc
-        // qua action AUTO_CANCEL_RACE_ENTRY + reason "Auto-cancelled: confirmation
-        // cut-off passed" — khong nham voi thao tac tay cua admin. Blocker: muon actor
-        // rieng phai seed system user (quyet dinh cap nhom, ngoai scope PR nay).
+        // Actor cho job nen: user he thong chuan (patch 006 seed Username = 'system',
+        // Role = 'System') — audit ghi dung "he thong tu dong huy", khong muon
+        // tai khoan Admin that. Thieu system user = moi truong chua chay patch 006
+        // → fail ro rang thay vi ghi audit sai actor.
         var systemActorId = await _context.Users
-            .Where(u => u.Role == "Admin" && u.Status == "Active")
+            .Where(u => u.Role == "System" && u.Status == "Active")
             .Select(u => u.UserId)
             .FirstOrDefaultAsync();
+        if (systemActorId == 0)
+            throw new InvalidOperationException("SYSTEM_USER_NOT_FOUND");
 
         var count = 0;
         foreach (var id in overdueIds)

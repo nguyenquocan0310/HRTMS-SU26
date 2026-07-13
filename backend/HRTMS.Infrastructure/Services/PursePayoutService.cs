@@ -31,7 +31,7 @@ namespace HRTMS.Infrastructure.Services
             var race = await _context.Races
                 .Include(r => r.Round).ThenInclude(rd => rd.Tournament)
                 .FirstOrDefaultAsync(r => r.RaceId == raceId)
-                ?? throw new KeyNotFoundException($"Không tìm thấy Race #{raceId}");
+                ?? throw new KeyNotFoundException("Không tìm thấy cuộc đua.");
 
             var payouts = await _context.PursePayouts
                 .Include(p => p.RecipientUser)
@@ -74,7 +74,7 @@ namespace HRTMS.Infrastructure.Services
                 .Include(p => p.RecipientUser)
                 .Include(p => p.RaceEntry).ThenInclude(re => re.Pairing).ThenInclude(pa => pa.Horse)
                 .FirstOrDefaultAsync(p => p.PursePayoutId == payoutId)
-                ?? throw new KeyNotFoundException($"Không tìm thấy PursePayout #{payoutId}");
+                ?? throw new KeyNotFoundException("Không tìm thấy khoản chi thưởng.");
 
             var oldStatus = payout.PayoutStatus;
 
@@ -133,6 +133,33 @@ namespace HRTMS.Infrastructure.Services
                 })
                 .OrderByDescending(e => e.TotalEarnings)
                 .ToList();
+        }
+
+        // =====================================================================
+        // Owner tự xem tiền thưởng của mình (self-scoped)
+        // Chỉ payout Role="Owner" của chính ownerUserId; chi tiết từng dòng
+        // (ngựa, hạng, số tiền, Paid/Unpaid) + tổng hợp.
+        // =====================================================================
+        public async Task<OwnerEarningsDto> GetMyEarningsAsync(int ownerUserId)
+        {
+            var payouts = await _context.PursePayouts
+                .Include(p => p.RecipientUser)
+                .Include(p => p.RaceEntry).ThenInclude(re => re.Pairing).ThenInclude(pa => pa.Horse)
+                .Where(p => p.RecipientUserId == ownerUserId && p.Role == "Owner")
+                .OrderByDescending(p => p.UpdatedAt)
+                .ToListAsync();
+
+            var items = payouts.Select(MapItem).ToList();
+
+            return new OwnerEarningsDto
+            {
+                OwnerUserId = ownerUserId,
+                TotalEarnings = items.Sum(i => i.CalculatedAmount),
+                PaidAmount = items.Where(i => i.PayoutStatus == "Paid").Sum(i => i.CalculatedAmount),
+                UnpaidAmount = items.Where(i => i.PayoutStatus == "Unpaid").Sum(i => i.CalculatedAmount),
+                PayoutCount = items.Count,
+                Payouts = items
+            };
         }
 
         // =====================================================================

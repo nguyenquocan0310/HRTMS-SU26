@@ -33,8 +33,8 @@ namespace HRTMS.Infrastructure.Services
         // là trạng thái cấp RACE, KHÔNG lưu ở Tournament.
         private static readonly Dictionary<string, string> ValidTransitions = new()
         {
-            ["Draft"]               = "Open Registration",
-            ["Open Registration"]   = "Closed Registration",
+            ["Draft"] = "Open Registration",
+            ["Open Registration"] = "Closed Registration",
             ["Closed Registration"] = "Completed",
         };
 
@@ -281,7 +281,7 @@ namespace HRTMS.Infrastructure.Services
             // Chỉ cho sửa khi còn ở Draft hoặc Open Registration
             if (tournament.Status != "Draft" && tournament.Status != "Open Registration")
                 throw new InvalidOperationException(
-                    $"Không thể sửa giải ở trạng thái '{tournament.Status}'");
+                    "Chỉ có thể chỉnh sửa thông tin giải đấu khi giải đang ở giai đoạn nháp hoặc chưa đóng đăng ký.");
 
             // Field-lock khi giải đang Open Registration (TRN.9.1): enrollment screening
             // (AllowedBreed), fee flow (EntryFeeAmount), pairing validation
@@ -457,20 +457,20 @@ namespace HRTMS.Infrastructure.Services
             if (RaceLevelStatuses.Contains(targetStatus))
             {
                 throw new InvalidOperationException(
-                    $"'{targetStatus}' là trạng thái cấp Race, không áp dụng cho Tournament (TRN.8).");
+                    "Trạng thái được chọn không hợp lệ đối với giải đấu.");
             }
 
             // Guard: chỉ cho phép transition hợp lệ
             if (!ValidTransitions.TryGetValue(tournament.Status, out var allowedNext) || allowedNext != targetStatus)
             {
-                // Bug 5 fix — thêm dấu ' đóng sau {targetStatus}
-                throw new InvalidOperationException($"Không thể chuyển từ '{tournament.Status}' sang '{targetStatus}'");
+                throw new InvalidOperationException(
+                    $"Không thể chuyển giải đấu từ trạng thái {StatusLabel(tournament.Status)} sang {StatusLabel(targetStatus)}.");
             }
 
             // Guard đặc biệt: chuyển sang Open Registration phải có PrizeDistributions
             if (targetStatus == "Open Registration" && tournament.PrizeDistributions.Count < 5)
             {
-                throw new InvalidOperationException("Phải cấu hình đủ 5 tỷ lệ PrizeDistributions trước khi đăng ký");
+                throw new InvalidOperationException("Vui lòng thiết lập đủ 5 mức tỷ lệ trao thưởng trước khi mở đăng ký.");
             }
 
             // Đóng đăng ký: validate nhẹ để giải chạy được từ vòng loại tới chung kết.
@@ -489,7 +489,7 @@ namespace HRTMS.Infrastructure.Services
                 if (confirmedPairings == 0)
                 {
                     throw new InvalidOperationException(
-                        "Chưa có cặp Ngựa–Nài nào được xác nhận (Confirmed). Không thể đóng đăng ký");
+                        "Chưa có cặp Ngựa–Nài nào được xác nhận. Không thể đóng đăng ký khi giải chưa có cặp thi đấu.");
                 }
             }
 
@@ -503,7 +503,7 @@ namespace HRTMS.Infrastructure.Services
                 if (unfinished.Count > 0)
                 {
                     throw new InvalidOperationException(
-                        "Chỉ có thể hoàn thành giải khi mọi cuộc đua đã ở trạng thái Official hoặc Cancelled (TRN.8).");
+                        "Chỉ có thể hoàn tất giải đấu sau khi tất cả cuộc đua đã có kết quả chính thức hoặc đã được hủy.");
                 }
             }
 
@@ -565,10 +565,11 @@ namespace HRTMS.Infrastructure.Services
                 throw new InvalidOperationException("Không thể hủy giải đã hoàn thành");
 
             using var transaction = await _context.Database.BeginTransactionAsync();
+            var affectedUserIds = new HashSet<int>();
+            var refundNotifications = new List<(int RecipientId, string Title, string Message, int RaceEntryId)>();
             try
             {
                 var now = DateTime.UtcNow;
-                var affectedUserIds = new HashSet<int>();
 
                 // Bug 4 fix — capture old status trước khi thay đổi
                 var oldStatus = tournament.Status;
@@ -594,17 +595,11 @@ namespace HRTMS.Infrastructure.Services
                                 entry.EntryFeeStatus = "Refund Pending";
 
                                 var ownerId = entry.Pairing.Horse.OwnerId;
-                                _context.Notifications.Add(new Notification
-                                {
-                                    RecipientId = ownerId,
-                                    Title = "Hoàn lệ phí tham gia",
-                                    Message = $"Giải đấu '{tournament.Name}' đã bị hủy. Lệ phí của lượt đăng ký #{entry.RaceEntryId} được chuyển sang 'Refund Pending'.",
-                                    Type = "In-app",
-                                    IsRead = false,
-                                    RelatedEntityType = "RaceEntry",
-                                    RelatedEntityId = entry.RaceEntryId,
-                                    SentAt = now,
-                                });
+                                refundNotifications.Add((
+                                    ownerId,
+                                    "Hoàn lệ phí tham gia",
+                                    $"Giải đấu \"{tournament.Name}\" đã bị hủy. Lệ phí của mã đăng ký {entry.RaceEntryId} đang được xử lý hoàn lại. Bạn sẽ nhận được thông báo khi quá trình hoàn tất.",
+                                    entry.RaceEntryId));
                                 _auditLog.LogDeferred(
                                     actorId: adminUserId,
                                     action: "Update_Entry_Fee_Status",
@@ -621,20 +616,26 @@ namespace HRTMS.Infrastructure.Services
                         // 4. Hoàn điểm ảo cho Predictions đang Pending
                         foreach (var prediction in race.Predictions.Where(p => p.Status == "Pending"))
                         {
-                            // Bug 2 fix — Include Wallet để tránh null reference
-                            var spectator = await _context.SpectatorProfiles
-                                .Include(s => s.Wallet)
-                                .FirstOrDefaultAsync(s => s.SpectatorId == prediction.SpectatorId);
+                            var wallet = await _context.Wallets
+                                .AsNoTracking()
+                                .FirstOrDefaultAsync(w => w.SpectatorId == prediction.SpectatorId);
 
-                            if (spectator?.Wallet != null)
+                            if (wallet != null)
                             {
-                                spectator.Wallet.Balance += prediction.PointsPlaced;
-                                spectator.Wallet.UpdatedAt = now;
+                                // FIX: ExecuteUpdateAsync cộng nguyên tử theo điều kiện WHERE thay vì
+                                // đọc entity rồi += và SaveChanges — tránh lost-update nếu ví đang
+                                // bị PlacePredictionAsync/redeem/EmergencyDisqualify khác thao tác
+                                // đồng thời (Wallet không có RowVersion nên EF không tự phát hiện conflict).
+                                await _context.Wallets
+                                    .Where(w => w.SpectatorId == prediction.SpectatorId)
+                                    .ExecuteUpdateAsync(s => s
+                                        .SetProperty(w => w.Balance, w => w.Balance + prediction.PointsPlaced)
+                                        .SetProperty(w => w.UpdatedAt, now));
 
                                 // Bug 3 fix — tạo ledger entry để giữ bất biến Balance = SUM(VPT)
                                 _context.VirtualPointsTransactions.Add(new VirtualPointsTransaction
                                 {
-                                    WalletId = spectator.Wallet.WalletId,
+                                    WalletId = wallet.WalletId,
                                     Amount = prediction.PointsPlaced,
                                     Type = "Prediction Refund",
                                     ReferenceId = prediction.PredictionId.ToString(),
@@ -685,21 +686,7 @@ namespace HRTMS.Infrastructure.Services
                     }
                 }
 
-                // 5. Gửi Notification cho tất cả Spectator có dự đoán bị ảnh hưởng
-                foreach (var userId in affectedUserIds)
-                {
-                    _context.Notifications.Add(new Notification
-                    {
-                        RecipientId = userId,
-                        Title = "Giải đấu bị hủy",
-                        Message = $"Giải đấu '{tournament.Name}' đã bị hủy bởi Ban tổ chức.",
-                        Type = "In-app",
-                        IsRead = false,
-                        RelatedEntityType = "Tournament",
-                        RelatedEntityId = tournamentId,
-                        SentAt = now,
-                    });
-                }
+                // 5. Notification cho Spectator bị ảnh hưởng — gửi sau khi commit (xem dưới).
 
                 await _context.SaveChangesAsync();
 
@@ -721,6 +708,30 @@ namespace HRTMS.Infrastructure.Services
                 await transaction.RollbackAsync();
                 throw;
             }
+
+            // Gửi notification SAU KHI transaction đã commit — dùng NotificationService
+            // (không insert thẳng Entity) để email thực sự được dispatch, không chỉ in-app.
+            // Type "Both" vì đây là sự kiện hủy giải/hoàn tiền — ảnh hưởng tài chính, cần
+            // đảm bảo user thấy được kể cả khi không đang mở app.
+            foreach (var (recipientId, title, message, raceEntryId) in refundNotifications)
+            {
+                await _notification.SendAsync(
+                    recipientId, title, message,
+                    type: "Both",
+                    relatedEntityType: "RaceEntry",
+                    relatedEntityId: raceEntryId);
+            }
+
+            if (affectedUserIds.Count > 0)
+            {
+                await _notification.SendBulkAsync(
+                    affectedUserIds,
+                    "Giải đấu bị hủy",
+                    $"Giải đấu \"{tournament.Name}\" đã bị hủy. Điểm dự đoán liên quan của bạn đã được hoàn về ví.",
+                    type: "Both",
+                    relatedEntityType: "Tournament",
+                    relatedEntityId: tournamentId);
+            }
         }
 
         // Giải Completed/Cancelled là trạng thái kết thúc — khóa mọi thao tác cấu trúc
@@ -729,8 +740,20 @@ namespace HRTMS.Infrastructure.Services
         {
             if (tournamentStatus == "Completed" || tournamentStatus == "Cancelled")
                 throw new InvalidOperationException(
-                    $"Giải đấu đang ở trạng thái '{tournamentStatus}' — không thể tạo/sửa vòng đấu hoặc cuộc đua.");
+                    $"Giải đấu {StatusLabel(tournamentStatus)} nên không thể tạo hoặc chỉnh sửa vòng đấu và cuộc đua.");
         }
+
+        // Nhãn trạng thái giải đấu bằng tiếng Việt cho thông báo/lỗi hiển thị cho người dùng.
+        // Không thay giá trị enum lưu DB (Draft/Open Registration/...) — chỉ dùng khi render text.
+        private static string StatusLabel(string status) => status switch
+        {
+            "Draft" => "đang ở giai đoạn nháp",
+            "Open Registration" => "đang mở đăng ký",
+            "Closed Registration" => "đã đóng đăng ký",
+            "Completed" => "đã hoàn tất",
+            "Cancelled" => "đã bị hủy",
+            _ => status
+        };
 
         public async Task<List<PrizeDistributionResponseDto>> SetPrizeDistributionsAsync(int tournamentId, SetPrizeDistributionDto dto, int adminUserId)
         {
@@ -744,7 +767,7 @@ namespace HRTMS.Infrastructure.Services
             // đóng đăng ký (PursePayout có thể đã tính theo tỷ lệ cũ).
             if (tournament.Status != "Draft" && tournament.Status != "Open Registration")
                 throw new InvalidOperationException(
-                    $"Không thể sửa tỷ lệ thưởng khi giải ở trạng thái '{tournament.Status}'");
+                    "Chỉ có thể điều chỉnh tỷ lệ trao thưởng khi giải đấu đang ở giai đoạn nháp hoặc chưa đóng đăng ký.");
 
             // 1. Validate đủ 5 position không trùng
             var positions = dto.Distributions.Select(d => d.Position).OrderBy(p => p).ToList();

@@ -9,6 +9,11 @@ public interface IMedicalCheckService
         int raceEntryId,
         RecordPreRaceWeightDto dto);
 
+    Task<PostRaceWeightResultDto> RecordPostRaceWeightAsync(
+        int doctorId,
+        int raceEntryId,
+        RecordPostRaceWeightDto dto);
+
     Task<HorseIdentityResultDto> RecordHorseIdentityAsync(
         int doctorId,
         int raceEntryId,
@@ -20,4 +25,8 @@ public interface IMedicalCheckService
     Task<List<MedicalCheckListDto>> GetRaceEntriesAsync(
         int doctorId,
         int raceId);
+
+    Task<RaceEntryHealthProfileDto> GetRaceEntryHealthProfileAsync(
+        int doctorId,
+        int raceEntryId);
 }
