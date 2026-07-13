@@ -60,3 +60,37 @@ export const allocateEntry = (raceId: number, pairingId: number): Promise<RaceEn
 // POST /api/admin/races/{raceId}/draw — draw post positions
 export const drawPostPositions = (raceId: number): Promise<unknown> =>
   apiFetch(`/admin/races/${raceId}/draw`, { method: 'POST' });
+
+
+export interface AdminPairing {
+  pairingId: number;
+  tournamentId: number;
+  tournamentName: string;
+  horseId: number;
+  horseName: string;
+  horseBreed: string;
+  jockeyId: number;
+  jockeyName: string;
+  ownerId: number;
+  ownerName: string;
+  status: string;
+  isAllocated: boolean;
+  createdAt: string;
+}
+
+interface PagedResult<T> {
+  items: T[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+}
+
+// GET /api/admin/pairings — Module E allocation picker (thay ô nhập tay Pairing ID)
+export const getAdminPairings = (
+  tournamentId: number,
+  unallocatedOnly = true,
+  pageSize = 100
+): Promise<AdminPairing[]> =>
+  apiFetch<PagedResult<AdminPairing>>(
+    `/admin/pairings?tournamentId=${tournamentId}&status=Confirmed&unallocatedOnly=${unallocatedOnly}&page=1&pageSize=${pageSize}`
+  ).then((res) => res.items);
