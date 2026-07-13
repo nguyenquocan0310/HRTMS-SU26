@@ -134,6 +134,33 @@ namespace HRTMS.Infrastructure.Services
         }
 
         // =====================================================================
+        // REQ-F-PRZ.6 — Owner tự xem tiền thưởng của mình (self-scoped)
+        // Chỉ payout Role="Owner" của chính ownerUserId; chi tiết từng dòng
+        // (ngựa, hạng, số tiền, Paid/Unpaid) + tổng hợp.
+        // =====================================================================
+        public async Task<OwnerEarningsDto> GetMyEarningsAsync(int ownerUserId)
+        {
+            var payouts = await _context.PursePayouts
+                .Include(p => p.RecipientUser)
+                .Include(p => p.RaceEntry).ThenInclude(re => re.Pairing).ThenInclude(pa => pa.Horse)
+                .Where(p => p.RecipientUserId == ownerUserId && p.Role == "Owner")
+                .OrderByDescending(p => p.UpdatedAt)
+                .ToListAsync();
+
+            var items = payouts.Select(MapItem).ToList();
+
+            return new OwnerEarningsDto
+            {
+                OwnerUserId = ownerUserId,
+                TotalEarnings = items.Sum(i => i.CalculatedAmount),
+                PaidAmount = items.Where(i => i.PayoutStatus == "Paid").Sum(i => i.CalculatedAmount),
+                UnpaidAmount = items.Where(i => i.PayoutStatus == "Unpaid").Sum(i => i.CalculatedAmount),
+                PayoutCount = items.Count,
+                Payouts = items
+            };
+        }
+
+        // =====================================================================
         // Helper: map entity -> DTO (dùng chung cho list + update)
         // =====================================================================
         private static PursePayoutItemDto MapItem(PursePayout p) => new()

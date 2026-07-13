@@ -14,5 +14,8 @@ namespace HRTMS.Core.Interfaces.Services
 
 		// REQ-F-PRZ.6 — Lịch sử thưởng tích lũy theo người nhận (lọc tùy chọn userId/role)
 		Task<List<EarningsHistoryItemDto>> GetEarningsHistoryAsync(int? recipientUserId, string? role);
+
+		// REQ-F-PRZ.6 — Owner tự xem tiền thưởng của mình (self-scoped, id lấy từ JWT)
+		Task<OwnerEarningsDto> GetMyEarningsAsync(int ownerUserId);
 	}
 }
