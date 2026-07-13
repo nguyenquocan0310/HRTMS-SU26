@@ -48,9 +48,6 @@ const OwnerDashboard = () => {
             <span className="inline-flex rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-700 border border-blue-100">
               OWNER WORKSPACE
             </span>
-            <h1 className="mt-5 text-4xl font-black tracking-tight text-slate-950">
-              Quản lý ngựa, giải đấu và jockey trong một workspace.
-            </h1>
             <p className="mt-3 text-base text-slate-600 leading-7">
               Theo dõi hồ sơ ngựa, đăng ký giải, mời jockey và quản lý race entry trước ngày đua.
             </p>
@@ -127,12 +124,6 @@ const OwnerDashboard = () => {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-blue-100 bg-white px-5 py-4">
-        <p className="text-sm text-slate-600">
-          <span className="font-bold text-blue-700">Gợi ý demo:</span> đăng ký tham gia giải trước,
-          sau đó tạo hồ sơ ngựa, đăng ký ngựa vào giải và mời jockey cho ngựa đã được duyệt.
-        </p>
-      </section>
     </div>
   )
 }

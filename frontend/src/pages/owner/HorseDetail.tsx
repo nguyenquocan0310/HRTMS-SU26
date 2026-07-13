@@ -245,8 +245,6 @@ export default function HorseDetail() {
             )}
             <span className="text-blue-600">Mã đăng ký</span>
             <span className="font-medium">#{latestEnrollment.enrollmentId}</span>
-            <span className="text-blue-600">Screening</span>
-            <span className="font-medium">{latestEnrollment.screeningStatus}</span>
             <span className="text-blue-600">Đăng ký lúc</span>
             <span className="font-medium">{new Date(latestEnrollment.createdAt).toLocaleDateString('vi-VN')}</span>
           </div>

@@ -73,7 +73,7 @@ const FEE_STATUS_OPTIONS = [
 function SkeletonRow() {
   return (
     <tr className="animate-pulse">
-      {[...Array(9)].map((_, i) => (
+      {[...Array(10)].map((_, i) => (
         <td key={i} className="px-4 py-3">
           <div className="h-3.5 bg-gray-100 rounded w-3/4" />
         </td>
@@ -92,7 +92,8 @@ export default function RaceEntries() {
   const [error, setError] = useState<string | null>(null);
   const [withdrawingId, setWithdrawingId] = useState<number | null>(null);
   const [withdrawReason, setWithdrawReason] = useState('');
-  const [actionLoading, setActionLoading] = useState(false);
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -103,8 +104,8 @@ export default function RaceEntries() {
   };
 
   const handleConfirm = async (raceEntryId: number) => {
-    if (actionLoading) return;
-    setActionLoading(true);
+    if (confirmingId !== null) return;
+    setConfirmingId(raceEntryId);
     try {
       await confirmRaceEntry(raceEntryId);
       showToast('Đã xác nhận tham gia.', 'success');
@@ -112,13 +113,13 @@ export default function RaceEntries() {
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : 'Xác nhận tham gia thất bại.', 'error');
     } finally {
-      setActionLoading(false);
+      setConfirmingId(null);
     }
   };
 
   const handleWithdrawAction = async () => {
-    if (withdrawingId === null || actionLoading) return;
-    setActionLoading(true);
+    if (withdrawingId === null || withdrawLoading) return;
+    setWithdrawLoading(true);
     try {
       const reason = withdrawReason.trim() || 'Owner withdrawn';
       await withdrawRaceEntry(withdrawingId, reason);
@@ -129,7 +130,7 @@ export default function RaceEntries() {
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : 'Rút lui thất bại.', 'error');
     } finally {
-      setActionLoading(false);
+      setWithdrawLoading(false);
     }
   };
 
@@ -255,7 +256,8 @@ export default function RaceEntries() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Jockey</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Lệ phí</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">TT phí</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">TT entry</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Trạng thái entry</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Hành động</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -263,7 +265,7 @@ export default function RaceEntries() {
                 [...Array(5)].map((_, i) => <SkeletonRow key={i} />)
               ) : entries.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-14 text-center">
+                  <td colSpan={10} className="py-14 text-center">
                     <p className="text-3xl mb-3">&#127943;</p>
                     <p className="text-sm font-semibold text-gray-700 mb-1">Chưa có đăng ký cuộc đua nào</p>
                     <p className="text-xs text-gray-500 mb-4">
@@ -313,34 +315,30 @@ export default function RaceEntries() {
                       <FeeStatusText status={entry.entryFeeStatus} />
                     </td>
                     <td className="px-4 py-3">
+                      <EntryStatusBadge status={entry.status} />
+                    </td>
+                    <td className="px-4 py-3">
                       <div className="flex flex-col gap-1.5">
-                        <EntryStatusBadge status={entry.status} />
                         {(entry.status.toLowerCase() === 'pending' || entry.status.toLowerCase() === 'pendingconf') && (
                           <button
                             onClick={() => handleConfirm(entry.raceEntryId)}
-                            disabled={actionLoading}
+                            disabled={confirmingId !== null}
                             className="px-2 py-1 text-[10px] font-semibold text-white bg-green-600 hover:bg-green-700 disabled:bg-green-300 rounded transition-colors whitespace-nowrap"
                           >
-                            Xác nhận tham gia
+                            {confirmingId === entry.raceEntryId ? 'Đang xác nhận...' : 'Xác nhận tham gia'}
                           </button>
                         )}
                         {(entry.status.toLowerCase() === 'pending' || entry.status.toLowerCase() === 'pendingconf' || entry.status.toLowerCase() === 'confirmed') && (
                           <button
                             onClick={() => setWithdrawingId(entry.raceEntryId)}
-                            disabled={actionLoading}
+                            disabled={withdrawLoading}
                             className="px-2 py-1 text-[10px] font-semibold text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 disabled:opacity-50 rounded transition-colors whitespace-nowrap"
                           >
                             Rút lui
                           </button>
                         )}
-                        {(entry.status.toLowerCase() === 'cancelled' || entry.status.toLowerCase() === 'withdrawn') && (
-                          <span className="text-[10px] text-gray-400 italic">Đã hủy</span>
-                        )}
-                        {entry.status.toLowerCase() === 'disqualified' && (
-                          <span className="text-[10px] text-gray-400 italic">Bị loại</span>
-                        )}
-                        {entry.status.toLowerCase() === 'rejected' && (
-                          <span className="text-[10px] text-gray-400 italic">Bị từ chối</span>
+                        {['cancelled', 'withdrawn', 'disqualified', 'rejected'].includes(entry.status.toLowerCase()) && (
+                          <span className="text-xs text-gray-400">—</span>
                         )}
                       </div>
                     </td>
@@ -385,17 +383,17 @@ export default function RaceEntries() {
                   setWithdrawingId(null);
                   setWithdrawReason('');
                 }}
-                disabled={actionLoading}
+                disabled={withdrawLoading}
                 className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-white transition-colors disabled:opacity-50"
               >
                 Hủy bỏ
               </button>
               <button
                 onClick={handleWithdrawAction}
-                disabled={actionLoading}
+                disabled={withdrawLoading}
                 className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:bg-red-400"
               >
-                {actionLoading ? 'Đang xử lý...' : 'Xác nhận rút lui'}
+                {withdrawLoading ? 'Đang xử lý...' : 'Xác nhận rút lui'}
               </button>
             </div>
           </div>
