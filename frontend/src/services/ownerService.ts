@@ -73,8 +73,14 @@ export const updateHorse = async (
   data: Partial<Horse>
 ): Promise<Horse> => {
   try {
-    const response = await axiosInstance.put<Horse>(`/api/horses/${id}`, data);
-    return response.data;
+    const res = await apiFetch<any>(`/horses/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    if (res?.success === false) {
+      throw new Error(res.message || 'Cập nhật hồ sơ ngựa thất bại.');
+    }
+    return res?.data || res;
   } catch (error) {
     console.error(`Error updating horse with ID ${id}:`, error);
     throw error;

@@ -275,9 +275,7 @@ export default function HorseDetail() {
           Quay lại
         </button>
         <button
-          onClick={() =>
-            navigate(`/owner/horses/edit/${(horse as any).horseId || horse.horseID || id || ''}`)
-          }
+          onClick={() => navigate(`/owner/horses/edit/${horse.horseId || horse.horseID || id || ''}`)}
           className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-full transition-colors"
         >
           Cập nhật thông tin
