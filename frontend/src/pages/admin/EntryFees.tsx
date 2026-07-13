@@ -127,10 +127,13 @@ const EntryFees = () => {
                         {entry.entryFeeStatus}
                       </span>
                     </td>
-                    <td>
+<td>
                       <div className={styles.actionBtns}>
-                        {/* Confirm Fee */}
-                        {entry.entryFeeStatus !== 'Paid' && (
+                        {/* Gộp Fee/Approve thành 1 nút duy nhất theo trạng thái —
+                            BE yêu cầu EntryFeeStatus="Paid" mới cho Approve, nên
+                            không hiện Approve trước khi Fee đã xác nhận, tránh
+                            luôn báo lỗi khi bấm nhầm thứ tự. */}
+                        {entry.entryFeeStatus !== 'Paid' ? (
                           <button
                             type="button"
                             className={styles.feeBtn}
@@ -140,17 +143,20 @@ const EntryFees = () => {
                           >
                             <FiCheck size={13} /> Fee
                           </button>
+                        ) : entry.status === 'Pending' ? (
+                          <button
+                            type="button"
+                            className={styles.approveBtn}
+                            onClick={() => handleApprove(entry.raceEntryId)}
+                            disabled={actionId === entry.raceEntryId}
+                            title="Approve entry vào race"
+                          >
+                            <FiCheckCircle size={13} /> Approve
+                          </button>
+                        ) : (
+                          <span className={styles.muted}>Đã xử lý</span>
                         )}
-                        {/* Approve Entry */}
-                        <button
-                          type="button"
-                          className={styles.approveBtn}
-                          onClick={() => handleApprove(entry.raceEntryId)}
-                          disabled={actionId === entry.raceEntryId}
-                          title="Approve entry vào race"
-                        >
-                          <FiCheckCircle size={13} /> Approve
-                        </button>
+                        {/* Reject Entry */}
                         {/* Reject Entry */}
                         <button
                           type="button"
