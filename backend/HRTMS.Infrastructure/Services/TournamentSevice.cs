@@ -33,8 +33,8 @@ namespace HRTMS.Infrastructure.Services
         // là trạng thái cấp RACE, KHÔNG lưu ở Tournament.
         private static readonly Dictionary<string, string> ValidTransitions = new()
         {
-            ["Draft"]               = "Open Registration",
-            ["Open Registration"]   = "Closed Registration",
+            ["Draft"] = "Open Registration",
+            ["Open Registration"] = "Closed Registration",
             ["Closed Registration"] = "Completed",
         };
 
@@ -565,10 +565,11 @@ namespace HRTMS.Infrastructure.Services
                 throw new InvalidOperationException("Không thể hủy giải đã hoàn thành");
 
             using var transaction = await _context.Database.BeginTransactionAsync();
+            var affectedUserIds = new HashSet<int>();
+            var refundNotifications = new List<(int RecipientId, string Title, string Message, int RaceEntryId)>();
             try
             {
                 var now = DateTime.UtcNow;
-                var affectedUserIds = new HashSet<int>();
 
                 // Bug 4 fix — capture old status trước khi thay đổi
                 var oldStatus = tournament.Status;
@@ -594,17 +595,11 @@ namespace HRTMS.Infrastructure.Services
                                 entry.EntryFeeStatus = "Refund Pending";
 
                                 var ownerId = entry.Pairing.Horse.OwnerId;
-                                _context.Notifications.Add(new Notification
-                                {
-                                    RecipientId = ownerId,
-                                    Title = "Hoàn lệ phí tham gia",
-                                    Message = $"Giải đấu \"{tournament.Name}\" đã bị hủy. Lệ phí của mã đăng ký {entry.RaceEntryId} đang được xử lý hoàn lại. Bạn sẽ nhận được thông báo khi quá trình hoàn tất.",
-                                    Type = "In-app",
-                                    IsRead = false,
-                                    RelatedEntityType = "RaceEntry",
-                                    RelatedEntityId = entry.RaceEntryId,
-                                    SentAt = now,
-                                });
+                                refundNotifications.Add((
+                                    ownerId,
+                                    "Hoàn lệ phí tham gia",
+                                    $"Giải đấu \"{tournament.Name}\" đã bị hủy. Lệ phí của mã đăng ký {entry.RaceEntryId} đang được xử lý hoàn lại. Bạn sẽ nhận được thông báo khi quá trình hoàn tất.",
+                                    entry.RaceEntryId));
                                 _auditLog.LogDeferred(
                                     actorId: adminUserId,
                                     action: "Update_Entry_Fee_Status",
@@ -621,20 +616,26 @@ namespace HRTMS.Infrastructure.Services
                         // 4. Hoàn điểm ảo cho Predictions đang Pending
                         foreach (var prediction in race.Predictions.Where(p => p.Status == "Pending"))
                         {
-                            // Bug 2 fix — Include Wallet để tránh null reference
-                            var spectator = await _context.SpectatorProfiles
-                                .Include(s => s.Wallet)
-                                .FirstOrDefaultAsync(s => s.SpectatorId == prediction.SpectatorId);
+                            var wallet = await _context.Wallets
+                                .AsNoTracking()
+                                .FirstOrDefaultAsync(w => w.SpectatorId == prediction.SpectatorId);
 
-                            if (spectator?.Wallet != null)
+                            if (wallet != null)
                             {
-                                spectator.Wallet.Balance += prediction.PointsPlaced;
-                                spectator.Wallet.UpdatedAt = now;
+                                // FIX: ExecuteUpdateAsync cộng nguyên tử theo điều kiện WHERE thay vì
+                                // đọc entity rồi += và SaveChanges — tránh lost-update nếu ví đang
+                                // bị PlacePredictionAsync/redeem/EmergencyDisqualify khác thao tác
+                                // đồng thời (Wallet không có RowVersion nên EF không tự phát hiện conflict).
+                                await _context.Wallets
+                                    .Where(w => w.SpectatorId == prediction.SpectatorId)
+                                    .ExecuteUpdateAsync(s => s
+                                        .SetProperty(w => w.Balance, w => w.Balance + prediction.PointsPlaced)
+                                        .SetProperty(w => w.UpdatedAt, now));
 
                                 // Bug 3 fix — tạo ledger entry để giữ bất biến Balance = SUM(VPT)
                                 _context.VirtualPointsTransactions.Add(new VirtualPointsTransaction
                                 {
-                                    WalletId = spectator.Wallet.WalletId,
+                                    WalletId = wallet.WalletId,
                                     Amount = prediction.PointsPlaced,
                                     Type = "Prediction Refund",
                                     ReferenceId = prediction.PredictionId.ToString(),
@@ -685,21 +686,7 @@ namespace HRTMS.Infrastructure.Services
                     }
                 }
 
-                // 5. Gửi Notification cho tất cả Spectator có dự đoán bị ảnh hưởng
-                foreach (var userId in affectedUserIds)
-                {
-                    _context.Notifications.Add(new Notification
-                    {
-                        RecipientId = userId,
-                        Title = "Giải đấu bị hủy",
-                        Message = $"Giải đấu \"{tournament.Name}\" đã bị hủy. Điểm dự đoán liên quan của bạn đã được hoàn về ví.",
-                        Type = "In-app",
-                        IsRead = false,
-                        RelatedEntityType = "Tournament",
-                        RelatedEntityId = tournamentId,
-                        SentAt = now,
-                    });
-                }
+                // 5. Notification cho Spectator bị ảnh hưởng — gửi sau khi commit (xem dưới).
 
                 await _context.SaveChangesAsync();
 
@@ -720,6 +707,30 @@ namespace HRTMS.Infrastructure.Services
             {
                 await transaction.RollbackAsync();
                 throw;
+            }
+
+            // Gửi notification SAU KHI transaction đã commit — dùng NotificationService
+            // (không insert thẳng Entity) để email thực sự được dispatch, không chỉ in-app.
+            // Type "Both" vì đây là sự kiện hủy giải/hoàn tiền — ảnh hưởng tài chính, cần
+            // đảm bảo user thấy được kể cả khi không đang mở app.
+            foreach (var (recipientId, title, message, raceEntryId) in refundNotifications)
+            {
+                await _notification.SendAsync(
+                    recipientId, title, message,
+                    type: "Both",
+                    relatedEntityType: "RaceEntry",
+                    relatedEntityId: raceEntryId);
+            }
+
+            if (affectedUserIds.Count > 0)
+            {
+                await _notification.SendBulkAsync(
+                    affectedUserIds,
+                    "Giải đấu bị hủy",
+                    $"Giải đấu \"{tournament.Name}\" đã bị hủy. Điểm dự đoán liên quan của bạn đã được hoàn về ví.",
+                    type: "Both",
+                    relatedEntityType: "Tournament",
+                    relatedEntityId: tournamentId);
             }
         }
 

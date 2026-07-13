@@ -277,18 +277,13 @@ public class HorseService : IHorseService
         await _auditLog.LogAsync(ownerId, "Withdraw_Enrollment", "HorseTournamentEntry",
             enrollmentId.ToString(), "Enrolled", "Withdrawn", null);
 
-        _context.Notifications.Add(new Notification
-        {
-            RecipientId = ownerId,
-            Title = "Đã rút ngựa khỏi giải",
-            Message = $"Ngựa '{entry.Horse.Name}' đã được rút khỏi giải '{entry.Tournament.Name}'.",
-            Type = "In-app",
-            IsRead = false,
-            RelatedEntityType = "HorseTournamentEntry",
-            RelatedEntityId = enrollmentId,
-            SentAt = DateTime.UtcNow
-        });
-        await _context.SaveChangesAsync();
+        await _notification.SendAsync(
+            ownerId,
+            "Đã rút ngựa khỏi giải",
+            $"Ngựa '{entry.Horse.Name}' đã được rút khỏi giải '{entry.Tournament.Name}'.",
+            type: "In-app",
+            relatedEntityType: "HorseTournamentEntry",
+            relatedEntityId: enrollmentId);
 
         return ApiResponse<string>.Ok("Đã rút ngựa khỏi giải.");
     }
@@ -372,10 +367,13 @@ public class HorseService : IHorseService
             // Toàn bộ re-screen + hủy pairing + withdraw entry trong MỘT transaction —
             // withdraw-flow của Module E ambient-aware nên không mở transaction lồng.
             await using var transaction = await _context.Database.BeginTransactionAsync();
+            var wasApproved = horse.AdminApprovalStatus != "Rejected";
+            var justRejected = false;
             try
             {
                 // Baseline profile (doping có thể đổi sang Failed → khóa hồ sơ).
                 ApplyProfileScreening(horse);
+                justRejected = wasApproved && horse.AdminApprovalStatus == "Rejected";
 
                 var cancelledPairingIds = new List<int>();
 
@@ -436,6 +434,21 @@ public class HorseService : IHorseService
             {
                 await transaction.RollbackAsync();
                 throw;
+            }
+
+            // Gửi SAU khi transaction đã commit — hồ sơ ngựa vừa bị khóa do
+            // sửa trường nhạy cảm (VD: doping chuyển Failed). Owner cần biết
+            // ngay, không chỉ thấy các enrollment/pairing bị hủy mà không hiểu vì sao.
+            if (justRejected)
+            {
+                await _notification.SendAsync(
+                    ownerId,
+                    "Hồ sơ ngựa bị khóa",
+                    $"Hồ sơ ngựa '{horse.Name}' vừa bị khóa sau khi cập nhật thông tin. " +
+                    $"Lý do: {horse.RejectionReason}",
+                    type: "Both",
+                    relatedEntityType: "Horse",
+                    relatedEntityId: horse.HorseId);
             }
         }
         else
@@ -724,35 +737,22 @@ public class HorseService : IHorseService
         }
     }
 
-    private void NotifyOwnerHorseApproved(Horse horse) =>
-        _context.Notifications.Add(new Notification
-        {
-            RecipientId = horse.OwnerId,
-            Title = "Hồ sơ ngựa được phê duyệt",
-            Message = $"Hồ sơ ngựa '{horse.Name}' đã được phê duyệt.",
-            Type = "In-app",
-            IsRead = false,
-            RelatedEntityType = "Horse",
-            RelatedEntityId = horse.HorseId,
-            SentAt = DateTime.UtcNow
-        });
-
     private static HorseEnrollmentResponseDto MapToEnrollmentDto(
         HorseTournamentEntry e, Horse horse, Tournament? tournament) => new()
-    {
-        EnrollmentId = e.EnrollmentId,
-        HorseId = e.HorseId,
-        HorseName = horse.Name,
-        TournamentId = e.TournamentId,
-        TournamentName = tournament?.Name,
-        Status = e.Status,
-        ScreeningStatus = e.ScreeningStatus,
-        ScreeningReason = e.ScreeningReason,
-        AdminApprovalStatus = e.AdminApprovalStatus,
-        RejectionReason = e.RejectionReason,
-        CreatedAt = e.CreatedAt,
-        UpdatedAt = e.UpdatedAt
-    };
+        {
+            EnrollmentId = e.EnrollmentId,
+            HorseId = e.HorseId,
+            HorseName = horse.Name,
+            TournamentId = e.TournamentId,
+            TournamentName = tournament?.Name,
+            Status = e.Status,
+            ScreeningStatus = e.ScreeningStatus,
+            ScreeningReason = e.ScreeningReason,
+            AdminApprovalStatus = e.AdminApprovalStatus,
+            RejectionReason = e.RejectionReason,
+            CreatedAt = e.CreatedAt,
+            UpdatedAt = e.UpdatedAt
+        };
 
     private static HorseResponseDto MapToDto(Horse h) => new()
     {
