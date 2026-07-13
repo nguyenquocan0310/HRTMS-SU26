@@ -1,7 +1,7 @@
 # API Contract — Module K (Tính & Phân bổ Tiền thưởng — REQ-F-PRZ)
 
-Controller: `PursePayoutController` · Base: `/api`
-Auth: JWT Bearer — toàn bộ endpoint **Role: Admin**. ActorId lấy từ claim `NameIdentifier`.
+Controller: `PursePayoutController` (Admin) · `OwnerEarningsController` (Owner self-view) · Base: `/api`
+Auth: JWT Bearer — endpoint 1–3 **Role: Admin**; endpoint 4 **Role: Owner** (self-scoped). ActorId/UserId lấy từ claim `NameIdentifier`.
 
 > **Phạm vi file này:** chỉ phần **quản lý chi trả sau công bố** (REQ-F-PRZ.6) + hiển thị `Remainder` (PRZ.4).
 > Việc **tính & sinh** `PursePayouts` (PRZ.2/PRZ.3) diễn ra bên trong transaction **Declare Official** (Module J,
@@ -95,6 +95,34 @@ Errors: không có (trả list rỗng nếu không có dữ liệu).
 
 > Gom nhóm theo (`recipientUserId`, `role`): một người vừa là Owner vừa là Jockey sẽ xuất hiện 2 dòng.
 > `totalEarnings = paidAmount + unpaidAmount`.
+
+## 4. Owner tự xem tiền thưởng của mình — PRZ.6 (self-scoped)
+`GET /api/owner/earnings` · Role: **Owner**
+
+Owner xem tổng thưởng + chi tiết từng dòng (ngựa nào thắng, về hạng mấy, bao nhiêu, đã trả chưa). `ownerUserId` **lấy từ JWT** (claim `NameIdentifier`), KHÔNG nhận từ query → Owner chỉ thấy payout của chính mình. Chỉ payout `role = "Owner"`; race đã `Official` mới sinh payout.
+
+`200 OK` → `OwnerEarningsDto`:
+```json
+{
+  "ownerUserId": 7,
+  "totalEarnings": 120000000,
+  "paidAmount": 54000000,
+  "unpaidAmount": 66000000,
+  "payoutCount": 3,
+  "payouts": [
+    {
+      "pursePayoutId": 15, "raceEntryId": 45, "recipientUserId": 7,
+      "recipientName": "Nguyen Van A", "role": "Owner",
+      "finishPosition": 1, "horseName": "Thunder",
+      "calculatedAmount": 45000000, "payoutStatus": "Unpaid",
+      "paidAt": null, "updatedByAdminId": null, "updatedAt": "..."
+    }
+  ]
+}
+```
+Errors: không có (chưa có payout → tổng = 0, `payouts` rỗng).
+
+> Khác endpoint 3 (`earnings-history`, Admin, nhận `recipientUserId` từ query): endpoint này Owner-only, self-scoped, trả **chi tiết từng dòng** thay vì chỉ tổng gộp. `totalEarnings = paidAmount + unpaidAmount`.
 
 ---
 
