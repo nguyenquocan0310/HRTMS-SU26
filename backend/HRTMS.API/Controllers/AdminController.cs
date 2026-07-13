@@ -95,6 +95,17 @@ public class AdminController : ControllerBase
             newValue: user.Status,
             ipAddress: ClientIp);
 
+        // Cảnh báo bảo mật: user cần biết ngay tài khoản bị khóa và vì sao,
+        // tránh hoang mang khi đăng nhập lại bị từ chối không rõ lý do.
+        await _notificationService.SendAsync(
+            user.UserId,
+            "Tài khoản của bạn đã bị tạm khóa",
+            "Tài khoản của bạn vừa bị Admin tạm khóa (Suspended). Mọi phiên đăng nhập hiện tại đã bị vô hiệu hoá. " +
+            "Nếu bạn cho rằng đây là nhầm lẫn, vui lòng liên hệ Admin để được hỗ trợ.",
+            type: "Both",
+            relatedEntityType: "Users",
+            relatedEntityId: user.UserId);
+
         return Ok(new { message = "User suspended successfully." });
     }
 
@@ -124,6 +135,14 @@ public class AdminController : ControllerBase
             oldValue: oldStatus,
             newValue: user.Status,
             ipAddress: ClientIp);
+
+        await _notificationService.SendAsync(
+            user.UserId,
+            "Tài khoản của bạn đã được kích hoạt lại",
+            "Tài khoản của bạn đã được Admin kích hoạt lại. Bạn có thể đăng nhập và sử dụng bình thường.",
+            type: "Both",
+            relatedEntityType: "Users",
+            relatedEntityId: user.UserId);
 
         return Ok(new { message = "Tài khoản đã được kích hoạt lại." });
     }
