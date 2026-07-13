@@ -24,12 +24,13 @@ export interface FamilyDeclarationItem {
 // ─── Step 4: Verification (theo từng role) ──────────────────────────────────
 // Owner/Jockey/Referee/Doctor đều bắt buộc PhoneNumber + DateOfBirth + IdentityNumber (ACC.1A).
 // Cả 4 role đều bắt buộc khai báo gia đình (COI): hoặc có ít nhất 1 khai báo trong
-// familyDeclarations, hoặc tick hasNoFamilyInIndustry = true. Không được để trống cả hai.
+// familyDeclarations, hoặc nhập noFamilyDeclarationNote (ví dụ: "Không có người thân
+// làm trong ngành này"). Không được để trống cả hai.
 export interface OwnerVerification {
   phoneNumber: string;
   identityNumber: string;
   dateOfBirth: string;
-  hasNoFamilyInIndustry: String;
+  noFamilyDeclarationNote: string;
   familyDeclarations: FamilyDeclarationItem[];
 }
 
@@ -42,7 +43,7 @@ export interface JockeyVerification {
   bloodType: string;
   healthStatus: string;
   certificateFile: File | null;
-  hasNoFamilyInIndustry: String;
+  noFamilyDeclarationNote: string;
   familyDeclaration: string; // giữ lại cho backward compat, KHÔNG dùng để submit nữa
   familyDeclarations: FamilyDeclarationItem[];
 }
@@ -52,7 +53,7 @@ export interface RefereeVerification {
   identityNumber: string;
   dateOfBirth: string;
   certificateFile: File | null;
-  hasNoFamilyInIndustry: String;
+  noFamilyDeclarationNote: string;
   familyDeclaration: string; // giữ lại cho backward compat, KHÔNG dùng để submit nữa
   familyDeclarations: FamilyDeclarationItem[];
 }
@@ -62,7 +63,7 @@ export interface DoctorVerification {
   identityNumber: string;
   dateOfBirth: string;
   certificateFile: File | null;
-  hasNoFamilyInIndustry: String;
+  noFamilyDeclarationNote: string;
   familyDeclarations: FamilyDeclarationItem[];
 }
 
@@ -95,7 +96,7 @@ export const initialFormData: RegisterFormData = {
     phoneNumber: '',
     identityNumber: '',
     dateOfBirth: '',
-    hasNoFamilyInIndustry: '',
+    noFamilyDeclarationNote: '',
     familyDeclarations: [],
   },
   jockeyVerification: {
@@ -107,7 +108,7 @@ export const initialFormData: RegisterFormData = {
     bloodType: '',
     healthStatus: '',
     certificateFile: null,
-    hasNoFamilyInIndustry: '',
+    noFamilyDeclarationNote: '',
     familyDeclaration: '',
     familyDeclarations: [],
   },
@@ -116,7 +117,7 @@ export const initialFormData: RegisterFormData = {
     identityNumber: '',
     dateOfBirth: '',
     certificateFile: null,
-    hasNoFamilyInIndustry: '',
+    noFamilyDeclarationNote: '',
     familyDeclaration: '',
     familyDeclarations: [],
   },
@@ -125,7 +126,7 @@ export const initialFormData: RegisterFormData = {
     identityNumber: '',
     dateOfBirth: '',
     certificateFile: null,
-    hasNoFamilyInIndustry: '',
+    noFamilyDeclarationNote: '',
     familyDeclarations: [],
   },
 };

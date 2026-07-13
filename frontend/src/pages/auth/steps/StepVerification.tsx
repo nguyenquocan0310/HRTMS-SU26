@@ -38,26 +38,20 @@ const StepVerification = ({ role, formData, onChange }: Props) => {
           Khai báo quan hệ gia đình với các thành viên khác trong ngành. Nếu không có, tick vào ô bên dưới.
         </p>
 
-        <div className={styles.field} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <input
-            type="checkbox"
-            id={`hasNoFamily-${key}`}
-            checked={verification.hasNoFamilyInIndustry}
-            onChange={(e) => {
-              const checked = e.target.checked;
-              updateVerification({
-                hasNoFamilyInIndustry: checked,
-                // Nếu tick "không có" thì xóa luôn danh sách đang nhập dở để tránh gửi nhầm
-                familyDeclarations: checked ? [] : verification.familyDeclarations,
-              });
-            }}
-          />
-          <label htmlFor={`hasNoFamily-${key}`} className={styles.label} style={{ marginBottom: 0 }}>
-            Tôi không có người thân làm việc trong ngành
+<div className={styles.field}>
+          <label className={styles.label}>
+            Nếu không có người thân trong ngành, nhập xác nhận bên dưới
           </label>
+          <input
+            type="text"
+            className={styles.input}
+            placeholder='Nhập: "Không có người thân làm trong ngành này"'
+            value={verification.noFamilyDeclarationNote}
+            onChange={(e) => updateVerification({ noFamilyDeclarationNote: e.target.value })}
+          />
         </div>
 
-        {!verification.hasNoFamilyInIndustry && (
+        {verification.noFamilyDeclarationNote.trim().length === 0 && (
           <>
             {verification.familyDeclarations.map((decl, idx) => (
               <div key={idx} className={styles.coiItem}>
