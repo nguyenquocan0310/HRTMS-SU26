@@ -24,10 +24,14 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const token = sessionStorage.getItem('token') ?? localStorage.getItem('token');
 
+// Khi body là FormData (upload file), KHÔNG được set Content-Type thủ công —
+  // browser cần tự thêm boundary. Chỉ set JSON Content-Type khi body không phải FormData.
+  const isFormData = options.body instanceof FormData;
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
