@@ -110,3 +110,23 @@ export const approveReferee = (id: number): Promise<unknown> =>
 
 export const approveDoctor = (id: number): Promise<unknown> =>
   apiFetch(`/admin/doctors/${id}/approve`, { method: 'PATCH' });
+
+
+// ── Referee/Doctor Active — dùng cho modal Assign Officials (khác với
+// pending-approvals vốn chỉ liệt kê hồ sơ đang CHỜ DUYỆT, không phải người đã Active) ──
+export interface ActiveUser {
+  userId: number;
+  username: string;
+  fullName: string;
+  email: string;
+  role: string;
+  status: string;
+  createdAt: string;
+}
+
+export const getActiveUsersByRole = async (role: 'Referee' | 'Doctor'): Promise<ActiveUser[]> => {
+  const res = await apiFetch<{ success: boolean; data: ActiveUser[] }>(
+    `/admin/users?role=${role}&status=Active`
+  );
+  return res.data ?? [];
+};
