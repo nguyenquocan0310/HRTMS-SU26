@@ -213,26 +213,25 @@ public class IndependenceCheckService : IIndependenceCheckService
 
         var entries = await _context.RaceEntries
             .Where(x => x.RaceId == raceId)
-            .Include(x => x.Pairing)
-                .ThenInclude(p => p.Horse)
-            .Include(x => x.Pairing)
-                .ThenInclude(p => p.Jockey)
-                    .ThenInclude(j => j.Jockey)
-            .Select(x => new IndependenceCheckListDto
-            {
-                RaceEntryId = x.RaceEntryId,
-                PairingId = x.PairingId,
-                HorseName = x.Pairing.Horse.Name,
-                JockeyName = x.Pairing.Jockey.Jockey.FullName,
-                IndependenceCheckStatus = x.IndependenceCheckStatus,
-                IndependenceViolationReason = x.IndependenceViolationReason,
-                RaceEntryStatus = x.Status,
-                PreRaceJockeyWeight = x.PreRaceJockeyWeight,
-                HorseIdentityCheckStatus = x.HorseIdentityCheckStatus,
-                ClinicalStatus = x.ClinicalStatus,
-                IsEmergencyDisqualified = x.Status == "Disqualified"
-            })
-            .ToListAsync();
+                .Include(x => x.Pairing).ThenInclude(p => p.Horse).ThenInclude(h => h.Owner).ThenInclude(o => o.Owner)
+                .Include(x => x.Pairing).ThenInclude(p => p.Jockey).ThenInclude(j => j.Jockey)
+                    .Select(x => new IndependenceCheckListDto
+     {
+         RaceEntryId = x.RaceEntryId,
+         PairingId = x.PairingId,
+         PostPosition = x.PostPosition,
+         HorseName = x.Pairing.Horse.Name,
+         OwnerName = x.Pairing.Horse.Owner.Owner.FullName,
+         JockeyName = x.Pairing.Jockey.Jockey.FullName,
+         IndependenceCheckStatus = x.IndependenceCheckStatus,
+         IndependenceViolationReason = x.IndependenceViolationReason,
+         RaceEntryStatus = x.Status,
+         PreRaceJockeyWeight = x.PreRaceJockeyWeight,
+         HorseIdentityCheckStatus = x.HorseIdentityCheckStatus,
+         ClinicalStatus = x.ClinicalStatus,
+         IsEmergencyDisqualified = x.Status == "Disqualified"
+     })
+     .ToListAsync();
 
         return entries;
     }
