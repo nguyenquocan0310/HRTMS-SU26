@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { apiFetch, API_BASE_URL } from '../../services/apiClient';
+import { API_BASE_URL } from '../../services/apiClient';
 import FilePreviewModal from './FilePreviewModal';
 
 // ─── Role classification ──────────────────────────────────────────────────────
@@ -91,13 +91,24 @@ const UserDetailModal = ({
   const [certError, setCertError] = useState<string | null>(null);
 
   const [previewFile, setPreviewFile] = useState<{ url: string; name: string } | null>(null);
+  const [blobLoading, setBlobLoading] = useState(false);
+
+  // Revoke blob URL when preview closes to avoid memory leak
+  const closePreview = () => {
+    if (previewFile?.url.startsWith('blob:')) URL.revokeObjectURL(previewFile.url);
+    setPreviewFile(null);
+  };
 
   const requiresDocApproval = APPROVAL_ROLES_WITH_DOCS.has(role);
 
   // ── Fetch enriched user detail from admin endpoint ────────────────────────
   useEffect(() => {
     setDetailLoading(true);
-    apiFetch<{ success: boolean; data: AdminUserDetail }>(`/admin/users/${userId}`)
+    const token = sessionStorage.getItem('token') ?? localStorage.getItem('token');
+    fetch(`${API_BASE_URL}/admin/users/${userId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then((r) => r.json())
       .then((res) => setUserDetail(res?.data ?? null))
       .catch(() => setUserDetail(null))
       .finally(() => setDetailLoading(false));
@@ -108,7 +119,11 @@ const UserDetailModal = ({
     if (!requiresDocApproval) return;
     setCertLoading(true);
     setCertError(null);
-    apiFetch<{ success: boolean; data: CertificateMeta }>(`/certificates/user/${userId}`)
+    const token = sessionStorage.getItem('token') ?? localStorage.getItem('token');
+    fetch(`${API_BASE_URL}/certificates/user/${userId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then((r) => r.json())
       .then((res) => {
         if (res?.success && res.data) {
           setCertMeta(res.data);
@@ -120,17 +135,27 @@ const UserDetailModal = ({
       .finally(() => setCertLoading(false));
   }, [userId, requiresDocApproval]);
 
-  // ── Build the download URL for the certificate ────────────────────────────
-  const getCertDownloadUrl = (): string | null => {
-    if (!certMeta) return null;
-    // downloadUrl from BE may be a relative path like /api/certificates/{id}/download
-    const raw = certMeta.downloadUrl;
-    if (raw.startsWith('http')) return raw;
-    // Strip leading /api if already in API_BASE_URL
-    const base = API_BASE_URL.endsWith('/api')
-      ? API_BASE_URL.slice(0, -4)
-      : API_BASE_URL;
-    return `${base}${raw}`;
+  // ── Fetch file with auth token → blob URL (avoids 401 on img src) ──────────
+  const fetchAndPreviewCert = async () => {
+    if (!certMeta) return;
+    setBlobLoading(true);
+    try {
+      const token = sessionStorage.getItem('token') ?? localStorage.getItem('token');
+      // downloadUrl from BE: may be '/api/certificates/{id}/download' or full URL
+      const raw = certMeta.downloadUrl;
+      const url = raw.startsWith('http') ? raw : `${API_BASE_URL}${raw.startsWith('/api') ? raw.slice(4) : raw}`;
+      const response = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      setPreviewFile({ url: blobUrl, name: certMeta.fileName });
+    } catch {
+      setCertError('Không thể tải file. Vui lòng thử lại.');
+    } finally {
+      setBlobLoading(false);
+    }
   };
 
   return (
@@ -320,20 +345,20 @@ const UserDetailModal = ({
                   {/* View File button */}
                   <button
                     type="button"
-                    onClick={() => {
-                      const url = getCertDownloadUrl();
-                      if (url) setPreviewFile({ url, name: certMeta.fileName });
-                    }}
+                    disabled={blobLoading}
+                    onClick={fetchAndPreviewCert}
                     style={{
                       marginTop: 8,
                       padding: '8px 0',
                       border: 'none',
                       borderRadius: 7,
-                      background: 'linear-gradient(135deg, #4a6fa5, #2e4d80)',
+                      background: blobLoading
+                        ? '#7a9cc8'
+                        : 'linear-gradient(135deg, #4a6fa5, #2e4d80)',
                       color: '#fff',
                       fontSize: 13,
                       fontWeight: 600,
-                      cursor: 'pointer',
+                      cursor: blobLoading ? 'wait' : 'pointer',
                       width: '100%',
                       display: 'flex',
                       alignItems: 'center',
@@ -341,11 +366,17 @@ const UserDetailModal = ({
                       gap: 6,
                     }}
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                    Xem tài liệu
+                    {blobLoading ? (
+                      'Đang tải...'
+                    ) : (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                        Xem tài liệu
+                      </>
+                    )}
                   </button>
                 </div>
               )}
@@ -407,7 +438,7 @@ const UserDetailModal = ({
         <FilePreviewModal
           fileUrl={previewFile.url}
           fileName={previewFile.name}
-          onClose={() => setPreviewFile(null)}
+          onClose={closePreview}
         />
       )}
     </>
