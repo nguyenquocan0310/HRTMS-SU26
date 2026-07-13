@@ -15,4 +15,12 @@ public class IndependenceCheckListDto
     public string? IndependenceViolationReason { get; set; }
 
     public string RaceEntryStatus { get; set; } = string.Empty;
+
+    public decimal? PreRaceJockeyWeight { get; set; }
+
+    public string? HorseIdentityCheckStatus { get; set; }
+
+    public string? ClinicalStatus { get; set; }
+
+    public bool IsEmergencyDisqualified { get; set; }
 }
