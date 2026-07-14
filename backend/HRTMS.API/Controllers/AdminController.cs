@@ -505,7 +505,7 @@ public class AdminController : ControllerBase
 
         var referees = await _context.RefereeProfiles
             .Where(r => r.Status == "Pending")
-            .Join(_context.Users,
+             .Join(_context.Users.Where(u => u.Status != "Suspended"),
                 r => r.RefereeId,
                 u => u.UserId,
                 (r, u) => new
@@ -523,7 +523,7 @@ public class AdminController : ControllerBase
 
         var doctors = await _context.DoctorProfiles
             .Where(d => d.Status == "Pending")
-            .Join(_context.Users,
+            .Join(_context.Users.Where(u => u.Status != "Suspended"),
                 d => d.DoctorId,
                 u => u.UserId,
                 (d, u) => new
@@ -541,7 +541,7 @@ public class AdminController : ControllerBase
 
         var jockeys = await _context.JockeyProfiles
             .Where(j => j.Status == "Pending")
-            .Join(_context.Users,
+             .Join(_context.Users.Where(u => u.Status != "Suspended"),
                 j => j.JockeyId,
                 u => u.UserId,
                 (j, u) => new

@@ -59,8 +59,8 @@ public class RegisterDto
     public IFormFile? CertificateFile { get; set; }
 
     // ── FamilyRelationshipDeclarations ──────────────────────────────────────
-    // Bắt buộc khai khi Role = Jockey hoặc Referee (EC-18)
-    // Doctor khai sau tại Dashboard (UI-S30)
-    // Owner KHÔNG khai (phía bị match — EC-38)
+    // Bắt buộc khai ngay lúc đăng ký với cả 4 role: Owner/Jockey/Referee/Doctor
+    // (AuthService.RolesRequireFrdAtRegister). Gửi mảng rỗng nếu không có
+    // người thân nào trong ngành. Admin/Spectator không thuộc diện này.
     public List<FamilyDeclarationItemDto>? FamilyDeclarations { get; set; }
 }

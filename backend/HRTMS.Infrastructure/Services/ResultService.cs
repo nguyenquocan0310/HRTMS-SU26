@@ -44,12 +44,31 @@ namespace HRTMS.Infrastructure.Services
             var races = await query.ToListAsync();
             var result = new List<UnofficialRaceListItemDto>(races.Count);
 
+            // FIX J1: load hết dữ liệu phụ trợ 1 lần (thay vì 2 query/race trong vòng lặp),
+            // rồi xử lý ở memory — cùng pattern với Module L (LeaderboardService).
+            var raceIds = races.Select(r => r.RaceId).ToList();
+            var racesWithPendingProtests = await _context.Protests
+                .Where(p => raceIds.Contains(p.RaceId) && p.Status == "Pending")
+                .Select(p => p.RaceId)
+                .Distinct()
+                .ToListAsync();
+            var pendingProtestRaceIds = racesWithPendingProtests.ToHashSet();
+
+            var tournamentIds = races.Select(r => r.Round.TournamentId).Distinct().ToList();
+            var allDistributions = await _context.PrizeDistributions
+                .Where(pd => tournamentIds.Contains(pd.TournamentId))
+                .ToListAsync();
+            var validTournamentIds = allDistributions
+                .GroupBy(pd => pd.TournamentId)
+                .Where(g => Math.Round(g.Sum(pd => pd.Percentage), 2) == 100m)
+                .Select(g => g.Key)
+                .ToHashSet();
+
             foreach (var race in races)
             {
-                var hasPendingProtests = await _context.Protests
-                    .AnyAsync(p => p.RaceId == race.RaceId && p.Status == "Pending");
+                var hasPendingProtests = pendingProtestRaceIds.Contains(race.RaceId);
 
-                var prizeOk = await IsPrizeDistributionsValidAsync(race.Round.TournamentId);
+                var prizeOk = validTournamentIds.Contains(race.Round.TournamentId);
                 var rankingOk = IsRankingIntegrityValid(race.RaceEntries);
                 var weighOutOk = IsPostRaceWeighInComplete(race.RaceEntries);
                 var protestDeadline = ProtestWindowPolicy.GetDeadline(race);
