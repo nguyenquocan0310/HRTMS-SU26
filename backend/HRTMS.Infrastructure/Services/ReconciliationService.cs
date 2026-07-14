@@ -9,14 +9,12 @@ namespace HRTMS.Infrastructure.Services;
 public class ReconciliationService : IReconciliationService
 {
     private readonly HRTMSDbContext _context;
-    private readonly IAuditLogService _auditLog;   // FIX #6: inject AuditLog
 
     private const int DefaultPageSize = 50;
 
-    public ReconciliationService(HRTMSDbContext context, IAuditLogService auditLog)
+    public ReconciliationService(HRTMSDbContext context)
     {
         _context = context;
-        _auditLog = auditLog;
     }
 
     public async Task<ApiResponse<List<PredictionHistoryDto>>> GetMyPredictionsAsync(int spectatorId)
