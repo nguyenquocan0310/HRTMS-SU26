@@ -163,6 +163,294 @@ namespace HRTMS.Infrastructure.Services
         }
 
         // =====================================================================
+        // PRZ.5 — Quỹ tổng hợp cấp Cuộc đua
+        // =====================================================================
+        public async Task<RacePurseSummaryDto> GetRacePurseSummaryAsync(int raceId, int userId, string role)
+        {
+            var race = await _context.Races
+                .Include(r => r.Round).ThenInclude(rd => rd.Tournament)
+                .FirstOrDefaultAsync(r => r.RaceId == raceId)
+                ?? throw new KeyNotFoundException("Không tìm thấy cuộc đua.");
+
+            await EnsureRaceAccessAsync(raceId, userId, role);
+
+            var payouts = await _context.PursePayouts
+                .Include(p => p.RecipientUser)
+                .Include(p => p.RaceEntry).ThenInclude(re => re.Pairing).ThenInclude(pa => pa.Horse)
+                .Where(p => p.RaceEntry.RaceId == raceId)
+                .OrderBy(p => p.RaceEntry.FinishPosition)
+                .ThenBy(p => p.Role)
+                .ToListAsync();
+
+            var items = payouts.Select(MapItem).ToList();
+            return BuildRaceSummary(race, items);
+        }
+
+        // =====================================================================
+        // PRZ.5 — Quỹ tổng hợp cấp Vòng đấu
+        // =====================================================================
+        public async Task<RoundPurseSummaryDto> GetRoundPurseSummaryAsync(int roundId, int userId, string role)
+        {
+            var round = await _context.Rounds
+                .Include(r => r.Tournament)
+                .Include(r => r.Races)
+                .FirstOrDefaultAsync(r => r.RoundId == roundId)
+                ?? throw new KeyNotFoundException("Không tìm thấy vòng đấu.");
+
+            await EnsureRoundAccessAsync(roundId, userId, role);
+
+            // Aggregate payout theo race trong 1 query — tránh N+1 khi vòng có nhiều race.
+            var payoutAgg = await _context.PursePayouts
+                .Where(p => p.RaceEntry.Race.RoundId == roundId)
+                .GroupBy(p => new { p.RaceEntry.RaceId, p.PayoutStatus })
+                .Select(g => new PayoutAggRow { RaceId = g.Key.RaceId, PayoutStatus = g.Key.PayoutStatus, Amount = g.Sum(x => x.CalculatedAmount) })
+                .ToListAsync();
+
+            var races = round.Races
+                .OrderBy(r => r.RaceNumber)
+                .Select(race => BuildRaceItem(race, payoutAgg.Where(a => a.RaceId == race.RaceId)))
+                .ToList();
+
+            var dto = new RoundPurseSummaryDto
+            {
+                RoundId = round.RoundId,
+                RoundName = round.Name,
+                TournamentName = round.Tournament.Name,
+                RoundStatus = round.Status,
+                AllocatedFund = races.Sum(r => r.AllocatedFund),
+                PaidAmount = races.Sum(r => r.PaidAmount),
+                PendingAmount = races.Sum(r => r.PendingAmount),
+                TotalRaceCount = races.Count,
+                PaidRaceCount = races.Count(r => r.PayoutStatus == "Paid"),
+                HasDiscrepancy = races.Any(r => r.HasDiscrepancy),
+                Races = races
+            };
+            dto.RemainingAmount = Math.Max(0m, dto.AllocatedFund - dto.PaidAmount - dto.PendingAmount);
+
+            return dto;
+        }
+
+        // =====================================================================
+        // PRZ.5 — Quỹ tổng hợp cấp Giải đấu
+        // =====================================================================
+        public async Task<TournamentPurseSummaryDto> GetTournamentPurseSummaryAsync(int tournamentId, int userId, string role)
+        {
+            var tournament = await _context.Tournaments
+                .Include(t => t.Rounds).ThenInclude(r => r.Races)
+                .FirstOrDefaultAsync(t => t.TournamentId == tournamentId)
+                ?? throw new KeyNotFoundException("Không tìm thấy giải đấu.");
+
+            await EnsureTournamentAccessAsync(tournamentId, userId, role);
+
+            var payoutAgg = await _context.PursePayouts
+                .Where(p => p.RaceEntry.Race.Round.TournamentId == tournamentId)
+                .GroupBy(p => new { p.RaceEntry.RaceId, p.PayoutStatus })
+                .Select(g => new PayoutAggRow { RaceId = g.Key.RaceId, PayoutStatus = g.Key.PayoutStatus, Amount = g.Sum(x => x.CalculatedAmount) })
+                .ToListAsync();
+
+            var rounds = tournament.Rounds
+                .OrderBy(r => r.SequenceOrder)
+                .Select(round =>
+                {
+                    var races = round.Races
+                        .OrderBy(r => r.RaceNumber)
+                        .Select(race => BuildRaceItem(race, payoutAgg.Where(a => a.RaceId == race.RaceId)))
+                        .ToList();
+
+                    return new RoundPurseSummaryItemDto
+                    {
+                        RoundId = round.RoundId,
+                        RoundName = round.Name,
+                        RoundStatus = round.Status,
+                        AllocatedFund = races.Sum(r => r.AllocatedFund),
+                        PaidAmount = races.Sum(r => r.PaidAmount),
+                        PendingAmount = races.Sum(r => r.PendingAmount),
+                        RemainingAmount = Math.Max(0m, races.Sum(r => r.AllocatedFund) - races.Sum(r => r.PaidAmount) - races.Sum(r => r.PendingAmount)),
+                        TotalRaceCount = races.Count,
+                        PaidRaceCount = races.Count(r => r.PayoutStatus == "Paid"),
+                        HasDiscrepancy = races.Any(r => r.HasDiscrepancy)
+                    };
+                })
+                .ToList();
+
+            var totalPaid = rounds.Sum(r => r.PaidAmount);
+            var totalPending = rounds.Sum(r => r.PendingAmount);
+            var totalRaceCount = rounds.Sum(r => r.TotalRaceCount);
+            var totalPaidRaceCount = rounds.Sum(r => r.PaidRaceCount);
+
+            return new TournamentPurseSummaryDto
+            {
+                TournamentId = tournament.TournamentId,
+                TournamentName = tournament.Name,
+                TournamentStatus = tournament.Status,
+                TotalFund = tournament.PurseAmount,
+                PaidAmount = totalPaid,
+                PendingAmount = totalPending,
+                // Quỹ giải KHÔNG bị trừ theo round/race khi các phần khác chưa xong —
+                // remaining tính trên TOÀN BỘ tổng giải trừ đúng phần đã Paid/Unpaid thực tế.
+                RemainingAmount = Math.Max(0m, tournament.PurseAmount - totalPaid - totalPending),
+                TotalRaceCount = totalRaceCount,
+                PaidRaceCount = totalPaidRaceCount,
+                TotalRoundCount = rounds.Count,
+                CompletedRoundCount = rounds.Count(r => r.RoundStatus == "Completed"),
+                HasDiscrepancy = rounds.Any(r => r.HasDiscrepancy),
+                Rounds = rounds
+            };
+        }
+
+        // =====================================================================
+        // Helper: build race-level summary DTO (dùng cho endpoint race-purse-summary)
+        // =====================================================================
+        private static RacePurseSummaryDto BuildRaceSummary(Race race, List<PursePayoutItemDto> items)
+        {
+            var paid = items.Where(i => i.PayoutStatus == "Paid").Sum(i => i.CalculatedAmount);
+            var pending = items.Where(i => i.PayoutStatus == "Unpaid").Sum(i => i.CalculatedAmount);
+            var (payoutStatus, hasDiscrepancy, discrepancyAmount) = DerivePayoutStatus(race.Status, race.PurseAmount, paid, pending, items.Count);
+
+            return new RacePurseSummaryDto
+            {
+                RaceId = race.RaceId,
+                RaceNumber = race.RaceNumber,
+                RaceName = $"Race {race.RaceNumber}",
+                RoundName = race.Round.Name,
+                TournamentName = race.Round.Tournament.Name,
+                AllocatedFund = race.PurseAmount,
+                PaidAmount = paid,
+                PendingAmount = pending,
+                RemainingAmount = Math.Max(0m, race.PurseAmount - paid - pending),
+                PayoutStatus = payoutStatus,
+                ResultStatus = race.Status,
+                HasDiscrepancy = hasDiscrepancy,
+                DiscrepancyAmount = discrepancyAmount,
+                Payouts = items
+            };
+        }
+
+        // =====================================================================
+        // Helper: build race-level summary ITEM (dùng cho danh sách con trong round/tournament)
+        // =====================================================================
+        private static RacePurseSummaryItemDto BuildRaceItem(Race race, IEnumerable<PayoutAggRow> payoutAggForRace)
+        {
+            decimal paid = 0m, pending = 0m;
+            int count = 0;
+            foreach (var row in payoutAggForRace)
+            {
+                count++;
+                if (row.PayoutStatus == "Paid") paid += row.Amount;
+                else if (row.PayoutStatus == "Unpaid") pending += row.Amount;
+            }
+
+            var (payoutStatus, hasDiscrepancy, _) = DerivePayoutStatus(race.Status, race.PurseAmount, paid, pending, count);
+
+            return new RacePurseSummaryItemDto
+            {
+                RaceId = race.RaceId,
+                RaceNumber = race.RaceNumber,
+                AllocatedFund = race.PurseAmount,
+                PaidAmount = paid,
+                PendingAmount = pending,
+                RemainingAmount = Math.Max(0m, race.PurseAmount - paid - pending),
+                PayoutStatus = payoutStatus,
+                ResultStatus = race.Status,
+                HasDiscrepancy = hasDiscrepancy
+            };
+        }
+
+        // =====================================================================
+        // Helper: suy ra payoutStatus + cờ discrepancy dùng chung race-level
+        // =====================================================================
+        private static (string PayoutStatus, bool HasDiscrepancy, decimal? DiscrepancyAmount) DerivePayoutStatus(
+            string raceStatus, decimal purseAmount, decimal paid, decimal pending, int payoutCount)
+        {
+            var overspend = paid + pending - purseAmount;
+            var hasDiscrepancy = overspend > 0m;
+            decimal? discrepancyAmount = hasDiscrepancy ? overspend : null;
+
+            string payoutStatus;
+            if (raceStatus == "Cancelled")
+                payoutStatus = "Cancelled";
+            else if (payoutCount == 0)
+                payoutStatus = "NotOfficial"; // chưa Declare Official -> chưa phát sinh payout nào
+            else if (pending == 0m)
+                payoutStatus = "Paid";
+            else
+                payoutStatus = "Pending";
+
+            return (payoutStatus, hasDiscrepancy, discrepancyAmount);
+        }
+
+        // =====================================================================
+        // RBAC — Admin xem tất cả; Owner/Jockey chỉ khi có ngựa/cặp đấu trong phạm
+        // vi; Spectator KHÔNG được xem (đồng bộ quyết định với ReportService —
+        // dữ liệu payout không public cho Spectator).
+        // =====================================================================
+        private async Task EnsureTournamentAccessAsync(int tournamentId, int userId, string role)
+        {
+            switch (role)
+            {
+                case "Admin":
+                    return;
+                case "Owner":
+                    if (!await _context.HorseTournamentEntries.AnyAsync(e => e.TournamentId == tournamentId && e.OwnerId == userId))
+                        throw new UnauthorizedAccessException("Bạn không có ngựa tham gia giải đấu này.");
+                    return;
+                case "Jockey":
+                    if (!await _context.Pairings.AnyAsync(p => p.TournamentId == tournamentId && p.JockeyId == userId))
+                        throw new UnauthorizedAccessException("Bạn không có cặp đấu trong giải đấu này.");
+                    return;
+                default:
+                    throw new UnauthorizedAccessException("Bạn không có quyền xem quỹ thưởng của giải đấu này.");
+            }
+        }
+
+        private async Task EnsureRoundAccessAsync(int roundId, int userId, string role)
+        {
+            switch (role)
+            {
+                case "Admin":
+                    return;
+                case "Owner":
+                    if (!await _context.RaceEntries.AnyAsync(e => e.Race.RoundId == roundId && e.Pairing.Horse.OwnerId == userId))
+                        throw new UnauthorizedAccessException("Bạn không có ngựa tham gia vòng đấu này.");
+                    return;
+                case "Jockey":
+                    if (!await _context.RaceEntries.AnyAsync(e => e.Race.RoundId == roundId && e.Pairing.JockeyId == userId))
+                        throw new UnauthorizedAccessException("Bạn không có cặp đấu trong vòng đấu này.");
+                    return;
+                default:
+                    throw new UnauthorizedAccessException("Bạn không có quyền xem quỹ thưởng của vòng đấu này.");
+            }
+        }
+
+        private async Task EnsureRaceAccessAsync(int raceId, int userId, string role)
+        {
+            switch (role)
+            {
+                case "Admin":
+                    return;
+                case "Owner":
+                    if (!await _context.RaceEntries.AnyAsync(e => e.RaceId == raceId && e.Pairing.Horse.OwnerId == userId))
+                        throw new UnauthorizedAccessException("Bạn không có ngựa tham gia cuộc đua này.");
+                    return;
+                case "Jockey":
+                    if (!await _context.RaceEntries.AnyAsync(e => e.RaceId == raceId && e.Pairing.JockeyId == userId))
+                        throw new UnauthorizedAccessException("Bạn không có cặp đấu trong cuộc đua này.");
+                    return;
+                default:
+                    throw new UnauthorizedAccessException("Bạn không có quyền xem quỹ thưởng của cuộc đua này.");
+            }
+        }
+
+        // Kết quả GROUP BY payout theo race — chiếu sang class cụ thể thay vì
+        // anonymous type để dùng lại được giữa các phương thức không cần dynamic.
+        private sealed class PayoutAggRow
+        {
+            public int RaceId { get; set; }
+            public string PayoutStatus { get; set; } = string.Empty;
+            public decimal Amount { get; set; }
+        }
+
+        // =====================================================================
         // Helper: map entity -> DTO (dùng chung cho list + update)
         // =====================================================================
         private static PursePayoutItemDto MapItem(PursePayout p) => new()

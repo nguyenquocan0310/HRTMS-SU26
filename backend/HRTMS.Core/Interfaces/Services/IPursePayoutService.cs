@@ -17,5 +17,10 @@ namespace HRTMS.Core.Interfaces.Services
 
 		// Owner tự xem tiền thưởng của mình (self-scoped, id lấy từ JWT)
 		Task<OwnerEarningsDto> GetMyEarningsAsync(int ownerUserId);
+
+		// Quỹ tổng hợp cấp giải/vòng/cuộc đua (PRZ.5) — RBAC theo userId/role lấy từ JWT.
+		Task<TournamentPurseSummaryDto> GetTournamentPurseSummaryAsync(int tournamentId, int userId, string role);
+		Task<RoundPurseSummaryDto> GetRoundPurseSummaryAsync(int roundId, int userId, string role);
+		Task<RacePurseSummaryDto> GetRacePurseSummaryAsync(int raceId, int userId, string role);
 	}
 }
