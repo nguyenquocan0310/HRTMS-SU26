@@ -29,5 +29,6 @@ public interface IJockeyService
     string? status,
     int page,
     int pageSize);
+    Task<JockeyCareerStatsDto> GetCareerStatsAsync(int jockeyId);
     
 }

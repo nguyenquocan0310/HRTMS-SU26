@@ -414,4 +414,66 @@ public class JockeyService : IJockeyService
             TotalCount = total
         };
     }
+    public async Task<JockeyCareerStatsDto> GetCareerStatsAsync(int jockeyId)
+{
+    // Chi tinh tren RaceEntry cua race da co ket qua chinh thuc (Official)
+    // va khong bi rut lui giua chung (IsWithdrawn) — FinishPosition/Points/Earnings
+    // cua entry rut lui khong phan anh dung phong do thi dau.
+    var jockey = await _context.JockeyProfiles
+        .Include(j => j.Jockey)
+        .AsNoTracking()
+        .FirstOrDefaultAsync(j => j.JockeyId == jockeyId);
+
+    if (jockey == null)
+    {
+        throw new KeyNotFoundException("JOCKEY_NOT_FOUND");
+    }
+
+    var officialEntries = await _context.RaceEntries
+        .AsNoTracking()
+        .Where(re =>
+            re.Pairing.JockeyId == jockeyId &&
+            re.Race.Status == "Official" &&
+            !re.IsWithdrawn)
+        .Select(re => new
+        {
+            re.FinishPosition,
+            re.PointsAwarded,
+            re.EarningsAwarded
+        })
+        .ToListAsync();
+
+    var totalRaces = officialEntries.Count;
+    var wins = officialEntries.Count(e => e.FinishPosition == 1);
+    var podiums = officialEntries.Count(e => e.FinishPosition is >= 1 and <= 3);
+
+    return new JockeyCareerStatsDto
+    {
+        JockeyId = jockeyId,
+        FullName = jockey.Jockey.FullName,
+
+        TotalRaces = totalRaces,
+        Wins = wins,
+        Podiums = podiums,
+
+        WinRate = totalRaces > 0
+            ? Math.Round(wins * 100.0 / totalRaces, 2)
+            : null,
+        PodiumRate = totalRaces > 0
+            ? Math.Round(podiums * 100.0 / totalRaces, 2)
+            : null,
+
+        AverageFinishPosition = totalRaces > 0 &&
+            officialEntries.Any(e => e.FinishPosition.HasValue)
+            ? Math.Round(
+                officialEntries
+                    .Where(e => e.FinishPosition.HasValue)
+                    .Average(e => (double)e.FinishPosition!.Value),
+                2)
+            : null,
+
+        TotalPoints = officialEntries.Sum(e => e.PointsAwarded ?? 0),
+        TotalEarnings = officialEntries.Sum(e => e.EarningsAwarded ?? 0)
+    };
+}
 }

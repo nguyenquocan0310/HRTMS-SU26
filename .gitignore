@@ -31,3 +31,6 @@ obj/
 .claude-flow/
 .mcp.json
 CLAUDE.md
+
+#Thư mục sinh ra khi chạy project
+backend/HRTMS.API/App_Data/
