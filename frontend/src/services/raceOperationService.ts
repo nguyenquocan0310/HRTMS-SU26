@@ -202,9 +202,17 @@ interface UnofficialRaceApiResponse {
  * GET /api/races/unofficial
  * Lấy danh sách tất cả race đang ở trạng thái Unofficial.
  */
-export const getUnofficialRaces = (): Promise<UnofficialRace[]> =>
-  apiFetch<UnofficialRaceApiResponse>('/races/unofficial')
-    .then((res) => res.data ?? []);
+export const getUnofficialRaces = (
+  tournamentId?: number
+): Promise<UnofficialRace[]> => {
+  const query = tournamentId
+    ? `?tournamentId=${tournamentId}`
+    : '';
+
+  return apiFetch<ApiResponse<UnofficialRace[]>>(
+    `/races/unofficial${query}`
+  ).then((res) => res.data ?? []);
+};
 
 /**
  * POST /api/races/{raceId}/declare-official

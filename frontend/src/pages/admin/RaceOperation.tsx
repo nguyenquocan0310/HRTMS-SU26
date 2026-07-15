@@ -98,11 +98,16 @@ const RaceOperations = () => {
     } catch { /* giữ nguyên state cũ nếu lỗi mạng */ }
   };
 
-  const reloadUnofficialRaces = async () => {
+const reloadUnofficialRaces = async () => {
+  if (!selectedTournamentId) {
+    setUnofficialRaces([]);
+    return;
+  }
+
   setLoadingUnofficialRaces(true);
 
   try {
-    const data = await getUnofficialRaces();
+    const data = await getUnofficialRaces(selectedTournamentId);
     setUnofficialRaces(data);
   } catch (error) {
     console.error('Load unofficial races failed:', error);
@@ -114,7 +119,8 @@ const RaceOperations = () => {
 
 useEffect(() => {
   reloadUnofficialRaces();
-}, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [selectedTournamentId]);
 
   const handleAllocate = async (pairingId: number) => {
     if (!selectedRaceId) return;
