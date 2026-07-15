@@ -386,7 +386,7 @@ namespace HRTMS.Infrastructure.Services
                     recipientIds: winnerIds,
                     title: "Dự đoán thắng! 🎉",
                     message: $"Bạn dự đoán đúng kết quả cuộc đua #{race.RaceNumber}. Bạn được cộng {rewardPoints} điểm vào ví.",
-                    type: "In-app",
+                    type: "Both",
                     relatedEntityType: "Race",
                     relatedEntityId: race.RaceId);
 
@@ -395,7 +395,7 @@ namespace HRTMS.Infrastructure.Services
                     recipientIds: loserIds,
                     title: "Kết quả dự đoán",
                     message: $"Cuộc đua #{race.RaceNumber} đã công bố kết quả chính thức. Dự đoán của bạn chưa trúng lần này.",
-                    type: "In-app",
+                    type: "Both",
                     relatedEntityType: "Race",
                     relatedEntityId: race.RaceId);
 
@@ -404,7 +404,7 @@ namespace HRTMS.Infrastructure.Services
                     recipientIds: refundIds,
                     title: "Hoàn điểm dự đoán",
                     message: $"Ngựa bạn dự đoán ở cuộc đua #{race.RaceNumber} đã bị hủy hoặc truất quyền. Điểm dự đoán đã được hoàn về ví.",
-                    type: "In-app",
+                    type: "Both",
                     relatedEntityType: "Race",
                     relatedEntityId: race.RaceId);
 

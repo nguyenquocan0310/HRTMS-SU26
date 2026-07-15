@@ -28,21 +28,57 @@ public class ReconciliationService : IReconciliationService
             .Include(p => p.Race)
                 .ThenInclude(r => r.Round)
             .OrderByDescending(p => p.CreatedAt)
-            .Select(p => new PredictionHistoryDto
+            .Select(p => new
             {
-                PredictionId = p.PredictionId,
-                RaceId = p.RaceId,
+                p.PredictionId,
+                p.RaceId,
                 RaceName = $"{p.Race.Round.Name} - Race #{p.Race.RaceNumber}",
                 HorseName = p.RaceEntry.Pairing.Horse.Name,
-                PredictionType = p.PredictionType,
-                PointsPlaced = p.PointsPlaced,
-                Status = p.Status,
-                PointsAwarded = p.PointsAwarded,
-                CreatedAt = p.CreatedAt
+                p.PredictionType,
+                p.PointsPlaced,
+                p.Status,
+                p.PointsAwarded,
+                RaceStatus = p.Race.Status,
+                ActualFinishPosition = p.RaceEntry.FinishPosition,
+                p.CreatedAt
             })
             .ToListAsync();
 
-        return ApiResponse<List<PredictionHistoryDto>>.Ok(predictions);
+        // REQ-F-REC.3 — nạp tên (các) ngựa về Nhất chính thức cho từng race liên quan,
+        // gom 1 query thay vì N+1 (mỗi race đối chiếu có thể lặp lại giữa nhiều dự đoán).
+        var raceIds = predictions.Select(p => p.RaceId).Distinct().ToList();
+        var winnersByRace = await _context.RaceEntries
+            .AsNoTracking()
+            .Where(re => raceIds.Contains(re.RaceId)
+                         && re.FinishPosition == 1
+                         && re.Status != "Cancelled" && re.Status != "Disqualified")
+            .Select(re => new { re.RaceId, HorseName = re.Pairing.Horse.Name })
+            .ToListAsync();
+
+        var winningNamesByRace = winnersByRace
+            .GroupBy(w => w.RaceId)
+            .ToDictionary(g => g.Key, g => string.Join(", ", g.Select(w => w.HorseName)));
+
+        var result = predictions.Select(p => new PredictionHistoryDto
+        {
+            PredictionId = p.PredictionId,
+            RaceId = p.RaceId,
+            RaceName = p.RaceName,
+            HorseName = p.HorseName,
+            PredictionType = p.PredictionType,
+            PointsPlaced = p.PointsPlaced,
+            Status = p.Status,
+            PointsAwarded = p.PointsAwarded,
+            // Chỉ hiển thị kết quả thực tế khi race đã Official — tránh lộ
+            // thứ hạng tạm/chưa chính thức cho Spectator trước khi công bố.
+            ActualFinishPosition = p.RaceStatus == "Official" ? p.ActualFinishPosition : null,
+            WinningHorseName = p.RaceStatus == "Official"
+                ? winningNamesByRace.GetValueOrDefault(p.RaceId)
+                : null,
+            CreatedAt = p.CreatedAt
+        }).ToList();
+
+        return ApiResponse<List<PredictionHistoryDto>>.Ok(result);
     }
 
     // FIX #5: Chỉ load 50 giao dịch gần nhất thay vì Include toàn bộ collection.
