@@ -308,7 +308,8 @@ public class JockeyService : IJockeyService
 
                 RequestMessage = p.RequestMessage,
                 Status = p.Status,
-                CreatedAt = p.CreatedAt
+                CreatedAt = p.CreatedAt,
+                RespondedAt = p.Status != "Pending" ? p.UpdatedAt : (DateTime?)null
             })
             .ToListAsync();
 
