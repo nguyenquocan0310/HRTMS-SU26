@@ -1,6 +1,14 @@
 import axios from 'axios';
 import type { AxiosInstance } from 'axios';
-import type { Horse, RaceEntry, JockeyInvitation } from '../types/owner.types';
+import type {
+  EarningsHistoryItem,
+  Horse,
+  HorseEnrollment,
+  JockeyInvitation,
+  OwnerEarnings,
+  RaceEntry,
+  RacePayoutSummary,
+} from '../types/owner.types';
 import { apiFetch } from './apiClient';
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -89,20 +97,12 @@ export const updateHorse = async (
  */
 export const getHorseEnrollments = async (
   horseId: number | string
-): Promise<HorseEnrollmentResponse[] | null> => {
-  try {
-    const res = await apiFetch<any>(`/horses/${horseId}/enrollments`);
-    // Backend có thể trả ApiResponse<list> hoặc thẳng array
-    if (Array.isArray(res)) return res;
-    if (Array.isArray(res?.data)) return res.data;
-    if (Array.isArray(res?.data?.items)) return res.data.items;
-    // Single enrollment wrapped in data
-    if (res?.data && typeof res.data === 'object' && !Array.isArray(res.data)) return [res.data];
-    return [];
-  } catch (error) {
-    console.error(`Error fetching enrollments for horse ${horseId}:`, error);
-    return null; // null = network error; [] = no enrollments
-  }
+): Promise<HorseEnrollment[]> => {
+  assertPositiveId(horseId, 'horseId');
+  const res = await apiFetch<ApiResponse<HorseEnrollment[]> | HorseEnrollment[]>(
+    `/horses/${horseId}/enrollments`
+  );
+  return unwrapApiResponse(res, 'Không tải được lịch sử đăng ký giải.');
 };
 
 /**
@@ -336,6 +336,73 @@ export interface HorseEnrollmentResponse {
   createdAt: string;
   updatedAt: string;
 }
+
+const assertPositiveId = (value: number | string, fieldName: string): void => {
+  const normalized = typeof value === 'string' ? value.trim() : value;
+  if (normalized === '' || !Number.isInteger(Number(normalized)) || Number(normalized) <= 0) {
+    throw new Error(`${fieldName} không hợp lệ.`);
+  }
+};
+
+const unwrapApiResponse = <T>(
+  response: ApiResponse<T> | T,
+  fallbackMessage: string
+): T => {
+  if (response && typeof response === 'object' && 'success' in response) {
+    const wrapped = response as ApiResponse<T>;
+    if (!wrapped.success || wrapped.data === null || wrapped.data === undefined) {
+      throw new Error(wrapped.message || fallbackMessage);
+    }
+    return wrapped.data;
+  }
+  if (response === null || response === undefined) throw new Error(fallbackMessage);
+  return response as T;
+};
+
+export const getOwnerEarnings = async (): Promise<OwnerEarnings> => {
+  const res = await apiFetch<ApiResponse<OwnerEarnings> | OwnerEarnings>('/owner/earnings');
+  return unwrapApiResponse(res, 'Không tải được thông tin thu nhập.');
+};
+
+export const getRacePayouts = async (
+  raceId: number | string
+): Promise<RacePayoutSummary> => {
+  assertPositiveId(raceId, 'raceId');
+  const res = await apiFetch<ApiResponse<RacePayoutSummary> | RacePayoutSummary>(
+    `/races/${raceId}/payouts`
+  );
+  return unwrapApiResponse(res, 'Không tải được chi tiết tiền thưởng của cuộc đua.');
+};
+
+export const getEarningsHistory = async (): Promise<EarningsHistoryItem[]> => {
+  const res = await apiFetch<ApiResponse<EarningsHistoryItem[]> | EarningsHistoryItem[]>(
+    '/payouts/earnings-history'
+  );
+  return unwrapApiResponse(res, 'Không tải được lịch sử thu nhập.');
+};
+
+export interface DeleteEnrollmentResult {
+  message: string;
+  data: string;
+}
+
+export const deleteHorseEnrollment = async (
+  horseId: number | string,
+  enrollmentId: number | string
+): Promise<DeleteEnrollmentResult> => {
+  assertPositiveId(horseId, 'horseId');
+  assertPositiveId(enrollmentId, 'enrollmentId');
+  const res = await apiFetch<ApiResponse<string> | string>(
+    `/horses/${horseId}/enrollments/${enrollmentId}`,
+    { method: 'DELETE' }
+  );
+
+  if (res && typeof res === 'object' && 'success' in res) {
+    if (!res.success) throw new Error(res.message || 'Rút hồ sơ thất bại.');
+    return { message: res.message || 'Rút hồ sơ thành công.', data: res.data ?? '' };
+  }
+  return { message: 'Rút hồ sơ thành công.', data: res };
+};
 
 /**
  * POST /api/horses/{horseId}/enrollments

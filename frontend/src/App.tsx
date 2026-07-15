@@ -21,6 +21,7 @@ import AssignOfficials from './pages/admin/AssignOfficials'
 // ── Import các trang Owner ──
 import MyHorses from './pages/owner/MyHorses'
 import OwnerDashboard from './pages/owner/OwnerDashboard'
+import OwnerEarningsPage from './pages/owner/OwnerEarnings'
 import OwnerLayout from './pages/owner/OwnerLayout'
 import RegisterHorse from './pages/owner/RegisterHorse'
 import HorseDetail from './pages/owner/HorseDetail'
@@ -120,6 +121,7 @@ export default function App() {
           </ProtectedRoute>
         }>
           <Route index element={<OwnerDashboard />} />
+          <Route path="earnings" element={<OwnerEarningsPage />} />
           <Route path="horses" element={<MyHorses />} />
           <Route path="horses/register" element={<RegisterHorse />} />
           <Route path="horses/:id" element={<HorseDetail />} />

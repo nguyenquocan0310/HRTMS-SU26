@@ -65,3 +65,64 @@ export interface Breed {
   breedCode: string;
   breedName: string;
 }
+
+export interface OwnerPayout {
+  pursePayoutId: number;
+  raceEntryId: number;
+  recipientUserId: number;
+  recipientName: string;
+  role: string;
+  finishPosition: number;
+  horseName: string;
+  calculatedAmount: number;
+  payoutStatus: string;
+  paidAt: string | null;
+  updatedByAdminId: number | null;
+  updatedAt: string;
+}
+
+export interface OwnerEarnings {
+  ownerUserId: number;
+  totalEarnings: number;
+  paidAmount: number;
+  unpaidAmount: number;
+  payoutCount: number;
+  payouts: OwnerPayout[];
+}
+
+export interface RacePayoutSummary {
+  raceId: number;
+  raceNumber: number;
+  roundName: string;
+  tournamentName: string;
+  raceStatus: string;
+  purseAmount: number;
+  totalAllocated: number;
+  remainderAmount: number;
+  payouts: OwnerPayout[];
+}
+
+export interface EarningsHistoryItem {
+  recipientUserId: number;
+  recipientName: string;
+  role: string;
+  totalEarnings: number;
+  paidAmount: number;
+  unpaidAmount: number;
+  payoutCount: number;
+}
+
+export interface HorseEnrollment {
+  enrollmentId: number;
+  horseId: number;
+  horseName: string;
+  tournamentId: number;
+  tournamentName: string | null;
+  status: string;
+  screeningStatus: string;
+  screeningReason: string | null;
+  adminApprovalStatus: string;
+  rejectionReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
