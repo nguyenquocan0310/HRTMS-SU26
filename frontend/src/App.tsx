@@ -23,6 +23,7 @@ import MyHorses from './pages/owner/MyHorses'
 import OwnerDashboard from './pages/owner/OwnerDashboard'
 import OwnerEarningsPage from './pages/owner/OwnerEarnings'
 import OwnerLayout from './pages/owner/OwnerLayout'
+import OwnerProfile from './pages/owner/OwnerProfile'
 import RegisterHorse from './pages/owner/RegisterHorse'
 import HorseDetail from './pages/owner/HorseDetail'
 import ScheduleConfirm from './pages/owner/ScheduleConfirm'
@@ -133,6 +134,7 @@ export default function App() {
           <Route path="jockey-invite" element={<JockeyInvite />} />
           <Route path="protest" element={<Protest userRole="HorseOwner" />} />
           <Route path="notifications" element={<NotificationCenter />} />
+          <Route path="profile" element={<OwnerProfile />} />
         </Route>
 
         {/* ── Cấu trúc Route của KỴ SĨ (Jockey) ── */}
