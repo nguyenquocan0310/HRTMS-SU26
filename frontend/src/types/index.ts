@@ -16,7 +16,7 @@ export interface User {
   fullName: string
   email: string
   role: Role
-  status: 'Active' | 'Pending' | 'Suspended'
+  status: 'Active' | 'Pending' | 'Suspended' | 'Rejected'
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
