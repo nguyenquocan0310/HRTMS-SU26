@@ -6,7 +6,7 @@ import type {
   JockeyInvitation,
   OwnerEarnings,
   RaceEntry,
-  RacePayoutSummary,
+  RacePurseSummary,
 } from '../types/owner.types';
 import { apiFetch } from './apiClient';
 
@@ -363,12 +363,12 @@ export const getOwnerEarnings = async (): Promise<OwnerEarnings> => {
   return unwrapApiResponse(res, 'Không tải được thông tin thu nhập.');
 };
 
-export const getRacePayouts = async (
+export const getRacePurseSummary = async (
   raceId: number | string
-): Promise<RacePayoutSummary> => {
+): Promise<RacePurseSummary> => {
   assertPositiveId(raceId, 'raceId');
-  const res = await apiFetch<ApiResponse<RacePayoutSummary> | RacePayoutSummary>(
-    `/races/${raceId}/payouts`
+  const res = await apiFetch<ApiResponse<RacePurseSummary> | RacePurseSummary>(
+    `/races/${raceId}/purse-summary`
   );
   return unwrapApiResponse(res, 'Không tải được chi tiết tiền thưởng của cuộc đua.');
 };

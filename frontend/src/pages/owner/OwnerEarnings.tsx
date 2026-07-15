@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   getOwnerEarnings,
-  getRacePayouts,
+  getMyRaceEntries,
+  getRacePurseSummary,
 } from '../../services/ownerService';
 import type {
   OwnerEarnings,
   OwnerPayout,
-  RacePayoutSummary,
+  RaceEntry,
+  RacePurseSummary,
 } from '../../types/owner.types';
 
 const formatCurrency = (value: number) =>
@@ -17,11 +19,6 @@ const formatDate = (value: string | null) =>
 
 const errorMessage = (error: unknown, fallback: string) =>
   error instanceof Error && error.message ? error.message : fallback;
-
-const isForbidden = (error: unknown) => {
-  const message = errorMessage(error, '').toLowerCase();
-  return message.includes('403') || message.includes('forbidden') || message.includes('không có quyền');
-};
 
 const StatusBadge = ({ status }: { status: string }) => {
   const normalized = status.toLowerCase();
@@ -71,7 +68,9 @@ export default function OwnerEarningsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [raceId, setRaceId] = useState('');
-  const [racePayout, setRacePayout] = useState<RacePayoutSummary | null>(null);
+  const [registeredRaces, setRegisteredRaces] = useState<RaceEntry['race'][]>([]);
+  const [racesLoading, setRacesLoading] = useState(true);
+  const [racePayout, setRacePayout] = useState<RacePurseSummary | null>(null);
   const [raceLoading, setRaceLoading] = useState(false);
   const [raceError, setRaceError] = useState<string | null>(null);
 
@@ -91,6 +90,25 @@ export default function OwnerEarningsPage() {
     void loadEarnings();
   }, [loadEarnings]);
 
+  useEffect(() => {
+    const loadRegisteredRaces = async () => {
+      setRacesLoading(true);
+      try {
+        const entries = await getMyRaceEntries(undefined, undefined, 1, 100);
+        const uniqueRaces = Array.from(
+          new Map(entries.map((entry) => [entry.race.raceId, entry.race])).values()
+        );
+        setRegisteredRaces(uniqueRaces);
+      } catch {
+        setRegisteredRaces([]);
+      } finally {
+        setRacesLoading(false);
+      }
+    };
+
+    void loadRegisteredRaces();
+  }, []);
+
   const loadRacePayout = async () => {
     const normalizedRaceId = Number(raceId);
     if (!Number.isInteger(normalizedRaceId) || normalizedRaceId <= 0) {
@@ -101,11 +119,9 @@ export default function OwnerEarningsPage() {
     setRaceError(null);
     setRacePayout(null);
     try {
-      setRacePayout(await getRacePayouts(normalizedRaceId));
+      setRacePayout(await getRacePurseSummary(normalizedRaceId));
     } catch (loadError) {
-      setRaceError(isForbidden(loadError)
-        ? 'Bạn không có quyền xem chi tiết tiền thưởng của cuộc đua này.'
-        : errorMessage(loadError, 'Không tải được chi tiết tiền thưởng của cuộc đua.'));
+      setRaceError(errorMessage(loadError, 'Không tải được chi tiết tiền thưởng của cuộc đua.'));
     } finally {
       setRaceLoading(false);
     }
@@ -161,24 +177,40 @@ export default function OwnerEarningsPage() {
 
       <section className="rounded-3xl border border-slate-200 bg-white p-6">
         <h2 className="text-lg font-black text-slate-950">Chi tiết tiền thưởng theo cuộc đua</h2>
-        <p className="mt-1 text-sm text-slate-500">Nhập mã cuộc đua khi bạn cần xem bảng phân bổ chi tiết.</p>
+        <p className="mt-1 text-sm text-slate-500">Chọn một cuộc đua mà ngựa của bạn đã đăng ký tham gia.</p>
         <div className="mt-4 flex max-w-md gap-3">
-          <input type="number" min="1" value={raceId} onChange={(event) => setRaceId(event.target.value)} placeholder="Mã cuộc đua" className="min-w-0 flex-1 rounded-xl border border-slate-300 px-4 py-2.5 text-sm outline-none focus:border-blue-500" />
-          <button type="button" disabled={raceLoading} onClick={() => void loadRacePayout()} className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60">
+          <select value={raceId} onChange={(event) => { setRaceId(event.target.value); setRaceError(null); setRacePayout(null); }} disabled={racesLoading} className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm outline-none focus:border-blue-500 disabled:bg-slate-50">
+            <option value="">{racesLoading ? 'Đang tải cuộc đua...' : 'Chọn cuộc đua'}</option>
+            {registeredRaces.map((race) => (
+              <option key={race.raceId} value={race.raceId}>
+                {race.tournamentName} · Race #{race.raceNumber}
+              </option>
+            ))}
+          </select>
+          <button type="button" disabled={raceLoading || !raceId} onClick={() => void loadRacePayout()} className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60">
             {raceLoading ? 'Đang tải...' : 'Xem chi tiết'}
           </button>
         </div>
+        {!racesLoading && registeredRaces.length === 0 && (
+          <p className="mt-3 text-sm text-slate-500">Bạn chưa có cuộc đua nào đã đăng ký.</p>
+        )}
         {raceError && <p className="mt-3 text-sm text-amber-700">{raceError}</p>}
         {racePayout && (
           <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+            {racePayout.payoutStatus === 'NotOfficial' && (
+              <p className="border-b border-blue-100 bg-blue-50 px-5 py-3 text-sm text-blue-700">
+                Cuộc đua chưa hoàn thành nên chưa phát sinh tiền thưởng.
+              </p>
+            )}
             <div className="grid gap-4 bg-slate-50 p-5 sm:grid-cols-2 lg:grid-cols-3">
               <div><p className="text-xs text-slate-500">Giải đấu</p><p className="mt-1 font-bold">{racePayout.tournamentName}</p></div>
               <div><p className="text-xs text-slate-500">Vòng đấu</p><p className="mt-1 font-bold">{racePayout.roundName}</p></div>
               <div><p className="text-xs text-slate-500">Race number</p><p className="mt-1 font-bold">{racePayout.raceNumber}</p></div>
-              <div><p className="text-xs text-slate-500">Trạng thái race</p><p className="mt-1 font-bold">{racePayout.raceStatus}</p></div>
-              <div><p className="text-xs text-slate-500">Tổng quỹ thưởng</p><p className="mt-1 font-bold">{formatCurrency(racePayout.purseAmount)}</p></div>
-              <div><p className="text-xs text-slate-500">Tổng đã phân bổ</p><p className="mt-1 font-bold">{formatCurrency(racePayout.totalAllocated)}</p></div>
-              <div><p className="text-xs text-slate-500">Phần còn lại</p><p className="mt-1 font-bold">{formatCurrency(racePayout.remainderAmount)}</p></div>
+              <div><p className="text-xs text-slate-500">Trạng thái cuộc đua</p><p className="mt-1 font-bold">{racePayout.resultStatus}</p></div>
+              <div><p className="text-xs text-slate-500">Quỹ cuộc đua</p><p className="mt-1 font-bold">{formatCurrency(racePayout.allocatedFund)}</p></div>
+              <div><p className="text-xs text-slate-500">Đã thanh toán</p><p className="mt-1 font-bold">{formatCurrency(racePayout.paidAmount)}</p></div>
+              <div><p className="text-xs text-slate-500">Chờ thanh toán</p><p className="mt-1 font-bold">{formatCurrency(racePayout.pendingAmount)}</p></div>
+              <div><p className="text-xs text-slate-500">Chưa phân bổ</p><p className="mt-1 font-bold">{formatCurrency(racePayout.remainingAmount)}</p></div>
             </div>
             <PayoutTable payouts={racePayout.payouts ?? []} emptyText="Cuộc đua chưa có khoản thưởng nào." />
           </div>
