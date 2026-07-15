@@ -61,7 +61,7 @@
   text-align: left;
   background: #fff;
   border: 1px solid #e5e7eb;
-  border-radius: 14px;
+  border-radius: 3px;
   padding: 1.1rem 1.25rem;
   cursor: pointer;
   display: flex;
@@ -96,7 +96,7 @@
   background: #fff;
   border: 1px solid #e5e7eb;
   border-left: 4px solid #2563eb;
-  border-radius: 10px;
+  border-radius: 3px;
   padding: 1rem 1.25rem;
   font-size: 0.86rem;
   color: #333;
@@ -144,7 +144,7 @@
   border: 1px solid #d1d5db;
   color: #333;
   padding: 0.4rem 0.8rem;
-  border-radius: 6px;
+  border-radius: 3px;
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
@@ -161,7 +161,7 @@
 /* ─── States ─── */
 .errorBox {
   padding: 0.75rem 1rem;
-  border-radius: 8px;
+  border-radius: 3px;
   background: #fef2f2;
   border: 1px solid #fecaca;
   color: #dc2626;
@@ -187,7 +187,7 @@
   [class*="tableWrap"] {
     background: #fff;
     border-color: #e5e7eb;
-    border-radius: 12px;
+    border-radius: 3px;
   }
 
   :global(thead) {

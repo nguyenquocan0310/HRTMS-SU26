@@ -18,7 +18,7 @@
 .infoCard {
   background: #fff;
   border: 1px solid #e5e7eb;
-  border-radius: 14px;
+  border-radius: 2px;
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
@@ -38,7 +38,7 @@
 .roleCard {
   background: #fff;
   border: 1px solid #e5e7eb;
-  border-radius: 14px;
+  border-radius: 2px;
   overflow: hidden;
   min-height: 120px;
 }
@@ -63,7 +63,7 @@
 /* ─── Security ─── */
 .secGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
 .secCard {
-  background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 2px;
   padding: 1.25rem; font-size: 0.82rem; color: #555; line-height: 1.6;
   code { background: #f3f4f6; padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.78rem; color: #333; }
 }

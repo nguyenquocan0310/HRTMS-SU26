@@ -85,7 +85,6 @@ const AdminDashboard = () => {
         <div>
           <span className={styles.eyebrow}>SYSTEM OVERVIEW</span>
           <h1 className={styles.heading}>Admin Dashboard</h1>
-          <p className={styles.subtext}>Monitor approvals, tournaments and operational audit activity.</p>
         </div>
         <div className={styles.headerActions}>
           <Link to="/admin/approval-center" className={styles.btnOutline}>Review applicants</Link>

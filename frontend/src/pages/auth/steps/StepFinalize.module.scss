@@ -21,7 +21,7 @@
 .summaryBox {
   background: #15151A;
   border: 1px solid #2a2a2a;
-  border-radius: 10px;
+  border-radius: 3px;
   padding: 1.25rem 1.5rem;
   max-width: 500px;
   margin-bottom: 2rem;
@@ -39,7 +39,7 @@
   color: #fff;
   border: none;
   padding: 0.8rem 2.5rem;
-  border-radius: 8px;
+  border-radius: 3px;
   font-weight: 700;
   font-size: 1rem;
   cursor: pointer;
@@ -61,7 +61,7 @@
   padding: 3rem 2rem;
   background: #15151A;
   border: 1px solid #2a2a2a;
-  border-radius: 16px;
+  border-radius: 4px;
   max-width: 500px;
   width: 100%;
   gap: 1rem;
@@ -96,7 +96,7 @@
   color: #fff;
   border: none;
   padding: 0.7rem 2rem;
-  border-radius: 8px;
+  border-radius: 3px;
   font-weight: 600;
   font-size: 0.9rem;
   cursor: pointer;
@@ -115,5 +115,5 @@
   color: #ff6b6b;
   font-size: 0.85rem;
   padding: 0.75rem 1rem;
-  border-radius: 8px;
+  border-radius: 3px;
 }
