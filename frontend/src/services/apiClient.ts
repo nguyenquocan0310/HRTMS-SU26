@@ -11,6 +11,7 @@ export interface ApiErrorResponse {
   // (vd MinLength, Required trên FamilyDeclarationItemDto), khác với format
   // {success,message} tùy chỉnh của tầng business logic.
   title?: string;
+  detail?: string;
   errors?: Record<string, string[]>;
 }
 
@@ -71,7 +72,7 @@ let errorBody: ApiErrorResponse | null = null;
       }
     }
 
-    throw new Error(errorBody?.title ?? `API error: ${response.status}`);
+    throw new Error(errorBody?.detail ?? errorBody?.title ?? `API error: ${response.status}`);
   }
 
   // Một số API trả về 204 No Content

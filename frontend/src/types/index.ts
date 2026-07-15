@@ -46,3 +46,4 @@ export interface ApiError {
 
 export * from './jockey.types'
 export * from './owner.types'
+export * from './protest.types'
