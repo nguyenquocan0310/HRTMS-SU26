@@ -1,23 +1,12 @@
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
-import { apiFetch } from '../../services/apiClient';
+import { useCallback, useEffect, useState } from 'react';
 import { logout } from '../../services/authService';
+import { getMyAccountProfile } from '../../services/accountService';
 import useAuthStore from '../../store/authStore';
+import NotificationBell from '../../components/notifications/NotificationBell';
+import type { JockeyRoleProfile, UserProfile } from '../../types/account.types';
 
-interface JockeyProfile {
-  userId: number;
-  username: string;
-  fullName: string;
-  email: string;
-  role: string;
-  status: string;
-}
-
-interface ProfileApiResponse {
-  success: boolean;
-  message: string;
-  data: JockeyProfile | null;
-}
+type JockeyAccountProfile = UserProfile<JockeyRoleProfile>;
 
 const navItems = [
   { to: '/jockey', label: 'Tổng quan', end: true },
@@ -27,26 +16,32 @@ const navItems = [
   { to: '/jockey/history', label: 'Lịch sử thi đấu', end: false },
   { to: '/jockey/profile-declaration', label: 'Thông tin kỵ sĩ', end: false },
   { to: '/jockey/protest', label: 'Khiếu nại giải đấu', end: false },
+  { to: '/jockey/notifications', label: 'Thông báo', end: false },
 ];
 
 export default function JockeyLayout() {
-  const [profile, setProfile] = useState<JockeyProfile | null>(null);
+  const [profile, setProfile] = useState<JockeyAccountProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const clearAuth = useAuthStore((s) => s.clearAuth);
 
-  useEffect(() => {
-    apiFetch<ProfileApiResponse>('/auth/profile')
-      .then((res) => {
-        if (res.success && res.data) setProfile(res.data);
-      })
+  const loadProfile = useCallback(() => {
+    return getMyAccountProfile<JockeyRoleProfile>()
+      .then(setProfile)
       .catch(() => {
         // Sidebar still renders navigation if profile cannot be loaded.
       })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    void loadProfile();
+    const handleProfileChanged = () => { void loadProfile(); };
+    window.addEventListener('hrtms:profile-changed', handleProfileChanged);
+    return () => window.removeEventListener('hrtms:profile-changed', handleProfileChanged);
+  }, [loadProfile]);
 
   const currentNav = navItems.find((item) => {
     if (item.end) return location.pathname === item.to;
@@ -140,10 +135,13 @@ export default function JockeyLayout() {
       </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-2 flex-shrink-0">
-          <span className="text-xs text-gray-400">Kỵ sĩ</span>
-          <span className="text-xs text-gray-300">/</span>
-          <span className="text-xs font-semibold text-gray-700">{pageTitle}</span>
+        <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between gap-4 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400">Kỵ sĩ</span>
+            <span className="text-xs text-gray-300">/</span>
+            <span className="text-xs font-semibold text-gray-700">{pageTitle}</span>
+          </div>
+          <NotificationBell notificationsPath="/jockey/notifications" />
         </header>
 
         <main className="flex-1 overflow-auto p-6">

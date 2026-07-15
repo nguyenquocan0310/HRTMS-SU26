@@ -2,7 +2,6 @@ import { apiFetch } from './apiClient'
 import type {
   ApiResponse,
   ChangePasswordPayload,
-  OwnerRoleProfile,
   UpdateBasicInfoPayload,
   UserProfile,
 } from '../types/account.types'
@@ -29,8 +28,8 @@ const assertMutationSuccess = (
   onSuccess?.(response.message || fallbackMessage)
 }
 
-export const getMyAccountProfile = async (): Promise<UserProfile<OwnerRoleProfile>> => {
-  const response = await apiFetch<ApiResponse<UserProfile<OwnerRoleProfile>>>('/auth/profile')
+export const getMyAccountProfile = async <TProfile>(): Promise<UserProfile<TProfile>> => {
+  const response = await apiFetch<ApiResponse<UserProfile<TProfile>>>('/auth/profile')
   return assertSuccess(response, 'Không tải được thông tin tài khoản.')
 }
 

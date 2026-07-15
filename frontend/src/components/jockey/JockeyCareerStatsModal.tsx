@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getJockeyCareerStats } from '../../services/jockeyService';
-import type { ApiError } from '../../services/apiClient';
 import type { JockeyCareerStats } from '../../types/jockey.types';
 
 interface JockeyCareerStatsModalProps {
@@ -21,8 +20,6 @@ const formatRate = (value: number | null) =>
   value == null ? '—' : `${numberFormatter.format(value)}%`;
 
 const getErrorMessage = (error: unknown) => {
-  const apiError = error as ApiError;
-  if (apiError?.status === 404) return 'Không tìm thấy hồ sơ Jockey';
   return error instanceof Error ? error.message : 'Không thể tải thành tích Jockey.';
 };
 

@@ -19,6 +19,25 @@ export interface OwnerRoleProfile {
   hasIdentity: boolean
 }
 
+export interface CertificateMetadata {
+  certificateId: number
+  fileName: string
+  contentType: string | null
+  fileSizeBytes: number
+  uploadedAt: string
+  downloadUrl: string
+}
+
+export interface JockeyRoleProfile {
+  licenseCertificate: string
+  experienceYears: number
+  selfDeclaredWeight: number
+  bloodType: string | null
+  healthStatus: string | null
+  status: string
+  certificate: CertificateMetadata | null
+}
+
 export interface UpdateBasicInfoPayload {
   fullName: string
   email: string

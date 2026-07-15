@@ -14,10 +14,23 @@ export interface JockeyProfile {
   licenseCertificate: string;
   experienceYears: number;
   selfDeclaredWeight: number;
-  bloodType: string;
-  healthStatus: string;
+  bloodType: string | null;
+  healthStatus: string | null;
   status: 'Active' | 'Suspended' | 'Retired';
   createdAt: string;
+}
+
+export interface JockeyCareerStats {
+  jockeyId: number;
+  fullName: string;
+  totalRaces: number;
+  wins: number;
+  podiums: number;
+  winRate: number | null;
+  podiumRate: number | null;
+  averageFinishPosition: number | null;
+  totalPoints: number;
+  totalEarnings: number;
 }
 
 /**

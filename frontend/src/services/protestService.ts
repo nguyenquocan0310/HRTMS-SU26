@@ -9,6 +9,24 @@ import type {
 
 type MessageHandler = (message: string) => void;
 
+export interface ProtestRaceEntry {
+  raceEntryId: number;
+  postPosition: number | null;
+  horseName: string;
+  jockeyName: string;
+  ownerName: string;
+}
+
+interface RaceEntriesEnvelope {
+  entries: Array<{
+    raceEntryId: number;
+    postPosition: number | null;
+    horseName: string;
+    jockeyName: string;
+    ownerName: string;
+  }>;
+}
+
 const positiveId = (value: string | number, name: string): number => {
   const id = typeof value === 'number' ? value : Number(value);
   if (!Number.isInteger(id) || id <= 0) {
@@ -54,6 +72,21 @@ export const getProtestsByRace = async (
   const id = positiveId(raceId, 'raceId');
   const response = await apiFetch<ApiResponse<Protest[]>>(`/protests/races/${id}`);
   return unwrap(response, onMessage);
+};
+
+export const getRaceEntriesForProtest = async (
+  raceId: string | number,
+): Promise<ProtestRaceEntry[]> => {
+  const id = positiveId(raceId, 'raceId');
+  const response = await apiFetch<ApiResponse<RaceEntriesEnvelope>>(`/races/${id}/entries`);
+  const data = unwrap(response);
+  return (data.entries ?? []).map((entry) => ({
+    raceEntryId: entry.raceEntryId,
+    postPosition: entry.postPosition,
+    horseName: entry.horseName,
+    jockeyName: entry.jockeyName,
+    ownerName: entry.ownerName,
+  }));
 };
 
 export const ruleProtest = async (
