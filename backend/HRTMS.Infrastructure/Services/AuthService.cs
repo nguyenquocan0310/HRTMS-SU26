@@ -182,6 +182,17 @@ public class AuthService : IAuthService
         if (await _context.Users.AnyAsync(u => u.Email == normalizedEmail || u.Username == dto.Username))
             return ApiResponse<int>.Fail("Email hoặc Username đã tồn tại.");
 
+        // Chặn trùng lặp số điện thoại — chỉ áp dụng khi có nhập SĐT
+        // (Spectator có thể không có PhoneNumber).
+        if (!string.IsNullOrEmpty(normalizedPhone)
+            && await _context.Users.AnyAsync(u => u.PhoneNumber == normalizedPhone))
+            return ApiResponse<int>.Fail("Số điện thoại đã được đăng ký với tài khoản khác.");
+
+        // Kiểm tra email có thật (domain tồn tại, có khả năng nhận thư) —
+        // [EmailAddress] chỉ check được format, không check domain có tồn tại hay không.
+        if (!await IsEmailDomainValidAsync(normalizedEmail))
+            return ApiResponse<int>.Fail("Email không hợp lệ hoặc domain email không tồn tại.");
+
         if (RolesRequireFrdAtRegister.Contains(dto.Role) && dto.FamilyDeclarations == null)
             return ApiResponse<int>.Fail(
                 $"Role {dto.Role} bắt buộc phải khai báo mục người thân (gửi mảng rỗng nếu không có người thân nào trong ngành).");
@@ -525,6 +536,131 @@ public class AuthService : IAuthService
             return "Số CCCD không hợp lệ. CCCD phải gồm đúng 12 chữ số.";
 
         return null;
+    }
+
+    /// <summary>
+    /// Kiểm tra email "có thật" ở mức domain: domain phải tồn tại và
+    /// resolve được (có MX hoặc ít nhất A/AAAA record) — nếu không thì
+    /// gần như chắc chắn email không thể nhận thư (domain gõ sai, domain
+    /// không tồn tại, v.v.). Đây không phải là gửi email xác thực (OTP/link),
+    /// chỉ là bước lọc sớm để tránh rác domain rõ ràng không hợp lệ.
+    /// Lỗi mạng/DNS tạm thời sẽ được coi là hợp lệ (fail-open) để không
+    /// chặn nhầm người dùng hợp lệ khi resolver DNS gặp sự cố.
+    /// </summary>
+    private static async Task<bool> IsEmailDomainValidAsync(string email)
+    {
+        var atIndex = email.LastIndexOf('@');
+        if (atIndex < 0 || atIndex == email.Length - 1)
+            return false;
+
+        var domain = email[(atIndex + 1)..].Trim();
+        if (string.IsNullOrWhiteSpace(domain) || !domain.Contains('.'))
+            return false;
+
+        try
+        {
+            var mxRecords = await ResolveMxAsync(domain);
+            if (mxRecords.Count > 0)
+                return true;
+
+            var addresses = await System.Net.Dns.GetHostAddressesAsync(domain);
+            return addresses.Length > 0;
+        }
+        catch (System.Net.Sockets.SocketException)
+        {
+            return false;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Truy vấn MX record thủ công qua UDP tới DNS resolver công cộng —
+    /// .NET BCL không có API MX lookup sẵn (Dns.GetHostEntry chỉ resolve
+    /// A/AAAA). Trả về danh sách rỗng nếu không có MX record hoặc query lỗi.
+    /// </summary>
+    private static async Task<List<string>> ResolveMxAsync(string domain)
+    {
+        var result = new List<string>();
+        try
+        {
+            using var client = new System.Net.Sockets.UdpClient();
+            var query = BuildMxQuery(domain);
+            var endpoint = new System.Net.IPEndPoint(System.Net.IPAddress.Parse("8.8.8.8"), 53);
+            await client.SendAsync(query, query.Length, endpoint);
+
+            var receiveTask = client.ReceiveAsync();
+            var completed = await Task.WhenAny(receiveTask, Task.Delay(2000));
+            if (completed != receiveTask)
+                return result;
+
+            result = ParseMxResponse(receiveTask.Result.Buffer);
+        }
+        catch
+        {
+            // UDP/53 bị chặn hoặc môi trường sandbox — caller sẽ fallback A/AAAA.
+        }
+        return result;
+    }
+
+    private static byte[] BuildMxQuery(string domain)
+    {
+        var labels = domain.Split('.');
+        using var ms = new MemoryStream();
+        ms.Write([0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        foreach (var label in labels)
+        {
+            var bytes = Encoding.ASCII.GetBytes(label);
+            ms.WriteByte((byte)bytes.Length);
+            ms.Write(bytes);
+        }
+        ms.WriteByte(0x00);
+        ms.Write([0x00, 0x0F]); // QTYPE = MX
+        ms.Write([0x00, 0x01]); // QCLASS = IN
+        return ms.ToArray();
+    }
+
+    private static List<string> ParseMxResponse(byte[] data)
+    {
+        var mx = new List<string>();
+        if (data.Length < 12) return mx;
+
+        int ancount = (data[6] << 8) | data[7];
+        int qdcount = (data[4] << 8) | data[5];
+        int pos = 12;
+
+        for (int i = 0; i < qdcount; i++)
+        {
+            pos = SkipName(data, pos);
+            pos += 4;
+        }
+
+        for (int i = 0; i < ancount && pos < data.Length; i++)
+        {
+            pos = SkipName(data, pos);
+            if (pos + 10 > data.Length) break;
+            int type = (data[pos] << 8) | data[pos + 1];
+            int rdlength = (data[pos + 8] << 8) | data[pos + 9];
+            pos += 10;
+            if (type == 15)
+                mx.Add("mx");
+            pos += rdlength;
+        }
+        return mx;
+    }
+
+    private static int SkipName(byte[] data, int pos)
+    {
+        while (pos < data.Length)
+        {
+            int len = data[pos];
+            if (len == 0) { pos++; break; }
+            if ((len & 0xC0) == 0xC0) { pos += 2; break; }
+            pos += len + 1;
+        }
+        return pos;
     }
 
     private (byte[] encrypted, byte[] hash) EncryptIdentity(string cccd)
