@@ -102,16 +102,6 @@ export interface RacePayoutSummary {
   payouts: OwnerPayout[];
 }
 
-export interface EarningsHistoryItem {
-  recipientUserId: number;
-  recipientName: string;
-  role: string;
-  totalEarnings: number;
-  paidAmount: number;
-  unpaidAmount: number;
-  payoutCount: number;
-}
-
 export interface HorseEnrollment {
   enrollmentId: number;
   horseId: number;
