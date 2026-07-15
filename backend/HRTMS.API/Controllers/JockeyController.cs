@@ -211,4 +211,54 @@ public class JockeyController : ControllerBase
             });
         }
     }
+    // Jockey tu xem career cua chinh minh (lay jockeyId tu JWT, khong nhan tu route)
+    [HttpGet("stats/my")]
+    [Authorize(Roles = "Jockey")]
+    public async Task<IActionResult> GetMyCareerStats()
+    {
+        var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (!int.TryParse(userIdValue, out var jockeyId))
+        {
+            return Unauthorized(new
+            {
+                error = "UNAUTHORIZED",
+                message = "Invalid or missing user identity."
+            });
+        }
+
+        try
+        {
+            var result = await _jockeyService.GetCareerStatsAsync(jockeyId);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(new
+            {
+                error = "JOCKEY_NOT_FOUND",
+                message = "Jockey profile not found."
+            });
+        }
+    }
+
+    // Xem career cua 1 Jockey bat ky — Owner dung khi chon Jockey de ghep cap,
+    // Admin/other roles cung xem duoc. Yeu cau da dang nhap (khong AllowAnonymous).
+    [HttpGet("{jockeyId:int}/stats")]
+    public async Task<IActionResult> GetJockeyCareerStats(int jockeyId)
+    {
+        try
+        {
+            var result = await _jockeyService.GetCareerStatsAsync(jockeyId);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(new
+            {
+                error = "JOCKEY_NOT_FOUND",
+                message = "Jockey profile not found."
+            });
+        }
+    }
 }
