@@ -1,27 +1,12 @@
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
-import { apiFetch } from '../../services/apiClient'
+import { useCallback, useState, useEffect } from 'react'
+import { getMyAccountProfile } from '../../services/accountService'
 import { logout } from '../../services/authService'
 import useAuthStore from '../../store/authStore'
+import type { OwnerRoleProfile, UserProfile } from '../../types/account.types'
 
-interface OwnerProfile {
-  userId: number
-  username: string
-  fullName: string
-  email: string
-  role: string
-  status: string
-  profile: {
-    phoneNumber: string
-    identityNumber: string
-  }
-}
 
-interface ProfileApiResponse {
-  success: boolean
-  message: string
-  data: OwnerProfile | null
-}
+type OwnerProfile = UserProfile<OwnerRoleProfile>
 
 const navGroups = [
   {
@@ -30,6 +15,7 @@ const navGroups = [
       { to: '/owner', label: 'Tổng quan', end: true },
       { to: '/owner/horses', label: 'Ngựa của tôi', end: false },
       { to: '/owner/horses/register', label: 'Đăng ký hồ sơ ngựa', end: false },
+      { to: '/owner/profile', label: 'Hồ sơ tài khoản', end: false },
     ],
   },
   {
@@ -85,16 +71,25 @@ export default function OwnerLayout() {
   const navigate = useNavigate()
   const clearAuth = useAuthStore((s) => s.clearAuth)
 
-  useEffect(() => {
-    apiFetch<ProfileApiResponse>('/auth/profile')
-      .then((res) => {
-        if (res.success && res.data) setProfile(res.data)
-      })
-      .catch(() => {
-        // Sidebar still renders navigation if profile loading fails.
-      })
-      .finally(() => setLoading(false))
+  const loadProfile = useCallback(async () => {
+    try {
+      setProfile(await getMyAccountProfile())
+    } catch {
+      // Sidebar still renders navigation if profile loading fails.
+    } finally {
+      setLoading(false)
+    }
   }, [])
+
+  useEffect(() => {
+    void loadProfile()
+
+    const handleProfileChanged = () => {
+      void loadProfile()
+    }
+    window.addEventListener('hrtms:profile-changed', handleProfileChanged)
+    return () => window.removeEventListener('hrtms:profile-changed', handleProfileChanged)
+  }, [loadProfile])
 
   useEffect(() => {
     ensureEggStyle()

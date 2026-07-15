@@ -22,6 +22,7 @@ import AssignOfficials from './pages/admin/AssignOfficials'
 import MyHorses from './pages/owner/MyHorses'
 import OwnerDashboard from './pages/owner/OwnerDashboard'
 import OwnerLayout from './pages/owner/OwnerLayout'
+import OwnerProfile from './pages/owner/OwnerProfile'
 import RegisterHorse from './pages/owner/RegisterHorse'
 import HorseDetail from './pages/owner/HorseDetail'
 import ScheduleConfirm from './pages/owner/ScheduleConfirm'
@@ -128,6 +129,8 @@ export default function App() {
           <Route path="schedule-confirm" element={<Navigate to="/owner/race-entries" replace />} />
           <Route path="jockey-invite" element={<JockeyInvite />} />
           <Route path="protest" element={<Protest userRole="HorseOwner" />} />
+          <Route path="profile" element={<OwnerProfile />} />
+
         </Route>
 
         {/* ── Cấu trúc Route của KỴ SĨ (Jockey) ── */}
@@ -202,7 +205,6 @@ export default function App() {
           <Route path="tournament-hub" element={<TournamentHub />} />
           <Route path="leaderboard" element={<Leaderboard />} />
           <Route path="live-race" element={<LiveRaceView />} />
-          <Route path="notifications" element={<NotificationCenter />} />
           <Route path="my-account" element={<MyAccount />} />
           <Route path="assign-officials" element={<AssignOfficials />} />
         </Route>
