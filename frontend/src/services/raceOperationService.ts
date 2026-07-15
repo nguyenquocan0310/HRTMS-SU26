@@ -180,3 +180,39 @@ export const getAdminPairings = (
     `/admin/pairings?${params.toString()}`
   ).then((res) => res.items ?? []);
 };
+
+export interface UnofficialRace {
+  raceId: number;
+  tournamentId: number;
+  tournamentName?: string;
+  roundId?: number;
+  roundName?: string;
+  raceNumber: number;
+  scheduledTime: string;
+  status: string;
+}
+
+interface UnofficialRaceApiResponse {
+  success: boolean;
+  message?: string;
+  data: UnofficialRace[] | null;
+}
+
+/**
+ * GET /api/races/unofficial
+ * Lấy danh sách tất cả race đang ở trạng thái Unofficial.
+ */
+export const getUnofficialRaces = (): Promise<UnofficialRace[]> =>
+  apiFetch<UnofficialRaceApiResponse>('/races/unofficial')
+    .then((res) => res.data ?? []);
+
+/**
+ * POST /api/races/{raceId}/declare-official
+ * Admin công bố kết quả chính thức của một Race.
+ */
+export const declareRaceOfficial = (
+  raceId: number
+): Promise<void> =>
+  apiFetch(`/races/${raceId}/declare-official`, {
+    method: 'POST',
+  }).then(() => undefined);
