@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import type { Horse } from '../../types/owner.types';
-import type { HorseEnrollmentResponse } from '../../services/ownerService';
-import { getHorseById, getHorseEnrollments } from '../../services/ownerService';
+import type { Horse, HorseEnrollment } from '../../types/owner.types';
+import { deleteHorseEnrollment, getHorseById, getHorseEnrollments } from '../../services/ownerService';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -73,13 +72,19 @@ const getProfileBadge = (status: string | undefined): BadgeProps => {
   }
 };
 
-const getEnrollmentBadge = (enrollment: HorseEnrollmentResponse): BadgeProps => {
-  switch (enrollment.adminApprovalStatus) {
-    case 'Approved': return { label: 'Trong giải: Đã duyệt',       variant: 'green'  };
-    case 'Rejected': return { label: 'Trong giải: Bị từ chối',      variant: 'red'    };
-    case 'Pending':
-    default:         return { label: 'Trong giải: Chờ Admin duyệt', variant: 'yellow' };
-  }
+const getEnrollmentBadge = (enrollment: HorseEnrollment): BadgeProps => {
+  return {
+    label: `Trong giải: ${enrollment.adminApprovalStatus}`,
+    variant: getStatusVariant(enrollment.adminApprovalStatus),
+  };
+};
+
+const getStatusVariant = (status: string): BadgeVariant => {
+  const normalized = status.toLowerCase();
+  if (['approved', 'eligible', 'autoeligible', 'active', 'confirmed'].includes(normalized)) return 'green';
+  if (['rejected', 'auto-rejected', 'autorejected', 'cancelled', 'withdrawn'].includes(normalized)) return 'red';
+  if (['pending', 'manualreview', 'underreview'].includes(normalized)) return 'yellow';
+  return 'gray';
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -92,8 +97,23 @@ export default function HorseDetail() {
   const [error, setError] = useState<string | null>(null);
 
   // Enrollment state
-  const [enrollments, setEnrollments] = useState<HorseEnrollmentResponse[] | null>(null);
+  const [enrollments, setEnrollments] = useState<HorseEnrollment[]>([]);
   const [enrollmentLoading, setEnrollmentLoading] = useState<boolean>(false);
+  const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
+  const [withdrawingId, setWithdrawingId] = useState<number | null>(null);
+  const [withdrawMessage, setWithdrawMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const loadEnrollments = async (horseId: number) => {
+    setEnrollmentLoading(true);
+    setEnrollmentError(null);
+    try {
+      setEnrollments(await getHorseEnrollments(horseId));
+    } catch (loadError) {
+      setEnrollmentError(loadError instanceof Error ? loadError.message : 'Không tải được lịch sử đăng ký giải.');
+    } finally {
+      setEnrollmentLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchHorse = async () => {
@@ -106,11 +126,7 @@ export default function HorseDetail() {
           const data = await getHorseById(horseIdNum);
           setHorse(data);
           // Fetch enrollments sau khi có horse (không block render)
-          setEnrollmentLoading(true);
-          getHorseEnrollments(horseIdNum).then((result) => {
-            setEnrollments(result);
-            setEnrollmentLoading(false);
-          });
+          void loadEnrollments(horseIdNum);
         } else {
           setError('Không tìm thấy thông tin ngựa');
         }
@@ -123,6 +139,27 @@ export default function HorseDetail() {
     };
     fetchHorse();
   }, [id]);
+
+  const handleWithdraw = async (enrollment: HorseEnrollment) => {
+    if (withdrawingId !== null) return;
+    if (!window.confirm('Bạn có chắc muốn rút hồ sơ ngựa khỏi giải đấu này không?')) return;
+
+    setWithdrawingId(enrollment.enrollmentId);
+    setWithdrawMessage(null);
+    try {
+      const result = await deleteHorseEnrollment(enrollment.horseId, enrollment.enrollmentId);
+      setWithdrawMessage({ type: 'success', text: result.message });
+      await loadEnrollments(enrollment.horseId);
+      window.dispatchEvent(new CustomEvent('owner-enrollments-changed'));
+    } catch (withdrawError) {
+      setWithdrawMessage({
+        type: 'error',
+        text: withdrawError instanceof Error ? withdrawError.message : 'Rút hồ sơ thất bại.',
+      });
+    } finally {
+      setWithdrawingId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -206,7 +243,7 @@ export default function HorseDetail() {
           <Badge {...profileBadge} />
           {enrollmentLoading ? (
             <Badge label="Đang tải trạng thái giải..." variant="gray" />
-          ) : enrollments === null ? (
+          ) : enrollmentError ? (
             <Badge label="Không tải được trạng thái giải" variant="gray" />
           ) : latestEnrollment ? (
             <Badge {...getEnrollmentBadge(latestEnrollment)} />
@@ -265,6 +302,85 @@ export default function HorseDetail() {
           ))}
         </div>
       </div>
+
+      {/* Enrollment history */}
+      <section className="bg-white border border-slate-200 rounded-3xl overflow-hidden mb-5">
+        <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-slate-100 bg-slate-50">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Lịch sử đăng ký giải</p>
+          {enrollmentError && id && (
+            <button
+              type="button"
+              onClick={() => void loadEnrollments(Number(id))}
+              className="text-xs font-bold text-blue-700 hover:text-blue-800"
+            >
+              Thử lại
+            </button>
+          )}
+        </div>
+
+        {withdrawMessage && (
+          <div className={`mx-5 mt-5 rounded-xl border px-4 py-3 text-sm ${
+            withdrawMessage.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-red-200 bg-red-50 text-red-700'
+          }`}>
+            {withdrawMessage.text}
+          </div>
+        )}
+
+        {enrollmentLoading ? (
+          <p className="px-6 py-10 text-center text-sm text-slate-500">Đang tải lịch sử đăng ký...</p>
+        ) : enrollmentError ? (
+          <p className="px-6 py-10 text-center text-sm text-red-600">{enrollmentError}</p>
+        ) : enrollments.length === 0 ? (
+          <p className="px-6 py-10 text-center text-sm text-slate-500">Ngựa chưa từng đăng ký giải đấu nào.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-white text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-5 py-3">Giải đấu</th>
+                  <th className="px-5 py-3">Trạng thái</th>
+                  <th className="px-5 py-3">Sàng lọc</th>
+                  <th className="px-5 py-3">Duyệt Admin</th>
+                  <th className="px-5 py-3">Ngày đăng ký</th>
+                  <th className="px-5 py-3">Hành động</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {enrollments.map((enrollment) => (
+                  <tr key={enrollment.enrollmentId} className="align-top">
+                    <td className="px-5 py-4">
+                      <p className="font-semibold text-slate-900">{enrollment.tournamentName || `#${enrollment.tournamentId}`}</p>
+                      {(enrollment.screeningReason || enrollment.rejectionReason) && (
+                        <p className="mt-2 max-w-xs text-xs leading-5 text-slate-500">
+                          {enrollment.screeningReason || enrollment.rejectionReason}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-5 py-4"><Badge label={enrollment.status} variant={getStatusVariant(enrollment.status)} /></td>
+                    <td className="px-5 py-4"><Badge label={enrollment.screeningStatus} variant={getStatusVariant(enrollment.screeningStatus)} /></td>
+                    <td className="px-5 py-4"><Badge label={enrollment.adminApprovalStatus} variant={getStatusVariant(enrollment.adminApprovalStatus)} /></td>
+                    <td className="px-5 py-4 text-slate-600">{new Date(enrollment.createdAt).toLocaleDateString('vi-VN')}</td>
+                    <td className="px-5 py-4">
+                      {enrollment.horseId && enrollment.enrollmentId ? (
+                        <button
+                          type="button"
+                          disabled={withdrawingId !== null}
+                          onClick={() => void handleWithdraw(enrollment)}
+                          className="whitespace-nowrap rounded-full border border-red-200 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {withdrawingId === enrollment.enrollmentId ? 'Đang rút...' : 'Rút hồ sơ'}
+                        </button>
+                      ) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       {/* Actions */}
       <div className="flex gap-3 justify-end">
