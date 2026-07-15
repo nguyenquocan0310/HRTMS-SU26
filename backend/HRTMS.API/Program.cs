@@ -1,5 +1,6 @@
 using HRTMS.API.Extensions;
 using HRTMS.API.Middleware;
+using HRTMS.API.Converters; 
 using HRTMS.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,6 +13,9 @@ builder.Services.AddCorsPolicy(builder.Configuration);
 builder.Services.AddSwaggerServices();
 builder.Services.AddHangfireJobs(builder.Configuration);
 builder.Services.AddControllers();
+
+builder.Services.AddControllers()
+    .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new UtcDateTimeConverter()));
 
 // Token blacklist cache (EC-29).
 // Dev: dùng in-memory cache để KHÔNG phụ thuộc Redis — tránh mỗi request có token
@@ -71,5 +75,8 @@ using (var scope = app.Services.CreateScope())
     {
         System.Console.WriteLine($"--> LỖI KIỂM TRA KẾT NỐI DB: {ex.Message}");
     }
+    
 }
+
+
 app.Run();
