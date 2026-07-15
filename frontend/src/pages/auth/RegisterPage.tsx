@@ -226,6 +226,7 @@ const RegisterPage = () => {
           <StepVerification
             role={formData.role}
             formData={formData}
+            errors={errors}
             onChange={updateFormData}
           />
         );
