@@ -43,6 +43,7 @@ export interface RefereeRaceAssignment {
 
 export interface RefereeRaceEntry {
   raceEntryId: number;
+  jockeyId: number | null;
   raceId: number | null;
   pairingId: number | null;
   postPosition: number | null;
@@ -199,8 +200,11 @@ const normalizeRaceEntry = (item: any): RefereeRaceEntry | null => {
   const raceEntryId = Number(item?.raceEntryId ?? item?.id);
   if (!Number.isFinite(raceEntryId)) return null;
 
+  const rawJockeyId = item?.jockey?.jockeyId ?? item?.jockeyId;
+  const jockeyId = Number(rawJockeyId);
   const normalized: RefereeRaceEntry = {
     raceEntryId,
+    jockeyId: Number.isInteger(jockeyId) && jockeyId > 0 ? jockeyId : null,
     raceId: item?.raceId ?? null,
     pairingId: item?.pairingId ?? null,
     postPosition: item?.postPosition ?? null,

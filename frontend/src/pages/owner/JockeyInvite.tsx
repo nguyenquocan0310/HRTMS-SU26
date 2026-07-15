@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { JockeyInvitation, Horse } from '../../types/owner.types';
 import { cancelPairing, getAvailableJockeys, getMyHorses, getOwnerPairings, inviteJockey, confirmPairing } from '../../services/ownerService';
 import { getMyTournamentParticipations, type ParticipationResponse } from '../../services/tournamentService';
+import JockeyCareerStatsModal from '../../components/jockey/JockeyCareerStatsModal';
 
 const PAIRING_STATUS: Record<string, { label: string; cls: string; dot: string }> = {
   Pending:   { label: 'Chờ xác nhận',          cls: 'bg-yellow-50 text-yellow-700 border-yellow-200', dot: 'bg-yellow-500' },
@@ -51,6 +52,7 @@ export default function JockeyInvite() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [sending, setSending] = useState(false);
   const [activeTab, setActiveTab] = useState<'available' | 'history'>('available');
+  const [careerJockeyId, setCareerJockeyId] = useState<number | null>(null);
   // Track which pairing is being confirmed (shows spinner on that row only)
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -364,6 +366,8 @@ export default function JockeyInvite() {
                 <tbody className="divide-y divide-gray-100">
                   {availableJockeys.map((j) => {
                     const jId = String(j.jockeyId || j.jockeyID || j.id || '');
+                    const statsJockeyId = Number(j.jockeyId);
+                    const canViewStats = Number.isInteger(statsJockeyId) && statsJockeyId > 0;
                     return (
                       <tr key={jId} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3 font-medium text-gray-800">{j.fullName || 'N/A'}</td>
@@ -380,7 +384,18 @@ export default function JockeyInvite() {
                           </span>
                         </td>
                         <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-2">
+                          {canViewStats && (
+                            <button
+                              type="button"
+                              onClick={() => setCareerJockeyId(statsJockeyId)}
+                              className="px-3.5 py-2 text-xs font-bold text-gray-700 border border-gray-200 bg-white hover:bg-gray-50 rounded-full transition-colors"
+                            >
+                              Xem thành tích Jockey
+                            </button>
+                          )}
                           <button
+                            type="button"
                             onClick={() => {
                               setSelectedJockeyId(jId);
                               setJockeyName(j.fullName || '');
@@ -390,6 +405,7 @@ export default function JockeyInvite() {
                           >
                             Mời tham gia
                           </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -705,6 +721,12 @@ export default function JockeyInvite() {
             </div>
           </div>
         </div>
+      )}
+      {careerJockeyId != null && (
+        <JockeyCareerStatsModal
+          jockeyId={careerJockeyId}
+          onClose={() => setCareerJockeyId(null)}
+        />
       )}
     </div>
   );

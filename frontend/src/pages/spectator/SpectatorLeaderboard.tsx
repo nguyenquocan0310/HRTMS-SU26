@@ -7,6 +7,7 @@ import {
   type LeaderboardMode,
 } from '../../services/leaderboardService'
 import { getTournaments, type TournamentResponse } from '../../services/tournamentService'
+import JockeyCareerStatsModal from '../../components/jockey/JockeyCareerStatsModal'
 
 type LeaderboardTab = 'horses' | 'jockeys'
 type LeaderboardEntry = HorseLeaderboardEntry | JockeyLeaderboardEntry
@@ -45,6 +46,7 @@ export default function SpectatorLeaderboard() {
   const [tournamentError, setTournamentError] = useState('')
   const [leaderboardError, setLeaderboardError] = useState('')
   const [retryKey, setRetryKey] = useState(0)
+  const [careerJockeyId, setCareerJockeyId] = useState<number | null>(null)
 
   const loadTournaments = useCallback(async () => {
     try {
@@ -300,7 +302,18 @@ export default function SpectatorLeaderboard() {
                           {rank}
                         </span>
                       </td>
-                      <td className="px-6 py-4 font-bold text-gray-900">{getEntryName(entry, activeTab)}</td>
+                      <td className="px-6 py-4 font-bold text-gray-900">
+                        <p>{getEntryName(entry, activeTab)}</p>
+                        {activeTab === 'jockeys' && Number.isInteger((entry as JockeyLeaderboardEntry).jockeyId) && (entry as JockeyLeaderboardEntry).jockeyId > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setCareerJockeyId((entry as JockeyLeaderboardEntry).jockeyId)}
+                            className="mt-1 text-xs font-bold text-amber-700 hover:text-amber-900 hover:underline"
+                          >
+                            Xem thành tích Jockey
+                          </button>
+                        )}
+                      </td>
                       <td className="px-6 py-4 text-center text-gray-600">{numberFormatter.format(safeNumber(entry.races))}</td>
                       <td className="px-6 py-4 text-center text-gray-600">{numberFormatter.format(safeNumber(entry.wins))}</td>
                       <td className="px-6 py-4 text-center text-gray-600">{numberFormatter.format(winRate * 100)}%</td>
@@ -313,6 +326,12 @@ export default function SpectatorLeaderboard() {
           </div>
         )}
       </section>
+      {careerJockeyId != null && (
+        <JockeyCareerStatsModal
+          jockeyId={careerJockeyId}
+          onClose={() => setCareerJockeyId(null)}
+        />
+      )}
     </div>
   )
 }
