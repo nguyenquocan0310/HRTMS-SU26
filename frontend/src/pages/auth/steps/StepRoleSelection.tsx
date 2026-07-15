@@ -1,4 +1,5 @@
-import { RegRole, ROLE_OPTIONS } from '../../../types/role.types';
+import { ROLE_OPTIONS } from '../../../types/role.types';
+import type { RegRole } from '../../../types/role.types';
 import RoleCard from '../../../components/common/RoleCard';
 import styles from './StepRoleSelection.module.scss';
 

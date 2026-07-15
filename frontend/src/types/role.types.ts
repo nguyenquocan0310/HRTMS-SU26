@@ -1,11 +1,13 @@
 // ─── Registration Roles (Admin excluded — only assignable internally) ─────────
-export enum RegRole {
-  Owner     = 'HorseOwner',
-  Jockey    = 'Jockey',
-  Referee   = 'RaceReferee',
-  Doctor    = 'Doctor',
-  Spectator = 'Spectator',
-}
+export const RegRole = {
+  Owner: 'HorseOwner',
+  Jockey: 'Jockey',
+  Referee: 'RaceReferee',
+  Doctor: 'Doctor',
+  Spectator: 'Spectator',
+} as const;
+
+export type RegRole = typeof RegRole[keyof typeof RegRole];
 
 // Display metadata for each role
 export interface RoleMeta {

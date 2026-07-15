@@ -1,4 +1,4 @@
-import { RegRole } from './role.types';
+import type { RegRole } from './role.types';
 
 // ─── Step 2: Identity ───────────────────────────────────────────────────────
 export interface IdentityData {
