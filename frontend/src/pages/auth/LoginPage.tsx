@@ -76,7 +76,7 @@ export default function LoginPage() {
           <div className={styles.fieldGroup}>
             <div className={styles.labelRow}>
               <label className={styles.label} htmlFor="login-credential">
-                USERNAME / EMAIL
+                EMAIL
               </label>
             </div>
             <div className={styles.inputWrap}>
@@ -98,10 +98,7 @@ export default function LoginPage() {
             <div className={styles.labelRow}>
               <label className={styles.label} htmlFor="login-password">
                 PASSWORD
-              </label>
-              <Link to="#" className={styles.forgotLink}>
-                FORGOT PASSWORD?
-              </Link>
+              </label>              
             </div>
             <div className={styles.inputWrap}>
               <input
@@ -123,18 +120,7 @@ export default function LoginPage() {
                 {showPassword ? <FiEyeOff /> : <FiEye />}
               </button>
             </div>
-          </div>
-
-          {/* Remember session */}
-          <label className={styles.checkRow}>
-            <input
-              type="checkbox"
-              className={styles.checkbox}
-              checked={rememberSession}
-              onChange={(e) => setRememberSession(e.target.checked)}
-            />
-            <span className={styles.checkLabel}>Remember this session</span>
-          </label>
+          </div>          
 
           {/* Submit */}
           <button
