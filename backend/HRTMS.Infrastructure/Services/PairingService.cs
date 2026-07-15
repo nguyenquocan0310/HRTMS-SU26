@@ -169,7 +169,7 @@ public class PairingService : IPairingService
 
         var messagePart = string.IsNullOrWhiteSpace(dto.RequestMessage)
             ? ""
-            : $" Lời nhắn từ chủ ngựa: \"{dto.RequestMessage}\"";
+            : $" Lời nhắn từ chủ ngựa: {dto.RequestMessage}";
 
 
         // Tao thong bao cho Jockey khi co loi moi moi (email — SRS Module O)
@@ -377,7 +377,7 @@ public class PairingService : IPairingService
 
         var reasonPart = string.IsNullOrWhiteSpace(dto.ResponseReason)
             ? ""
-            : $" Lý do: \"{dto.ResponseReason}\"";
+            : $" Lý do: {dto.ResponseReason}";
 
         // Gui thong bao cho Owner (email)
         await _notification.SendAsync(
