@@ -44,7 +44,7 @@ const RaceOperations = () => {
       r.races.map((race) => ({
         id: race.raceId,
         label: `Race #${race.raceNumber} · ${formatDateTime(race.scheduledTime)}`,
-        isDrawn: race.status !== 'Upcoming',
+        isDrawn: race.isPostPositionDrawn,
       }))
     );
     setRaces(opts);
@@ -265,7 +265,7 @@ const RaceOperations = () => {
                     <td className={styles.gate}>{entry.postPosition ?? '—'}</td>
                     <td className={styles.name}>{entry.horseName}</td>
                     <td>{entry.jockeyName}</td>
-                    <td>—</td>
+                    <td>{entry.ownerName ?? '—'}</td>
                     <td>
                       <span className={`${styles.badge} ${entry.status === 'Confirmed' ? styles.confirmed : styles.pending}`}>
                         {entry.status}
