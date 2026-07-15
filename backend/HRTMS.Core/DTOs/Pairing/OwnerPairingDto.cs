@@ -12,6 +12,7 @@ public class OwnerPairingDto
 
     public DateTime CreatedAt { get; set; }
     public int TournamentId { get; set; }
+    public string? RequestMessage { get; set; }
 }
 
 public class OwnerPairingHorseDto

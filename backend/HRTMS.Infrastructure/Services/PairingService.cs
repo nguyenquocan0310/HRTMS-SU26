@@ -441,6 +441,7 @@ public class PairingService : IPairingService
             {
                 PairingId = p.PairingId,
                 TournamentId = p.TournamentId,
+                RequestMessage = p.RequestMessage,
 
                 Horse = new OwnerPairingHorseDto
                 {
