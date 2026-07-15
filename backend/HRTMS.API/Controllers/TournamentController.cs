@@ -208,8 +208,9 @@ namespace HRTMS.API.Controllers
             if (race == null)
                 return NotFound(new { success = false, message = "RACE_NOT_FOUND" });
 
-            // Chỉ public sau khi đã draw post position, Admin thấy luôn
+            // Chỉ public sau khi đã draw post position; Admin thấy luôn (cho phép admin allocate và xem trước khi draw)
             bool isAdmin = User.IsInRole("Admin");
+            // Nếu chưa draw và không phải admin, return empty → không public race positions trước khi chốt
             if (!race.IsPostPositionDrawn && !isAdmin)
                 return Ok(new { success = true, message = "Kết quả bốc thăm chưa được công bố.", data = Array.Empty<object>() });
 
@@ -217,7 +218,7 @@ namespace HRTMS.API.Controllers
                 .Include(e => e.Pairing).ThenInclude(p => p.Horse)
                 .Include(e => e.Pairing).ThenInclude(p => p.Jockey).ThenInclude(j => j.Jockey)
                 .Where(e => e.RaceId == raceId && e.Status != "Cancelled" && e.Status != "Disqualified")
-                .OrderBy(e => e.PostPosition)
+                .OrderBy(e => e.PostPosition ?? int.MaxValue)  // Null postPositions cuối cùng (chưa draw)
                 .Select(e => new
                 {
                     e.RaceEntryId,
