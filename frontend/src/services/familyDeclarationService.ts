@@ -23,7 +23,8 @@ export interface FamilyDeclarationPayload {
   relatedPersonName: string;
   relatedUserId: number | null;
   relationType: string;
-  industryRole: string;
+  industryRole: string | null;
+  relatedIdentityNumber?: string;
   notes: string;
 }
 

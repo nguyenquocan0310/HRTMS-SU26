@@ -40,6 +40,7 @@ import JockeyTournamentList from './pages/jockey/JockeyTournamentList'
 
 // ── Import các trang shared ──
 import Protest from './pages/shared/Protest'
+import SharedNotificationCenter from './pages/shared/NotificationCenter'
 
 // ── Import các trang Doctor ──
 import DoctorLayout from './pages/doctor/DoctorLayout'
@@ -146,6 +147,7 @@ export default function App() {
           <Route path="profile-declaration" element={<ProfileDeclaration />} />
           <Route path="tournaments" element={<JockeyTournamentList />} />
           <Route path="protest" element={<Protest userRole="Jockey" />} />
+          <Route path="notifications" element={<SharedNotificationCenter />} />
         </Route>
 
         {/* ── Cấu trúc Route của BÁC SĨ (Doctor) ── */}

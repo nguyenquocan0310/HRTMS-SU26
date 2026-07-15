@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import type { JockeyRaceEntry } from '../../types/jockey.types';
 import { getMyJockeyRaceEntries } from '../../services/jockeyService';
 
@@ -87,8 +87,7 @@ export default function MyRaces() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchMyRaces = async () => {
+  const fetchMyRaces = useCallback(async () => {
       try {
         setLoading(true);
         setError(null);
@@ -99,10 +98,12 @@ export default function MyRaces() {
       } finally {
         setLoading(false);
       }
-    };
-
-    fetchMyRaces();
   }, []);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => { void fetchMyRaces(); }, 0);
+    return () => window.clearTimeout(id);
+  }, [fetchMyRaces]);
 
   if (loading) {
     return (
@@ -121,7 +122,7 @@ export default function MyRaces() {
         <h2 className="text-base font-semibold text-gray-900">Không tải được dữ liệu</h2>
         <p className="text-sm text-gray-500 mt-2">{error}</p>
         <button
-          onClick={() => window.location.reload()}
+          onClick={() => void fetchMyRaces()}
           className="mt-4 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
         >
           Thử lại
