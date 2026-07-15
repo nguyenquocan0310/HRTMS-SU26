@@ -1,7 +1,4 @@
 import { apiFetch } from './apiClient';
-import type { Penalty, RaceViolation, UpdateViolationPayload } from '../types/protest.types';
-
-export type { RaceViolation } from '../types/protest.types';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -43,7 +40,6 @@ export interface RefereeRaceAssignment {
 
 export interface RefereeRaceEntry {
   raceEntryId: number;
-  jockeyId: number | null;
   raceId: number | null;
   pairingId: number | null;
   postPosition: number | null;
@@ -52,11 +48,9 @@ export interface RefereeRaceEntry {
   horseName: string;
   jockeyName: string;
   ownerName: string | null;
-  selfDeclaredWeight?: number | null;
-  preRaceJockeyWeight?: number | null;
-  horseIdentityCheckStatus?: string | null;
-  clinicalStatus?: string | null;
-  isEmergencyDisqualified?: boolean;
+  preRaceJockeyWeight: number | null;
+  horseIdentityCheckStatus: string | null;
+  clinicalStatus: string | null;
   independenceCheckStatus: string | null;
   independenceViolationReason: string | null;
   hasIndependenceWarning: boolean;
@@ -124,17 +118,24 @@ export interface RaceLiveStatus {
   entries: LiveRaceEntry[];
 }
 
+export interface RaceViolation {
+  violationId?: number;
+  raceEntryId: number | null;
+  horseName?: string | null;
+  jockeyName?: string | null;
+  violationCode: string;
+  penalty: string;
+  placeBehindEntryId?: number | null;
+  description?: string | null;
+  recordedAt?: string | null;
+  refereeName?: string | null;
+}
+
 export interface CreateViolationPayload {
   raceEntryId: number;
   violationCode: string;
-  penalty: Penalty;
-  placeBehindEntryId?: number | null;
-  description: string;
-}
-
-export interface ViolationCodeOption {
-  code: string;
-  name: string;
+  penalty: string;
+  placeBehindEntryId?: number;
   description: string;
 }
 
@@ -167,12 +168,6 @@ const unwrapData = <T>(res: ApiResponse<T> | T): T => {
   return res as T;
 };
 
-const positiveId = (value: string | number, name: string): number => {
-  const id = typeof value === 'number' ? value : Number(value);
-  if (!Number.isInteger(id) || id <= 0) throw new Error(`${name} phải là số nguyên dương.`);
-  return id;
-};
-
 const normalizeAssignment = (item: any): RefereeRaceAssignment | null => {
   const raceId = Number(item?.raceId);
   if (!Number.isFinite(raceId)) return null;
@@ -200,11 +195,8 @@ const normalizeRaceEntry = (item: any): RefereeRaceEntry | null => {
   const raceEntryId = Number(item?.raceEntryId ?? item?.id);
   if (!Number.isFinite(raceEntryId)) return null;
 
-  const rawJockeyId = item?.jockey?.jockeyId ?? item?.jockeyId;
-  const jockeyId = Number(rawJockeyId);
-  const normalized: RefereeRaceEntry = {
+  return {
     raceEntryId,
-    jockeyId: Number.isInteger(jockeyId) && jockeyId > 0 ? jockeyId : null,
     raceId: item?.raceId ?? null,
     pairingId: item?.pairingId ?? null,
     postPosition: item?.postPosition ?? null,
@@ -213,25 +205,13 @@ const normalizeRaceEntry = (item: any): RefereeRaceEntry | null => {
     horseName: item?.horse?.name ?? item?.horseName ?? 'Chưa có tên',
     jockeyName: item?.jockey?.fullName ?? item?.jockeyName ?? 'Chưa có kỵ sĩ',
     ownerName: item?.owner?.fullName ?? item?.ownerName ?? null,
+    preRaceJockeyWeight: item?.preRaceJockeyWeight ?? null,
+    horseIdentityCheckStatus: item?.horseIdentityCheckStatus ?? null,
+    clinicalStatus: item?.clinicalStatus ?? null,
     independenceCheckStatus: item?.independenceCheckStatus ?? null,
     independenceViolationReason: item?.independenceViolationReason ?? item?.violationReason ?? null,
     hasIndependenceWarning: Boolean(item?.hasIndependenceWarning ?? item?.hasWarning),
   };
-
-  if ('selfDeclaredWeight' in item) normalized.selfDeclaredWeight = item.selfDeclaredWeight ?? null;
-  if ('preRaceJockeyWeight' in item || 'preRaceWeight' in item) {
-    normalized.preRaceJockeyWeight = item.preRaceJockeyWeight ?? item.preRaceWeight ?? null;
-  }
-  if ('horseIdentityCheckStatus' in item || 'horseIdentityStatus' in item) {
-    normalized.horseIdentityCheckStatus =
-      item.horseIdentityCheckStatus ?? item.horseIdentityStatus ?? null;
-  }
-  if ('clinicalStatus' in item) normalized.clinicalStatus = item.clinicalStatus ?? null;
-  if ('isEmergencyDisqualified' in item) {
-    normalized.isEmergencyDisqualified = Boolean(item.isEmergencyDisqualified);
-  }
-
-  return normalized;
 };
 
 export const getRefereeProfile = async (): Promise<RefereeProfile> => {
@@ -256,10 +236,8 @@ export const getMyRefereeRaceAssignments = async (): Promise<RefereeRaceAssignme
     .filter((item): item is RefereeRaceAssignment => item !== null);
 };
 
-export const getRefereeRaceEntries = async (
-  raceId: number | string
-): Promise<RefereeRaceEntry[]> => {
-  const res = await apiFetch<any>(`/referee/race-entries/races/${raceId}/entries`);
+export const getRefereeRaceEntries = async (raceId: number): Promise<RefereeRaceEntry[]> => {
+  const res = await apiFetch<any>(`/races/${raceId}/entries`);
   return extractArray(res)
     .map(normalizeRaceEntry)
     .filter((item): item is RefereeRaceEntry => item !== null);
@@ -291,16 +269,8 @@ export const getRaceLiveStatus = async (raceId: number): Promise<RaceLiveStatus>
 };
 
 export const getRaceViolations = async (raceId: number): Promise<RaceViolation[]> => {
-  const id = positiveId(raceId, 'raceId');
   const res = await apiFetch<ApiResponse<RaceViolation[]> | RaceViolation[]>(
-    `/races/${id}/violations`
-  );
-  return unwrapData(res);
-};
-
-export const getViolationCodes = async (): Promise<ViolationCodeOption[]> => {
-  const res = await apiFetch<ApiResponse<ViolationCodeOption[]> | ViolationCodeOption[]>(
-    '/violations/codes'
+    `/races/${raceId}/violations`
   );
   return unwrapData(res);
 };
@@ -322,45 +292,6 @@ export const createRaceViolation = async (
     { method: 'POST', body: JSON.stringify(payload) }
   );
   return unwrapData(res);
-};
-
-export const updateRaceViolation = async (
-  raceId: string | number,
-  violationId: string | number,
-  payload: UpdateViolationPayload,
-  onMessage?: (message: string) => void
-): Promise<RaceViolation> => {
-  const validRaceId = positiveId(raceId, 'raceId');
-  const validViolationId = positiveId(violationId, 'violationId');
-  const placeBehindEntryId = payload.placeBehindEntryId == null
-    ? null
-    : positiveId(payload.placeBehindEntryId, 'placeBehindEntryId');
-  const res = await apiFetch<ApiResponse<RaceViolation>>(
-    `/referees/races/${validRaceId}/violations/${validViolationId}`,
-    {
-      method: 'PATCH',
-      body: JSON.stringify({
-        violationCode: payload.violationCode,
-        penalty: payload.penalty,
-        placeBehindEntryId: payload.penalty === 'PlaceBehind' ? placeBehindEntryId : null,
-        description: payload.description,
-      }),
-    }
-  );
-  if (!res.success || res.data === null) throw new Error(res.message || 'Không thể cập nhật vi phạm.');
-  onMessage?.(res.message);
-  return res.data;
-};
-
-export const deleteRaceViolation = async (
-  raceId: string | number,
-  violationId: string | number
-): Promise<void> => {
-  const validRaceId = positiveId(raceId, 'raceId');
-  const validViolationId = positiveId(violationId, 'violationId');
-  await apiFetch<void>(`/referees/races/${validRaceId}/violations/${validViolationId}`, {
-    method: 'DELETE',
-  });
 };
 
 export const finishRace = async (

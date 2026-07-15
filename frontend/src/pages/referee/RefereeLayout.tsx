@@ -4,7 +4,6 @@ import { apiFetch } from '../../services/apiClient';
 import { logout } from '../../services/authService';
 import { getRefereeProfile, type RefereeProfile } from '../../services/refereeService';
 import useAuthStore from '../../store/authStore';
-import NotificationBell from '../../components/notifications/NotificationBell';
 
 interface RefereeAuthProfile {
   userId: number;
@@ -82,9 +81,7 @@ export default function RefereeLayout() {
     if (item.end) return location.pathname === item.to;
     return location.pathname.startsWith(item.to);
   });
-  const pageTitle = location.pathname === '/referee/notifications'
-    ? 'Thông báo'
-    : currentNav?.label ?? 'Tổng quan';
+  const pageTitle = currentNav?.label ?? 'Tổng quan';
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
@@ -172,13 +169,10 @@ export default function RefereeLayout() {
       </aside>
 
       <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex flex-shrink-0 items-center justify-between gap-4 border-b border-gray-200 bg-white px-6 py-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="text-xs text-gray-400">Trọng tài</span>
-            <span className="text-xs text-gray-300">/</span>
-            <span className="truncate text-xs font-semibold text-gray-700">{pageTitle}</span>
-          </div>
-          <NotificationBell notificationsPath="/referee/notifications" />
+        <header className="flex flex-shrink-0 items-center gap-2 border-b border-gray-200 bg-white px-6 py-3">
+          <span className="text-xs text-gray-400">Trọng tài</span>
+          <span className="text-xs text-gray-300">/</span>
+          <span className="text-xs font-semibold text-gray-700">{pageTitle}</span>
         </header>
 
         <main className="flex-1 overflow-auto p-6">

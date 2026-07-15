@@ -11,14 +11,8 @@ export interface ApiErrorResponse {
   // (vd MinLength, Required trên FamilyDeclarationItemDto), khác với format
   // {success,message} tùy chỉnh của tầng business logic.
   title?: string;
-  detail?: string;
   errors?: Record<string, string[]>;
 }
-
-export type ApiError = Error & { status?: number };
-
-const createApiError = (message: string, status: number): ApiError =>
-  Object.assign(new Error(message), { status });
 
 /**
  * Wrapper fetch dùng chung — tự động gắn token, parse JSON, ném lỗi rõ ràng.
@@ -54,7 +48,7 @@ export async function apiFetch<T>(
         sessionStorage.setItem('authReason', 'expired');
         window.location.href = '/login';
       }
-      throw createApiError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', response.status);
+      throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
     }
 
 let errorBody: ApiErrorResponse | null = null;
@@ -66,21 +60,18 @@ let errorBody: ApiErrorResponse | null = null;
 
     // Ưu tiên message tùy chỉnh của BE (tầng business logic).
     if (errorBody?.message) {
-      throw createApiError(errorBody.message, response.status);
+      throw new Error(errorBody.message);
     }
 
     // Fallback: lỗi validate tự động của ASP.NET (dạng { title, errors: {...} }).
     if (errorBody?.errors) {
       const detailMessages = Object.values(errorBody.errors).flat();
       if (detailMessages.length > 0) {
-        throw createApiError(detailMessages.join(' '), response.status);
+        throw new Error(detailMessages.join(' '));
       }
     }
 
-    throw createApiError(
-      errorBody?.detail ?? errorBody?.title ?? `API error: ${response.status}`,
-      response.status
-    );
+    throw new Error(errorBody?.title ?? `API error: ${response.status}`);
   }
 
   // Một số API trả về 204 No Content

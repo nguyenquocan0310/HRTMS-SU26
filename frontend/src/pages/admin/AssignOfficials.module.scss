@@ -8,7 +8,7 @@
 
 /* ─── Filter card ─── */
 .filterCard {
-  background: #fff; border: 1px solid #e5e7eb; border-radius: 14px;
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 3px;
   padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;
 }
 .filterRow { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
@@ -17,7 +17,7 @@
 .selectWrap { position: relative; display: flex; align-items: center; }
 .select {
   width: 100%; appearance: none; background: #f9fafb; border: 1px solid #d1d5db;
-  border-radius: 8px; padding: 0.55rem 2rem 0.55rem 0.85rem;
+  border-radius: 3px; padding: 0.55rem 2rem 0.55rem 0.85rem;
   font-size: 0.85rem; color: #333; outline: none; cursor: pointer;
   &:focus { border-color: #2563eb; }
 }
@@ -25,7 +25,7 @@
 
 .raceInfo {
   display: flex; gap: 1.5rem; flex-wrap: wrap;
-  padding: 0.75rem 1rem; background: #f9fafb; border-radius: 8px;
+  padding: 0.75rem 1rem; background: #f9fafb; border-radius: 3px;
 }
 .raceInfoItem { font-size: 0.82rem; color: #555; }
 
@@ -37,7 +37,7 @@
 .assignGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
 
 .assignCard {
-  background: #fff; border: 1px solid #e5e7eb; border-radius: 14px;
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 3px;
   padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;
 }
 .cardTitle { font-size: 1rem; font-weight: 700; color: #111; margin: 0; }
@@ -47,14 +47,14 @@
 
 .assignBtn {
   padding: 0.6rem 1.5rem; background: #2563eb; color: #fff; border: none;
-  border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+  border-radius: 3px; font-size: 0.85rem; font-weight: 600; cursor: pointer;
   transition: background 0.2s;
   &:hover { background: #1d4ed8; }
 }
 
 .assignedItem {
   display: flex; align-items: flex-start; justify-content: space-between;
-  gap: 1rem; background: #f9fafb; border-radius: 10px; padding: 1rem;
+  gap: 1rem; background: #f9fafb; border-radius: 3px; padding: 1rem;
 }
 .assignedInfo { display: flex; flex-direction: column; gap: 0.25rem; flex: 1; }
 .assignedName { font-size: 0.92rem; font-weight: 700; color: #111; }
@@ -64,7 +64,7 @@
 .removeBtn {
   display: flex; align-items: center; gap: 0.3rem; flex-shrink: 0;
   background: #fff; border: 1px solid #fca5a5; color: #dc2626;
-  padding: 0.4rem 0.75rem; border-radius: 7px; font-size: 0.78rem; font-weight: 600;
+  padding: 0.4rem 0.75rem; border-radius: 3px; font-size: 0.78rem; font-weight: 600;
   cursor: pointer; transition: all 0.2s;
   &:hover:not(:disabled) { background: #fef2f2; }
   &:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -72,7 +72,7 @@
 
 .addMoreBtn {
   background: transparent; border: 1px dashed #d1d5db; color: #888;
-  padding: 0.5rem; border-radius: 8px; font-size: 0.82rem; cursor: pointer;
+  padding: 0.5rem; border-radius: 3px; font-size: 0.82rem; cursor: pointer;
   transition: all 0.2s; width: 100%;
   &:hover { border-color: #2563eb; color: #2563eb; }
 }
@@ -81,7 +81,7 @@
 
 /* ─── Status card ─── */
 .statusCard {
-  background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 1.5rem;
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 3px; padding: 1.5rem;
   display: flex; flex-direction: column; gap: 0.75rem;
 }
 .statusItems { display: flex; gap: 1.5rem; }
@@ -99,7 +99,7 @@
 .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 200; }
 .modal {
   position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
-  background: #fff; border-radius: 14px; padding: 1.5rem;
+  background: #fff; border-radius: 3px; padding: 1.5rem;
   width: 460px; max-width: 95vw; z-index: 201;
   box-shadow: 0 12px 40px rgba(0,0,0,0.15);
   display: flex; flex-direction: column; gap: 1rem;
@@ -118,7 +118,7 @@
 .searchWrap { position: relative; display: flex; align-items: center; }
 .searchIcon { position: absolute; left: 0.75rem; color: #999; pointer-events: none; }
 .searchInput {
-  width: 100%; background: #f9fafb; border: 1px solid #d1d5db; border-radius: 8px;
+  width: 100%; background: #f9fafb; border: 1px solid #d1d5db; border-radius: 3px;
   padding: 0.55rem 0.85rem 0.55rem 2.2rem; font-size: 0.84rem; color: #333; outline: none;
   &:focus { border-color: #2563eb; }
   &::placeholder { color: #bbb; }
@@ -127,7 +127,7 @@
 .personList { display: flex; flex-direction: column; gap: 0.5rem; }
 .personRow {
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-  padding: 0.85rem 1rem; background: #f9fafb; border-radius: 10px;
+  padding: 0.85rem 1rem; background: #f9fafb; border-radius: 3px;
   border: 1px solid #e5e7eb;
 }
 .personInfo { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; }
@@ -142,7 +142,7 @@
 
 .sendBtn {
   background: #2563eb; color: #fff; border: none; padding: 0.45rem 1rem;
-  border-radius: 7px; font-size: 0.82rem; font-weight: 600; cursor: pointer;
+  border-radius: 3px; font-size: 0.82rem; font-weight: 600; cursor: pointer;
   white-space: nowrap; transition: background 0.2s; flex-shrink: 0;
   &:hover:not(:disabled) { background: #1d4ed8; }
   &:disabled { opacity: 0.4; cursor: not-allowed; }

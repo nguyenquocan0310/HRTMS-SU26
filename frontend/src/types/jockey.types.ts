@@ -20,20 +20,6 @@ export interface JockeyProfile {
   createdAt: string;
 }
 
-/** Aggregated career statistics calculated from Official races only. */
-export interface JockeyCareerStats {
-  jockeyId: number;
-  fullName: string;
-  totalRaces: number;
-  wins: number;
-  podiums: number;
-  winRate: number | null;
-  podiumRate: number | null;
-  averageFinishPosition: number | null;
-  totalPoints: number;
-  totalEarnings: number;
-}
-
 /**
  * Represents a race invitation sent to a jockey
  */

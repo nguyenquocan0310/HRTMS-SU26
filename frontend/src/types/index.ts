@@ -16,7 +16,7 @@ export interface User {
   fullName: string
   email: string
   role: Role
-  status: 'Active' | 'Pending' | 'Suspended' | 'Rejected'
+  status: 'Active' | 'Pending' | 'Suspended'
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -46,4 +46,3 @@ export interface ApiError {
 
 export * from './jockey.types'
 export * from './owner.types'
-export * from './protest.types'

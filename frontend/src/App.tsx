@@ -12,7 +12,7 @@ import TournamentBuilder from './components/admin/TournamentBuilder'
 import TournamentHub from './pages/admin/TournamentHub'
 import Leaderboard from './pages/admin/Leaderboard'
 import LiveRaceView from './pages/admin/LiveRaceView'
-import AdminNotificationCenter from './pages/admin/NotificationCenter'
+import NotificationCenter from './pages/admin/NotificationCenter'
 import MyAccount from './pages/admin/MyAccount'
 import AssignOfficials from './pages/admin/AssignOfficials'
 
@@ -21,7 +21,6 @@ import AssignOfficials from './pages/admin/AssignOfficials'
 // ── Import các trang Owner ──
 import MyHorses from './pages/owner/MyHorses'
 import OwnerDashboard from './pages/owner/OwnerDashboard'
-import OwnerEarningsPage from './pages/owner/OwnerEarnings'
 import OwnerLayout from './pages/owner/OwnerLayout'
 import OwnerProfile from './pages/owner/OwnerProfile'
 import RegisterHorse from './pages/owner/RegisterHorse'
@@ -41,7 +40,6 @@ import JockeyTournamentList from './pages/jockey/JockeyTournamentList'
 
 // ── Import các trang shared ──
 import Protest from './pages/shared/Protest'
-import NotificationCenter from './pages/shared/NotificationCenter'
 
 // ── Import các trang Doctor ──
 import DoctorLayout from './pages/doctor/DoctorLayout'
@@ -64,7 +62,6 @@ import PredictionPage from './pages/spectator/PredictionPage'
 import WalletTransactions from './pages/spectator/WalletTransactions'
 import MyPredictions from './pages/spectator/MyPredictions'
 import SpectatorLiveRace from './pages/spectator/SpectatorLiveRace'
-import SpectatorLeaderboard from './pages/spectator/SpectatorLeaderboard'
 import RaceOperations from './pages/admin/RaceOperation'
 import EntryFees from './pages/admin/EntryFees'
 
@@ -124,7 +121,6 @@ export default function App() {
           </ProtectedRoute>
         }>
           <Route index element={<OwnerDashboard />} />
-          <Route path="earnings" element={<OwnerEarningsPage />} />
           <Route path="horses" element={<MyHorses />} />
           <Route path="horses/register" element={<RegisterHorse />} />
           <Route path="horses/:id" element={<HorseDetail />} />
@@ -133,8 +129,8 @@ export default function App() {
           <Route path="schedule-confirm" element={<Navigate to="/owner/race-entries" replace />} />
           <Route path="jockey-invite" element={<JockeyInvite />} />
           <Route path="protest" element={<Protest userRole="HorseOwner" />} />
-          <Route path="notifications" element={<NotificationCenter />} />
           <Route path="profile" element={<OwnerProfile />} />
+
         </Route>
 
         {/* ── Cấu trúc Route của KỴ SĨ (Jockey) ── */}
@@ -150,7 +146,6 @@ export default function App() {
           <Route path="profile-declaration" element={<ProfileDeclaration />} />
           <Route path="tournaments" element={<JockeyTournamentList />} />
           <Route path="protest" element={<Protest userRole="Jockey" />} />
-          <Route path="notifications" element={<NotificationCenter />} />
         </Route>
 
         {/* ── Cấu trúc Route của BÁC SĨ (Doctor) ── */}
@@ -163,7 +158,6 @@ export default function App() {
           <Route path="paddock" element={<PaddockConsole />} />
           <Route path="tournaments" element={<DoctorTournamentList />} />
           <Route path="coi" element={<DoctorCoiDeclarations />} />
-          <Route path="notifications" element={<NotificationCenter />} />
         </Route>
 
         {/* ── Cấu trúc Route của TRỌNG TÀI (Referee) ── */}
@@ -176,7 +170,6 @@ export default function App() {
           <Route path="tournaments" element={<RefereeTournamentList />} />
           <Route path="coi" element={<RefereeCoiDeclarations />} />
           <Route path="race-console" element={<RefereeRaceConsole />} />
-          <Route path="notifications" element={<NotificationCenter />} />
         </Route>
 
         {/* ── Cấu trúc Route của KHÁN GIẢ (Spectator) ── */}
@@ -190,8 +183,6 @@ export default function App() {
           <Route path="wallet" element={<WalletTransactions />} />
           <Route path="my-predictions" element={<MyPredictions />} />
           <Route path="live-race" element={<SpectatorLiveRace />} />
-          <Route path="leaderboard" element={<SpectatorLeaderboard />} />
-          <Route path="notifications" element={<NotificationCenter />} />
         </Route>
 
         {/* Admin */}
@@ -214,7 +205,6 @@ export default function App() {
           <Route path="tournament-hub" element={<TournamentHub />} />
           <Route path="leaderboard" element={<Leaderboard />} />
           <Route path="live-race" element={<LiveRaceView />} />
-          <Route path="notifications" element={<AdminNotificationCenter />} />
           <Route path="my-account" element={<MyAccount />} />
           <Route path="assign-officials" element={<AssignOfficials />} />
         </Route>

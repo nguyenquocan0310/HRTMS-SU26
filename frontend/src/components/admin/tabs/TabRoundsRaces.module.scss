@@ -8,7 +8,7 @@
 .errorBanner {
   background: rgba(231, 76, 60, 0.12);
   border: 1px solid rgba(231, 76, 60, 0.35);
-  border-radius: 10px;
+  border-radius: 2px;
   padding: 0.85rem 1.1rem;
   color: #ff8585;
   font-size: 0.82rem;
@@ -26,7 +26,7 @@
 .roundCard {
   background: #15151A;
   border: 1px solid #232328;
-  border-radius: 14px;
+  border-radius: 2px;
   overflow: hidden;
 }
 
@@ -67,7 +67,7 @@
 .roundDateInput {
   background: #0d0d10;
   border: 1px solid #2a2a30;
-  border-radius: 6px;
+  border-radius: 2px;
   padding: 0.4rem 0.6rem;
   color: #ccc;
   font-size: 0.78rem;
@@ -80,7 +80,7 @@
   font-size: 0.72rem;
   font-weight: 600;
   padding: 0.25rem 0.6rem;
-  border-radius: 20px;
+  border-radius: 2px;
   white-space: nowrap;
 }
 
@@ -90,7 +90,7 @@
   color: #888;
   cursor: pointer;
   padding: 0.4rem;
-  border-radius: 6px;
+  border-radius: 2px;
   display: flex;
   transition: all 0.2s;
 
@@ -112,7 +112,7 @@
 .raceRow {
   background: #0d0d10;
   border: 1px solid #232328;
-  border-radius: 10px;
+  border-radius: 2px;
   padding: 0.85rem 1rem;
   display: flex;
   flex-direction: column;
@@ -136,7 +136,7 @@
   color: #D8B45A;
   background: rgba(216, 180, 90, 0.1);
   padding: 0.2rem 0.55rem;
-  border-radius: 12px;
+  border-radius: 2px;
   cursor: help;
 }
 
@@ -211,7 +211,7 @@
   border: 1px dashed #2a2a30;
   color: #aaa;
   padding: 0.6rem;
-  border-radius: 8px;
+  border-radius: 2px;
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
@@ -234,7 +234,7 @@
   border: 1px dashed #B5121B;
   color: #F3C8C3;
   padding: 0.85rem;
-  border-radius: 12px;
+  border-radius: 2px;
   font-size: 0.85rem;
   font-weight: 700;
   cursor: pointer;
