@@ -1,5 +1,11 @@
 import { apiFetch } from './apiClient';
 
+interface ApiResponse<T> {
+  success: boolean;
+  message?: string;
+  data: T | null;
+}
+
 export interface RaceEntryResponse {
   raceEntryId: number;
   raceId: number;
@@ -55,7 +61,7 @@ interface RaceEntriesData {
 /**
  * GET /api/races/{raceId}/entries
  *
- * API thực tế trả:
+ * API trả:
  * {
  *   success: true,
  *   data: {
@@ -69,13 +75,15 @@ interface RaceEntriesData {
  *   }
  * }
  *
- * apiFetch đã unwrap lớp ngoài, nên res chính là object nằm trong data.
+ * apiFetch không unwrap data, nên phải đọc res.data.entries.
  */
 export const getRaceEntries = (
   raceId: number
 ): Promise<RaceScheduleEntry[]> =>
-  apiFetch<RaceEntriesData>(`/races/${raceId}/entries`).then((res) =>
-    (res.entries ?? []).map((entry) => ({
+  apiFetch<ApiResponse<RaceEntriesData>>(
+    `/races/${raceId}/entries`
+  ).then((res) =>
+    (res.data?.entries ?? []).map((entry) => ({
       raceEntryId: entry.raceEntryId,
       postPosition: entry.postPosition,
       status: entry.status,
@@ -91,20 +99,28 @@ export const getRaceEntries = (
 
 /**
  * POST /api/admin/races/{raceId}/entries
- * Allocate một pairing đã Confirmed vào Race.
+ * Allocate pairing vào Race.
  */
 export const allocateEntry = (
   raceId: number,
   pairingId: number
 ): Promise<RaceEntryResponse> =>
-  apiFetch<RaceEntryResponse>(`/admin/races/${raceId}/entries`, {
-    method: 'POST',
-    body: JSON.stringify({ pairingId }),
+  apiFetch<ApiResponse<RaceEntryResponse>>(
+    `/admin/races/${raceId}/entries`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ pairingId }),
+    }
+  ).then((res) => {
+    if (!res.data) {
+      throw new Error(res.message || 'Allocate không trả về dữ liệu.');
+    }
+
+    return res.data;
   });
 
 /**
  * POST /api/admin/races/{raceId}/draw
- * Bốc thăm post position cho các RaceEntry của Race.
  */
 export const drawPostPositions = (
   raceId: number
@@ -140,10 +156,12 @@ interface PagedResult<T> {
 /**
  * GET /api/admin/pairings
  *
- * Lấy pairing:
- * - thuộc đúng Tournament;
- * - có status Confirmed;
- * - có thể chỉ lấy pairing chưa allocate.
+ * Theo ảnh Network trước đó, endpoint này đang trả PagedResult trực tiếp:
+ * {
+ *   items: [],
+ *   totalCount: 0,
+ *   ...
+ * }
  */
 export const getAdminPairings = (
   tournamentId: number,
