@@ -1,6 +1,5 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import useAuthStore from '../../store/authStore'
-import NotificationBell from '../../components/notifications/NotificationBell'
 
 export default function SpectatorLayout() {
   const navigate = useNavigate()
@@ -86,20 +85,6 @@ export default function SpectatorLayout() {
               <span>Lịch sử dự đoán</span>
             </NavLink>
 
-            <NavLink
-              to="/spectator/leaderboard"
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  isActive
-                    ? 'bg-amber-100 text-amber-800 font-semibold shadow-sm'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                }`
-              }
-            >
-              <span className="text-lg">🏆</span>
-              <span>Bảng xếp hạng</span>
-            </NavLink>
-
           </nav>
         </div>
 
@@ -116,18 +101,9 @@ export default function SpectatorLayout() {
       </aside>
 
       {/* Vùng không gian chính bên phải hiển thị Outlet */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex flex-shrink-0 items-center justify-between gap-4 border-b border-gray-200 bg-white px-4 py-3 sm:px-6">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-amber-600">Khán giả</p>
-            <p className="text-sm font-semibold text-gray-800">Theo dõi &amp; dự đoán</p>
-          </div>
-          <NotificationBell notificationsPath="/spectator/notifications" />
-        </header>
-        <main className="flex-1 overflow-auto p-4 sm:p-6">
-          <Outlet />
-        </main>
-      </div>
+      <main className="flex-1 overflow-auto p-6">
+        <Outlet />
+      </main>
     </div>
   )
 }

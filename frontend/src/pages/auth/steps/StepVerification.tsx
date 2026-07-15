@@ -25,10 +25,7 @@ const StepVerification = ({ role, formData, onChange }: Props) => {
     K extends 'ownerVerification' | 'jockeyVerification' | 'refereeVerification' | 'doctorVerification',
   >(
     key: K,
-    verification: {
-      noFamilyDeclarationNote: string;
-      familyDeclarations: FamilyDeclarationItem[];
-    }
+    verification: { hasNoFamilyInIndustry: boolean; familyDeclarations: FamilyDeclarationItem[] }
   ) => {
     const updateVerification = (partial: Record<string, unknown>) => {
       onChange({ [key]: { ...verification, ...partial } } as Partial<RegisterFormData>);
