@@ -1,77 +1,55 @@
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
-import { apiFetch } from '../../services/apiClient'
+import { useCallback, useEffect, useState } from 'react'
+import { getMyAccountProfile } from '../../services/accountService'
+import { getDoctorProfile } from '../../services/doctorService'
 import { logout } from '../../services/authService'
 import useAuthStore from '../../store/authStore'
+import type { DoctorRoleProfile, UserProfile } from '../../types/account.types'
 
-interface DoctorProfile {
-  userId?: number
-  doctorId?: number
-  username: string
-  fullName: string
-  email: string
-  role: string
-  status: string
-  medicalLicenseNumber?: string
-}
-
-interface ProfileApiResponse {
-  success: boolean
-  message: string
-  data: DoctorProfile | null
-}
+type DoctorAccountProfile = UserProfile<DoctorRoleProfile>
 
 const navItems = [
   { to: '/doctor', label: 'Tổng quan', end: true },
   { to: '/doctor/tournaments', label: 'Đăng ký giải đấu', end: false },
   { to: '/doctor/coi', label: 'Khai báo COI', end: false },
+  { to: '/doctor/profile', label: 'Hồ sơ tài khoản', end: false },
+  { to: '/doctor/notifications', label: 'Thông báo', end: false },
 ]
 
-const normalizeDoctorProfile = (res: DoctorProfile | ProfileApiResponse | null): DoctorProfile | null => {
-  if (!res) return null
-  const data = 'data' in res ? res.data : res
-  if (!data) return null
-  return {
-    ...data,
-    role: data.role ?? 'Doctor',
-    status: data.status ?? '',
-  }
-}
-
 export default function DoctorLayout() {
-  const [profile, setProfile] = useState<DoctorProfile | null>(null)
+  const [profile, setProfile] = useState<DoctorAccountProfile | null>(null)
+  const [professionalStatus, setProfessionalStatus] = useState('')
   const [loading, setLoading] = useState(true)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const clearAuth = useAuthStore((state) => state.clearAuth)
 
-  useEffect(() => {
-    const loadProfile = async () => {
-      try {
-        const doctorProfile = await apiFetch<DoctorProfile>('/doctors/profile')
-        const normalized = normalizeDoctorProfile(doctorProfile)
-        if (normalized) {
-          setProfile(normalized)
-          setLoading(false)
-          return
-        }
-      } catch {
-        // Fallback xuống profile dùng chung nếu endpoint riêng không khả dụng.
-      }
-
-      try {
-        const authProfile = await apiFetch<ProfileApiResponse>('/auth/profile')
-        setProfile(normalizeDoctorProfile(authProfile))
-      } catch {
-        setProfile(null)
-      } finally {
-        setLoading(false)
-      }
+  const loadProfile = useCallback(async () => {
+    try {
+      const [accountResult, professionalResult] = await Promise.allSettled([
+        getMyAccountProfile<DoctorRoleProfile>(),
+        getDoctorProfile(),
+      ])
+      setProfile(accountResult.status === 'fulfilled' ? accountResult.value : null)
+      setProfessionalStatus(
+        professionalResult.status === 'fulfilled'
+          ? professionalResult.value.status
+          : accountResult.status === 'fulfilled'
+            ? accountResult.value.profile?.status ?? ''
+            : '',
+      )
+    } finally {
+      setLoading(false)
     }
-
-    loadProfile()
   }, [])
+
+  useEffect(() => {
+    void loadProfile()
+    const handleProfileChanged = () => { void loadProfile() }
+    window.addEventListener('hrtms:profile-changed', handleProfileChanged)
+    return () => window.removeEventListener('hrtms:profile-changed', handleProfileChanged)
+  }, [loadProfile])
 
   const currentNav = navItems.find((item) => {
     if (item.end) return location.pathname === item.to
@@ -116,9 +94,9 @@ export default function DoctorLayout() {
                 <span className="inline-flex px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 rounded border border-blue-100">
                   Bác sĩ thú y
                 </span>
-                {profile.status && (
+                {professionalStatus && (
                   <span className="inline-flex px-2 py-0.5 text-xs font-medium bg-green-50 text-green-700 rounded border border-green-100">
-                    {profile.status}
+                    {professionalStatus}
                   </span>
                 )}
               </div>

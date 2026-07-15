@@ -2,6 +2,26 @@ import { apiFetch } from './apiClient';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export interface DoctorProfessionalProfile {
+  doctorId: number;
+  username: string;
+  fullName: string;
+  email: string;
+  medicalLicenseNumber: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface UpdateDoctorProfilePayload {
+  medicalLicenseNumber: string;
+}
+
+export interface UpdateDoctorProfileResult {
+  doctorId: number;
+  status: string;
+  message: string;
+}
+
 export interface DoctorRaceAssignment {
   raceId: number;
   raceNumber: number;
@@ -106,6 +126,17 @@ const extractArray = (res: any): any[] => {
 };
 
 // ─── Service functions ────────────────────────────────────────────────────────
+
+export const getDoctorProfile = async (): Promise<DoctorProfessionalProfile> =>
+  apiFetch<DoctorProfessionalProfile>('/doctors/profile');
+
+export const updateDoctorProfile = async (
+  payload: UpdateDoctorProfilePayload
+): Promise<UpdateDoctorProfileResult> =>
+  apiFetch<UpdateDoctorProfileResult>('/doctors/profile', {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
 
 /**
  * GET /api/doctors/race-assignments/my
