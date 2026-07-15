@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  getEarningsHistory,
   getOwnerEarnings,
   getRacePayouts,
 } from '../../services/ownerService';
 import type {
-  EarningsHistoryItem,
   OwnerEarnings,
   OwnerPayout,
   RacePayoutSummary,
@@ -72,9 +70,6 @@ export default function OwnerEarningsPage() {
   const [earnings, setEarnings] = useState<OwnerEarnings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [history, setHistory] = useState<EarningsHistoryItem[] | null>(null);
-  const [historyLoading, setHistoryLoading] = useState(true);
-  const [historyError, setHistoryError] = useState<string | null>(null);
   const [raceId, setRaceId] = useState('');
   const [racePayout, setRacePayout] = useState<RacePayoutSummary | null>(null);
   const [raceLoading, setRaceLoading] = useState(false);
@@ -94,14 +89,6 @@ export default function OwnerEarningsPage() {
 
   useEffect(() => {
     void loadEarnings();
-    getEarningsHistory()
-      .then(setHistory)
-      .catch((loadError: unknown) => {
-        if (!isForbidden(loadError)) {
-          setHistoryError(errorMessage(loadError, 'Không tải được lịch sử thu nhập.'));
-        }
-      })
-      .finally(() => setHistoryLoading(false));
   }, [loadEarnings]);
 
   const loadRacePayout = async () => {
@@ -145,7 +132,6 @@ export default function OwnerEarningsPage() {
     ['Chưa thanh toán', earnings.unpaidAmount],
     ['Số khoản thưởng', earnings.payoutCount],
   ] as const;
-  const scopedHistory = history?.filter((item) => item.recipientUserId === earnings.ownerUserId) ?? null;
 
   return (
     <div className="space-y-7">
@@ -172,43 +158,6 @@ export default function OwnerEarningsPage() {
         </div>
         <PayoutTable payouts={earnings.payouts ?? []} emptyText="Bạn chưa có khoản thưởng nào." />
       </section>
-
-      {historyLoading && (
-        <section className="rounded-3xl border border-slate-200 bg-white px-6 py-10 text-center text-sm text-slate-500">
-          Đang tải tổng hợp lịch sử thu nhập...
-        </section>
-      )}
-      {!historyLoading && scopedHistory !== null && (
-        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
-          <div className="border-b border-slate-100 px-6 py-5">
-            <h2 className="text-lg font-black text-slate-950">Tổng hợp lịch sử thu nhập</h2>
-          </div>
-          {scopedHistory.length === 0 ? (
-            <p className="px-6 py-10 text-center text-sm text-slate-500">Chưa có dữ liệu lịch sử thu nhập.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                  <tr><th className="px-5 py-3">Người nhận</th><th className="px-5 py-3">Vai trò</th><th className="px-5 py-3">Tổng</th><th className="px-5 py-3">Đã trả</th><th className="px-5 py-3">Chưa trả</th><th className="px-5 py-3">Số khoản</th></tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {scopedHistory.map((item) => (
-                    <tr key={`${item.recipientUserId}-${item.role}`}>
-                      <td className="px-5 py-4 font-semibold text-slate-900">{item.recipientName}</td>
-                      <td className="px-5 py-4 text-slate-600">{item.role}</td>
-                      <td className="px-5 py-4">{formatCurrency(item.totalEarnings)}</td>
-                      <td className="px-5 py-4">{formatCurrency(item.paidAmount)}</td>
-                      <td className="px-5 py-4">{formatCurrency(item.unpaidAmount)}</td>
-                      <td className="px-5 py-4">{item.payoutCount}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      )}
-      {historyError && <p className="text-sm text-amber-700">{historyError}</p>}
 
       <section className="rounded-3xl border border-slate-200 bg-white p-6">
         <h2 className="text-lg font-black text-slate-950">Chi tiết tiền thưởng theo cuộc đua</h2>

@@ -1,7 +1,6 @@
 import axios from 'axios';
 import type { AxiosInstance } from 'axios';
 import type {
-  EarningsHistoryItem,
   Horse,
   HorseEnrollment,
   JockeyInvitation,
@@ -372,13 +371,6 @@ export const getRacePayouts = async (
     `/races/${raceId}/payouts`
   );
   return unwrapApiResponse(res, 'Không tải được chi tiết tiền thưởng của cuộc đua.');
-};
-
-export const getEarningsHistory = async (): Promise<EarningsHistoryItem[]> => {
-  const res = await apiFetch<ApiResponse<EarningsHistoryItem[]> | EarningsHistoryItem[]>(
-    '/payouts/earnings-history'
-  );
-  return unwrapApiResponse(res, 'Không tải được lịch sử thu nhập.');
 };
 
 export interface DeleteEnrollmentResult {
