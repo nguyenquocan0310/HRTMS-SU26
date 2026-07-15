@@ -1,5 +1,5 @@
 // Gộp lại thành 1 dòng
-import type { RegRole, RoleMeta } from '../../types/role.types';
+import { type RoleMeta, RegRole } from '../../types/role.types';
 import {
   GiHorseHead,
 } from 'react-icons/gi';

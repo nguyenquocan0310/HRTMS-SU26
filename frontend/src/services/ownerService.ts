@@ -1,11 +1,28 @@
-import type {
-  Horse,
-  HorseEnrollment,
-  OwnerEarnings,
-  RaceEntry,
-  RacePurseSummary,
-} from '../types/owner.types';
+import axios from 'axios';
+import type { AxiosInstance } from 'axios';
+import type { Horse, RaceEntry, JockeyInvitation } from '../types/owner.types';
 import { apiFetch } from './apiClient';
+
+const API_URL = import.meta.env.VITE_API_URL;
+
+// Create axios instance (dùng cho các hàm chưa được migrate sang apiFetch)
+const axiosInstance: AxiosInstance = axios.create({
+  baseURL: API_URL,
+});
+
+// Add JWT token to every request
+axiosInstance.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 // ─── Horse CRUD (dùng apiFetch — không hard-code localhost) ──────────────────
 
@@ -56,11 +73,8 @@ export const updateHorse = async (
   data: Partial<Horse>
 ): Promise<Horse> => {
   try {
-    const res = await apiFetch<ApiResponse<Horse> | Horse>(`/horses/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-    return unwrapApiResponse(res, 'Cập nhật thông tin ngựa thất bại.');
+    const response = await axiosInstance.put<Horse>(`/api/horses/${id}`, data);
+    return response.data;
   } catch (error) {
     console.error(`Error updating horse with ID ${id}:`, error);
     throw error;
@@ -75,12 +89,20 @@ export const updateHorse = async (
  */
 export const getHorseEnrollments = async (
   horseId: number | string
-): Promise<HorseEnrollment[]> => {
-  assertPositiveId(horseId, 'horseId');
-  const res = await apiFetch<ApiResponse<HorseEnrollment[]> | HorseEnrollment[]>(
-    `/horses/${horseId}/enrollments`
-  );
-  return unwrapApiResponse(res, 'Không tải được lịch sử đăng ký giải.');
+): Promise<HorseEnrollmentResponse[] | null> => {
+  try {
+    const res = await apiFetch<any>(`/horses/${horseId}/enrollments`);
+    // Backend có thể trả ApiResponse<list> hoặc thẳng array
+    if (Array.isArray(res)) return res;
+    if (Array.isArray(res?.data)) return res.data;
+    if (Array.isArray(res?.data?.items)) return res.data.items;
+    // Single enrollment wrapped in data
+    if (res?.data && typeof res.data === 'object' && !Array.isArray(res.data)) return [res.data];
+    return [];
+  } catch (error) {
+    console.error(`Error fetching enrollments for horse ${horseId}:`, error);
+    return null; // null = network error; [] = no enrollments
+  }
 };
 
 /**
@@ -104,17 +126,27 @@ export const getMyRaceEntries = async (
   return res.data;
 };
 
+
+/**
+ * Get all jockey invitations for the current user
+ */
+export const getMyJockeyInvitations = async (): Promise<JockeyInvitation[]> => {
+  try {
+    const response = await axiosInstance.get<JockeyInvitation[]>('/api/jockey-invitations/my');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching my jockey invitations:', error);
+    throw error;
+  }
+};
+
 /**
  * Get available jockeys for a tournament
  */
 export const getAvailableJockeys = async (tournamentId: number = 1, page: number = 1, pageSize: number = 20): Promise<any[]> => {
   try {
-    const params = new URLSearchParams();
-    params.set('tournamentId', String(tournamentId));
-    params.set('page', String(page));
-    params.set('pageSize', String(pageSize));
-
-    const data = await apiFetch<any>(`/jockeys/available?${params.toString()}`);
+    const response = await axiosInstance.get<any>(`http://localhost:5222/api/jockeys/available?tournamentId=${tournamentId}&page=${page}&pageSize=${pageSize}`);
+    const data = response.data;
 
     // Extract array of jockeys from standard API response envelopes
     if (Array.isArray(data)) return data;
@@ -146,7 +178,8 @@ export const getOwnerPairings = async (
     params.append('page', String(page));
     params.append('pageSize', String(pageSize));
 
-    const data = await apiFetch<any>(`/owner/pairings?${params.toString()}`);
+    const response = await axiosInstance.get<any>(`http://localhost:5222/api/owner/pairings?${params.toString()}`);
+    const data = response.data;
 
     // Extract array of pairings from standard API response envelopes
     if (Array.isArray(data)) return data;
@@ -180,6 +213,24 @@ export const inviteJockey = async (payload: InviteJockeyPayload): Promise<any> =
     body: JSON.stringify(payload),
   });
 };
+
+
+
+/**
+ * Accept/Confirm a pairing invitation
+ */
+export const acceptPairing = async (pairingId: string): Promise<any> => {
+  try {
+    const response = await axiosInstance.patch<any>(
+      `http://localhost:5222/api/pairings/${pairingId}/accept`
+    );
+    return response.data;
+  } catch (error) {
+    console.error(`Error accepting pairing ${pairingId}:`, error);
+    throw error;
+  }
+};
+
 /**
  * PATCH /api/pairings/{id}/confirm
  * Owner xác nhận ghép cặp sau khi Jockey đã accept.
@@ -286,66 +337,6 @@ export interface HorseEnrollmentResponse {
   updatedAt: string;
 }
 
-const assertPositiveId = (value: number | string, fieldName: string): void => {
-  const normalized = typeof value === 'string' ? value.trim() : value;
-  if (normalized === '' || !Number.isInteger(Number(normalized)) || Number(normalized) <= 0) {
-    throw new Error(`${fieldName} không hợp lệ.`);
-  }
-};
-
-const unwrapApiResponse = <T>(
-  response: ApiResponse<T> | T,
-  fallbackMessage: string
-): T => {
-  if (response && typeof response === 'object' && 'success' in response) {
-    const wrapped = response as ApiResponse<T>;
-    if (!wrapped.success || wrapped.data === null || wrapped.data === undefined) {
-      throw new Error(wrapped.message || fallbackMessage);
-    }
-    return wrapped.data;
-  }
-  if (response === null || response === undefined) throw new Error(fallbackMessage);
-  return response as T;
-};
-
-export const getOwnerEarnings = async (): Promise<OwnerEarnings> => {
-  const res = await apiFetch<ApiResponse<OwnerEarnings> | OwnerEarnings>('/owner/earnings');
-  return unwrapApiResponse(res, 'Không tải được thông tin thu nhập.');
-};
-
-export const getRacePurseSummary = async (
-  raceId: number | string
-): Promise<RacePurseSummary> => {
-  assertPositiveId(raceId, 'raceId');
-  const res = await apiFetch<ApiResponse<RacePurseSummary> | RacePurseSummary>(
-    `/races/${raceId}/purse-summary`
-  );
-  return unwrapApiResponse(res, 'Không tải được chi tiết tiền thưởng của cuộc đua.');
-};
-
-export interface DeleteEnrollmentResult {
-  message: string;
-  data: string;
-}
-
-export const deleteHorseEnrollment = async (
-  horseId: number | string,
-  enrollmentId: number | string
-): Promise<DeleteEnrollmentResult> => {
-  assertPositiveId(horseId, 'horseId');
-  assertPositiveId(enrollmentId, 'enrollmentId');
-  const res = await apiFetch<ApiResponse<string> | string>(
-    `/horses/${horseId}/enrollments/${enrollmentId}`,
-    { method: 'DELETE' }
-  );
-
-  if (res && typeof res === 'object' && 'success' in res) {
-    if (!res.success) throw new Error(res.message || 'Rút hồ sơ thất bại.');
-    return { message: res.message || 'Rút hồ sơ thành công.', data: res.data ?? '' };
-  }
-  return { message: 'Rút hồ sơ thành công.', data: res };
-};
-
 /**
  * POST /api/horses/{horseId}/enrollments
  * Đưa một hồ sơ ngựa đã có trong kho vào một giải cụ thể để backend screening theo giải.
@@ -390,31 +381,13 @@ export const createHorseProfile = async (
 /**
  * PATCH /api/race-entries/{id}/confirm
  */
-interface RaceEntryConfirmationResult {
-  raceEntryId: number;
-  status: string;
-}
-
-export const confirmRaceEntry = async (id: number): Promise<RaceEntryConfirmationResult | null> => {
-  type ConfirmResponse =
-    | RaceEntryConfirmationResult
-    | ApiResponse<RaceEntryConfirmationResult>
-    | undefined;
-
-  const res = await apiFetch<ConfirmResponse>(`/race-entries/${id}/confirm`, {
+export const confirmRaceEntry = async (id: number): Promise<any> => {
+  interface ApiResponse<T> { success: boolean; message: string; data: T | null }
+  const res = await apiFetch<ApiResponse<any>>(`/race-entries/${id}/confirm`, {
     method: 'PATCH',
   });
-
-  if (res === undefined) return null;
-
-  if ('success' in res) {
-    if (!res.success) {
-      throw new Error(res.message || 'Xác nhận tham gia thất bại.');
-    }
-    return res.data;
-  }
-
-  return res;
+  if (!res.success) throw new Error(res.message || 'Xác nhận tham gia thất bại.');
+  return res.data;
 };
 
 /**
