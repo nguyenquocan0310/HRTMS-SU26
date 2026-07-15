@@ -2,7 +2,7 @@ import { apiFetch } from './apiClient';
 
 interface ApiResponse<T> {
   success: boolean;
-  message: string;
+  message?: string;
   data: T | null;
 }
 
@@ -29,9 +29,10 @@ export interface RaceScheduleEntry {
   entryFeeStatus: string;
   horseId: number;
   horseName: string;
-  horseBreed: string;
+  horseBreed?: string;
   jockeyId: number;
   jockeyName: string;
+  ownerName?: string;
 }
 
 interface RawRaceEntryApiItem {
@@ -39,40 +40,94 @@ interface RawRaceEntryApiItem {
   postPosition: number | null;
   status: string;
   entryFeeStatus: string;
-  horse: { horseId: number; name: string; breed: string };
-  jockey: { jockeyId: number; fullName: string };
+  horseId: number;
+  horseName: string;
+  horseBreed?: string;
+  jockeyId: number;
+  jockeyName: string;
+  ownerName?: string;
 }
 
-// GET /api/races/{raceId}/entries — trả về { success, data: [...] } với data LÀ MẢNG PHẲNG
-// các entry (mỗi entry lồng object horse/jockey), KHÔNG có object race bao ngoài
-// (không có raceId/roundId/isPostPositionDrawn ở tầng này — lấy isDrawn từ race list thay thế).
-export const getRaceEntries = (raceId: number): Promise<RaceScheduleEntry[]> =>
-  apiFetch<{ success: boolean; data: RawRaceEntryApiItem[] }>(`/races/${raceId}/entries`)
-    .then((res) =>
-      (res.data ?? []).map((e) => ({
-        raceEntryId: e.raceEntryId,
-        postPosition: e.postPosition,
-        status: e.status,
-        entryFeeStatus: e.entryFeeStatus,
-        horseId: e.horse?.horseId,
-        horseName: e.horse?.name,
-        horseBreed: e.horse?.breed,
-        jockeyId: e.jockey?.jockeyId,
-        jockeyName: e.jockey?.fullName,
-      }))
-    );
+interface RaceEntriesData {
+  raceId: number;
+  roundId: number;
+  raceNumber: number;
+  scheduledTime: string;
+  status: string;
+  isPostPositionDrawn: boolean;
+  entries: RawRaceEntryApiItem[];
+}
 
-// POST /api/admin/races/{raceId}/entries — allocate pairing
-export const allocateEntry = (raceId: number, pairingId: number): Promise<RaceEntryResponse> =>
-  apiFetch<RaceEntryResponse>(`/admin/races/${raceId}/entries`, {
-    method: 'POST',
-    body: JSON.stringify({ pairingId }),
+/**
+ * GET /api/races/{raceId}/entries
+ *
+ * API trả:
+ * {
+ *   success: true,
+ *   data: {
+ *     raceId,
+ *     roundId,
+ *     raceNumber,
+ *     scheduledTime,
+ *     status,
+ *     isPostPositionDrawn,
+ *     entries: [...]
+ *   }
+ * }
+ *
+ * apiFetch không unwrap data, nên phải đọc res.data.entries.
+ */
+export const getRaceEntries = (
+  raceId: number
+): Promise<RaceScheduleEntry[]> =>
+  apiFetch<ApiResponse<RaceEntriesData>>(
+    `/races/${raceId}/entries`
+  ).then((res) =>
+    (res.data?.entries ?? []).map((entry) => ({
+      raceEntryId: entry.raceEntryId,
+      postPosition: entry.postPosition,
+      status: entry.status,
+      entryFeeStatus: entry.entryFeeStatus,
+      horseId: entry.horseId,
+      horseName: entry.horseName,
+      horseBreed: entry.horseBreed,
+      jockeyId: entry.jockeyId,
+      jockeyName: entry.jockeyName,
+      ownerName: entry.ownerName,
+    }))
+  );
+
+/**
+ * POST /api/admin/races/{raceId}/entries
+ * Allocate pairing vào Race.
+ */
+export const allocateEntry = (
+  raceId: number,
+  pairingId: number
+): Promise<RaceEntryResponse> =>
+  apiFetch<ApiResponse<RaceEntryResponse>>(
+    `/admin/races/${raceId}/entries`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ pairingId }),
+    }
+  ).then((res) => {
+    if (!res.data) {
+      throw new Error(res.message || 'Allocate không trả về dữ liệu.');
+    }
+
+    return res.data;
   });
 
-// POST /api/admin/races/{raceId}/draw — draw post positions
-export const drawPostPositions = (raceId: number): Promise<unknown> =>
-  apiFetch(`/admin/races/${raceId}/draw`, { method: 'POST' });
-
+/**
+ * POST /api/admin/races/{raceId}/draw
+ */
+export const drawPostPositions = (
+  raceId: number
+): Promise<unknown> =>
+  apiFetch(`/admin/races/${raceId}/draw`, {
+    method: 'POST',
+  });
 
 export interface AdminPairing {
   pairingId: number;
@@ -95,14 +150,77 @@ interface PagedResult<T> {
   page: number;
   pageSize: number;
   totalCount: number;
+  totalPages?: number;
 }
 
-// GET /api/admin/pairings — Module E allocation picker (thay ô nhập tay Pairing ID)
+/**
+ * GET /api/admin/pairings
+ *
+ * Theo ảnh Network trước đó, endpoint này đang trả PagedResult trực tiếp:
+ * {
+ *   items: [],
+ *   totalCount: 0,
+ *   ...
+ * }
+ */
 export const getAdminPairings = (
   tournamentId: number,
   unallocatedOnly = true,
   pageSize = 100
-): Promise<AdminPairing[]> =>
-  apiFetch<PagedResult<AdminPairing>>(
-    `/admin/pairings?tournamentId=${tournamentId}&status=Confirmed&unallocatedOnly=${unallocatedOnly}&page=1&pageSize=${pageSize}`
-  ).then((res) => res.items);
+): Promise<AdminPairing[]> => {
+  const params = new URLSearchParams({
+    tournamentId: String(tournamentId),
+    status: 'Confirmed',
+    unallocatedOnly: String(unallocatedOnly),
+    page: '1',
+    pageSize: String(pageSize),
+  });
+
+  return apiFetch<PagedResult<AdminPairing>>(
+    `/admin/pairings?${params.toString()}`
+  ).then((res) => res.items ?? []);
+};
+
+export interface UnofficialRace {
+  raceId: number;
+  tournamentId: number;
+  tournamentName?: string;
+  roundId?: number;
+  roundName?: string;
+  raceNumber: number;
+  scheduledTime: string;
+  status: string;
+}
+
+interface UnofficialRaceApiResponse {
+  success: boolean;
+  message?: string;
+  data: UnofficialRace[] | null;
+}
+
+/**
+ * GET /api/races/unofficial
+ * Lấy danh sách tất cả race đang ở trạng thái Unofficial.
+ */
+export const getUnofficialRaces = (
+  tournamentId?: number
+): Promise<UnofficialRace[]> => {
+  const query = tournamentId
+    ? `?tournamentId=${tournamentId}`
+    : '';
+
+  return apiFetch<ApiResponse<UnofficialRace[]>>(
+    `/races/unofficial${query}`
+  ).then((res) => res.data ?? []);
+};
+
+/**
+ * POST /api/races/{raceId}/declare-official
+ * Admin công bố kết quả chính thức của một Race.
+ */
+export const declareRaceOfficial = (
+  raceId: number
+): Promise<void> =>
+  apiFetch(`/races/${raceId}/declare-official`, {
+    method: 'POST',
+  }).then(() => undefined);
