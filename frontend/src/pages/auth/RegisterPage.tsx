@@ -57,6 +57,7 @@ const nextStep = () => {
               updateFormData({ role });
               setRoleError('');
             }}
+            error={roleError}
           />
         );
       case 2:
