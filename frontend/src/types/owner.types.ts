@@ -90,15 +90,20 @@ export interface OwnerEarnings {
   payouts: OwnerPayout[];
 }
 
-export interface RacePayoutSummary {
+export interface RacePurseSummary {
   raceId: number;
   raceNumber: number;
+  raceName: string;
   roundName: string;
   tournamentName: string;
-  raceStatus: string;
-  purseAmount: number;
-  totalAllocated: number;
-  remainderAmount: number;
+  allocatedFund: number;
+  paidAmount: number;
+  pendingAmount: number;
+  remainingAmount: number;
+  payoutStatus: string;
+  resultStatus: string;
+  hasDiscrepancy: boolean;
+  discrepancyAmount: number | null;
   payouts: OwnerPayout[];
 }
 
