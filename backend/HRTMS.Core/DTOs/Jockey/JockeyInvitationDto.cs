@@ -13,6 +13,8 @@ public class JockeyInvitationDto
     public string Status { get; set; } = string.Empty;
 
     public DateTime CreatedAt { get; set; }
+
+    public DateTime? RespondedAt { get; set; }
 }
 
 public class InvitationHorseDto
