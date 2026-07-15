@@ -53,6 +53,7 @@ const nextStep = () => {
         return (
           <StepRoleSelection
             selected={formData.role}
+            error={roleError}
             onSelect={(role) => {
               updateFormData({ role });
               setRoleError('');
