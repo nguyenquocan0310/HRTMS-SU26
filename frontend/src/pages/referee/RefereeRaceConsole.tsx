@@ -30,6 +30,7 @@ import type {
   ProtestRulingPayload,
   UpdateViolationPayload,
 } from '../../types/protest.types';
+import JockeyCareerStatsModal from '../../components/jockey/JockeyCareerStatsModal';
 
 const PENALTIES: Penalty[] = ['Disqualified', 'PlaceBehind', 'Warning', 'Scratch'];
 
@@ -190,6 +191,7 @@ export default function RefereeRaceConsole() {
   const [rulingForm, setRulingForm] = useState<ProtestRulingPayload>(emptyRulingForm);
   const [finishNotes, setFinishNotes] = useState('');
   const [finishValues, setFinishValues] = useState<Record<number, { position: string; time: string }>>({});
+  const [careerJockeyId, setCareerJockeyId] = useState<number | null>(null);
 
   const showToast = (message: string) => {
     setToast(message);
@@ -664,6 +666,15 @@ export default function RefereeRaceConsole() {
                     <td className="px-5 py-4">
                       <p className="font-semibold text-gray-900">{entry.horseName}</p>
                       <p className="text-xs text-gray-400">{entry.jockeyName}</p>
+                      {entry.jockeyId != null && Number.isInteger(entry.jockeyId) && entry.jockeyId > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setCareerJockeyId(entry.jockeyId)}
+                          className="mt-1 text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                        >
+                          Xem thành tích Jockey
+                        </button>
+                      )}
                     </td>
                     <td className="px-5 py-4">{statusBadge(entry.isWithdrawn ? 'Withdrawn' : entry.status)}</td>
                     <td className="px-5 py-4 text-gray-700">{entry.finishPosition ?? '—'}</td>
@@ -935,13 +946,25 @@ export default function RefereeRaceConsole() {
                         </div>
                       </td>
                       <td className="px-5 py-4 text-right">
+                        <div className="flex flex-col items-end gap-2">
+                        {entry.jockeyId != null && Number.isInteger(entry.jockeyId) && entry.jockeyId > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setCareerJockeyId(entry.jockeyId)}
+                            className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                          >
+                            Xem thành tích Jockey
+                          </button>
+                        )}
                         <button
+                          type="button"
                           onClick={() => handleIndependenceCheck(entry)}
                           disabled={savingKey === key}
                           className="rounded-md bg-gray-900 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           {savingKey === key ? 'Đang kiểm tra...' : 'Kiểm tra độc lập'}
                         </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -964,6 +987,12 @@ export default function RefereeRaceConsole() {
           <ResultTable title="Entries được xác nhận vào starting list" items={startingListResult.confirmedEntries ?? []} />
           <ResultTable title="Entries bị loại khỏi starting list" items={startingListResult.rejectedEntries ?? []} />
         </section>
+      )}
+      {careerJockeyId != null && (
+        <JockeyCareerStatsModal
+          jockeyId={careerJockeyId}
+          onClose={() => setCareerJockeyId(null)}
+        />
       )}
     </div>
   );

@@ -1,46 +1,41 @@
-import axios from 'axios';
-import type  { AxiosInstance } from 'axios';
 import type {
+  JockeyCareerStats,
   JockeyProfile,
   JockeyRaceEntry,
   JockeyRaceResult,
 } from '../types/jockey.types';
 import { apiFetch } from './apiClient';
 
-const API_URL = import.meta.env.VITE_API_URL;
+interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  data: T | null;
+}
 
-// Create axios instance
-const axiosInstance: AxiosInstance = axios.create({
-  baseURL: API_URL,
-});
-
-// Add JWT token to every request
-axiosInstance.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+const unwrap = <T>(response: ApiResponse<T> | T): T => {
+  if (response && typeof response === 'object' && 'data' in response) {
+    const wrapped = response as ApiResponse<T>;
+    if (wrapped.success === false || wrapped.data == null) {
+      throw new Error(wrapped.message || 'API trả về dữ liệu không hợp lệ.');
     }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
+    return wrapped.data;
   }
-);
+  return response as T;
+};
+
+const positiveJockeyId = (jockeyId: number): number => {
+  if (!Number.isInteger(jockeyId) || jockeyId <= 0) {
+    throw new Error('jockeyId phải là số nguyên dương.');
+  }
+  return jockeyId;
+};
 
 /**
  * Get the current jockey's profile information
  */
 export const getMyProfile = async (): Promise<JockeyProfile> => {
-  try {
-    const response = await axiosInstance.get<JockeyProfile>(
-      'http://localhost:5222/api/jockeys/profile'
-    );
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching jockey profile:', error);
-    throw error;
-  }
+  const response = await apiFetch<ApiResponse<JockeyProfile> | JockeyProfile>('/jockeys/profile');
+  return unwrap(response);
 };
 
 /**
@@ -57,16 +52,11 @@ export interface UpdateProfilePayload {
 export const updateMyProfile = async (
   payload: UpdateProfilePayload
 ): Promise<{ message: string }> => {
-  try {
-    const response = await axiosInstance.patch<{ message: string }>(
-      'http://localhost:5222/api/jockeys/profile',
-      payload
-    );
-    return response.data;
-  } catch (error) {
-    console.error('Error updating jockey profile:', error);
-    throw error;
-  }
+  const response = await apiFetch<ApiResponse<{ message: string }> | { message: string }>(
+    '/jockeys/profile',
+    { method: 'PATCH', body: JSON.stringify(payload) }
+  );
+  return unwrap(response);
 };
 
 
@@ -78,29 +68,17 @@ export const getMyInvitations = async (
   page: number = 1,
   pageSize: number = 20
 ): Promise<any[]> => {
-  try {
-    const params = new URLSearchParams();
-    if (status) params.append('status', status);
-    params.append('page', String(page));
-    params.append('pageSize', String(pageSize));
+  const params = new URLSearchParams();
+  if (status) params.append('status', status);
+  params.append('page', String(page));
+  params.append('pageSize', String(pageSize));
 
-    const response = await axiosInstance.get<any>(
-      `http://localhost:5222/api/jockeys/invitations?${params.toString()}`
-    );
-    const data = response.data;
-
-    // Extract array of invitations
-    if (Array.isArray(data)) return data;
-    if (data && data.data) {
-      if (Array.isArray(data.data)) return data.data;
-      if (data.data.items && Array.isArray(data.data.items)) return data.data.items;
-    }
-    if (data && data.items && Array.isArray(data.items)) return data.items;
-    return [];
-  } catch (error) {
-    console.error('Error fetching jockey invitations:', error);
-    throw error;
-  }
+  const data = await apiFetch<any>(`/jockeys/invitations?${params.toString()}`);
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data?.data?.items)) return data.data.items;
+  if (Array.isArray(data?.items)) return data.items;
+  return [];
 };
 
 /**
@@ -118,30 +96,37 @@ export const respondToInvitation = async (
  * Get all upcoming races for the current jockey
  */
 export const getMyRaces = async (): Promise<JockeyRaceEntry[]> => {
-  try {
-    const response = await axiosInstance.get<JockeyRaceEntry[]>(
-      '/api/race-entries/jockey/my'
-    );
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching jockey races:', error);
-    throw error;
-  }
+  const response = await apiFetch<ApiResponse<JockeyRaceEntry[]> | JockeyRaceEntry[]>(
+    '/race-entries/jockey/my'
+  );
+  return unwrap(response);
 };
 
 /**
  * Get race history/results for the current jockey
  */
 export const getMyRaceHistory = async (): Promise<JockeyRaceResult[]> => {
-  try {
-    const response = await axiosInstance.get<JockeyRaceResult[]>(
-      '/api/race-results/jockey/my'
-    );
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching jockey race history:', error);
-    throw error;
-  }
+  const response = await apiFetch<ApiResponse<JockeyRaceResult[]> | JockeyRaceResult[]>(
+    '/race-results/jockey/my'
+  );
+  return unwrap(response);
+};
+
+/** GET /api/jockeys/stats/my — jockeyId is resolved by the backend from JWT. */
+export const getMyCareerStats = async (): Promise<JockeyCareerStats> => {
+  const response = await apiFetch<ApiResponse<JockeyCareerStats> | JockeyCareerStats>(
+    '/jockeys/stats/my'
+  );
+  return unwrap(response);
+};
+
+/** GET /api/jockeys/{jockeyId}/stats */
+export const getJockeyCareerStats = async (jockeyId: number): Promise<JockeyCareerStats> => {
+  const id = positiveJockeyId(jockeyId);
+  const response = await apiFetch<ApiResponse<JockeyCareerStats> | JockeyCareerStats>(
+    `/jockeys/${id}/stats`
+  );
+  return unwrap(response);
 };
 
 /**
@@ -149,8 +134,7 @@ export const getMyRaceHistory = async (): Promise<JockeyRaceResult[]> => {
  * Jockey chấp nhận lời mời của Owner.
  */
 export const acceptPairing = async (pairingId: string): Promise<any> => {
-  interface ApiResp<T> { success: boolean; message: string; data: T | null }
-  const res = await apiFetch<ApiResp<any>>(`/pairings/${pairingId}/accept`, {
+  const res = await apiFetch<ApiResponse<any>>(`/pairings/${pairingId}/accept`, {
     method: 'PATCH',
   });
   if (res && res.success === false) {
@@ -168,8 +152,7 @@ export const declinePairing = async (
   pairingId: string,
   responseReason: string = 'Jockey từ chối lời mời.'
 ): Promise<any> => {
-  interface ApiResp<T> { success: boolean; message: string; data: T | null }
-  const res = await apiFetch<ApiResp<any>>(`/pairings/${pairingId}/decline`, {
+  const res = await apiFetch<ApiResponse<any>>(`/pairings/${pairingId}/decline`, {
     method: 'PATCH',
     body: JSON.stringify({ responseReason }),
   });
@@ -207,10 +190,10 @@ export const getMyJockeyRaceEntries = async (
  *
  * const form = new FormData();
  * form.append('file', file);
- * const res = await axiosInstance.post('/jockeys/certificate/upload', form, {
- *   headers: { 'Content-Type': 'multipart/form-data' },
+ * const res = await apiFetch<{ url: string }>('/jockeys/certificate/upload', {
+ *   method: 'POST', body: form,
  * });
- * return { url: res.data.url, fileName: file.name };
+ * return { url: res.url, fileName: file.name };
  */
 export const uploadCertificateFile = async (
   file: File

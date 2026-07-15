@@ -17,6 +17,7 @@ export interface DoctorRaceAssignment {
 
 export interface DoctorRaceEntry {
   raceEntryId: number;
+  jockeyId?: number;
   postPosition: number | null;
   status: string;
   entryFeeStatus: string | null;
@@ -125,9 +126,12 @@ const normalizeRaceEntry = (item: any): DoctorRaceEntry | null => {
     (typeof preRaceJockeyWeight === 'number' && typeof selfDeclaredWeight === 'number'
       ? Number((preRaceJockeyWeight - selfDeclaredWeight).toFixed(1))
       : null);
+  const rawJockeyId = item?.jockey?.jockeyId ?? item?.jockeyId;
+  const jockeyId = Number(rawJockeyId);
 
   return {
     raceEntryId,
+    ...(Number.isInteger(jockeyId) && jockeyId > 0 ? { jockeyId } : {}),
     postPosition: item?.postPosition ?? null,
     status: item?.status ?? item?.raceEntryStatus ?? 'Confirmed',
     entryFeeStatus: item?.entryFeeStatus ?? null,

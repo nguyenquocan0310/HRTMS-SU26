@@ -12,6 +12,7 @@ import {
   type DoctorRaceEntry,
   type DoctorRaceEntryHealthProfile,
 } from '../../services/doctorService'
+import JockeyCareerStatsModal from '../../components/jockey/JockeyCareerStatsModal'
 
 type ActiveTab = 'weigh-in' | 'vet-check' | 'weigh-out'
 type IdentityStatus = 'Matched' | 'Mismatch'
@@ -156,12 +157,14 @@ function HealthProfileModal({
   loading,
   error,
   onClose,
+  onViewCareer,
 }: {
   entry: DoctorRaceEntry
   profile: DoctorRaceEntryHealthProfile | null
   loading: boolean
   error: string | null
   onClose: () => void
+  onViewCareer: (jockeyId: number) => void
 }) {
   const position = profile?.postPosition ?? entry.postPosition
   const detailRows = [
@@ -183,6 +186,9 @@ function HealthProfileModal({
     ['Cân trước đua', profile?.preRaceJockeyWeight != null ? `${profile.preRaceJockeyWeight} kg` : null],
     ['Cân sau đua', profile?.postRaceJockeyWeight != null ? `${profile.postRaceJockeyWeight} kg` : null],
   ] as const
+  const rawJockeyId = profile?.jockeyId ?? entry.jockeyId
+  const jockeyId = Number(rawJockeyId)
+  const canViewCareer = Number.isInteger(jockeyId) && jockeyId > 0
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/45 p-4" onMouseDown={onClose}>
@@ -225,7 +231,18 @@ function HealthProfileModal({
               </section>
 
               <section>
-                <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-700">Thông tin kỵ sĩ</h3>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-bold uppercase tracking-wide text-gray-700">Thông tin kỵ sĩ</h3>
+                  {canViewCareer && (
+                    <button
+                      type="button"
+                      onClick={() => onViewCareer(jockeyId)}
+                      className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100"
+                    >
+                      Xem thành tích Jockey
+                    </button>
+                  )}
+                </div>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   {jockeyRows.map(([label, value]) => (
                     <div key={label} className="rounded-md border border-gray-200 p-3">
@@ -282,6 +299,7 @@ export default function PaddockConsole() {
   const [detailProfile, setDetailProfile] = useState<DoctorRaceEntryHealthProfile | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
+  const [careerJockeyId, setCareerJockeyId] = useState<number | null>(null)
 
   const showToast = (message: string) => {
     setToastMessage(message)
@@ -1051,11 +1069,18 @@ export default function PaddockConsole() {
           profile={detailProfile}
           loading={detailLoading}
           error={detailError}
+          onViewCareer={setCareerJockeyId}
           onClose={() => {
             setDetailEntry(null)
             setDetailProfile(null)
             setDetailError(null)
           }}
+        />
+      )}
+      {careerJockeyId != null && (
+        <JockeyCareerStatsModal
+          jockeyId={careerJockeyId}
+          onClose={() => setCareerJockeyId(null)}
         />
       )}
     </div>
