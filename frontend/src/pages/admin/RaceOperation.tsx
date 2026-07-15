@@ -54,9 +54,13 @@ const RaceOperations = () => {
 
   const reloadEntries = (raceId: number) => {
     setLoadingSchedule(true);
+    setActionError('');
     getRaceEntries(raceId)
       .then(setEntries)
-      .catch(() => setEntries([]))
+      .catch((err) => {
+        setEntries([]);
+        setActionError(err instanceof Error ? err.message : 'Không thể tải danh sách entry.');
+      })
       .finally(() => setLoadingSchedule(false));
   };
 
