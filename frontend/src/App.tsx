@@ -115,7 +115,7 @@ export default function App() {
 
         {/* Owner routes */}
         <Route path="/owner" element={
-          <ProtectedRoute allowedRoles={['Owner']}>
+          <ProtectedRoute allowedRoles={['Owner', 'HorseOwner']}>
             <OwnerLayout />
           </ProtectedRoute>
         }>
