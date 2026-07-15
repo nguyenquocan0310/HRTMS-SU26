@@ -48,6 +48,7 @@ import DoctorDashboard from './pages/doctor/DoctorDashboard'
 import PaddockConsole from './pages/doctor/PaddockConsole'
 import DoctorTournamentList from './pages/doctor/DoctorTournamentList'
 import DoctorCoiDeclarations from './pages/doctor/DoctorCoiDeclarations'
+import DoctorProfile from './pages/doctor/DoctorProfile'
 
 // ── Import các trang Referee ──
 import RefereeLayout from './pages/referee/RefereeLayout'
@@ -160,6 +161,8 @@ export default function App() {
           <Route path="paddock" element={<PaddockConsole />} />
           <Route path="tournaments" element={<DoctorTournamentList />} />
           <Route path="coi" element={<DoctorCoiDeclarations />} />
+          <Route path="profile" element={<DoctorProfile />} />
+          <Route path="notifications" element={<SharedNotificationCenter />} />
         </Route>
 
         {/* ── Cấu trúc Route của TRỌNG TÀI (Referee) ── */}

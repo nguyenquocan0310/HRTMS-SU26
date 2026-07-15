@@ -38,6 +38,12 @@ export interface JockeyRoleProfile {
   certificate: CertificateMetadata | null
 }
 
+export interface DoctorRoleProfile {
+  medicalLicenseNumber: string
+  status: string
+  certificate: CertificateMetadata | null
+}
+
 export interface UpdateBasicInfoPayload {
   fullName: string
   email: string
