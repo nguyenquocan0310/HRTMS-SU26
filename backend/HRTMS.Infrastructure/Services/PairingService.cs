@@ -167,11 +167,16 @@ public class PairingService : IPairingService
         _context.Pairings.Add(pairing);
         await _context.SaveChangesAsync();
 
-        // Tao thong bao cho Jockey khi co loi moi moi (email + in-app — SRS Module O)
+        var messagePart = string.IsNullOrWhiteSpace(dto.RequestMessage)
+            ? ""
+            : $" Lời nhắn từ chủ ngựa: \"{dto.RequestMessage}\"";
+
+
+        // Tao thong bao cho Jockey khi co loi moi moi (email — SRS Module O)
         await _notification.SendAsync(
             dto.JockeyId,
             "Lời mời ghép cặp thi đấu",
-            $"Bạn nhận được lời mời ghép cặp thi đấu cùng ngựa '{horse.Name}'. Vui lòng phản hồi lời mời.",
+            $"Bạn nhận được lời mời ghép cặp thi đấu cùng ngựa '{horse.Name}'. Vui lòng phản hồi lời mời.{messagePart}",
             type: "Both",
             relatedEntityType: "Pairing",
             relatedEntityId: pairing.PairingId);
@@ -370,11 +375,15 @@ public class PairingService : IPairingService
         pairing.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        // Gui thong bao cho Owner (email + in-app)
+        var reasonPart = string.IsNullOrWhiteSpace(dto.ResponseReason)
+            ? ""
+            : $" Lý do: \"{dto.ResponseReason}\"";
+
+        // Gui thong bao cho Owner (email)
         await _notification.SendAsync(
             pairing.Horse.OwnerId,
             "Nài ngựa đã từ chối lời mời",
-            $"Nài ngựa đã từ chối ghép cặp cùng ngựa '{pairing.Horse.Name}'.",
+            $"Nài ngựa đã từ chối ghép cặp cùng ngựa '{pairing.Horse.Name}'.{reasonPart}",
             type: "Both",
             relatedEntityType: "Pairing",
             relatedEntityId: pairing.PairingId);
@@ -441,7 +450,6 @@ public class PairingService : IPairingService
             {
                 PairingId = p.PairingId,
                 TournamentId = p.TournamentId,
-                RequestMessage = p.RequestMessage,
 
                 Horse = new OwnerPairingHorseDto
                 {
@@ -454,12 +462,11 @@ public class PairingService : IPairingService
                 {
                     JockeyId = p.Jockey.JockeyId,
                     FullName = p.Jockey.Jockey.FullName,
-                    LicenseCertificate =
-                        p.Jockey.LicenseCertificate,
-                    ExperienceYears =
-                        p.Jockey.ExperienceYears
+                    LicenseCertificate = p.Jockey.LicenseCertificate,
+                    ExperienceYears = p.Jockey.ExperienceYears
                 },
 
+                RequestMessage = p.RequestMessage,
                 Status = p.Status,
                 CreatedAt = p.CreatedAt
             })
