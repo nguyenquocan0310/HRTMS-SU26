@@ -218,16 +218,12 @@ const ApprovalCenter = () => {
       <div className={styles.header}>
         <div>
           <h1 className={styles.heading}>Admin Workspace</h1>
-          <p className={styles.subtext}>System operations and governance</p>
         </div>
       </div>
 
       <div className={styles.subHeader}>
         <div>
-          <h2 className={styles.subHeading}>Approval Center</h2>
-          <p className={styles.subtext}>
-            Tách riêng hồ sơ tài khoản, hồ sơ ngựa và đăng ký tham gia giải để admin duyệt đúng ngữ cảnh.
-          </p>
+          <h2 className={styles.subHeading}>Approval Center</h2>         
         </div>
         {activeGroup !== 'roster' && (
           <span className={styles.countBadge}>{totalCount} hồ sơ</span>

@@ -65,7 +65,6 @@ export default function LoginPage() {
             <GiHorseHead />
           </div>
           <span className={styles.logoText}>HRTMS</span>
-          <span className={styles.tagline}>MYSTIC THOROUGHBRED</span>
         </div>
 
         {/* Error */}
@@ -148,22 +147,12 @@ export default function LoginPage() {
         </form>
 
         {/* Divider + security notice */}
-        <hr className={styles.divider} />
-        <div className={styles.securityNotice}>
-          Authorized Personnel Only.
-          <br />
-          Encryption Level: <span className={styles.gold}>256-BIT AES</span>
-        </div>
+        <hr className={styles.divider} />    
       </div>
 
       {/* ═══ BELOW CARD ══════════════════════════════════════ */}
       <div className={styles.bottomMeta}>
-        <div className={styles.metaRow}>
-          <a href="#" className={styles.statusLink}>
-            <FiHelpCircle size={13} />
-            System Status
-          </a>
-          <span className={styles.version}>v2.4.0-STABLE</span>
+        <div className={styles.metaRow}>      
         </div>
         <div className={styles.registerRow}>
           New to HRTMS?{' '}
