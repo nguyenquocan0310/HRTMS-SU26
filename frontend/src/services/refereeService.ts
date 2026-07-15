@@ -1,4 +1,7 @@
 import { apiFetch } from './apiClient';
+import type { Penalty, RaceViolation, UpdateViolationPayload } from '../types/protest.types';
+
+export type { RaceViolation } from '../types/protest.types';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -120,24 +123,17 @@ export interface RaceLiveStatus {
   entries: LiveRaceEntry[];
 }
 
-export interface RaceViolation {
-  violationId?: number;
-  raceEntryId: number | null;
-  horseName?: string | null;
-  jockeyName?: string | null;
-  violationCode: string;
-  penalty: string;
-  placeBehindEntryId?: number | null;
-  description?: string | null;
-  recordedAt?: string | null;
-  refereeName?: string | null;
-}
-
 export interface CreateViolationPayload {
   raceEntryId: number;
   violationCode: string;
-  penalty: string;
-  placeBehindEntryId?: number;
+  penalty: Penalty;
+  placeBehindEntryId?: number | null;
+  description: string;
+}
+
+export interface ViolationCodeOption {
+  code: string;
+  name: string;
   description: string;
 }
 
@@ -168,6 +164,12 @@ const unwrapData = <T>(res: ApiResponse<T> | T): T => {
     return apiRes.data;
   }
   return res as T;
+};
+
+const positiveId = (value: string | number, name: string): number => {
+  const id = typeof value === 'number' ? value : Number(value);
+  if (!Number.isInteger(id) || id <= 0) throw new Error(`${name} phải là số nguyên dương.`);
+  return id;
 };
 
 const normalizeAssignment = (item: any): RefereeRaceAssignment | null => {
@@ -285,8 +287,16 @@ export const getRaceLiveStatus = async (raceId: number): Promise<RaceLiveStatus>
 };
 
 export const getRaceViolations = async (raceId: number): Promise<RaceViolation[]> => {
+  const id = positiveId(raceId, 'raceId');
   const res = await apiFetch<ApiResponse<RaceViolation[]> | RaceViolation[]>(
-    `/races/${raceId}/violations`
+    `/races/${id}/violations`
+  );
+  return unwrapData(res);
+};
+
+export const getViolationCodes = async (): Promise<ViolationCodeOption[]> => {
+  const res = await apiFetch<ApiResponse<ViolationCodeOption[]> | ViolationCodeOption[]>(
+    '/violations/codes'
   );
   return unwrapData(res);
 };
@@ -308,6 +318,45 @@ export const createRaceViolation = async (
     { method: 'POST', body: JSON.stringify(payload) }
   );
   return unwrapData(res);
+};
+
+export const updateRaceViolation = async (
+  raceId: string | number,
+  violationId: string | number,
+  payload: UpdateViolationPayload,
+  onMessage?: (message: string) => void
+): Promise<RaceViolation> => {
+  const validRaceId = positiveId(raceId, 'raceId');
+  const validViolationId = positiveId(violationId, 'violationId');
+  const placeBehindEntryId = payload.placeBehindEntryId == null
+    ? null
+    : positiveId(payload.placeBehindEntryId, 'placeBehindEntryId');
+  const res = await apiFetch<ApiResponse<RaceViolation>>(
+    `/referees/races/${validRaceId}/violations/${validViolationId}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({
+        violationCode: payload.violationCode,
+        penalty: payload.penalty,
+        placeBehindEntryId: payload.penalty === 'PlaceBehind' ? placeBehindEntryId : null,
+        description: payload.description,
+      }),
+    }
+  );
+  if (!res.success || res.data === null) throw new Error(res.message || 'Không thể cập nhật vi phạm.');
+  onMessage?.(res.message);
+  return res.data;
+};
+
+export const deleteRaceViolation = async (
+  raceId: string | number,
+  violationId: string | number
+): Promise<void> => {
+  const validRaceId = positiveId(raceId, 'raceId');
+  const validViolationId = positiveId(violationId, 'violationId');
+  await apiFetch<void>(`/referees/races/${validRaceId}/violations/${validViolationId}`, {
+    method: 'DELETE',
+  });
 };
 
 export const finishRace = async (
