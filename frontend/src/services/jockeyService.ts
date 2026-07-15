@@ -2,7 +2,6 @@ import type {
   JockeyCareerStats,
   JockeyProfile,
   JockeyRaceEntry,
-  JockeyRaceResult,
 } from '../types/jockey.types';
 import { apiFetch } from './apiClient';
 
@@ -81,38 +80,7 @@ export const getMyInvitations = async (
   return [];
 };
 
-/**
- * Respond to a race invitation — DEPRECATED, kept for safety.
- * Use acceptPairing / declinePairing instead.
- */
-export const respondToInvitation = async (
-  _invitationID: string,
-  _status: 'Accepted' | 'Declined'
-): Promise<void> => {
-  console.warn('respondToInvitation is deprecated. Use acceptPairing or declinePairing.');
-};
-
-/**
- * Get all upcoming races for the current jockey
- */
-export const getMyRaces = async (): Promise<JockeyRaceEntry[]> => {
-  const response = await apiFetch<ApiResponse<JockeyRaceEntry[]> | JockeyRaceEntry[]>(
-    '/race-entries/jockey/my'
-  );
-  return unwrap(response);
-};
-
-/**
- * Get race history/results for the current jockey
- */
-export const getMyRaceHistory = async (): Promise<JockeyRaceResult[]> => {
-  const response = await apiFetch<ApiResponse<JockeyRaceResult[]> | JockeyRaceResult[]>(
-    '/race-results/jockey/my'
-  );
-  return unwrap(response);
-};
-
-/** GET /api/jockeys/stats/my — jockeyId is resolved by the backend from JWT. */
+/** GET /jockeys/stats/my — jockeyId is resolved by the backend from JWT. */
 export const getMyCareerStats = async (): Promise<JockeyCareerStats> => {
   const response = await apiFetch<ApiResponse<JockeyCareerStats> | JockeyCareerStats>(
     '/jockeys/stats/my'
@@ -120,7 +88,7 @@ export const getMyCareerStats = async (): Promise<JockeyCareerStats> => {
   return unwrap(response);
 };
 
-/** GET /api/jockeys/{jockeyId}/stats */
+/** GET /jockeys/{jockeyId}/stats */
 export const getJockeyCareerStats = async (jockeyId: number): Promise<JockeyCareerStats> => {
   const id = positiveJockeyId(jockeyId);
   const response = await apiFetch<ApiResponse<JockeyCareerStats> | JockeyCareerStats>(
@@ -130,7 +98,7 @@ export const getJockeyCareerStats = async (jockeyId: number): Promise<JockeyCare
 };
 
 /**
- * PATCH /api/pairings/{id}/accept
+ * PATCH /pairings/{id}/accept
  * Jockey chấp nhận lời mời của Owner.
  */
 export const acceptPairing = async (pairingId: string): Promise<any> => {
@@ -144,7 +112,7 @@ export const acceptPairing = async (pairingId: string): Promise<any> => {
 };
 
 /**
- * PATCH /api/pairings/{id}/decline
+ * PATCH /pairings/{id}/decline
  * Jockey từ chối lời mời của Owner.
  * @param responseReason - Lý do từ chối (tuyện chọn, có giá trị mặc định)
  */
@@ -177,23 +145,19 @@ export const getMyJockeyRaceEntries = async (
   page: number = 1,
   pageSize: number = 20
 ): Promise<PagedResult<JockeyRaceEntry>> => {
-  return apiFetch<PagedResult<JockeyRaceEntry>>(
+  const response = await apiFetch<
+    ApiResponse<PagedResult<JockeyRaceEntry>> | PagedResult<JockeyRaceEntry>
+  >(
     `/jockeys/race-entries/my?page=${page}&pageSize=${pageSize}`
   );
+  return unwrap(response);
 };
 
 
 /**
  * Upload chứng chỉ hành nghề (ảnh/pdf).
- * TODO: BE chưa có endpoint — hiện tạm dùng blob URL local để preview.
- * Khi BE xong, thay thân hàm bằng:
- *
- * const form = new FormData();
- * form.append('file', file);
- * const res = await apiFetch<{ url: string }>('/jockeys/certificate/upload', {
- *   method: 'POST', body: form,
- * });
- * return { url: res.url, fileName: file.name };
+ * Placeholder: BE chưa có endpoint upload/update certificate sau đăng ký.
+ * Hiện chỉ tạo blob URL local để preview, không gửi request lên server.
  */
 export const uploadCertificateFile = async (
   file: File
