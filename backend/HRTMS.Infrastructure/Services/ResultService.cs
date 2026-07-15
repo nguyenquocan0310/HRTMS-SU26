@@ -214,6 +214,17 @@ namespace HRTMS.Infrastructure.Services
 
                 return result;
             }
+            catch (DbUpdateConcurrencyException)
+            {
+                // REQ-F-RES.4 — chống double-click/retry: request khác đã commit
+                // Declare Official (hoặc cập nhật Race) trước khi transaction này
+                // kịp lưu, RowVersion lệch → EF phát hiện conflict. Rollback và
+                // trả lỗi nghiệp vụ rõ ràng thay vì để 500 thô lộ ra ngoài.
+                await transaction.RollbackAsync();
+                throw new InvalidOperationException(
+                    "Cuộc đua này vừa được công bố kết quả chính thức ở một thao tác khác. " +
+                    "Vui lòng tải lại trang để xem kết quả mới nhất.");
+            }
             catch
             {
                 await transaction.RollbackAsync();
