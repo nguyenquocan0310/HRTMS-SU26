@@ -6,11 +6,13 @@
 }
 
 .errorBanner {
-  background: rgba(231, 76, 60, 0.12);
-  border: 1px solid rgba(231, 76, 60, 0.35);
-  border-radius: 2px;
   padding: 0.85rem 1.1rem;
-  color: #ff8585;
+
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+
+  color: #dc2626;
   font-size: 0.82rem;
   line-height: 1.5;
 }
@@ -21,102 +23,125 @@
   gap: 1rem;
 }
 
-// ─── Round card ───────────────────────────────────────────────────────────
-
 .roundCard {
-  background: #15151A;
-  border: 1px solid #232328;
-  border-radius: 2px;
   overflow: hidden;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
 }
 
 .roundHeader {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+
   padding: 0.9rem 1.1rem;
-  background: #1a1a1f;
+
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
 }
 
 .roundToggle {
-  background: transparent;
-  border: none;
-  color: #aaa;
-  cursor: pointer;
   display: flex;
   padding: 0.2rem;
+
+  border: none;
+  background: transparent;
+
+  color: #64748b;
+
+  cursor: pointer;
 }
 
 .roundNameInput {
   flex: 1;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid transparent;
-  color: #fff;
-  font-size: 0.92rem;
-  font-weight: 700;
-  outline: none;
-  padding: 0.2rem 0;
   min-width: 100px;
 
+  padding: 0.2rem 0;
+
+  border: none;
+  border-bottom: 1px solid transparent;
+  outline: none;
+  background: transparent;
+
+  color: #111827;
+  font-size: 0.92rem;
+  font-weight: 700;
+
   &:focus {
-    border-bottom-color: #B5121B;
+    border-bottom-color: #2563eb;
   }
 }
 
 .roundDateInput {
-  background: #0d0d10;
-  border: 1px solid #2a2a30;
-  border-radius: 2px;
   padding: 0.4rem 0.6rem;
-  color: #ccc;
-  font-size: 0.78rem;
+
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
   outline: none;
+  background: #ffffff;
+
+  color: #374151;
+  font-size: 0.78rem;
+
+  &:focus {
+    border-color: #2563eb;
+  }
 }
 
 .raceCountBadge {
-  background: rgba(181, 18, 27, 0.12);
-  color: #F3C8C3;
+  padding: 0.25rem 0.6rem;
+
+  border-radius: 999px;
+  background: #eff6ff;
+
+  color: #2563eb;
   font-size: 0.72rem;
   font-weight: 600;
-  padding: 0.25rem 0.6rem;
-  border-radius: 2px;
   white-space: nowrap;
 }
 
 .removeRoundBtn {
-  background: transparent;
-  border: none;
-  color: #888;
-  cursor: pointer;
-  padding: 0.4rem;
-  border-radius: 2px;
   display: flex;
-  transition: all 0.2s;
+  padding: 0.4rem;
+
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+
+  color: #64748b;
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
 
   &:hover {
-    color: #e74c3c;
-    background: rgba(231, 76, 60, 0.1);
+    background: #fef2f2;
+    color: #dc2626;
   }
 }
-
-// ─── Races list ───────────────────────────────────────────────────────────
 
 .racesList {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
+
   padding: 1rem 1.1rem;
 }
 
 .raceRow {
-  background: #0d0d10;
-  border: 1px solid #232328;
-  border-radius: 2px;
-  padding: 0.85rem 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+
+  padding: 0.85rem 1rem;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
 }
 
 .raceRowHeader {
@@ -126,38 +151,46 @@
 }
 
 .raceNumberBadge {
+  color: #111827;
   font-size: 0.78rem;
   font-weight: 700;
-  color: #F3C8C3;
 }
 
 .frozenBadge {
-  font-size: 0.7rem;
-  color: #D8B45A;
-  background: rgba(216, 180, 90, 0.1);
   padding: 0.2rem 0.55rem;
-  border-radius: 2px;
+
+  border-radius: 999px;
+  background: #fffbeb;
+
+  color: #b45309;
+  font-size: 0.7rem;
+
   cursor: help;
 }
 
 .removeRaceBtn {
-  margin-left: auto;
-  background: transparent;
-  border: none;
-  color: #777;
-  cursor: pointer;
-  padding: 0.3rem;
   display: flex;
-  transition: color 0.2s;
+  margin-left: auto;
+  padding: 0.3rem;
+
+  border: none;
+  background: transparent;
+
+  color: #64748b;
+
+  cursor: pointer;
+
+  transition: color 0.2s ease;
 
   &:hover {
-    color: #e74c3c;
+    color: #dc2626;
   }
 }
 
 .raceFields {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns:
+    repeat(auto-fit, minmax(150px, 1fr));
   gap: 0.75rem;
 }
 
@@ -167,39 +200,50 @@
   gap: 0.3rem;
 
   label {
+    color: #64748b;
     font-size: 0.7rem;
-    color: #888;
+    font-weight: 600;
   }
 
   input,
   select {
-    background: #15151A;
-    border: 1px solid #2a2a30;
-    border-radius: 6px;
     padding: 0.45rem 0.6rem;
-    color: #fff;
-    font-size: 0.8rem;
+
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
     outline: none;
-    transition: border-color 0.2s;
+    background: #ffffff;
+
+    color: #111827;
+    font-size: 0.8rem;
+
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
 
     option {
-      background: #15151A;
+      background: #ffffff;
+      color: #111827;
     }
 
     &:focus {
-      border-color: #B5121B;
+      border-color: #2563eb;
+      box-shadow:
+        0 0 0 3px
+        rgba(37, 99, 235, 0.1);
     }
 
     &:disabled {
-      opacity: 0.5;
+      background: #f8fafc;
+      color: #94a3b8;
       cursor: not-allowed;
     }
   }
 }
 
 .raceErrorText {
+  color: #dc2626;
   font-size: 0.74rem;
-  color: #ff6b6b;
 }
 
 .addRaceBtn {
@@ -207,40 +251,55 @@
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  background: transparent;
-  border: 1px dashed #2a2a30;
-  color: #aaa;
+
   padding: 0.6rem;
-  border-radius: 2px;
+
+  border: 1px dashed #94a3b8;
+  border-radius: 8px;
+  background: #ffffff;
+
+  color: #475569;
   font-size: 0.8rem;
   font-weight: 600;
+
   cursor: pointer;
-  transition: all 0.2s;
+
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease;
 
   &:hover {
-    border-color: #B5121B;
-    color: #F3C8C3;
+    border-color: #2563eb;
+    background: #eff6ff;
+    color: #2563eb;
   }
 }
-
-// ─── Add round button ─────────────────────────────────────────────────────
 
 .addRoundBtn {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  background: rgba(181, 18, 27, 0.08);
-  border: 1px dashed #B5121B;
-  color: #F3C8C3;
+
   padding: 0.85rem;
-  border-radius: 2px;
+
+  border: 1px dashed #2563eb;
+  border-radius: 8px;
+  background: #eff6ff;
+
+  color: #2563eb;
   font-size: 0.85rem;
   font-weight: 700;
+
   cursor: pointer;
-  transition: all 0.2s;
+
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
 
   &:hover {
-    background: rgba(181, 18, 27, 0.15);
+    border-color: #1d4ed8;
+    background: #dbeafe;
   }
 }

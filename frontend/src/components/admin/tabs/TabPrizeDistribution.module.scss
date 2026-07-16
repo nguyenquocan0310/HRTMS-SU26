@@ -1,83 +1,211 @@
-.container { display: flex; flex-direction: column; gap: 1.5rem; padding: 0.5rem 0; }
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 0.5rem 0;
+}
 
 .totalPurseCard {
-  display: flex; justify-content: space-between; align-items: center;
-  background: #15151A; border: 1px solid #232328; border-radius: 12px; padding: 1rem 1.25rem;
-}
-.totalPurseLabel { font-size: 0.78rem; color: #888; font-weight: 600; letter-spacing: 0.3px; }
-.totalPurseValue { font-size: 1.2rem; font-weight: 800; color: #D8B45A; }
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 
-.rows { display: flex; flex-direction: column; gap: 1rem; }
+  padding: 1rem 1.25rem;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.totalPurseLabel {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.totalPurseValue {
+  color: #b45309;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
 
 .row {
   display: grid;
   grid-template-columns: 70px 1fr 90px 150px 32px;
   align-items: center;
   gap: 1rem;
-  background: #15151A;
-  border: 1px solid #232328;
-  border-radius: 2px;
+
   padding: 0.85rem 1.1rem;
-  transition: border-color 0.2s;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
 }
 
 .rowLocked {
-  border-color: rgba(181, 18, 27, 0.4);
-  background: rgba(181, 18, 27, 0.05);
+  border-color: #fecaca;
+  background: #fef2f2;
 }
 
-.rankLabel { font-size: 0.85rem; font-weight: 700; color: #F3C8C3; }
+.rankLabel {
+  color: #111827;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
 
 .slider {
-  width: 100%; accent-color: #B5121B; cursor: pointer;
-  &:disabled { opacity: 0.4; cursor: not-allowed; }
+  width: 100%;
+  accent-color: #2563eb;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
 }
 
 .percentInputWrap {
-  display: flex; align-items: center; gap: 0.3rem;
-  background: #0d0d10; border: 1px solid #2a2a30; border-radius: 3px; padding: 0.3rem 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+
+  padding: 0.3rem 0.5rem;
+
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
 }
+
 .percentInput {
-  width: 100%; background: transparent; border: none; color: #fff;
-  font-size: 0.85rem; outline: none; text-align: right;
-  &:disabled { opacity: 0.5; cursor: not-allowed; }
-  &::-webkit-inner-spin-button, &::-webkit-outer-spin-button { opacity: 1; }
-}
-.percentSign { color: #888; font-size: 0.8rem; }
-.amountValue { font-size: 0.82rem; color: #ccc; text-align: right; white-space: nowrap; }
+  width: 100%;
 
-/* ─── Lock button ─── */
+  border: none;
+  outline: none;
+  background: transparent;
+
+  color: #111827;
+  font-size: 0.85rem;
+  text-align: right;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &::-webkit-inner-spin-button,
+  &::-webkit-outer-spin-button {
+    opacity: 1;
+  }
+}
+
+.percentSign {
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.amountValue {
+  color: #374151;
+  font-size: 0.82rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
 .lockBtn {
-  width: 32px; height: 32px; border-radius: 8px;
-  background: transparent; border: 1px solid #2a2a30;
-  color: #666; display: flex; align-items: center; justify-content: center;
-  cursor: pointer; transition: all 0.2s; flex-shrink: 0;
+  display: flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 
-  &:hover { border-color: #B5121B; color: #F3C8C3; }
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+
+  color: #64748b;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease;
+
+  &:hover {
+    border-color: #2563eb;
+    background: #eff6ff;
+    color: #2563eb;
+  }
 }
+
 .lockBtnActive {
-  background: rgba(181, 18, 27, 0.2);
-  border-color: #B5121B;
-  color: #F3C8C3;
+  border-color: #dc2626;
+  background: #fef2f2;
+  color: #dc2626;
 }
 
 .totalRow {
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
   padding: 0.9rem 1.1rem;
-  background: rgba(46, 204, 113, 0.1); border: 1px solid rgba(46, 204, 113, 0.35);
-  border-radius: 2px; font-size: 0.9rem; font-weight: 700; color: #2ecc71;
+
+  border: 1px solid #86efac;
+  border-radius: 8px;
+  background: #f0fdf4;
+
+  color: #15803d;
+  font-size: 0.9rem;
+  font-weight: 700;
 }
-.totalRowError { background: rgba(231, 76, 60, 0.1); border-color: rgba(231, 76, 60, 0.4); color: #e74c3c; }
-.totalPercentValue { font-size: 1.1rem; }
+
+.totalRowError {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.totalPercentValue {
+  font-size: 1.1rem;
+}
 
 .errorBanner {
-  background: rgba(231, 76, 60, 0.12); border: 1px solid rgba(231, 76, 60, 0.35);
-  border-radius: 2px; padding: 0.85rem 1.1rem; color: #ff8585; font-size: 0.82rem; line-height: 1.5;
+  padding: 0.85rem 1.1rem;
+
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+
+  color: #dc2626;
+  font-size: 0.82rem;
+  line-height: 1.5;
 }
 
-.hint { font-size: 0.78rem; color: #666; margin: 0; }
+.hint {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.78rem;
+}
 
 @media (max-width: 640px) {
-  .row { grid-template-columns: 1fr; gap: 0.6rem; }
-  .amountValue { text-align: left; }
+  .row {
+    grid-template-columns: 1fr;
+    gap: 0.6rem;
+  }
+
+  .amountValue {
+    text-align: left;
+  }
 }
