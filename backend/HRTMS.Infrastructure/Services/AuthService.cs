@@ -65,10 +65,13 @@ public class AuthService : IAuthService
         _config = configuration;
 
         var keyHex = configuration["Security:IdentityEncryptionKeyHex"];
-        if (!string.IsNullOrEmpty(keyHex) && keyHex.Length == 64)
-            _encryptionKey = Convert.FromHexString(keyHex);
-        else
-            _encryptionKey = new byte[32];
+        if (string.IsNullOrEmpty(keyHex) || keyHex.Length != 64)
+            throw new InvalidOperationException(
+                "Security:IdentityEncryptionKeyHex chưa được cấu hình hoặc không hợp lệ " +
+                "(bắt buộc chuỗi hex 64 ký tự = 32 byte AES key). " +
+                "Không được phép khởi động service với key rỗng vì sẽ mã hóa CCCD bằng key toàn số 0.");
+
+        _encryptionKey = Convert.FromHexString(keyHex);
     }
 
     // =========================================================
