@@ -29,6 +29,7 @@ import ScheduleConfirm from './pages/owner/ScheduleConfirm'
 import RaceEntries from './pages/owner/RaceEntries'
 import JockeyInvite from './pages/owner/JockeyInvite'
 import TournamentList from './pages/owner/TournamentList'
+import OwnerEarningsPage from './pages/owner/OwnerEarnings'
 
 // ── Import các trang Jockey ──
 import JockeyLayout from './pages/jockey/JockeyLayout'
@@ -133,6 +134,7 @@ export default function App() {
           <Route path="jockey-invite" element={<JockeyInvite />} />
           <Route path="protest" element={<Protest userRole="HorseOwner" />} />
           <Route path="profile" element={<OwnerProfile />} />
+          <Route path="earnings" element={<OwnerEarningsPage />} />
           <Route path="notifications" element={<SharedNotificationCenter />} />
 
         </Route>

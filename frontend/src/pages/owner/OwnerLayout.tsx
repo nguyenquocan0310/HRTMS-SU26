@@ -16,6 +16,7 @@ const navGroups = [
       { to: '/owner', label: 'Tổng quan', end: true },
       { to: '/owner/horses', label: 'Ngựa của tôi', end: false },
       { to: '/owner/horses/register', label: 'Đăng ký hồ sơ ngựa', end: false },
+      { to: '/owner/earnings', label: 'Thu nhập', end: false },
       { to: '/owner/profile', label: 'Hồ sơ tài khoản', end: false },
     ],
   },
