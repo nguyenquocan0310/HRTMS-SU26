@@ -194,7 +194,7 @@ export default function App() {
           <Route path="my-predictions" element={<MyPredictions />} />
           <Route path="live-race" element={<SpectatorLiveRace />} />
           <Route path="leaderboard" element={<SpectatorLeaderboard />} />
-          <Route path="notifications" element={<SharedNotificationCenter />} />
+          <Route path="notifications" element={<SharedNotificationCenter iconless />} />
           <Route path="profile" element={<SpectatorProfile />} />
         </Route>
 
