@@ -197,8 +197,9 @@ const RaceOperations = () => {
 
     try {
       await declareRaceOfficial(raceId, {
-    confirmedByAdmin: true,
-  });
+        confirmedByAdmin: true,
+      });
+
       setActionMsg('Race đã được chuyển sang trạng thái Official.');
 
       // Không xóa race khỏi danh sách. Reload để status đổi ngay.
@@ -339,7 +340,11 @@ const RaceOperations = () => {
                 <div style={{ marginTop: '0.45rem' }}>
                   <span
                     className={`${styles.badge} ${
-                      selectedRaceIsOfficial ? styles.confirmed : styles.pending
+                      selectedRaceIsOfficial
+                        ? styles.confirmed
+                        : selectedRaceIsUnofficial
+                          ? styles.pending
+                          : styles.upcoming
                     }`}
                   >
                     {selectedRace.status || 'Unknown'}
