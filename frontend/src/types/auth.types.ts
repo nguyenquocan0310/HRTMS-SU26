@@ -1,37 +1,26 @@
 import { RegRole } from './role.types';
 
 // ─── Step 2: Identity ───────────────────────────────────────────────────────
+
 export interface IdentityData {
   username: string;
   fullName: string;
   email: string;
 }
+
 // ─── Step 3: Credentials ────────────────────────────────────────────────────
+
 export interface CredentialsData {
   password: string;
   confirmPassword: string;
 }
 
-// ─── Khai báo xung đột lợi ích (gia đình) — dùng chung cho cả 4 role ────────
-export interface FamilyDeclarationItem {
-  relatedPersonName: string;
-  relationType: string;
-  relatedIdentityNumber: string;
-  industryRole: string;
-  notes: string;
-}
+// ─── Step 4: Verification ───────────────────────────────────────────────────
 
-// ─── Step 4: Verification (theo từng role) ──────────────────────────────────
-// Owner/Jockey/Referee/Doctor đều bắt buộc PhoneNumber + DateOfBirth + IdentityNumber (ACC.1A).
-// Cả 4 role đều bắt buộc khai báo gia đình (COI): hoặc có ít nhất 1 khai báo trong
-// familyDeclarations, hoặc nhập noFamilyDeclarationNote (ví dụ: "Không có người thân
-// làm trong ngành này"). Không được để trống cả hai.
 export interface OwnerVerification {
   phoneNumber: string;
   identityNumber: string;
   dateOfBirth: string;
-  noFamilyDeclarationNote: string;
-  familyDeclarations: FamilyDeclarationItem[];
 }
 
 export interface JockeyVerification {
@@ -43,9 +32,6 @@ export interface JockeyVerification {
   bloodType: string;
   healthStatus: string;
   certificateFile: File | null;
-  noFamilyDeclarationNote: string;
-  familyDeclaration: string; // giữ lại cho backward compat, KHÔNG dùng để submit nữa
-  familyDeclarations: FamilyDeclarationItem[];
 }
 
 export interface RefereeVerification {
@@ -53,9 +39,6 @@ export interface RefereeVerification {
   identityNumber: string;
   dateOfBirth: string;
   certificateFile: File | null;
-  noFamilyDeclarationNote: string;
-  familyDeclaration: string; // giữ lại cho backward compat, KHÔNG dùng để submit nữa
-  familyDeclarations: FamilyDeclarationItem[];
 }
 
 export interface DoctorVerification {
@@ -63,13 +46,10 @@ export interface DoctorVerification {
   identityNumber: string;
   dateOfBirth: string;
   certificateFile: File | null;
-  noFamilyDeclarationNote: string;
-  familyDeclarations: FamilyDeclarationItem[];
 }
 
-// Spectator không có verification data
+// ─── Toàn bộ dữ liệu Register ───────────────────────────────────────────────
 
-// ─── Toàn bộ form data xuyên suốt 6 bước ────────────────────────────────────
 export interface RegisterFormData {
   role: RegRole | null;
   identity: IdentityData;
@@ -80,25 +60,54 @@ export interface RegisterFormData {
   doctorVerification: DoctorVerification;
 }
 
-// ─── Giá trị khởi tạo ────────────────────────────────────────────────────────
+// ─── Validation errors ──────────────────────────────────────────────────────
+
+export interface RegisterFormErrors {
+  role?: string;
+
+  identity?: Partial<Record<keyof IdentityData, string>>;
+
+  credentials?: Partial<Record<keyof CredentialsData, string>>;
+
+  ownerVerification?: Partial<
+    Record<keyof OwnerVerification, string>
+  >;
+
+  jockeyVerification?: Partial<
+    Record<keyof JockeyVerification, string>
+  >;
+
+  refereeVerification?: Partial<
+    Record<keyof RefereeVerification, string>
+  >;
+
+  doctorVerification?: Partial<
+    Record<keyof DoctorVerification, string>
+  >;
+}
+
+// ─── Giá trị khởi tạo ───────────────────────────────────────────────────────
+
 export const initialFormData: RegisterFormData = {
   role: null,
+
   identity: {
     username: '',
     fullName: '',
     email: '',
   },
+
   credentials: {
     password: '',
     confirmPassword: '',
   },
+
   ownerVerification: {
     phoneNumber: '',
     identityNumber: '',
     dateOfBirth: '',
-    noFamilyDeclarationNote: '',
-    familyDeclarations: [],
   },
+
   jockeyVerification: {
     phoneNumber: '',
     identityNumber: '',
@@ -108,25 +117,19 @@ export const initialFormData: RegisterFormData = {
     bloodType: '',
     healthStatus: '',
     certificateFile: null,
-    noFamilyDeclarationNote: '',
-    familyDeclaration: '',
-    familyDeclarations: [],
   },
+
   refereeVerification: {
     phoneNumber: '',
     identityNumber: '',
     dateOfBirth: '',
     certificateFile: null,
-    noFamilyDeclarationNote: '',
-    familyDeclaration: '',
-    familyDeclarations: [],
   },
+
   doctorVerification: {
     phoneNumber: '',
     identityNumber: '',
     dateOfBirth: '',
     certificateFile: null,
-    noFamilyDeclarationNote: '',
-    familyDeclarations: [],
   },
 };

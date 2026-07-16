@@ -1,264 +1,615 @@
 import { useEffect, useState } from 'react';
-import { FiX, FiClock, FiFileText, FiCheckCircle, FiXCircle } from 'react-icons/fi';
-import type { ApprovalItem } from './ApprovalCenter';
 import {
-  approveHorse, rejectHorse, getHorseDetail, type HorseDetail,
-  approveJockey, approveReferee, approveDoctor,
+  FiCheckCircle,
+  FiX,
+  FiXCircle,
+} from 'react-icons/fi';
+
+import type { HorseApproval } from './ApprovalCenter';
+
+import {
+  approveHorse,
+  getHorseDetail,
+  rejectHorse,
+  type HorseDetail,
 } from '../../services/approvalService';
-import { apiFetch } from '../../services/apiClient';
+
 import styles from './ApprovalDetailPanel.module.scss';
 
-interface VerificationLogEntry { id: string; label: string; time: string; }
-
 interface Props {
-  item: ApprovalItem;
+  item: HorseApproval;
   onClose: () => void;
-  onSuccess: (newStatus: 'Approved' | 'Rejected') => void;
+  onSuccess: (
+    newStatus: 'Approved' | 'Rejected'
+  ) => void;
 }
 
-const MOCK_LOGS: VerificationLogEntry[] = [
-  { id: 'l1', label: 'Hồ sơ được nộp', time: '—' },
-  { id: 'l2', label: 'Hệ thống xác minh dữ liệu tự động', time: '—' },
-  { id: 'l3', label: 'Đang chờ Admin xem xét', time: '—' },
-];
+interface SpecRowProps {
+  label: string;
+  value: string | number | null | undefined;
+  warning?: boolean;
+  warningText?: string;
+}
 
-const MOCK_EVIDENCE = [
-  { id: 'e1', label: 'Giấy chứng nhận' },
-  { id: 'e2', label: 'Ảnh hồ sơ' },
-];
+const SpecRow = ({
+  label,
+  value,
+  warning = false,
+  warningText,
+}: SpecRowProps) => {
+  const displayValue =
+    value === null ||
+    value === undefined ||
+    value === ''
+      ? '—'
+      : String(value);
 
-const ApprovalDetailPanel = ({ item, onClose, onSuccess }: Props) => {
-  const [showRejectForm, setShowRejectForm] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  return (
+    <div className={styles.specRow}>
+      <span className={styles.specLabel}>
+        {label}
+      </span>
 
-  // Chi tiết ngựa (breed/vaccination/doping) không có sẵn trong list pending,
-  // phải gọi riêng theo horseId khi mở panel.
-  const [horseDetail, setHorseDetail] = useState<HorseDetail | null>(null);
-  const [horseDetailLoading, setHorseDetailLoading] = useState(false);
+      <span
+        className={`${styles.specValue} ${
+          warning
+            ? styles.specValueWarning
+            : ''
+        }`}
+      >
+        {displayValue}
+
+        {warning && warningText && (
+          <span
+            className={
+              styles.specWarningText
+            }
+          >
+            {' '}
+            — {warningText}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+};
+
+const ApprovalDetailPanel = ({
+  item,
+  onClose,
+  onSuccess,
+}: Props) => {
+  const [
+    horseDetail,
+    setHorseDetail,
+  ] =
+    useState<HorseDetail | null>(null);
+
+  const [
+    horseDetailLoading,
+    setHorseDetailLoading,
+  ] = useState(true);
+
+  const [
+    showRejectForm,
+    setShowRejectForm,
+  ] = useState(false);
+
+  const [
+    rejectReason,
+    setRejectReason,
+  ] = useState('');
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [error, setError] =
+    useState('');
 
   useEffect(() => {
-    if (item.type !== 'horse') return;
-    setHorseDetailLoading(true);
-    getHorseDetail(item.horseId)
-      .then(setHorseDetail)
-      .catch(() => setHorseDetail(null))
-      .finally(() => setHorseDetailLoading(false));
-  }, [item]);
+    let cancelled = false;
 
-  const isReasonValid = rejectReason.trim().length >= 10;
-  const isHorse = item.type === 'horse';
-  const entryFeeUnpaid = isHorse && item.entryFeeStatus !== 'Paid';
+    setHorseDetailLoading(true);
+    setError('');
+
+    getHorseDetail(item.horseId)
+      .then((data) => {
+        if (!cancelled) {
+          setHorseDetail(data);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setHorseDetail(null);
+
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'Không tải được chi tiết ngựa.'
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setHorseDetailLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [item.horseId]);
+
+  const trimmedRejectReason =
+    rejectReason.trim();
+
+  const isReasonValid =
+    trimmedRejectReason.length >= 10;
 
   const handleApprove = async () => {
+    if (loading) {
+      return;
+    }
+
     setLoading(true);
     setError('');
+
     try {
-      if (item.type === 'horse') {
-        // PATCH /api/admin/horse-entries/{enrollmentId}/approve
-        await approveHorse(item.entityId);
-      } else if (item.type === 'jockey') {
-        // PATCH /api/admin/jockeys/{id}/approve
-        await approveJockey(item.entityId);
-      } else if (item.type === 'onboarding') {
-        if (item.role === 'Referee') {
-          // PATCH /api/admin/referees/{id}/approve
-          await approveReferee(item.entityId);
-        } else {
-          // PATCH /api/admin/doctors/{id}/approve
-          await approveDoctor(item.entityId);
-        }
-      }
+      await approveHorse(item.entityId);
       onSuccess('Approved');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Approve thất bại.');
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Duyệt hồ sơ ngựa thất bại.'
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const handleConfirmReject = async () => {
-    if (!isReasonValid) return;
-    setLoading(true);
-    setError('');
-    try {
-      if (item.type === 'horse') {
-        // PATCH /api/admin/horse-entries/{enrollmentId}/reject
-        await rejectHorse(item.entityId, rejectReason.trim());
-      } else {
-        // Personnel reject — dùng chung endpoint nếu BE có, tạm dùng approvalService pattern
-        await apiFetch(`/admin/users/${item.entityId}/reject`, {
-          method: 'PATCH',
-          body: JSON.stringify({ reason: rejectReason.trim() }),
-        });
+  const handleConfirmReject =
+    async () => {
+      if (
+        !isReasonValid ||
+        loading
+      ) {
+        return;
       }
-      onSuccess('Rejected');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Reject thất bại.');
-    } finally {
-      setLoading(false);
+
+      setLoading(true);
+      setError('');
+
+      try {
+        await rejectHorse(
+          item.entityId,
+          trimmedRejectReason
+        );
+
+        onSuccess('Rejected');
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Từ chối hồ sơ ngựa thất bại.'
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+  const handleClose = () => {
+    if (loading) {
+      return;
     }
+
+    onClose();
   };
 
   return (
     <>
-      <div className={styles.overlay} onClick={onClose} />
-      <div className={styles.drawer}>
-        {/* HEADER */}
-        <div className={styles.drawerHeader}>
-          <h2 className={styles.drawerTitle}>{item.subject}</h2>
-          <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Đóng">
+      <div
+        className={styles.overlay}
+        onClick={handleClose}
+      />
+
+      <aside
+        className={styles.drawer}
+        aria-label="Chi tiết hồ sơ ngựa"
+      >
+        {/* Header */}
+
+        <div
+          className={
+            styles.drawerHeader
+          }
+        >
+          <div>
+            <h2
+              className={
+                styles.drawerTitle
+              }
+            >
+              {item.subject}
+            </h2>
+
+            <p
+              style={{
+                margin: '4px 0 0',
+                color: '#888',
+                fontSize: 12,
+              }}
+            >
+              Hồ sơ ngựa ·{' '}
+              {item.stable}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            className={styles.closeBtn}
+            onClick={handleClose}
+            disabled={loading}
+            aria-label="Đóng"
+          >
             <FiX size={20} />
           </button>
         </div>
 
-        <div className={styles.drawerBody}>
-          {/* CORE SPECIFICATIONS */}
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>Core Specifications</h3>
+        {/* Body */}
 
-            {item.type === 'horse' && (
-              <div className={styles.specGrid}>
-                {horseDetailLoading ? (
-                  <p style={{ fontSize: 13, color: '#999' }}>Đang tải chi tiết ngựa...</p>
-                ) : !horseDetail ? (
-                  <p style={{ fontSize: 13, color: '#999' }}>Không tải được chi tiết ngựa.</p>
-                ) : (
-                  <>
-                    <SpecRow label="Breed" value={horseDetail.breed} />
-                    <SpecRow label="Gender" value={horseDetail.gender} />
-                    <SpecRow label="Color" value={horseDetail.color} />
-                    <SpecRow label="Birth Year" value={String(horseDetail.birthYear)} />
-                    <SpecRow label="Weight" value={`${horseDetail.weight} kg`} />
-                    <SpecRow label="Pedigree" value={horseDetail.pedigree} />
-                    <SpecRow
-                      label="Doping Test Result"
-                      value={horseDetail.dopingTestResult}
-                      warning={horseDetail.dopingTestResult === 'Failed'}
-                      warningText="Doping test thất bại"
-                    />
-                    <SpecRow label="Vaccination Record Ref" value={horseDetail.vaccinationRecordRef} />
-                    <SpecRow
-                      label="Entry Fee Status"
-                      value={item.entryFeeStatus}
-                      warning={entryFeeUnpaid}
-                      warningText="Chưa thanh toán phí tham dự"
-                    />
-                  </>
-                )}
-              </div>
-            )}
+        <div
+          className={styles.drawerBody}
+        >
+          <section
+            className={styles.section}
+          >
+            <h3
+              className={
+                styles.sectionTitle
+              }
+            >
+              Thông tin đăng ký
+            </h3>
 
-            {item.type === 'jockey' && (
-              <div className={styles.specGrid}>
-                <SpecRow label="License Certificate" value={item.licenseCertificate} />
-                <SpecRow label="Experience Years" value={`${item.experienceYears ?? '—'} năm`} />
-              </div>
-            )}
-            {item.type === 'onboarding' && (
-              <div className={styles.specGrid}>
-                <SpecRow label="Role" value={item.role} />
-                {item.role === 'Referee' && <SpecRow label="Certification Level" value={item.certificationLevel ?? '—'} />}
-                {item.role === 'Doctor' && <SpecRow label="Medical License Number" value={item.medicalLicenseNumber ?? '—'} />}
-              </div>
-            )}
-          </section>
-
-          {/* VERIFICATION LOGS */}
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>Verification Logs</h3>
-            <div className={styles.timeline}>
-              {MOCK_LOGS.map((log) => (
-                <div key={log.id} className={styles.timelineItem}>
-                  <div className={styles.timelineDot}><FiClock size={12} /></div>
-                  <div className={styles.timelineContent}>
-                    <span className={styles.timelineLabel}>{log.label}</span>
-                    <span className={styles.timelineTime}>{log.time}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* ATTACHED EVIDENCE */}
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>Attached Evidence</h3>
-            <div className={styles.evidenceGrid}>
-              {MOCK_EVIDENCE.map((ev) => (
-                <div key={ev.id} className={styles.evidenceThumb}>
-                  <FiFileText size={22} /><span>{ev.label}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* ERROR */}
-          {error && <div className={styles.errorBox}>{error}</div>}
-
-          {/* REJECT FORM */}
-          {showRejectForm && (
-            <section className={styles.section}>
-              <h3 className={styles.sectionTitle}>Lý do từ chối</h3>
-              <textarea
-                className={styles.rejectTextarea}
-                rows={4}
-                placeholder="Nhập lý do từ chối (tối thiểu 10 ký tự)..."
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
+            <div
+              className={styles.specGrid}
+            >
+              <SpecRow
+                label="Tên ngựa"
+                value={item.subject}
               />
-              {!isReasonValid && rejectReason.length > 0 && (
-                <span className={styles.rejectError}>
-                  Lý do phải có ít nhất 10 ký tự (hiện tại: {rejectReason.trim().length}).
-                </span>
-              )}
+
+              <SpecRow
+                label="Tournament"
+                value={item.stable}
+              />
+
+              <SpecRow
+                label="Ngày nộp"
+                value={
+                  item.submittedDate
+                }
+              />
+
+              <SpecRow
+                label="Trạng thái duyệt"
+                value={item.status}
+              />
+            </div>
+          </section>
+
+          <section
+            className={styles.section}
+          >
+            <h3
+              className={
+                styles.sectionTitle
+              }
+            >
+              Thông tin chi tiết ngựa
+            </h3>
+
+            {horseDetailLoading ? (
+              <p
+                style={{
+                  fontSize: 13,
+                  color: '#999',
+                }}
+              >
+                Đang tải chi tiết ngựa...
+              </p>
+            ) : !horseDetail ? (
+              <p
+                style={{
+                  fontSize: 13,
+                  color: '#999',
+                }}
+              >
+                Không tải được chi tiết
+                ngựa.
+              </p>
+            ) : (
+              <div
+                className={
+                  styles.specGrid
+                }
+              >
+                <SpecRow
+                  label="Horse ID"
+                  value={
+                    horseDetail.horseId
+                  }
+                />
+
+                <SpecRow
+                  label="Owner ID"
+                  value={
+                    horseDetail.ownerId
+                  }
+                />
+
+                <SpecRow
+                  label="Breed"
+                  value={horseDetail.breed}
+                />
+
+                <SpecRow
+                  label="Gender"
+                  value={
+                    horseDetail.gender
+                  }
+                />
+
+                <SpecRow
+                  label="Color"
+                  value={
+                    horseDetail.color
+                  }
+                />
+
+                <SpecRow
+                  label="Birth Year"
+                  value={
+                    horseDetail.birthYear
+                  }
+                />
+
+                <SpecRow
+                  label="Age"
+                  value={horseDetail.age}
+                />
+
+                <SpecRow
+                  label="Weight"
+                  value={
+                    horseDetail.weight
+                      ? `${horseDetail.weight} kg`
+                      : '—'
+                  }
+                />
+
+                <SpecRow
+                  label="Pedigree"
+                  value={
+                    horseDetail.pedigree
+                  }
+                />
+
+                <SpecRow
+                  label="Identifying Marks"
+                  value={
+                    horseDetail.identifyingMarks
+                  }
+                />
+
+                <SpecRow
+                  label="Vaccination Record"
+                  value={
+                    horseDetail.vaccinationRecordRef
+                  }
+                />
+
+                <SpecRow
+                  label="Doping Test Date"
+                  value={
+                    horseDetail.dopingTestDate
+                  }
+                />
+
+                <SpecRow
+                  label="Doping Test Result"
+                  value={
+                    horseDetail.dopingTestResult
+                  }
+                  warning={
+                    horseDetail.dopingTestResult ===
+                    'Failed'
+                  }
+                  warningText="Kết quả kiểm tra doping không đạt"
+                />
+
+                <SpecRow
+                  label="Legal Consent"
+                  value={
+                    horseDetail.legalConsentAccepted
+                      ? 'Accepted'
+                      : 'Not accepted'
+                  }
+                  warning={
+                    !horseDetail.legalConsentAccepted
+                  }
+                  warningText="Chưa chấp nhận cam kết pháp lý"
+                />
+
+                <SpecRow
+                  label="Screening Status"
+                  value={
+                    horseDetail.screeningStatus
+                  }
+                />
+
+                <SpecRow
+                  label="Screening Reason"
+                  value={
+                    horseDetail.screeningReason
+                  }
+                />
+
+                <SpecRow
+                  label="Admin Approval"
+                  value={
+                    horseDetail.adminApprovalStatus
+                  }
+                />
+
+                <SpecRow
+                  label="Rejection Reason"
+                  value={
+                    horseDetail.rejectionReason
+                  }
+                />
+              </div>
+            )}
+          </section>
+
+          {error && (
+            <div
+              className={styles.errorBox}
+            >
+              {error}
+            </div>
+          )}
+
+          {showRejectForm && (
+            <section
+              className={styles.section}
+            >
+              <h3
+                className={
+                  styles.sectionTitle
+                }
+              >
+                Lý do từ chối
+              </h3>
+
+              <textarea
+                className={
+                  styles.rejectTextarea
+                }
+                rows={4}
+                placeholder="Nhập lý do từ chối, tối thiểu 10 ký tự..."
+                value={rejectReason}
+                onChange={(event) =>
+                  setRejectReason(
+                    event.target.value
+                  )
+                }
+              />
+
+              {rejectReason.length > 0 &&
+                !isReasonValid && (
+                  <span
+                    className={
+                      styles.rejectError
+                    }
+                  >
+                    Lý do phải có ít nhất
+                    10 ký tự. Hiện tại:{' '}
+                    {
+                      trimmedRejectReason.length
+                    }
+                    .
+                  </span>
+                )}
             </section>
           )}
         </div>
 
-        {/* FOOTER ACTIONS */}
-        <div className={styles.drawerFooter}>
+        {/* Footer actions */}
+
+        <div
+          className={styles.drawerFooter}
+        >
           {!showRejectForm ? (
             <>
-              <button type="button" className={styles.rejectBtn}
-                onClick={() => setShowRejectForm(true)} disabled={loading}>
-                <FiXCircle size={16} /> REJECT REQUEST
+              <button
+                type="button"
+                className={
+                  styles.rejectBtn
+                }
+                onClick={() => {
+                  setShowRejectForm(true);
+                  setRejectReason('');
+                  setError('');
+                }}
+                disabled={loading}
+              >
+                <FiXCircle size={16} />
+
+                REJECT REQUEST
               </button>
-              <button type="button" className={styles.approveBtn}
+
+              <button
+                type="button"
+                className={
+                  styles.approveBtn
+                }
                 onClick={handleApprove}
-                disabled={loading || entryFeeUnpaid}
-                title={entryFeeUnpaid ? 'Chưa thanh toán phí tham dự.' : undefined}>
-                <FiCheckCircle size={16} />
-                {loading ? 'Đang xử lý...' : 'APPROVE ENTRY'}
+                disabled={loading}
+              >
+                <FiCheckCircle
+                  size={16}
+                />
+
+                {loading
+                  ? 'Đang xử lý...'
+                  : 'APPROVE ENTRY'}
               </button>
             </>
           ) : (
             <>
-              <button type="button" className={styles.cancelBtn}
-                onClick={() => { setShowRejectForm(false); setRejectReason(''); }} disabled={loading}>
+              <button
+                type="button"
+                className={
+                  styles.cancelBtn
+                }
+                onClick={() => {
+                  setShowRejectForm(
+                    false
+                  );
+
+                  setRejectReason('');
+                  setError('');
+                }}
+                disabled={loading}
+              >
                 Hủy
               </button>
-              <button type="button" className={styles.rejectConfirmBtn}
-                onClick={handleConfirmReject} disabled={!isReasonValid || loading}>
-                {loading ? 'Đang xử lý...' : 'Xác nhận từ chối'}
+
+              <button
+                type="button"
+                className={
+                  styles.rejectConfirmBtn
+                }
+                onClick={
+                  handleConfirmReject
+                }
+                disabled={
+                  !isReasonValid ||
+                  loading
+                }
+              >
+                {loading
+                  ? 'Đang xử lý...'
+                  : 'Xác nhận từ chối'}
               </button>
             </>
           )}
         </div>
-      </div>
+      </aside>
     </>
   );
 };
-
-interface SpecRowProps { label: string; value: string; warning?: boolean; warningText?: string; }
-const SpecRow = ({ label, value, warning, warningText }: SpecRowProps) => (
-  <div className={styles.specRow}>
-    <span className={styles.specLabel}>{label}</span>
-    <span className={`${styles.specValue} ${warning ? styles.specValueWarning : ''}`}>
-      {value}
-      {warning && warningText && <span className={styles.specWarningText}> — {warningText}</span>}
-    </span>
-  </div>
-);
 
 export default ApprovalDetailPanel;

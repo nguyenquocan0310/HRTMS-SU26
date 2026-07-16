@@ -1,208 +1,172 @@
-import { useRef } from 'react';
 import { RegRole } from '../../../types/role.types';
-import { type RegisterFormData, type FamilyDeclarationItem } from '../../../types/auth.types';
+
+import {
+  type RegisterFormData,
+  type RegisterFormErrors,
+} from '../../../types/auth.types';
+
 import styles from './StepVerification.module.scss';
 
 interface Props {
   role: RegRole | null;
   formData: RegisterFormData;
+  errors?: RegisterFormErrors;
   onChange: (partial: Partial<RegisterFormData>) => void;
 }
 
-const emptyDeclaration: FamilyDeclarationItem = {
-  relatedPersonName: '',
-  relationType: '',
-  relatedIdentityNumber: '',
-  industryRole: '',
-  notes: '',
-};
+type CertificateRoleKey =
+  | 'jockeyVerification'
+  | 'refereeVerification'
+  | 'doctorVerification';
 
-const StepVerification = ({ role, formData, onChange }: Props) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-  // ─── Khối khai báo gia đình dùng chung cho cả 4 role ───────────────────────
-  const renderFamilyDeclarationBlock  = <
-    K extends 'ownerVerification' | 'jockeyVerification' | 'refereeVerification' | 'doctorVerification',
-  >(
-    key: K,
-    verification: { hasNoFamilyInIndustry: boolean; familyDeclarations: FamilyDeclarationItem[] }
-  ) => {
-    const updateVerification = (partial: Record<string, unknown>) => {
-      onChange({ [key]: { ...verification, ...partial } } as Partial<RegisterFormData>);
-    };
+const ALLOWED_FILE_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+];
 
-    return (
-      <div className={styles.coiBox}>
-        <h4 className={styles.coiTitle}>Family / Conflict of Interest Declaration</h4>
-        <p className={styles.coiDesc}>
-          Khai báo quan hệ gia đình với các thành viên khác trong ngành. Nếu không có, tick vào ô bên dưới.
-        </p>
+const BLOOD_TYPES = [
+  'A+',
+  'A-',
+  'B+',
+  'B-',
+  'AB+',
+  'AB-',
+  'O+',
+  'O-',
+];
 
-<div className={styles.field}>
-          <label className={styles.label}>
-            Nếu không có người thân trong ngành, nhập xác nhận bên dưới
-          </label>
-          <input
-            type="text"
-            className={styles.input}
-            placeholder='Nhập: "Không có người thân làm trong ngành này"'
-            value={verification.noFamilyDeclarationNote}
-            onChange={(e) => updateVerification({ noFamilyDeclarationNote: e.target.value })}
-          />
-        </div>
+const StepVerification = ({
+  role,
+  formData,
+  errors,
+  onChange,
+}: Props) => {
+  const inputClass = (error?: string) =>
+    `${styles.input} ${error ? styles.inputError : ''}`;
 
-        {verification.noFamilyDeclarationNote.trim().length === 0 && (
-          <>
-            {verification.familyDeclarations.map((decl, idx) => (
-              <div key={idx} className={styles.coiItem}>
-                <div className={styles.field}>
-                  <label className={styles.label}>Họ tên người liên quan</label>
-                  <input
-                    type="text"
-                    className={styles.input}
-                    value={decl.relatedPersonName}
-                    onChange={(e) => {
-                      const updated = [...verification.familyDeclarations];
-                      updated[idx] = { ...updated[idx], relatedPersonName: e.target.value };
-                      updateVerification({ familyDeclarations: updated });
-                    }}
-                  />
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>Quan hệ</label>
-                  <input
-                    type="text"
-                    className={styles.input}
-                    placeholder="Ví dụ: Parent, Sibling, Spouse"
-                    value={decl.relationType}
-                    onChange={(e) => {
-                      const updated = [...verification.familyDeclarations];
-                      updated[idx] = { ...updated[idx], relationType: e.target.value };
-                      updateVerification({ familyDeclarations: updated });
-                    }}
-                  />
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>CCCD người liên quan</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    className={styles.input}
-                    placeholder="Nhập đúng 12 số CCCD"
-                    maxLength={12}
-                    value={decl.relatedIdentityNumber}
-                    onChange={(e) => {
-                      const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 12);
-                      const updated = [...verification.familyDeclarations];
-                      updated[idx] = { ...updated[idx], relatedIdentityNumber: digitsOnly };
-                      updateVerification({ familyDeclarations: updated });
-                    }}
-                  />
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>Vai trò trong ngành</label>
-                  <input
-                    type="text"
-                    className={styles.input}
-                    placeholder="Ví dụ: Owner, Jockey, Referee, Doctor"
-                    value={decl.industryRole}
-                    onChange={(e) => {
-                      const updated = [...verification.familyDeclarations];
-                      updated[idx] = { ...updated[idx], industryRole: e.target.value };
-                      updateVerification({ familyDeclarations: updated });
-                    }}
-                  />
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>Ghi chú</label>
-                  <input
-                    type="text"
-                    className={styles.input}
-                    value={decl.notes}
-                    onChange={(e) => {
-                      const updated = [...verification.familyDeclarations];
-                      updated[idx] = { ...updated[idx], notes: e.target.value };
-                      updateVerification({ familyDeclarations: updated });
-                    }}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className={styles.removeBtn}
-                  onClick={() => {
-                    const updated = verification.familyDeclarations.filter((_, i) => i !== idx);
-                    updateVerification({ familyDeclarations: updated });
-                  }}
-                >
-                  Xóa khai báo này
-                </button>
-              </div>
-            ))}
+  const renderError = (error?: string) =>
+    error ? (
+      <span className={styles.error}>{error}</span>
+    ) : null;
 
-            <button
-              type="button"
-              className={styles.addBtn}
-              onClick={() => {
-                const updated = [...verification.familyDeclarations, { ...emptyDeclaration }];
-                updateVerification({ familyDeclarations: updated });
-              }}
-            >
-              + Thêm khai báo
-            </button>
-          </>
-        )}
-      </div>
-    );
-  };
-
-  // ─── Ô upload file chứng chỉ dùng chung cho Jockey/Referee/Doctor ──────────
-  const renderCertificateUpload = (
-    key: 'jockeyVerification' | 'refereeVerification' | 'doctorVerification',
+  const handleCertificateChange = (
+    key: CertificateRoleKey,
     file: File | null
   ) => {
-    const maxSizeBytes = 10 * 1024 * 1024;
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    onChange({
+      [key]: {
+        ...formData[key],
+        certificateFile: file,
+      },
+    } as Partial<RegisterFormData>);
+  };
 
+  const renderCertificateUpload = (
+    key: CertificateRoleKey,
+    file: File | null,
+    error?: string
+  ) => {
     return (
       <div className={styles.field}>
-        <label className={styles.label}>Certificate File (bắt buộc)</label>
+        <label className={styles.label}>
+          Certificate File
+        </label>
+
         <input
-          ref={fileInputRef}
           type="file"
           accept=".pdf,.jpg,.jpeg,.png,.webp"
-          className={styles.input}
-          onChange={(e) => {
-            const selected = e.target.files?.[0] ?? null;
-            if (selected) {
-              if (!allowedTypes.includes(selected.type)) {
-                alert('Định dạng file không hợp lệ. Chỉ nhận .pdf, .jpg, .jpeg, .png, .webp');
-                e.target.value = '';
-                return;
-              }
-              if (selected.size > maxSizeBytes) {
-                alert('File vượt quá dung lượng cho phép (tối đa 10MB).');
-                e.target.value = '';
-                return;
-              }
+          className={inputClass(error)}
+          onChange={(event) => {
+            const selectedFile =
+              event.target.files?.[0] ?? null;
+
+            if (!selectedFile) {
+              handleCertificateChange(key, null);
+              return;
             }
-            onChange({ [key]: { ...(formData[key] as object), certificateFile: selected } } as Partial<RegisterFormData>);
+
+            if (
+              !ALLOWED_FILE_TYPES.includes(
+                selectedFile.type
+              )
+            ) {
+              window.alert(
+                'Định dạng file không hợp lệ. Chỉ chấp nhận PDF, JPG, JPEG, PNG hoặc WEBP.'
+              );
+
+              event.target.value = '';
+              handleCertificateChange(key, null);
+              return;
+            }
+
+            if (selectedFile.size > MAX_FILE_SIZE) {
+              window.alert(
+                'File vượt quá dung lượng cho phép. Kích thước tối đa là 10MB.'
+              );
+
+              event.target.value = '';
+              handleCertificateChange(key, null);
+              return;
+            }
+
+            handleCertificateChange(
+              key,
+              selectedFile
+            );
           }}
         />
-{file && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
-            <span style={{ fontSize: '12px', color: '#4caf50' }}>
-              Đã chọn: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+
+        {renderError(error)}
+
+        {file && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '10px',
+              marginTop: '6px',
+            }}
+          >
+            <span
+              style={{
+                fontSize: '12px',
+                color: '#16a34a',
+              }}
+            >
+              Đã chọn: {file.name}{' '}
+              ({(file.size / 1024 / 1024).toFixed(2)} MB)
             </span>
+
             <button
               type="button"
               onClick={() => {
-                const url = URL.createObjectURL(file);
-                window.open(url, '_blank');
+                const fileUrl =
+                  URL.createObjectURL(file);
+
+                window.open(
+                  fileUrl,
+                  '_blank',
+                  'noopener,noreferrer'
+                );
+
+                window.setTimeout(() => {
+                  URL.revokeObjectURL(fileUrl);
+                }, 1000);
               }}
               style={{
-                fontSize: '12px', color: '#2563eb', background: 'none',
-                border: '1px solid #2563eb', borderRadius: '6px',
-                padding: '2px 8px', cursor: 'pointer',
+                fontSize: '12px',
+                color: '#2563eb',
+                background: 'transparent',
+                border: '1px solid #2563eb',
+                borderRadius: '6px',
+                padding: '3px 9px',
+                cursor: 'pointer',
               }}
             >
               Xem file
@@ -214,291 +178,685 @@ const StepVerification = ({ role, formData, onChange }: Props) => {
   };
 
   // ─── Owner ────────────────────────────────────────────────────────────────
+
   if (role === RegRole.Owner) {
+    const verification =
+      formData.ownerVerification;
+
+    const verificationErrors =
+      errors?.ownerVerification;
+
     return (
       <div className={styles.container}>
-        <h2 className={styles.title}>Owner Verification</h2>
-        <p className={styles.subtitle}>Provide your identity details for verification.</p>
+        <h2 className={styles.title}>
+          Owner Verification
+        </h2>
+
+        <p className={styles.subtitle}>
+          Provide your identity details for verification.
+        </p>
+
         <div className={styles.form}>
           <div className={styles.field}>
-            <label className={styles.label}>Phone Number</label>
+            <label className={styles.label}>
+              Phone Number
+            </label>
+
             <input
-              type="text"
-              className={styles.input}
-              placeholder="Enter your phone number"
-              value={formData.ownerVerification.phoneNumber}
-              onChange={(e) =>
-                onChange({
-                  ownerVerification: { ...formData.ownerVerification, phoneNumber: e.target.value },
-                })
-              }
-            />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Identity Number (CCCD)</label>
-            <input
-              type="text"
+              type="tel"
               inputMode="numeric"
-              className={styles.input}
-              placeholder="Nhập đúng 12 số CCCD"
-              maxLength={12}
-              value={formData.ownerVerification.identityNumber}
-              onChange={(e) => {
-                const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 12);
+              className={inputClass(
+                verificationErrors?.phoneNumber
+              )}
+              placeholder="Enter your phone number"
+              value={verification.phoneNumber}
+              onChange={(event) => {
+                const phoneNumber =
+                  event.target.value
+                    .replace(/\D/g, '')
+                    .slice(0, 11);
+
                 onChange({
-                  ownerVerification: { ...formData.ownerVerification, identityNumber: digitsOnly },
+                  ownerVerification: {
+                    ...verification,
+                    phoneNumber,
+                  },
                 });
               }}
             />
-            <span style={{ fontSize: '12px', color: formData.ownerVerification.identityNumber.length === 12 ? '#4caf50' : '#999' }}>
-              {formData.ownerVerification.identityNumber.length}/12 số
+
+            {renderError(
+              verificationErrors?.phoneNumber
+            )}
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>
+              Identity Number (CCCD)
+            </label>
+
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={12}
+              className={inputClass(
+                verificationErrors?.identityNumber
+              )}
+              placeholder="Nhập đúng 12 số CCCD"
+              value={verification.identityNumber}
+              onChange={(event) => {
+                const identityNumber =
+                  event.target.value
+                    .replace(/\D/g, '')
+                    .slice(0, 12);
+
+                onChange({
+                  ownerVerification: {
+                    ...verification,
+                    identityNumber,
+                  },
+                });
+              }}
+            />
+
+            {renderError(
+              verificationErrors?.identityNumber
+            )}
+
+            <span
+              style={{
+                fontSize: '12px',
+                color:
+                  verification.identityNumber
+                    .length === 12
+                    ? '#16a34a'
+                    : '#999',
+              }}
+            >
+              {verification.identityNumber.length}/12 số
             </span>
           </div>
+
           <div className={styles.field}>
-            <label className={styles.label}>Date of Birth</label>
+            <label className={styles.label}>
+              Date of Birth
+            </label>
+
             <input
               type="date"
-              className={styles.input}
-              value={formData.ownerVerification.dateOfBirth}
-              onChange={(e) =>
+              className={inputClass(
+                verificationErrors?.dateOfBirth
+              )}
+              value={verification.dateOfBirth}
+              onChange={(event) =>
                 onChange({
-                  ownerVerification: { ...formData.ownerVerification, dateOfBirth: e.target.value },
+                  ownerVerification: {
+                    ...verification,
+                    dateOfBirth:
+                      event.target.value,
+                  },
                 })
               }
             />
-          </div>
 
-          {renderFamilyDeclarationBlock('ownerVerification', formData.ownerVerification)}
+            {renderError(
+              verificationErrors?.dateOfBirth
+            )}
+          </div>
         </div>
       </div>
     );
   }
 
   // ─── Jockey ───────────────────────────────────────────────────────────────
+
   if (role === RegRole.Jockey) {
+    const verification =
+      formData.jockeyVerification;
+
+    const verificationErrors =
+      errors?.jockeyVerification;
+
     return (
       <div className={styles.container}>
-        <h2 className={styles.title}>Jockey Verification</h2>
-        <p className={styles.subtitle}>Provide your license and physical details.</p>
+        <h2 className={styles.title}>
+          Jockey Verification
+        </h2>
+
+        <p className={styles.subtitle}>
+          Provide your identity, certificate and physical information.
+        </p>
+
         <div className={styles.form}>
           <div className={styles.field}>
-            <label className={styles.label}>Phone Number</label>
+            <label className={styles.label}>
+              Phone Number
+            </label>
+
             <input
-              type="text"
-              className={styles.input}
-              placeholder="Enter your phone number"
-              value={formData.jockeyVerification.phoneNumber}
-              onChange={(e) =>
-                onChange({
-                  jockeyVerification: { ...formData.jockeyVerification, phoneNumber: e.target.value },
-                })
-              }
-            />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Identity Number (CCCD)</label>
-            <input
-              type="text"
+              type="tel"
               inputMode="numeric"
-              className={styles.input}
-              placeholder="Nhập đúng 12 số CCCD"
-              maxLength={12}
-              value={formData.jockeyVerification.identityNumber}
-              onChange={(e) => {
-                const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 12);
+              className={inputClass(
+                verificationErrors?.phoneNumber
+              )}
+              placeholder="Enter your phone number"
+              value={verification.phoneNumber}
+              onChange={(event) => {
+                const phoneNumber =
+                  event.target.value
+                    .replace(/\D/g, '')
+                    .slice(0, 11);
+
                 onChange({
-                  jockeyVerification: { ...formData.jockeyVerification, identityNumber: digitsOnly },
+                  jockeyVerification: {
+                    ...verification,
+                    phoneNumber,
+                  },
                 });
               }}
             />
-            <span style={{ fontSize: '12px', color: formData.jockeyVerification.identityNumber.length === 12 ? '#4caf50' : '#999' }}>
-              {formData.jockeyVerification.identityNumber.length}/12 số
+
+            {renderError(
+              verificationErrors?.phoneNumber
+            )}
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>
+              Identity Number (CCCD)
+            </label>
+
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={12}
+              className={inputClass(
+                verificationErrors?.identityNumber
+              )}
+              placeholder="Nhập đúng 12 số CCCD"
+              value={verification.identityNumber}
+              onChange={(event) => {
+                const identityNumber =
+                  event.target.value
+                    .replace(/\D/g, '')
+                    .slice(0, 12);
+
+                onChange({
+                  jockeyVerification: {
+                    ...verification,
+                    identityNumber,
+                  },
+                });
+              }}
+            />
+
+            {renderError(
+              verificationErrors?.identityNumber
+            )}
+
+            <span
+              style={{
+                fontSize: '12px',
+                color:
+                  verification.identityNumber
+                    .length === 12
+                    ? '#16a34a'
+                    : '#999',
+              }}
+            >
+              {verification.identityNumber.length}/12 số
             </span>
           </div>
+
           <div className={styles.field}>
-            <label className={styles.label}>Date of Birth</label>
+            <label className={styles.label}>
+              Date of Birth
+            </label>
+
             <input
               type="date"
-              className={styles.input}
-              value={formData.jockeyVerification.dateOfBirth}
-              onChange={(e) =>
+              className={inputClass(
+                verificationErrors?.dateOfBirth
+              )}
+              value={verification.dateOfBirth}
+              onChange={(event) =>
                 onChange({
-                  jockeyVerification: { ...formData.jockeyVerification, dateOfBirth: e.target.value },
+                  jockeyVerification: {
+                    ...verification,
+                    dateOfBirth:
+                      event.target.value,
+                  },
                 })
               }
             />
+
+            {renderError(
+              verificationErrors?.dateOfBirth
+            )}
           </div>
 
-          {renderCertificateUpload('jockeyVerification', formData.jockeyVerification.certificateFile)}
+          {renderCertificateUpload(
+            'jockeyVerification',
+            verification.certificateFile,
+            verificationErrors?.certificateFile
+          )}
 
           <div className={styles.field}>
-            <label className={styles.label}>Experience Years</label>
+            <label className={styles.label}>
+              Experience Years
+            </label>
+
             <input
               type="number"
-              className={styles.input}
+              min={0}
+              step={1}
+              className={inputClass(
+                verificationErrors?.experienceYears
+              )}
               placeholder="Years of experience"
-              value={formData.jockeyVerification.experienceYears}
-              onChange={(e) =>
+              value={verification.experienceYears}
+              onChange={(event) =>
                 onChange({
                   jockeyVerification: {
-                    ...formData.jockeyVerification,
-                    experienceYears: e.target.value ? Number(e.target.value) : '',
+                    ...verification,
+                    experienceYears:
+                      event.target.value === ''
+                        ? ''
+                        : Number(
+                            event.target.value
+                          ),
                   },
                 })
               }
             />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Self Declared Weight (kg)</label>
-            <input
-              type="number"
-              className={styles.input}
-              placeholder="Your weight in kg"
-              value={formData.jockeyVerification.selfDeclaredWeight}
-              onChange={(e) =>
-                onChange({
-                  jockeyVerification: {
-                    ...formData.jockeyVerification,
-                    selfDeclaredWeight: e.target.value ? Number(e.target.value) : '',
-                  },
-                })
-              }
-            />
+
+            {renderError(
+              verificationErrors?.experienceYears
+            )}
           </div>
 
-          {renderFamilyDeclarationBlock('jockeyVerification', formData.jockeyVerification)}
+          <div className={styles.field}>
+            <label className={styles.label}>
+              Self Declared Weight (kg)
+            </label>
+
+            <input
+              type="number"
+              min={1}
+              step="0.1"
+              className={inputClass(
+                verificationErrors?.selfDeclaredWeight
+              )}
+              placeholder="Your weight in kg"
+              value={
+                verification.selfDeclaredWeight
+              }
+              onChange={(event) =>
+                onChange({
+                  jockeyVerification: {
+                    ...verification,
+                    selfDeclaredWeight:
+                      event.target.value === ''
+                        ? ''
+                        : Number(
+                            event.target.value
+                          ),
+                  },
+                })
+              }
+            />
+
+            {renderError(
+              verificationErrors?.selfDeclaredWeight
+            )}
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>
+              Blood Type
+            </label>
+
+            <select
+              className={inputClass(
+                verificationErrors?.bloodType
+              )}
+              value={verification.bloodType}
+              onChange={(event) =>
+                onChange({
+                  jockeyVerification: {
+                    ...verification,
+                    bloodType:
+                      event.target.value,
+                  },
+                })
+              }
+            >
+              <option value="">
+                -- Select blood type --
+              </option>
+
+              {BLOOD_TYPES.map((bloodType) => (
+                <option
+                  key={bloodType}
+                  value={bloodType}
+                >
+                  {bloodType}
+                </option>
+              ))}
+            </select>
+
+            {renderError(
+              verificationErrors?.bloodType
+            )}
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>
+              Health Status
+            </label>
+
+            <input
+              type="text"
+              className={inputClass(
+                verificationErrors?.healthStatus
+              )}
+              placeholder="Enter your current health status"
+              value={verification.healthStatus}
+              onChange={(event) =>
+                onChange({
+                  jockeyVerification: {
+                    ...verification,
+                    healthStatus:
+                      event.target.value,
+                  },
+                })
+              }
+            />
+
+            {renderError(
+              verificationErrors?.healthStatus
+            )}
+          </div>
         </div>
       </div>
     );
   }
 
   // ─── Referee ──────────────────────────────────────────────────────────────
+
   if (role === RegRole.Referee) {
+    const verification =
+      formData.refereeVerification;
+
+    const verificationErrors =
+      errors?.refereeVerification;
+
     return (
       <div className={styles.container}>
-        <h2 className={styles.title}>Referee Verification</h2>
-        <p className={styles.subtitle}>Provide your certification and declarations.</p>
+        <h2 className={styles.title}>
+          Referee Verification
+        </h2>
+
+        <p className={styles.subtitle}>
+          Provide your identity and certification information.
+        </p>
+
         <div className={styles.form}>
           <div className={styles.field}>
-            <label className={styles.label}>Phone Number</label>
+            <label className={styles.label}>
+              Phone Number
+            </label>
+
             <input
-              type="text"
-              className={styles.input}
-              placeholder="Enter your phone number"
-              value={formData.refereeVerification.phoneNumber}
-              onChange={(e) =>
-                onChange({
-                  refereeVerification: { ...formData.refereeVerification, phoneNumber: e.target.value },
-                })
-              }
-            />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Identity Number (CCCD)</label>
-            <input
-              type="text"
+              type="tel"
               inputMode="numeric"
-              className={styles.input}
-              placeholder="Nhập đúng 12 số CCCD"
-              maxLength={12}
-              value={formData.refereeVerification.identityNumber}
-              onChange={(e) => {
-                const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 12);
+              className={inputClass(
+                verificationErrors?.phoneNumber
+              )}
+              placeholder="Enter your phone number"
+              value={verification.phoneNumber}
+              onChange={(event) => {
+                const phoneNumber =
+                  event.target.value
+                    .replace(/\D/g, '')
+                    .slice(0, 11);
+
                 onChange({
-                  refereeVerification: { ...formData.refereeVerification, identityNumber: digitsOnly },
+                  refereeVerification: {
+                    ...verification,
+                    phoneNumber,
+                  },
                 });
               }}
             />
-            <span style={{ fontSize: '12px', color: formData.refereeVerification.identityNumber.length === 12 ? '#4caf50' : '#999' }}>
-              {formData.refereeVerification.identityNumber.length}/12 số
+
+            {renderError(
+              verificationErrors?.phoneNumber
+            )}
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>
+              Identity Number (CCCD)
+            </label>
+
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={12}
+              className={inputClass(
+                verificationErrors?.identityNumber
+              )}
+              placeholder="Nhập đúng 12 số CCCD"
+              value={verification.identityNumber}
+              onChange={(event) => {
+                const identityNumber =
+                  event.target.value
+                    .replace(/\D/g, '')
+                    .slice(0, 12);
+
+                onChange({
+                  refereeVerification: {
+                    ...verification,
+                    identityNumber,
+                  },
+                });
+              }}
+            />
+
+            {renderError(
+              verificationErrors?.identityNumber
+            )}
+
+            <span
+              style={{
+                fontSize: '12px',
+                color:
+                  verification.identityNumber
+                    .length === 12
+                    ? '#16a34a'
+                    : '#999',
+              }}
+            >
+              {verification.identityNumber.length}/12 số
             </span>
           </div>
+
           <div className={styles.field}>
-            <label className={styles.label}>Date of Birth</label>
+            <label className={styles.label}>
+              Date of Birth
+            </label>
+
             <input
               type="date"
-              className={styles.input}
-              value={formData.refereeVerification.dateOfBirth}
-              onChange={(e) =>
+              className={inputClass(
+                verificationErrors?.dateOfBirth
+              )}
+              value={verification.dateOfBirth}
+              onChange={(event) =>
                 onChange({
-                  refereeVerification: { ...formData.refereeVerification, dateOfBirth: e.target.value },
+                  refereeVerification: {
+                    ...verification,
+                    dateOfBirth:
+                      event.target.value,
+                  },
                 })
               }
             />
+
+            {renderError(
+              verificationErrors?.dateOfBirth
+            )}
           </div>
 
-          {renderCertificateUpload('refereeVerification', formData.refereeVerification.certificateFile)}
-
-          {renderFamilyDeclarationBlock('refereeVerification', formData.refereeVerification)}
+          {renderCertificateUpload(
+            'refereeVerification',
+            verification.certificateFile,
+            verificationErrors?.certificateFile
+          )}
         </div>
       </div>
     );
   }
 
   // ─── Doctor ───────────────────────────────────────────────────────────────
+
   if (role === RegRole.Doctor) {
+    const verification =
+      formData.doctorVerification;
+
+    const verificationErrors =
+      errors?.doctorVerification;
+
     return (
       <div className={styles.container}>
-        <h2 className={styles.title}>Doctor Verification</h2>
-        <p className={styles.subtitle}>Provide your identity and medical license details.</p>
+        <h2 className={styles.title}>
+          Doctor Verification
+        </h2>
+
+        <p className={styles.subtitle}>
+          Provide your identity and medical certification information.
+        </p>
+
         <div className={styles.form}>
           <div className={styles.field}>
-            <label className={styles.label}>Phone Number</label>
+            <label className={styles.label}>
+              Phone Number
+            </label>
+
             <input
-              type="text"
-              className={styles.input}
-              placeholder="Enter your phone number"
-              value={formData.doctorVerification.phoneNumber}
-              onChange={(e) =>
-                onChange({
-                  doctorVerification: { ...formData.doctorVerification, phoneNumber: e.target.value },
-                })
-              }
-            />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Identity Number (CCCD)</label>
-            <input
-              type="text"
+              type="tel"
               inputMode="numeric"
-              className={styles.input}
-              placeholder="Nhập đúng 12 số CCCD"
-              maxLength={12}
-              value={formData.doctorVerification.identityNumber}
-              onChange={(e) => {
-                const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 12);
+              className={inputClass(
+                verificationErrors?.phoneNumber
+              )}
+              placeholder="Enter your phone number"
+              value={verification.phoneNumber}
+              onChange={(event) => {
+                const phoneNumber =
+                  event.target.value
+                    .replace(/\D/g, '')
+                    .slice(0, 11);
+
                 onChange({
-                  doctorVerification: { ...formData.doctorVerification, identityNumber: digitsOnly },
+                  doctorVerification: {
+                    ...verification,
+                    phoneNumber,
+                  },
                 });
               }}
             />
-            <span style={{ fontSize: '12px', color: formData.doctorVerification.identityNumber.length === 12 ? '#4caf50' : '#999' }}>
-              {formData.doctorVerification.identityNumber.length}/12 số
+
+            {renderError(
+              verificationErrors?.phoneNumber
+            )}
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>
+              Identity Number (CCCD)
+            </label>
+
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={12}
+              className={inputClass(
+                verificationErrors?.identityNumber
+              )}
+              placeholder="Nhập đúng 12 số CCCD"
+              value={verification.identityNumber}
+              onChange={(event) => {
+                const identityNumber =
+                  event.target.value
+                    .replace(/\D/g, '')
+                    .slice(0, 12);
+
+                onChange({
+                  doctorVerification: {
+                    ...verification,
+                    identityNumber,
+                  },
+                });
+              }}
+            />
+
+            {renderError(
+              verificationErrors?.identityNumber
+            )}
+
+            <span
+              style={{
+                fontSize: '12px',
+                color:
+                  verification.identityNumber
+                    .length === 12
+                    ? '#16a34a'
+                    : '#999',
+              }}
+            >
+              {verification.identityNumber.length}/12 số
             </span>
           </div>
+
           <div className={styles.field}>
-            <label className={styles.label}>Date of Birth</label>
+            <label className={styles.label}>
+              Date of Birth
+            </label>
+
             <input
               type="date"
-              className={styles.input}
-              value={formData.doctorVerification.dateOfBirth}
-              onChange={(e) =>
+              className={inputClass(
+                verificationErrors?.dateOfBirth
+              )}
+              value={verification.dateOfBirth}
+              onChange={(event) =>
                 onChange({
-                  doctorVerification: { ...formData.doctorVerification, dateOfBirth: e.target.value },
+                  doctorVerification: {
+                    ...verification,
+                    dateOfBirth:
+                      event.target.value,
+                  },
                 })
               }
             />
+
+            {renderError(
+              verificationErrors?.dateOfBirth
+            )}
           </div>
 
-          {renderCertificateUpload('doctorVerification', formData.doctorVerification.certificateFile)}
-
-          {renderFamilyDeclarationBlock('doctorVerification', formData.doctorVerification)}
+          {renderCertificateUpload(
+            'doctorVerification',
+            verification.certificateFile,
+            verificationErrors?.certificateFile
+          )}
         </div>
       </div>
     );
   }
 
-  // Spectator — không bao giờ render vì RegisterPage skip bước này
+  // Spectator bỏ qua Step 4.
   return null;
 };
 

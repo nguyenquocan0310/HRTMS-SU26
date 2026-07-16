@@ -2,9 +2,10 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  color: #111827;
 }
 
-// ─── List view header ─────────────────────────────────────────────────────
+/* ─── List view header ─────────────────────────────────────────────────── */
 
 .header {
   display: flex;
@@ -15,60 +16,148 @@
 }
 
 .heading {
+  margin: 0;
+  color: #111827;
   font-size: 1.65rem;
   font-weight: 800;
-  color: #fff;
-  margin: 0;
 }
 
 .createBtn {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  background: linear-gradient(135deg, #B5121B, #8b0d13);
-  border: none;
-  color: #fff;
+
   padding: 0.65rem 1.25rem;
+
+  border: none;
   border-radius: 8px;
+  background: linear-gradient(
+    135deg,
+    #b5121b,
+    #8b0d13
+  );
+
+  color: #ffffff;
   font-size: 0.85rem;
   font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s;
   white-space: nowrap;
+
+  cursor: pointer;
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 22px rgba(181, 18, 27, 0.35);
+    box-shadow:
+      0 8px 22px
+      rgba(181, 18, 27, 0.25);
+  }
+
+  &:focus-visible {
+    outline: 3px solid
+      rgba(181, 18, 27, 0.2);
+    outline-offset: 2px;
   }
 }
 
 .tournamentName {
-  font-weight: 600;
-  color: #fff;
+  color: #111827;
+  font-weight: 700;
 }
 
 .editBtn {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  background: transparent;
-  border: 1px solid #2a2a30;
-  color: #ccc;
-  padding: 0.4rem 0.8rem;
+
+  padding: 0.42rem 0.8rem;
+
+  border: 1px solid #d1d5db;
   border-radius: 6px;
+  background: #ffffff;
+
+  color: #374151;
   font-size: 0.78rem;
   font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
   white-space: nowrap;
 
-  &:hover {
-    border-color: #B5121B;
-    color: #F3C8C3;
+  cursor: pointer;
+
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease;
+
+  &:hover:not(:disabled) {
+    border-color: #2563eb;
+    background: #eff6ff;
+    color: #2563eb;
+  }
+
+  &:disabled {
+    border-color: #e5e7eb;
+    background: #f9fafb;
+    color: #9ca3af;
+    cursor: not-allowed;
   }
 }
 
-// ─── Wizard header ────────────────────────────────────────────────────────
+/* ─── Light DataTable override ─────────────────────────────────────────── */
+
+.container {
+  :global(.tableWrap),
+  [class*='tableWrap'] {
+    overflow-x: auto;
+
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #ffffff;
+  }
+
+  :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    background: #ffffff;
+  }
+
+  :global(thead) {
+    background: #f8fafc !important;
+  }
+
+  :global(th) {
+    border-bottom: 1px solid
+      #e5e7eb !important;
+    background: #f8fafc !important;
+    color: #64748b !important;
+  }
+
+  :global(td) {
+    background: #ffffff !important;
+    color: #334155 !important;
+  }
+
+  :global(tbody tr) {
+    border-bottom: 1px solid
+      #f1f5f9 !important;
+    background: #ffffff !important;
+  }
+
+  :global(tbody tr:hover) {
+    background: #f8fafc !important;
+  }
+
+  :global(tbody tr:hover td) {
+    background: #f8fafc !important;
+  }
+
+  :global(.emptyCell) {
+    color: #94a3b8 !important;
+  }
+}
+
+/* ─── Wizard header ────────────────────────────────────────────────────── */
 
 .wizardHeader {
   display: flex;
@@ -78,29 +167,41 @@
 
 .backLink {
   align-self: flex-start;
-  background: transparent;
-  border: none;
-  color: #888;
-  font-size: 0.82rem;
-  cursor: pointer;
+
   padding: 0;
-  transition: color 0.2s;
+
+  border: none;
+  background: transparent;
+
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition: color 0.2s ease;
 
   &:hover {
-    color: #F3C8C3;
+    color: #2563eb;
   }
 }
 
-// ─── Tab stepper ──────────────────────────────────────────────────────────
+/* ─── Tab stepper ──────────────────────────────────────────────────────── */
 
 .tabStepper {
   display: flex;
   align-items: flex-start;
-  background: #15151A;
-  border: 1px solid #232328;
-  border-radius: 14px;
+
   padding: 1.25rem 1.5rem;
+
   overflow-x: auto;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
 .tabStepWrapper {
@@ -113,82 +214,208 @@
 .tabConnector {
   flex: 1;
   height: 2px;
-  background: #2a2a30;
-  margin: 0 0.5rem;
-  margin-bottom: 1.6rem;
+
+  margin: 0 0.5rem 1.6rem;
+
+  background: #e2e8f0;
 }
 
 .tabStep {
   display: flex;
+  min-width: 90px;
   flex-direction: column;
   align-items: center;
   gap: 0.5rem;
-  background: transparent;
+
   border: none;
+  background: transparent;
+
   cursor: pointer;
-  min-width: 90px;
 }
 
 .tabStepCircle {
+  display: flex;
   width: 32px;
   height: 32px;
-  border-radius: 50%;
-  background: transparent;
-  border: 2px solid #2a2a30;
-  color: #666;
-  display: flex;
   align-items: center;
   justify-content: center;
+
+  border: 2px solid #cbd5e1;
+  border-radius: 50%;
+  background: #ffffff;
+
+  color: #64748b;
   font-size: 0.85rem;
   font-weight: 700;
-  transition: all 0.25s;
+
+  transition:
+    border-color 0.25s ease,
+    background-color 0.25s ease,
+    color 0.25s ease,
+    box-shadow 0.25s ease;
 }
 
 .tabStepLabel {
+  color: #64748b;
   font-size: 0.74rem;
-  color: #777;
+  font-weight: 500;
   text-align: center;
   white-space: nowrap;
-  transition: color 0.25s;
+
+  transition: color 0.25s ease;
+}
+
+.tabStep:hover {
+  .tabStepCircle {
+    border-color: #93c5fd;
+    background: #eff6ff;
+    color: #2563eb;
+  }
+
+  .tabStepLabel {
+    color: #2563eb;
+  }
 }
 
 .tabStepActive {
   .tabStepCircle {
-    background: #B5121B;
-    border-color: #B5121B;
-    color: #fff;
-    box-shadow: 0 0 12px rgba(181, 18, 27, 0.5);
+    border-color: #2563eb;
+    background: #2563eb;
+    color: #ffffff;
+
+    box-shadow:
+      0 0 0 4px
+      rgba(37, 99, 235, 0.12);
   }
 
   .tabStepLabel {
-    color: #F3C8C3;
-    font-weight: 600;
+    color: #2563eb;
+    font-weight: 700;
   }
 }
 
-// ─── Tab content ──────────────────────────────────────────────────────────
+/* ─── Tab content ──────────────────────────────────────────────────────── */
 
 .tabContent {
-  background: #15151A;
-  border: 1px solid #232328;
-  border-radius: 14px;
   padding: 1.5rem;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+
+  color: #111827;
+
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
-// ─── Action bar ───────────────────────────────────────────────────────────
+/*
+  Ép các thành phần cơ bản bên trong tab sang light mode.
+  Các selector này hỗ trợ trong trường hợp tab con dùng class module riêng.
+*/
+
+.tabContent {
+  :global(label) {
+    color: #374151 !important;
+  }
+
+  :global(h1),
+  :global(h2),
+  :global(h3),
+  :global(h4),
+  :global(h5),
+  :global(h6) {
+    color: #111827 !important;
+  }
+
+  :global(p),
+  :global(span) {
+    color: inherit;
+  }
+
+  :global(input),
+  :global(select),
+  :global(textarea) {
+    border-color: #d1d5db !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  :global(input::placeholder),
+  :global(textarea::placeholder) {
+    color: #9ca3af !important;
+  }
+
+  :global(input:focus),
+  :global(select:focus),
+  :global(textarea:focus) {
+    border-color: #2563eb !important;
+    outline: none !important;
+
+    box-shadow:
+      0 0 0 3px
+      rgba(37, 99, 235, 0.12) !important;
+  }
+
+  :global(select option) {
+    background: #ffffff;
+    color: #111827;
+  }
+
+  :global(button) {
+    color: inherit;
+  }
+
+  [class*='card'],
+  [class*='section'],
+  [class*='panel'],
+  [class*='form'],
+  [class*='rowBox'],
+  [class*='raceCard'],
+  [class*='roundCard'] {
+    border-color: #e5e7eb !important;
+    background: #ffffff !important;
+  }
+
+  [class*='title'],
+  [class*='heading'],
+  [class*='label'] {
+    color: #111827 !important;
+  }
+
+  [class*='subtitle'],
+  [class*='description'],
+  [class*='hint'],
+  [class*='helper'] {
+    color: #64748b !important;
+  }
+}
+
+/* ─── Action bar ───────────────────────────────────────────────────────── */
 
 .actionBar {
   position: sticky;
   bottom: 0;
+  z-index: 10;
+
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #131316;
-  border: 1px solid #232328;
-  border-radius: 14px;
-  padding: 1rem 1.25rem;
   flex-wrap: wrap;
   gap: 0.75rem;
+
+  padding: 1rem 1.25rem;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background:
+    rgba(255, 255, 255, 0.96);
+
+  box-shadow:
+    0 -4px 18px
+    rgba(15, 23, 42, 0.06);
+
+  backdrop-filter: blur(8px);
 }
 
 .actionBarRight {
@@ -197,67 +424,121 @@
 }
 
 .cancelTournamentBtn {
-  background: transparent;
-  border: 1px solid #2a2a30;
-  color: #e74c3c;
   padding: 0.6rem 1.1rem;
+
+  border: 1px solid #fecaca;
   border-radius: 8px;
+  background: #ffffff;
+
+  color: #dc2626;
   font-size: 0.82rem;
   font-weight: 600;
+
   cursor: pointer;
-  transition: all 0.2s;
+
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
 
   &:hover {
-    border-color: #e74c3c;
-    background: rgba(231, 76, 60, 0.08);
+    border-color: #ef4444;
+    background: #fef2f2;
   }
 }
 
 .saveDraftBtn {
-  background: transparent;
-  border: 1px solid #2a2a30;
-  color: #ccc;
   padding: 0.6rem 1.1rem;
+
+  border: 1px solid #cbd5e1;
   border-radius: 8px;
+  background: #ffffff;
+
+  color: #334155;
   font-size: 0.82rem;
   font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
 
-  &:hover {
-    border-color: #555;
-  }
-}
-
-.publishBtn {
-  background: #2ecc71;
-  border: none;
-  color: #0a1f12;
-  padding: 0.6rem 1.3rem;
-  border-radius: 8px;
-  font-size: 0.82rem;
-  font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
+
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease;
 
   &:hover:not(:disabled) {
-    background: #27ae60;
-    transform: translateY(-2px);
+    border-color: #2563eb;
+    background: #eff6ff;
+    color: #2563eb;
   }
 
   &:disabled {
-    background: #2a2a30;
-    color: #666;
+    border-color: #e5e7eb;
+    background: #f8fafc;
+    color: #94a3b8;
     cursor: not-allowed;
   }
 }
 
-// ─── Responsive ───────────────────────────────────────────────────────────
+.publishBtn {
+  padding: 0.6rem 1.3rem;
+
+  border: none;
+  border-radius: 8px;
+  background: #16a34a;
+
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background: #15803d;
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    background: #e5e7eb;
+    color: #9ca3af;
+    cursor: not-allowed;
+  }
+}
+
+/* ─── Error and loading states ─────────────────────────────────────────── */
+
+.listError {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+
+  color: #dc2626;
+  font-size: 0.85rem;
+}
+
+.loadingText {
+  padding: 2rem 0;
+
+  color: #64748b;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* ─── Responsive ───────────────────────────────────────────────────────── */
 
 @media (max-width: 768px) {
   .header {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .createBtn {
+    justify-content: center;
   }
 
   .actionBar {
@@ -277,21 +558,12 @@
   .tabStepLabel {
     display: none;
   }
-}
 
-.listError {
-  background: rgba(231, 76, 60, 0.12);
-  border: 1px solid rgba(231, 76, 60, 0.35);
-  color: #ff6b6b;
-  font-size: 0.85rem;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  margin-bottom: 1rem;
-}
+  .tabStepWrapper {
+    min-width: 80px;
+  }
 
-.loadingText {
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.9rem;
-  padding: 2rem 0;
-  text-align: center;
+  .tabContent {
+    padding: 1rem;
+  }
 }

@@ -5,26 +5,38 @@
 }
 
 .notice {
-  background: rgba(243, 196, 90, 0.12);
-  border: 1px solid rgba(243, 196, 90, 0.35);
-  color: #f3c45a;
-  font-size: 0.88rem;
   padding: 1rem 1.25rem;
-  border-radius: 2px;
+
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  background: #fffbeb;
+
+  color: #92400e;
+  font-size: 0.88rem;
 }
 
 .sectionTitle {
+  margin: 0 0 1rem;
+
+  color: #111827;
   font-size: 0.95rem;
   font-weight: 700;
-  color: #fff;
-  margin: 0 0 1rem;
 }
 
-/* ─── Overview ─── */
+.overviewCard,
+.statBox,
+.tableCard,
+.validationCard {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+
+  box-shadow:
+    0 1px 3px
+    rgba(15, 23, 42, 0.04);
+}
+
 .overviewCard {
-  background: #18181d;
-  border: 1px solid #2a2a30;
-  border-radius: 2px;
   padding: 1.25rem 1.5rem;
 }
 
@@ -41,19 +53,18 @@
 }
 
 .overviewLabel {
+  color: #64748b;
   font-size: 0.7rem;
-  color: #888;
-  text-transform: uppercase;
   letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 .overviewValue {
+  color: #111827;
   font-size: 0.95rem;
-  color: #fff;
   font-weight: 600;
 }
 
-/* ─── Stats ─── */
 .statsRow {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -61,31 +72,25 @@
 }
 
 .statBox {
-  background: #18181d;
-  border: 1px solid #2a2a30;
-  border-radius: 2px;
-  padding: 1rem 1.25rem;
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
+
+  padding: 1rem 1.25rem;
 }
 
 .statValue {
+  color: #111827;
   font-size: 1.4rem;
   font-weight: 800;
-  color: #fff;
 }
 
 .statLabel {
+  color: #64748b;
   font-size: 0.75rem;
-  color: #888;
 }
 
-/* ─── Table card ─── */
 .tableCard {
-  background: #18181d;
-  border: 1px solid #2a2a30;
-  border-radius: 2px;
   padding: 1.25rem 1.5rem;
 }
 
@@ -93,6 +98,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+
   margin-bottom: 1rem;
 }
 
@@ -100,100 +106,127 @@
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  background: rgba(181, 18, 27, 0.15);
-  border: 1px solid rgba(181, 18, 27, 0.4);
-  color: #F3C8C3;
+
   padding: 0.45rem 0.9rem;
-  border-radius: 2px;
+
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  background: #eff6ff;
+
+  color: #2563eb;
   font-size: 0.78rem;
   font-weight: 600;
+
   cursor: pointer;
-  transition: all 0.2s;
+
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
 
   &:hover {
-    background: rgba(181, 18, 27, 0.25);
+    border-color: #93c5fd;
+    background: #dbeafe;
   }
 }
 
 .tableWrap {
   overflow-x: auto;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
+
+  background: #ffffff;
   font-size: 0.82rem;
 
   th {
-    text-align: left;
-    color: #888;
-    font-weight: 600;
+    padding: 0.65rem 0.75rem;
+
+    border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
+
+    color: #64748b;
     font-size: 0.72rem;
-    text-transform: uppercase;
+    font-weight: 600;
     letter-spacing: 0.5px;
-    padding: 0.6rem 0.75rem;
-    border-bottom: 1px solid #2a2a30;
+    text-align: left;
+    text-transform: uppercase;
   }
 
   td {
-    padding: 0.7rem 0.75rem;
-    color: #ddd;
-    border-bottom: 1px solid #232328;
+    padding: 0.75rem;
+
+    border-bottom: 1px solid #f1f5f9;
+
+    color: #374151;
   }
 
   tr:last-child td {
     border-bottom: none;
   }
+
+  tbody tr:hover {
+    background: #f8fafc;
+  }
 }
 
 .horseName {
+  color: #111827;
   font-weight: 600;
-  color: #fff;
 }
 
 .emptyCell {
-  text-align: center;
-  color: #666;
   padding: 1.5rem !important;
+
+  color: #94a3b8;
+  text-align: center;
 }
 
 .assignedBadge {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  background: rgba(46, 204, 113, 0.15);
-  color: #2ecc71;
+
   padding: 0.2rem 0.6rem;
+
   border-radius: 999px;
+  background: #dcfce7;
+
+  color: #15803d;
   font-size: 0.72rem;
   font-weight: 600;
 }
 
 .waitingBadge {
   display: inline-flex;
-  background: rgba(243, 196, 90, 0.15);
-  color: #f3c45a;
+
   padding: 0.2rem 0.6rem;
+
   border-radius: 999px;
+  background: #fef3c7;
+
+  color: #b45309;
   font-size: 0.72rem;
   font-weight: 600;
 }
 
-/* ─── Validation ─── */
 .validationCard {
-  background: #18181d;
-  border: 1px solid #2a2a30;
-  border-radius: 2px;
   padding: 1.25rem 1.5rem;
 }
 
 .validationList {
-  list-style: none;
-  margin: 0;
-  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+
+  margin: 0;
+  padding: 0;
+
+  list-style: none;
 }
 
 .validationItem {
@@ -204,42 +237,64 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #2ecc71;
+
+  color: #15803d;
 }
 
 .validWarn {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #f3c45a;
+
+  color: #b45309;
 }
 
 .validationMuted {
-  color: #666;
+  color: #94a3b8;
 }
 
 .errorBox {
-  background: rgba(231, 76, 60, 0.12);
-  border: 1px solid rgba(231, 76, 60, 0.35);
-  color: #ff6b6b;
-  font-size: 0.85rem;
   padding: 0.75rem 1rem;
-  border-radius: 2px;
+
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+
+  color: #dc2626;
+  font-size: 0.85rem;
 }
 
 .loadingText {
-  color: rgba(255, 255, 255, 0.5);
+  padding: 1rem 0;
+
+  color: #64748b;
   font-size: 0.85rem;
   text-align: center;
-  padding: 1rem 0;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .overviewGrid {
     grid-template-columns: repeat(2, 1fr);
   }
 
   .statsRow {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .overviewGrid,
+  .statsRow {
+    grid-template-columns: 1fr;
+  }
+
+  .tableHeader {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .autoAllocateBtn {
+    justify-content: center;
   }
 }

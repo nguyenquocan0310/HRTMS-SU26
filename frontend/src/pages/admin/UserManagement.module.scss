@@ -2,9 +2,10 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  color: #111827;
 }
 
-// ─── Header ───────────────────────────────────────────────────────────────
+/* ─── Header ───────────────────────────────────────────────────────────── */
 
 .header {
   display: flex;
@@ -13,159 +14,283 @@
 }
 
 .heading {
+  margin: 0;
+  color: #111827;
   font-size: 1.65rem;
   font-weight: 800;
-  color: #fff;
-  margin: 0;
 }
 
 .filters {
   display: flex;
-  gap: 0.75rem;
   flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 .searchWrap {
   position: relative;
-  flex: 1;
+
+  display: flex;
   min-width: 220px;
   max-width: 360px;
-  display: flex;
+  flex: 1;
   align-items: center;
 }
 
 .searchIcon {
   position: absolute;
   left: 12px;
-  color: #666;
+
+  color: #94a3b8;
   pointer-events: none;
 }
 
 .searchInput {
   width: 100%;
-  background: #15151A;
-  border: 1px solid #2a2a30;
-  border-radius: 2px;
-  padding: 0.55rem 0.75rem 0.55rem 2.2rem;
-  color: #fff;
-  font-size: 0.85rem;
+
+  padding: 0.6rem 0.75rem 0.6rem 2.2rem;
+
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
   outline: none;
-  transition: border-color 0.2s;
+  background: #ffffff;
+
+  color: #111827;
+  font-size: 0.85rem;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 
   &::placeholder {
-    color: #555;
+    color: #9ca3af;
   }
 
   &:focus {
-    border-color: #B5121B;
-    box-shadow: 0 0 0 3px rgba(181, 18, 27, 0.15);
+    border-color: #2563eb;
+
+    box-shadow:
+      0 0 0 3px
+      rgba(37, 99, 235, 0.12);
   }
 }
 
 .filterSelect {
-  background: #15151A;
-  border: 1px solid #2a2a30;
-  border-radius: 2px;
-  padding: 0.55rem 0.85rem;
-  color: #ccc;
-  font-size: 0.85rem;
-  outline: none;
-  cursor: pointer;
   min-width: 150px;
-  transition: border-color 0.2s;
+
+  padding: 0.6rem 0.85rem;
+
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  outline: none;
+  background: #ffffff;
+
+  color: #374151;
+  font-size: 0.85rem;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 
   option {
-    background: #15151A;
-    color: #fff;
+    background: #ffffff;
+    color: #111827;
   }
 
   &:focus {
-    border-color: #B5121B;
+    border-color: #2563eb;
+
+    box-shadow:
+      0 0 0 3px
+      rgba(37, 99, 235, 0.12);
   }
 }
 
-// ─── Table cells ──────────────────────────────────────────────────────────
+/* ─── Light DataTable override ─────────────────────────────────────────── */
+
+.container {
+  :global(.tableWrap),
+  [class*='tableWrap'] {
+    overflow-x: auto;
+
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #ffffff;
+  }
+
+  :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    background: #ffffff;
+  }
+
+  :global(thead) {
+    background: #f8fafc !important;
+  }
+
+  :global(th) {
+    border-bottom: 1px solid
+      #e2e8f0 !important;
+    background: #f8fafc !important;
+
+    color: #64748b !important;
+  }
+
+  :global(td) {
+    background: #ffffff !important;
+    color: #374151 !important;
+  }
+
+  :global(tbody tr) {
+    border-bottom: 1px solid
+      #f1f5f9 !important;
+    background: #ffffff !important;
+  }
+
+  :global(tbody tr:hover) {
+    background: #f8fafc !important;
+  }
+
+  :global(tbody tr:hover td) {
+    background: #f8fafc !important;
+  }
+
+  :global(.emptyCell) {
+    color: #94a3b8 !important;
+  }
+}
+
+/* ─── Table cells ──────────────────────────────────────────────────────── */
 
 .usernameCell {
-  font-weight: 600;
-  color: #fff;
+  color: #111827;
+  font-weight: 700;
 }
 
 .emailCell {
-  color: #999;
+  color: #64748b;
   font-size: 0.82rem;
 }
 
 .roleBadge {
   display: inline-block;
+
   padding: 0.22rem 0.65rem;
-  border-radius: 2px;
-  background: #1d1d23;
-  border: 1px solid #2a2a30;
-  color: #ccc;
+
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: #eff6ff;
+
+  color: #1d4ed8;
   font-size: 0.75rem;
   font-weight: 600;
 }
 
 .actionCell {
   display: flex;
-  gap: 0.5rem;
   flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .suspendBtn {
-  background: transparent;
-  border: 1px solid #e74c3c;
-  color: #e74c3c;
-  padding: 0.35rem 0.7rem;
-  border-radius: 2px;
+  padding: 0.38rem 0.72rem;
+
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  background: #ffffff;
+
+  color: #dc2626;
   font-size: 0.75rem;
   font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
   white-space: nowrap;
 
+  cursor: pointer;
+
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+
   &:hover {
-    background: rgba(231, 76, 60, 0.1);
+    border-color: #ef4444;
+    background: #fef2f2;
   }
 }
 
 .activateBtn {
-  background: transparent;
-  border: 1px solid #2ecc71;
-  color: #2ecc71;
-  padding: 0.35rem 0.7rem;
-  border-radius: 2px;
+  padding: 0.38rem 0.72rem;
+
+  border: 1px solid #86efac;
+  border-radius: 6px;
+  background: #ffffff;
+
+  color: #15803d;
   font-size: 0.75rem;
   font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
   white-space: nowrap;
 
+  cursor: pointer;
+
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+
   &:hover {
-    background: rgba(46, 204, 113, 0.1);
+    border-color: #22c55e;
+    background: #f0fdf4;
   }
 }
 
 .detailBtn {
-  background: transparent;
-  border: 1px solid #2a2a30;
-  color: #ccc;
-  padding: 0.35rem 0.7rem;
-  border-radius: 2px;
+  padding: 0.38rem 0.72rem;
+
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+
+  color: #374151;
   font-size: 0.75rem;
   font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
   white-space: nowrap;
 
+  cursor: pointer;
+
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease;
+
   &:hover {
-    border-color: #B5121B;
-    color: #F3C8C3;
+    border-color: #2563eb;
+    background: #eff6ff;
+    color: #2563eb;
   }
 }
 
-// ─── Pagination ───────────────────────────────────────────────────────────
+.approveBtn {
+  padding: 0.38rem 0.8rem;
+
+  border: 1px solid #86efac;
+  border-radius: 6px;
+  background: #f0fdf4;
+
+  color: #15803d;
+  font-size: 0.8rem;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+
+  &:hover {
+    border-color: #22c55e;
+    background: #dcfce7;
+  }
+}
+
+/* ─── Pagination ───────────────────────────────────────────────────────── */
 
 .pagination {
   display: flex;
@@ -176,8 +301,8 @@
 }
 
 .pageInfo {
+  color: #64748b;
   font-size: 0.8rem;
-  color: #888;
 }
 
 .pageBtns {
@@ -189,28 +314,46 @@
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  background: #15151A;
-  border: 1px solid #2a2a30;
-  color: #ccc;
+
   padding: 0.5rem 0.9rem;
-  border-radius: 2px;
+
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+
+  color: #374151;
   font-size: 0.8rem;
   font-weight: 600;
+
   cursor: pointer;
-  transition: all 0.2s;
+
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease;
 
   &:hover:not(:disabled) {
-    border-color: #B5121B;
-    color: #F3C8C3;
+    border-color: #2563eb;
+    background: #eff6ff;
+    color: #2563eb;
   }
 
   &:disabled {
-    opacity: 0.4;
+    border-color: #e5e7eb;
+    background: #f8fafc;
+    color: #9ca3af;
     cursor: not-allowed;
   }
 }
 
-// ─── Responsive ───────────────────────────────────────────────────────────
+.loadingText {
+  padding: 2rem;
+
+  color: #64748b;
+  text-align: center;
+}
+
+/* ─── Responsive ───────────────────────────────────────────────────────── */
 
 @media (max-width: 768px) {
   .filters {
@@ -219,27 +362,21 @@
 
   .searchWrap,
   .filterSelect {
+    width: 100%;
     max-width: 100%;
+  }
+
+  .pagination {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pageBtns {
     width: 100%;
   }
-}
 
-.approveBtn {
-  padding: 0.3rem 0.8rem;
-  border-radius: 2px;
-  border: 1px solid rgba(39, 174, 96, 0.4);
-  background: rgba(39, 174, 96, 0.15);
-  color: #2ecc71;
-  font-size: 0.8rem;
-  cursor: pointer;
-
-  &:hover {
-    background: rgba(39, 174, 96, 0.25);
+  .pageBtn {
+    flex: 1;
+    justify-content: center;
   }
-}
-
-.loadingText {
-  color: var(--color-text-secondary);
-  padding: 2rem;
-  text-align: center;
 }

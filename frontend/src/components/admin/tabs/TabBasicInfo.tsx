@@ -8,7 +8,7 @@ interface Props {
 }
 
 
-const RACE_DISTANCES = [1000, 1200, 1400, 1600, 1800, 2000];
+const RACE_DISTANCES = [1600, 1800, 2000];
 
 const formatVND = (n: number | '') =>
   n === '' ? '' : Number(n).toLocaleString('vi-VN');
