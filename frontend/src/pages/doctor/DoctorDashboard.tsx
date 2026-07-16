@@ -72,15 +72,13 @@ export default function DoctorDashboard() {
   const [assignmentsError, setAssignmentsError] = useState<string | null>(null)
 
   useEffect(() => {
-    setAssignmentsLoading(true)
-    setAssignmentsError(null)
     getMyDoctorRaceAssignments()
       .then((data) => {
         setAssignments(data)
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         console.error('Failed to load race assignments:', err)
-        setAssignmentsError(err?.message || 'Không tải được danh sách phân công.')
+        setAssignmentsError(err instanceof Error ? err.message : 'Không tải được danh sách phân công.')
       })
       .finally(() => setAssignmentsLoading(false))
   }, [])
@@ -149,7 +147,7 @@ export default function DoctorDashboard() {
       )}
 
       {/* Hệ thống 4 thẻ chỉ số (Stats Cards) */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {/* Thẻ 1: Race được phân công */}
         <div className="bg-white border border-gray-200 rounded-lg p-5 flex items-center justify-between shadow-sm transition-colors hover:border-blue-200 hover:bg-blue-50/30">
           <div>

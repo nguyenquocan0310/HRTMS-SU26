@@ -158,7 +158,7 @@ export default function App() {
           <Route path="paddock" element={<PaddockConsole />} />
           <Route path="tournaments" element={<DoctorTournamentList />} />
           <Route path="profile" element={<DoctorProfile />} />
-          <Route path="notifications" element={<SharedNotificationCenter />} />
+          <Route path="notifications" element={<SharedNotificationCenter iconless />} />
         </Route>
 
         {/* ── Cấu trúc Route của TRỌNG TÀI (Referee) ── */}
