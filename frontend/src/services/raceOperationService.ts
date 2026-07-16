@@ -117,6 +117,7 @@ export interface AdminPairing {
   ownerId: number;
   ownerName: string;
   status: string;
+  advancementStatus: string | null;
   isAllocated: boolean;
   createdAt: string;
 }
@@ -131,11 +132,13 @@ interface PagedResult<T> {
 
 export const getAdminPairings = (
   tournamentId: number,
+  targetRaceId: number,
   unallocatedOnly = true,
   pageSize = 100
 ): Promise<AdminPairing[]> => {
   const params = new URLSearchParams({
     tournamentId: String(tournamentId),
+    targetRaceId: String(targetRaceId),
     status: 'Confirmed',
     unallocatedOnly: String(unallocatedOnly),
     page: '1',
