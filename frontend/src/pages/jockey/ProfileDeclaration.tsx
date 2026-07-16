@@ -8,6 +8,7 @@ import { getMyProfile, updateMyProfile } from '../../services/jockeyService'
 import type { UpdateProfilePayload } from '../../services/jockeyService'
 import type { JockeyProfile } from '../../types/jockey.types'
 import type { JockeyRoleProfile, UserProfile } from '../../types/account.types'
+import CertificateViewer from '../../components/common/CertificateViewer'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -249,12 +250,6 @@ export default function ProfileDeclaration() {
                 <label className="text-sm font-semibold text-gray-700">Tình trạng sức khỏe<select value={professionalForm.healthStatus || ''} onChange={(e) => setProfessionalForm((p) => ({ ...p, healthStatus: e.target.value || null }))} disabled={professionalSaving} className={inputClass}><option value="">Chưa cập nhật</option>{healthStatusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
                 <div><p className="text-sm font-semibold text-gray-700">Trạng thái hồ sơ</p><p className={readOnlyClass}>{professional.status}</p></div>
               </div>
-              {account?.profile?.certificate && (
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                  <h3 className="text-sm font-bold text-gray-800">Tệp chứng chỉ hiện có (chỉ đọc)</h3>
-                  <div className="mt-3 grid gap-3 text-sm sm:grid-cols-3"><p><span className="text-gray-500">Tên tệp:</span> {account.profile.certificate.fileName}</p><p><span className="text-gray-500">Ngày tải:</span> {new Date(account.profile.certificate.uploadedAt).toLocaleDateString('vi-VN')}</p><p><span className="text-gray-500">Loại tệp:</span> {account.profile.certificate.contentType || 'Không xác định'}</p></div>
-                </div>
-              )}
               {professionalSuccess && <Feedback type="success">{professionalSuccess}</Feedback>}
               {professionalError && <Feedback type="error">{professionalError}</Feedback>}
               <div className="flex justify-end"><button type="submit" disabled={professionalSaving} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{professionalSaving ? 'Đang lưu...' : 'Cập nhật hồ sơ'}</button></div>
@@ -262,6 +257,8 @@ export default function ProfileDeclaration() {
           )}
         </div>
       </section>
+
+      <CertificateViewer certificate={account?.profile?.certificate} />
 
       <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-bold text-gray-900">Bảo mật</h2>
