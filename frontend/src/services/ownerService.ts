@@ -304,6 +304,24 @@ const assertPositiveId = (value: number | string, fieldName: string): void => {
   }
 };
 
+/**
+ * Lấy các enrollment của Owner trong một giải. Caller có thể yêu cầu riêng
+ * trạng thái duyệt để không nhầm hồ sơ trong kho với ngựa đủ điều kiện dự giải.
+ */
+export const getMyTournamentHorseEnrollments = async (
+  tournamentId: number,
+  adminApprovalStatus?: string
+): Promise<HorseEnrollmentResponse[]> => {
+  const params = new URLSearchParams({ tournamentId: String(tournamentId) });
+  if (adminApprovalStatus) params.set('adminApprovalStatus', adminApprovalStatus);
+
+  const res = await apiFetch<ApiResponse<HorseEnrollmentResponse[]> | HorseEnrollmentResponse[]>(
+    `/horses/my/enrollments?${params.toString()}`
+  );
+
+  return unwrapApiResponse(res, 'Không tải được danh sách ngựa của giải.');
+};
+
 const unwrapApiResponse = <T>(
   response: ApiResponse<T> | T,
   fallbackMessage: string
