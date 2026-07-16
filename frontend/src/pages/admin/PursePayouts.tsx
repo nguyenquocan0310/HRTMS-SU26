@@ -1,619 +1,104 @@
+/* eslint-disable react-hooks/set-state-in-effect -- Selected scope changes require server-side summary refreshes. */
 import { useEffect, useMemo, useState } from 'react';
+import { FiRefreshCw } from 'react-icons/fi';
+import { getTournaments, type TournamentResponse } from '../../services/tournamentService';
 import {
-  FiDownload,
-  FiRefreshCw,
-} from 'react-icons/fi';
-
-import {
-  getTournaments,
-  type TournamentResponse,
-} from '../../services/tournamentService';
-
-import {
-  getEarningsHistory,
   getRacePayoutSummary,
+  getRacePurseSummary,
+  getTournamentPurseSummary,
   updatePayoutStatus,
-  type EarningsHistoryItem,
-  type PursePayoutItem,
   type RacePayoutSummary,
+  type RacePurseSummary,
+  type TournamentPurseSummary,
 } from '../../services/pursePayoutService';
-
 import styles from './PursePayouts.module.scss';
 
-interface RaceRef {
-  raceId: number;
-  raceNumber: number;
-  roundName: string;
-}
+const formatMoney = (value: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(value ?? 0);
+const payoutLabel = (status: string) => status === 'Paid' ? 'Đã chi trả' : status === 'Unpaid' ? 'Chờ chi trả' : 'Chưa thể chi trả';
+const raceStatusLabel = (status: string) => ({ Official: 'Đã công bố kết quả', Cancelled: 'Đã hủy', Upcoming: 'Sắp diễn ra', Live: 'Đang diễn ra', Unofficial: 'Chờ xác nhận kết quả' }[status] ?? 'Chưa có dữ liệu');
 
-const formatMoney = (value: number) =>
-  new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-    maximumFractionDigits: 0,
-  }).format(value ?? 0);
+interface RaceOption { raceId: number; label: string; }
 
 const PursePayouts = () => {
-  const [tournaments, setTournaments] = useState<
-    TournamentResponse[]
-  >([]);
-
-  const [selectedTournamentId, setSelectedTournamentId] =
-    useState<number | null>(null);
-
-  const [raceSummaries, setRaceSummaries] = useState<
-    RacePayoutSummary[]
-  >([]);
-
-  const [earningsHistory, setEarningsHistory] = useState<
-    EarningsHistoryItem[]
-  >([]);
-
-  const [loading, setLoading] = useState(false);
-  const [updatingPayoutId, setUpdatingPayoutId] =
-    useState<number | null>(null);
-
+  const [tournaments, setTournaments] = useState<TournamentResponse[]>([]);
+  const [selectedTournamentId, setSelectedTournamentId] = useState<number | null>(null);
+  const [selectedRaceId, setSelectedRaceId] = useState<number | null>(null);
+  const [tournamentSummary, setTournamentSummary] = useState<TournamentPurseSummary | null>(null);
+  const [raceSummary, setRaceSummary] = useState<RacePurseSummary | null>(null);
+  const [payoutSummary, setPayoutSummary] = useState<RacePayoutSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [raceLoading, setRaceLoading] = useState(false);
+  const [updatingPayoutId, setUpdatingPayoutId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
-  useEffect(() => {
-    getTournaments()
-      .then((items) => {
-        setTournaments(items);
+  const raceOptions = useMemo<RaceOption[]>(() => {
+    const selected = tournaments.find((item) => item.tournamentId === selectedTournamentId);
+    return selected?.rounds.flatMap((round) => round.races.map((race) => ({ raceId: race.raceId, label: `${round.name} — Cuộc đua #${race.raceNumber}` }))) ?? [];
+  }, [tournaments, selectedTournamentId]);
 
-        if (items.length > 0) {
-          setSelectedTournamentId(items[0].tournamentId);
-        }
-      })
-      .catch((err) => {
-        setError(
-          err instanceof Error
-            ? err.message
-            : 'Không tải được danh sách giải đấu.'
-        );
-      });
+  useEffect(() => {
+    getTournaments().then((items) => { setTournaments(items); setSelectedTournamentId(items[0]?.tournamentId ?? null); }).catch(() => setError('Không tải được danh sách giải đấu. Vui lòng thử lại.')).finally(() => setLoading(false));
   }, []);
 
-  const selectedTournament = useMemo(
-    () =>
-      tournaments.find(
-        (item) =>
-          item.tournamentId === selectedTournamentId
-      ) ?? null,
-    [tournaments, selectedTournamentId]
-  );
+  const loadTournament = async (tournamentId: number) => {
+    setLoading(true); setError(''); setMessage('');
+    try { setTournamentSummary(await getTournamentPurseSummary(tournamentId)); }
+    catch (requestError) { setTournamentSummary(null); setError(requestError instanceof Error ? requestError.message : 'Không tải được tổng hợp quỹ thưởng.'); }
+    finally { setLoading(false); }
+  };
 
-  const selectedRaceRefs = useMemo<RaceRef[]>(() => {
-    if (!selectedTournament) {
-      return [];
-    }
+  useEffect(() => { if (selectedTournamentId) void loadTournament(selectedTournamentId); }, [selectedTournamentId]);
+  useEffect(() => { setSelectedRaceId(raceOptions[0]?.raceId ?? null); }, [raceOptions]);
 
-    return selectedTournament.rounds.flatMap((round) =>
-      round.races.map((race) => ({
-        raceId: race.raceId,
-        raceNumber: race.raceNumber,
-        roundName: round.name,
-      }))
-    );
-  }, [selectedTournament]);
-
-  const loadData = async () => {
-    if (!selectedTournamentId) {
-      setRaceSummaries([]);
-      setEarningsHistory([]);
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-    setMessage('');
-
+  const loadRace = async (raceId: number) => {
+    setRaceLoading(true); setError('');
     try {
-      const summaries = await Promise.all(
-        selectedRaceRefs.map((race) =>
-          getRacePayoutSummary(race.raceId)
-        )
-      );
-
-      const history = await getEarningsHistory();
-
-      setRaceSummaries(summaries);
-      setEarningsHistory(history);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Không tải được dữ liệu quỹ và chi thưởng.'
-      );
-    } finally {
-      setLoading(false);
-    }
+      const [summary, payouts] = await Promise.all([getRacePurseSummary(raceId), getRacePayoutSummary(raceId)]);
+      setRaceSummary(summary); setPayoutSummary(payouts);
+    } catch (requestError) {
+      setRaceSummary(null); setPayoutSummary(null);
+      setError(requestError instanceof Error ? requestError.message : 'Không tải được chi tiết chi trả.');
+    } finally { setRaceLoading(false); }
   };
 
-  useEffect(() => {
-    if (!selectedTournamentId) {
-      return;
-    }
+  useEffect(() => { if (selectedRaceId) void loadRace(selectedRaceId); else { setRaceSummary(null); setPayoutSummary(null); } }, [selectedRaceId]);
 
-    loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTournamentId, selectedRaceRefs.length]);
+  const refresh = async () => {
+    if (selectedTournamentId) await loadTournament(selectedTournamentId);
+    if (selectedRaceId) await loadRace(selectedRaceId);
+  };
 
-  const allPayouts = useMemo(
-    () =>
-      raceSummaries.flatMap((summary) =>
-        summary.payouts.map((payout) => ({
-          ...payout,
-          raceId: summary.raceId,
-          raceNumber: summary.raceNumber,
-          roundName: summary.roundName,
-        }))
-      ),
-    [raceSummaries]
-  );
-
-  const summary = useMemo(() => {
-    const initialFund = raceSummaries.reduce(
-      (total, race) => total + race.purseAmount,
-      0
-    );
-
-    const allocated = raceSummaries.reduce(
-      (total, race) => total + race.totalAllocated,
-      0
-    );
-
-    const unallocated = raceSummaries.reduce(
-      (total, race) => total + race.remainderAmount,
-      0
-    );
-
-    const paid = allPayouts
-      .filter(
-        (item) =>
-          item.payoutStatus.toLowerCase() === 'paid'
-      )
-      .reduce(
-        (total, item) =>
-          total + item.calculatedAmount,
-        0
-      );
-
-    return {
-      initialFund,
-      allocated,
-      unallocated,
-      paid,
-      remaining: Math.max(0, initialFund - paid),
-    };
-  }, [raceSummaries, allPayouts]);
-
-  const handleChangeStatus = async (
-    payout: PursePayoutItem
-  ) => {
-    const nextStatus =
-      payout.payoutStatus === 'Paid'
-        ? 'Unpaid'
-        : 'Paid';
-
-    setUpdatingPayoutId(payout.pursePayoutId);
-    setError('');
-    setMessage('');
-
+  const handleChangeStatus = async (payoutId: number, currentStatus: string) => {
+    const nextStatus = currentStatus === 'Paid' ? 'Unpaid' : 'Paid';
+    setUpdatingPayoutId(payoutId); setError(''); setMessage('');
     try {
-      await updatePayoutStatus(
-        payout.pursePayoutId,
-        nextStatus
-      );
-
-      setMessage(
-        `Đã cập nhật trạng thái payout #${payout.pursePayoutId} thành ${nextStatus}.`
-      );
-
-      await loadData();
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Không cập nhật được trạng thái chi trả.'
-      );
-    } finally {
-      setUpdatingPayoutId(null);
-    }
+      await updatePayoutStatus(payoutId, nextStatus);
+      setMessage(nextStatus === 'Paid' ? 'Đã đánh dấu khoản thưởng là đã chi trả.' : 'Đã chuyển khoản thưởng về trạng thái chờ chi trả.');
+      await refresh();
+    } catch (requestError) { setError(requestError instanceof Error ? requestError.message : 'Không thể cập nhật trạng thái chi trả.'); }
+    finally { setUpdatingPayoutId(null); }
   };
 
-  const handleExportCsv = () => {
-    const rows = [
-      [
-        'Vòng',
-        'Race',
-        'Người nhận',
-        'Vai trò',
-        'Ngựa',
-        'Hạng',
-        'Tiền thưởng',
-        'Trạng thái',
-      ],
-      ...allPayouts.map((item) => [
-        item.roundName,
-        `Race #${item.raceNumber}`,
-        item.recipientName,
-        item.role,
-        item.horseName,
-        String(item.finishPosition),
-        String(item.calculatedAmount),
-        item.payoutStatus,
-      ]),
-    ];
-
-    const csv = rows
-      .map((row) =>
-        row
-          .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
-          .join(',')
-      )
-      .join('\n');
-
-    const blob = new Blob(
-      ['\uFEFF', csv],
-      { type: 'text/csv;charset=utf-8;' }
-    );
-
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-
-    anchor.href = url;
-    anchor.download = `purse-payouts-${
-      selectedTournament?.name ?? 'tournament'
-    }.csv`;
-
-    anchor.click();
-    URL.revokeObjectURL(url);
-  };
-
-  return (
-    <div className={styles.container}>
-      <div className={styles.header}>
-        <div>
-          <h1 className={styles.heading}>
-            Quỹ &amp; chi thưởng
-          </h1>
-
-          <p className={styles.subtext}>
-            Theo dõi ngân sách race, thực chi và trạng thái
-            phát thưởng.
-          </p>
-        </div>
-
-        <div className={styles.headerActions}>
-          <button
-            type="button"
-            className={styles.ghostBtn}
-            onClick={loadData}
-            disabled={loading}
-          >
-            <FiRefreshCw size={16} />
-            Tải lại
-          </button>
-
-          <button
-            type="button"
-            className={styles.ghostBtn}
-            onClick={handleExportCsv}
-            disabled={allPayouts.length === 0}
-          >
-            <FiDownload size={16} />
-            Xuất CSV
-          </button>
-        </div>
-      </div>
-
-      <div className={styles.filterSection}>
-        <label className={styles.label}>
-          Giải đấu
-        </label>
-
-        <select
-          className={styles.select}
-          value={selectedTournamentId ?? ''}
-          onChange={(event) =>
-            setSelectedTournamentId(
-              Number(event.target.value)
-            )
-          }
-        >
-          {tournaments.length === 0 ? (
-            <option value="">
-              -- Chưa có giải đấu --
-            </option>
-          ) : (
-            tournaments.map((tournament) => (
-              <option
-                key={tournament.tournamentId}
-                value={tournament.tournamentId}
-              >
-                {tournament.name}
-              </option>
-            ))
-          )}
-        </select>
-      </div>
-
-      {error && (
-        <div className={styles.errorBox}>{error}</div>
-      )}
-
-      {message && (
-        <div className={styles.successBox}>
-          {message}
-        </div>
-      )}
-
+  return <div className={styles.container}>
+    <div className={styles.header}><div><h1 className={styles.heading}>Quỹ thưởng và chi trả</h1><p className={styles.subtext}>Số liệu tổng hợp được lấy trực tiếp từ hệ thống, không tự tính lại ở giao diện.</p></div><div className={styles.headerActions}><button type="button" className={styles.ghostBtn} onClick={() => void refresh()} disabled={loading || raceLoading}><FiRefreshCw size={15} /> Cập nhật</button></div></div>
+    <div className={styles.filterSection}><label className={styles.label} htmlFor="purse-tournament">Giải đấu</label><select id="purse-tournament" className={styles.select} value={selectedTournamentId ?? ''} onChange={(event) => setSelectedTournamentId(Number(event.target.value))}>{tournaments.map((item) => <option key={item.tournamentId} value={item.tournamentId}>{item.name}</option>)}</select></div>
+    {error && <div className={styles.errorBox} role="alert">{error}</div>}{message && <div className={styles.successBox}>{message}</div>}
+    {loading ? <p className={styles.emptyCell}>Đang tải tổng hợp quỹ thưởng...</p> : !tournamentSummary ? <p className={styles.emptyCell}>Chưa có dữ liệu quỹ thưởng.</p> : <>
       <div className={styles.summaryGrid}>
-        <div className={styles.summaryItem}>
-          <span>Quỹ ban đầu</span>
-          <strong>
-            {formatMoney(summary.initialFund)}
-          </strong>
-        </div>
-
-        <div className={styles.summaryItem}>
-          <span>Đã phân bổ</span>
-          <strong>
-            {formatMoney(summary.allocated)}
-          </strong>
-        </div>
-
-        <div className={styles.summaryItem}>
-          <span>Chưa phân bổ</span>
-          <strong>
-            {formatMoney(summary.unallocated)}
-          </strong>
-        </div>
-
-        <div className={styles.summaryItem}>
-          <span>Thực chi phát sinh</span>
-          <strong>{formatMoney(summary.paid)}</strong>
-        </div>
-
-        <div className={styles.summaryItem}>
-          <span>Số tiền còn lại</span>
-          <strong>
-            {formatMoney(summary.remaining)}
-          </strong>
-          <small>Sau khi trừ thực chi</small>
-        </div>
+        <div className={styles.summaryItem}><span>Tổng quỹ</span><strong>{formatMoney(tournamentSummary.totalFund)}</strong></div>
+        <div className={styles.summaryItem}><span>Đã chi trả</span><strong>{formatMoney(tournamentSummary.paidAmount)}</strong></div>
+        <div className={styles.summaryItem}><span>Chờ chi trả</span><strong>{formatMoney(tournamentSummary.pendingAmount)}</strong></div>
+        <div className={styles.summaryItem}><span>Còn lại</span><strong>{formatMoney(tournamentSummary.remainingAmount)}</strong></div>
+        <div className={styles.summaryItem}><span>Tiến độ</span><strong>{tournamentSummary.paidRaceCount}/{tournamentSummary.totalRaceCount} cuộc đua đã chi trả</strong><small>{tournamentSummary.completedRoundCount}/{tournamentSummary.totalRoundCount} vòng đã hoàn thành</small></div>
       </div>
-
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>
-          Phân bổ theo vòng / race
-        </h2>
-
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Vòng / race</th>
-                <th>Trạng thái</th>
-                <th>Ngân sách</th>
-                <th>Thực chi</th>
-                <th>Phần dư</th>
-                <th>Quỹ sau race</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className={styles.emptyCell}
-                  >
-                    Đang tải...
-                  </td>
-                </tr>
-              ) : raceSummaries.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className={styles.emptyCell}
-                  >
-                    Chưa có dữ liệu Race.
-                  </td>
-                </tr>
-              ) : (
-                raceSummaries.map((race) => {
-                  const paid = race.payouts
-                    .filter(
-                      (item) =>
-                        item.payoutStatus === 'Paid'
-                    )
-                    .reduce(
-                      (total, item) =>
-                        total + item.calculatedAmount,
-                      0
-                    );
-
-                  return (
-                    <tr key={race.raceId}>
-                      <td>
-                        <strong>{race.roundName}</strong>
-                        {' · '}Race #{race.raceNumber}
-                      </td>
-
-                      <td>{race.raceStatus}</td>
-                      <td>{formatMoney(race.purseAmount)}</td>
-                      <td>{formatMoney(paid)}</td>
-                      <td>
-                        {formatMoney(race.remainderAmount)}
-                      </td>
-                      <td>
-                        {formatMoney(
-                          Math.max(
-                            0,
-                            race.purseAmount - paid
-                          )
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+      {tournamentSummary.hasDiscrepancy && <div className={styles.errorBox}>Dữ liệu quỹ thưởng có chênh lệch. Vui lòng kiểm tra lại các khoản chi trả.</div>}
+      <section className={styles.section}><h2 className={styles.sectionTitle}>Theo vòng đấu</h2><div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>Vòng đấu</th><th>Quỹ được phân bổ</th><th>Đã chi trả</th><th>Chờ chi trả</th><th>Còn lại</th><th>Tiến độ</th></tr></thead><tbody>{tournamentSummary.rounds.length === 0 ? <tr><td colSpan={6} className={styles.emptyCell}>Chưa có vòng đấu.</td></tr> : tournamentSummary.rounds.map((round) => <tr key={round.roundId}><td>{round.roundName}</td><td>{formatMoney(round.allocatedFund)}</td><td>{formatMoney(round.paidAmount)}</td><td>{formatMoney(round.pendingAmount)}</td><td>{formatMoney(round.remainingAmount)}</td><td>{round.paidRaceCount}/{round.totalRaceCount} cuộc đua đã chi trả</td></tr>)}</tbody></table></div></section>
+      <section className={styles.section}><h2 className={styles.sectionTitle}>Chi tiết theo cuộc đua</h2><select className={styles.select} value={selectedRaceId ?? ''} onChange={(event) => setSelectedRaceId(Number(event.target.value))}>{raceOptions.map((race) => <option key={race.raceId} value={race.raceId}>{race.label}</option>)}</select>
+        {raceLoading ? <p className={styles.emptyCell}>Đang tải chi tiết cuộc đua...</p> : !raceSummary || !payoutSummary ? <p className={styles.emptyCell}>Chưa có dữ liệu cuộc đua.</p> : <><p className={styles.sectionSubtext}>{raceStatusLabel(raceSummary.resultStatus)} · {payoutLabel(raceSummary.payoutStatus)} · Quỹ phân bổ: {formatMoney(raceSummary.allocatedFund)}</p><div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>Người nhận</th><th>Vai trò</th><th>Ngựa</th><th>Thứ hạng</th><th>Số tiền</th><th>Trạng thái</th><th></th></tr></thead><tbody>{payoutSummary.payouts.length === 0 ? <tr><td colSpan={7} className={styles.emptyCell}>Cuộc đua chưa có khoản chi trả. Chỉ cuộc đua đã công bố kết quả mới sinh khoản thưởng.</td></tr> : payoutSummary.payouts.map((payout) => <tr key={payout.pursePayoutId}><td>{payout.recipientName}</td><td>{payout.role === 'Owner' ? 'Chủ ngựa' : 'Nài ngựa'}</td><td>{payout.horseName}</td><td>{payout.finishPosition ?? '—'}</td><td>{formatMoney(payout.calculatedAmount)}</td><td><span className={`${styles.statusBadge} ${payout.payoutStatus === 'Paid' ? styles.paid : styles.unpaid}`}>{payoutLabel(payout.payoutStatus)}</span></td><td><button type="button" className={styles.statusBtn} disabled={updatingPayoutId === payout.pursePayoutId} onClick={() => void handleChangeStatus(payout.pursePayoutId, payout.payoutStatus)}>{updatingPayoutId === payout.pursePayoutId ? 'Đang cập nhật...' : payout.payoutStatus === 'Paid' ? 'Chuyển chờ chi trả' : 'Đánh dấu đã chi trả'}</button></td></tr>)}</tbody></table></div></>}
       </section>
-
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>
-          Chi tiết payout
-        </h2>
-
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Race</th>
-                <th>Người nhận</th>
-                <th>Vai trò</th>
-                <th>Ngựa</th>
-                <th>Hạng</th>
-                <th>Tiền thưởng</th>
-                <th>Trạng thái</th>
-                <th></th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {allPayouts.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={8}
-                    className={styles.emptyCell}
-                  >
-                    Race chưa Official hoặc chưa sinh payout.
-                  </td>
-                </tr>
-              ) : (
-                allPayouts.map((payout) => (
-                  <tr key={payout.pursePayoutId}>
-                    <td>
-                      {payout.roundName} · Race #
-                      {payout.raceNumber}
-                    </td>
-
-                    <td>{payout.recipientName}</td>
-                    <td>{payout.role}</td>
-                    <td>{payout.horseName}</td>
-                    <td>{payout.finishPosition}</td>
-
-                    <td>
-                      {formatMoney(
-                        payout.calculatedAmount
-                      )}
-                    </td>
-
-                    <td>
-                      <span
-                        className={`${styles.statusBadge} ${
-                          payout.payoutStatus === 'Paid'
-                            ? styles.paid
-                            : styles.unpaid
-                        }`}
-                      >
-                        {payout.payoutStatus}
-                      </span>
-                    </td>
-
-                    <td>
-                      <button
-                        type="button"
-                        className={styles.statusBtn}
-                        onClick={() =>
-                          handleChangeStatus(payout)
-                        }
-                        disabled={
-                          updatingPayoutId ===
-                          payout.pursePayoutId
-                        }
-                      >
-                        {updatingPayoutId ===
-                        payout.pursePayoutId
-                          ? 'Đang xử lý...'
-                          : payout.payoutStatus === 'Paid'
-                            ? 'Đánh dấu Unpaid'
-                            : 'Đánh dấu Paid'}
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <div>
-            <h2 className={styles.sectionTitle}>
-              Lịch sử thu nhập
-            </h2>
-
-            <p className={styles.sectionSubtext}>
-              Thống kê toàn hệ thống.
-            </p>
-          </div>
-        </div>
-
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Người nhận</th>
-                <th>Vai trò</th>
-                <th>Tổng thu nhập</th>
-                <th>Đã chi</th>
-                <th>Chưa chi</th>
-                <th>Số payout</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {earningsHistory.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className={styles.emptyCell}
-                  >
-                    Chưa có lịch sử thu nhập.
-                  </td>
-                </tr>
-              ) : (
-                earningsHistory.map((item) => (
-                  <tr
-                    key={`${item.recipientUserId}-${item.role}`}
-                  >
-                    <td>{item.recipientName}</td>
-                    <td>{item.role}</td>
-                    <td>
-                      {formatMoney(item.totalEarnings)}
-                    </td>
-                    <td>{formatMoney(item.paidAmount)}</td>
-                    <td>
-                      {formatMoney(item.unpaidAmount)}
-                    </td>
-                    <td>{item.payoutCount}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </div>
-  );
+    </>}
+  </div>;
 };
 
 export default PursePayouts;

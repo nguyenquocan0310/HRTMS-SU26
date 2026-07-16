@@ -26,31 +26,31 @@ interface StatusBadgeProps {
 }
 
 const STATUS_CONFIG: Record<StatusType, { label: string; className: string }> = {
-  Pending: { label: 'Pending', className: 'statusPending' },
-  Approved: { label: 'Approved', className: 'statusApproved' },
-  Active: { label: 'Active', className: 'statusApproved' },
-  Suspended: { label: 'Suspended', className: 'statusRejected' },
-  Rejected: { label: 'Rejected', className: 'statusRejected' },
-  AutoRejected: { label: 'Auto-Rejected', className: 'statusAutoRejected' },
-  Withdrawn: { label: 'Withdrawn', className: 'statusUrgent' },
-  Disqualified: { label: 'Disqualified', className: 'statusUrgent' },
-  Draft: { label: 'Draft', className: 'statusDraft' },
-  OpenRegistration: { label: 'Open Registration', className: 'statusApproved' },
-  Closed: { label: 'Closed', className: 'statusAutoRejected' },
-  Completed: { label: 'Completed', className: 'statusCompleted' },
-  Cancelled: { label: 'Cancelled', className: 'statusUrgent' },
-  ManualReview: { label: 'Manual Review', className: 'statusPending' },
-  'Open Registration': { label: 'Open Registration', className: 'statusApproved' },
-  'Closed Registration': { label: 'Closed Registration', className: 'statusAutoRejected' },
-  'Pre-Race': { label: 'Pre-Race', className: 'statusPending' },
-  'In-Progress': { label: 'In-Progress', className: 'statusCompleted' },
+  Pending: { label: 'Chờ xử lý', className: 'statusPending' },
+  Approved: { label: 'Đã phê duyệt', className: 'statusApproved' },
+  Active: { label: 'Đang hoạt động', className: 'statusApproved' },
+  Suspended: { label: 'Tạm ngưng', className: 'statusRejected' },
+  Rejected: { label: 'Đã từ chối', className: 'statusRejected' },
+  AutoRejected: { label: 'Tự động từ chối', className: 'statusAutoRejected' },
+  Withdrawn: { label: 'Đã rút', className: 'statusUrgent' },
+  Disqualified: { label: 'Bị loại', className: 'statusUrgent' },
+  Draft: { label: 'Bản nháp', className: 'statusDraft' },
+  OpenRegistration: { label: 'Đang mở đăng ký', className: 'statusApproved' },
+  Closed: { label: 'Đã đóng', className: 'statusAutoRejected' },
+  Completed: { label: 'Đã hoàn thành', className: 'statusCompleted' },
+  Cancelled: { label: 'Đã hủy', className: 'statusUrgent' },
+  ManualReview: { label: 'Chờ xem xét', className: 'statusPending' },
+  'Open Registration': { label: 'Đang mở đăng ký', className: 'statusApproved' },
+  'Closed Registration': { label: 'Đã đóng đăng ký', className: 'statusAutoRejected' },
+  'Pre-Race': { label: 'Trước giờ đua', className: 'statusPending' },
+  'In-Progress': { label: 'Đang diễn ra', className: 'statusCompleted' },
 };
 
-const FALLBACK = { label: 'Unknown', className: 'statusDraft' as const };
+const FALLBACK = { label: 'Chưa xác định', className: 'statusDraft' as const };
 
 const StatusBadge = ({ status, label }: StatusBadgeProps) => {
   const config = STATUS_CONFIG[status] ?? {
-    label: status ? String(status) : FALLBACK.label,
+    label: FALLBACK.label,
     className: FALLBACK.className,
   };
 

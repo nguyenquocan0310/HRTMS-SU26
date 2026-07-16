@@ -48,7 +48,7 @@ interface RawRaceEntryApiItem {
   ownerName?: string;
 }
 
-interface RaceEntriesData {
+export interface RaceEntriesData {
   raceId: number;
   roundId: number;
   raceNumber: number;
@@ -58,13 +58,24 @@ interface RaceEntriesData {
   entries: RawRaceEntryApiItem[];
 }
 
+export const getRaceSchedule = (
+  raceId: number
+): Promise<RaceEntriesData> =>
+  apiFetch<ApiResponse<RaceEntriesData>>(
+    `/races/${raceId}/entries`
+  ).then((res) => {
+    if (!res.success || !res.data) {
+      throw new Error(res.message || 'Không tải được danh sách xuất phát.');
+    }
+    return res.data;
+  });
+
 export const getRaceEntries = (
   raceId: number
 ): Promise<RaceScheduleEntry[]> =>
-  apiFetch<ApiResponse<RaceEntriesData>>(
-    `/races/${raceId}/entries`
-  ).then((res) =>
-    (res.data?.entries ?? []).map((entry) => ({
+  getRaceSchedule(raceId)
+    .then((data) =>
+    (data.entries ?? []).map((entry) => ({
       raceEntryId: entry.raceEntryId,
       postPosition: entry.postPosition,
       status: entry.status,
@@ -98,10 +109,25 @@ export const allocateEntry = (
     return res.data;
   });
 
+export interface PostPositionAssignment {
+  raceEntryId: number;
+  pairingId: number;
+  horseId: number;
+  horseName: string;
+  postPosition: number;
+}
+
+export interface PostPositionDrawResult {
+  raceId: number;
+  isPostPositionDrawn: boolean;
+  totalEntries: number;
+  assignments: PostPositionAssignment[];
+}
+
 export const drawPostPositions = (
   raceId: number
-): Promise<unknown> =>
-  apiFetch(`/admin/races/${raceId}/draw`, {
+): Promise<PostPositionDrawResult> =>
+  apiFetch<PostPositionDrawResult>(`/admin/races/${raceId}/draw`, {
     method: 'POST',
   });
 

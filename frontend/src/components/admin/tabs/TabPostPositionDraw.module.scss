@@ -126,7 +126,7 @@
 
 .entriesHeader {
   display: grid;
-  grid-template-columns: 1fr 140px;
+  grid-template-columns: 1fr 1fr 140px;
 
   padding: 0.75rem 1.1rem;
 
@@ -142,7 +142,7 @@
 
 .entryRow {
   display: grid;
-  grid-template-columns: 1fr 140px;
+  grid-template-columns: 1fr 1fr 140px;
   align-items: center;
 
   padding: 0.8rem 1.1rem;
@@ -186,3 +186,6 @@
   font-size: 0.85rem;
   text-align: center;
 }
+.error, .success { margin: 0; padding: 0.7rem 0.85rem; font-size: 0.84rem; }
+.error { color: #b91c1c; border: 1px solid #fecaca; background: #fef2f2; }
+.success { color: #166534; border: 1px solid #bbf7d0; background: #f0fdf4; }

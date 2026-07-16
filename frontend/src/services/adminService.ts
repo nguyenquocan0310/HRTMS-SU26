@@ -27,10 +27,37 @@ export interface AuditLogItem {
   createdAt: string;
 }
 
+export interface AuditLogPage {
+  total: number;
+  page: number;
+  pageSize: number;
+  data: AuditLogItem[];
+}
+
+export interface AuditLogFilters {
+  action?: string;
+  entityName?: string;
+  actorId?: number;
+  from?: string;
+  to?: string;
+  page?: number;
+  pageSize?: number;
+}
+
 /** Lấy N bản ghi audit log mới nhất cho mục Recent Activity. */
 export const getRecentAuditLogs = async (limit = 5): Promise<AuditLogItem[]> => {
   const res = await apiFetch<{ success: boolean; data: AuditLogItem[] }>(
     `/admin/audit-logs?page=1&pageSize=${limit}`
   );
   return res.data ?? [];
+};
+
+export const getAuditLogs = async (filters: AuditLogFilters = {}): Promise<AuditLogPage> => {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== '') params.set(key, String(value));
+  });
+
+  const res = await apiFetch<AuditLogPage>(`/admin/audit-logs?${params.toString()}`);
+  return { ...res, data: res.data ?? [] };
 };

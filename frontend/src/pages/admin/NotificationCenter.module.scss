@@ -4,6 +4,7 @@
 .subtext { font-size: 0.88rem; color: #888; margin: 0; }
 .sectionHeader { display: flex; flex-direction: column; gap: 0.4rem; }
 .sectionTop { display: flex; align-items: center; justify-content: space-between; }
+.actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .sectionTitle { font-size: 1.3rem; font-weight: 800; color: #111; margin: 0; }
 .sectionDesc { font-size: 0.85rem; color: #888; margin: 0; }
 .markAllBtn {
@@ -17,6 +18,7 @@
 }
 .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; overflow: hidden; min-height: 200px; }
 .loading { color: #999; padding: 2rem; text-align: center; }
+.error { padding: 0.8rem 1rem; border: 1px solid #fecaca; background: #fef2f2; color: #b91c1c; font-size: 0.85rem; }
 .empty { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; padding: 3rem 1.5rem; text-align: center; }
 .emptyIcon { width: 52px; height: 52px; border-radius: 50%; background: #f3f4f6; display: flex; align-items: center; justify-content: center; color: #9ca3af; }
 .emptyTitle { font-size: 1rem; font-weight: 700; color: #111; margin: 0; }

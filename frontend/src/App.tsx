@@ -16,6 +16,8 @@ import MyAccount from './pages/admin/MyAccount'
 import AssignOfficials from './pages/admin/AssignOfficials'
 import PursePayouts from './pages/admin/PursePayouts';
 import TicketCodeManagement from './pages/admin/TicketCodeManagement';
+import Reports from './pages/admin/Reports';
+import AuditLog from './pages/admin/AuditLog';
 
 
 // ── Import các trang Owner ──
@@ -219,6 +221,9 @@ export default function App() {
           <Route path="tournament-hub" element={<TournamentHub />} />
           <Route path="leaderboard" element={<Leaderboard />} />
           <Route path="live-race" element={<LiveRaceView />} />
+          <Route path="notifications" element={<NotificationCenter />} />
+          <Route path="reports" element={<Reports />} />
+          <Route path="audit-log-viewer" element={<AuditLog />} />
           <Route path="my-account" element={<MyAccount />} />
           <Route path="assign-officials" element={<AssignOfficials />} />
         </Route>

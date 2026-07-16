@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import {
   FiSearch,
@@ -12,6 +12,7 @@ import {
 import AdminSidebar from '../components/admin/AdminSidebar';
 import useAuthStore from '../store/authStore';
 import { logout as logoutApi } from '../services/authService';
+import { getUnreadNotificationCount, NOTIFICATIONS_CHANGED_EVENT } from '../services/notificationService';
 import styles from './AdminLayout.module.scss';
 
 const AdminLayout = () => {
@@ -36,7 +37,27 @@ const AdminLayout = () => {
     navigate('/login', { replace: true });
   };
 
-  const unreadNotifications = 0;
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    const loadUnreadCount = async () => {
+      try {
+        const count = await getUnreadNotificationCount();
+        if (active) setUnreadNotifications(count);
+      } catch {
+        if (active) setUnreadNotifications(0);
+      }
+    };
+    void loadUnreadCount();
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, loadUnreadCount);
+    const timer = window.setInterval(() => void loadUnreadCount(), 45_000);
+    return () => {
+      active = false;
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, loadUnreadCount);
+      window.clearInterval(timer);
+    };
+  }, []);
 
   return (
     <div className={styles.layout}>
@@ -104,9 +125,9 @@ const AdminLayout = () => {
 
             {accountMenuOpen && (
               <div className={styles.accountMenu}>
-                <button type="button" className={styles.accountMenuItem}>
+                <button type="button" className={styles.accountMenuItem} onClick={() => navigate('/admin/my-account')}>
                   <FiUser size={15} />
-                  My Account
+                  Tài khoản của tôi
                 </button>
                 <button
                   type="button"
