@@ -45,8 +45,7 @@ export type ApprovalGroup =
   | 'horse';
 
 export type RegistrationSubTab =
-  | 'jockey'
-  | 'officials'
+  | 'personnel'
   | 'tournament';
 
 export interface HorseApproval {
@@ -146,12 +145,8 @@ const REGISTRATION_SUB_TABS: Array<{
   label: string;
 }> = [
   {
-    key: 'jockey',
-    label: 'Jockey',
-  },
-  {
-    key: 'officials',
-    label: 'Trọng tài / Bác sĩ',
+    key: 'personnel',
+    label: 'Nhân viên',
   },
   {
     key: 'tournament',
@@ -243,9 +238,7 @@ const ApprovalCenter = () => {
     registrationSubTab,
     setRegistrationSubTab,
   ] =
-    useState<RegistrationSubTab>(
-      'jockey'
-    );
+    useState<RegistrationSubTab>('personnel');
 
   const [
     personnelItems,
@@ -388,36 +381,13 @@ const ApprovalCenter = () => {
 
   // ─── Filter personnel theo tab ───────────────────────────────────────────
 
-  const displayedPersonnel =
-    useMemo(() => {
-      if (
-        registrationSubTab ===
-        'jockey'
-      ) {
-        return personnelItems.filter(
-          (item) =>
-            item.role === 'Jockey'
-        );
-      }
+const displayedPersonnel = useMemo(() => {
+  if (registrationSubTab === 'personnel') {
+    return personnelItems;
+  }
 
-      if (
-        registrationSubTab ===
-        'officials'
-      ) {
-        return personnelItems.filter(
-          (item) =>
-            item.role ===
-              'Referee' ||
-            item.role ===
-              'Doctor'
-        );
-      }
-
-      return [];
-    }, [
-      personnelItems,
-      registrationSubTab,
-    ]);
+  return [];
+}, [personnelItems, registrationSubTab]);
 
   // ─── Approve personnel ───────────────────────────────────────────────────
 
