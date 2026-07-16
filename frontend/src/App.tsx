@@ -14,7 +14,7 @@ import Leaderboard from './pages/admin/Leaderboard'
 import LiveRaceView from './pages/admin/LiveRaceView'
 import MyAccount from './pages/admin/MyAccount'
 import AssignOfficials from './pages/admin/AssignOfficials'
-
+import PursePayouts from './pages/admin/PursePayouts';
 
 
 // ── Import các trang Owner ──
@@ -207,6 +207,10 @@ export default function App() {
           <Route path="tournament-builder/:id" element={<TournamentBuilder />} />
           <Route path="race-operations" element={<RaceOperations />} />
           <Route path="entry-fees" element={<EntryFees />} />
+          <Route
+  path="purse-payouts"
+  element={<PursePayouts />}
+/>
           <Route path="tournament-hub" element={<TournamentHub />} />
           <Route path="leaderboard" element={<Leaderboard />} />
           <Route path="live-race" element={<LiveRaceView />} />

@@ -6,6 +6,7 @@ import {
 } from 'react-icons/fi';
 import styles from './AdminSidebar.module.scss';
 
+
 interface NavItem { label: string; path: string; icon: React.ReactNode; }
 
 const OPERATIONS_ITEMS: NavItem[] = [
@@ -17,6 +18,9 @@ const OPERATIONS_ITEMS: NavItem[] = [
   { label: 'Race Operations', path: '/admin/race-operations', icon: <FiFlag size={18} /> },
   { label: 'Assign Officials', path: '/admin/assign-officials', icon: <FiUsers size={18} /> },
   { label: 'Entry Fees', path: '/admin/entry-fees', icon: <FiCreditCard size={18} /> },
+
+  // Thêm ngay dưới Entry Fees
+  { label: 'Quỹ & chi thưởng', path: '/admin/purse-payouts', icon: <FiAward size={18} /> },
 ];
 
 const SHARED_ITEMS: NavItem[] = [
