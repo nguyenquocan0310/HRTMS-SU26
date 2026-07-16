@@ -154,11 +154,15 @@ useEffect(() => {
   const isDrawn = currentRace?.isDrawn ?? false;
 
 
-  const filteredUnofficialRaces = selectedTournamentId
-  ? unofficialRaces.filter(
-      (race) => race.tournamentId === selectedTournamentId
-    )
-  : [];
+  const selectedUnofficialRace =
+  selectedTournamentId && selectedRaceId
+    ? unofficialRaces.find(
+        (race) =>
+          race.tournamentId === selectedTournamentId &&
+          race.raceId === selectedRaceId &&
+          race.status.toLowerCase() === 'unofficial'
+      ) ?? null
+    : null;
 
 
   const handleDeclareOfficial = async (raceId: number) => {
@@ -257,8 +261,8 @@ useEffect(() => {
     <h3 className={styles.tableTitle}>Race List</h3>
 
     <span className={styles.countBadge}>
-      {filteredUnofficialRaces.length}
-    </span>
+  {selectedUnofficialRace ? 1 : 0}
+</span>
   </div>
 
   <p className={styles.tableSubtext}>
@@ -266,40 +270,76 @@ useEffect(() => {
   </p>
 
   {loadingUnofficialRaces ? (
-    <p className={styles.emptyCell}>Đang tải danh sách Race...</p>
-  ) : filteredUnofficialRaces.length === 0 ? (
-    <p className={styles.emptyCell}>
-      Không có Race Unofficial trong Tournament này.
-    </p>
-  ) : (
-    <div className={styles.pairingList}>
-      {filteredUnofficialRaces.map((race) => (
-        <div key={race.raceId} className={styles.pairingItem}>
-          <div>
-            <div className={styles.pairingHorse}>
-              Race #{race.raceNumber}
-            </div>
-
-            <div className={styles.pairingMeta}>
-              {race.roundName ? `${race.roundName} · ` : ''}
-              {formatDateTime(race.scheduledTime)} · {race.status}
-            </div>
-          </div>
-
-          <button
-            type="button"
-            className={styles.allocateBtn}
-            onClick={() => handleDeclareOfficial(race.raceId)}
-            disabled={declaringRaceId === race.raceId}
-          >
-            {declaringRaceId === race.raceId
-              ? 'Đang xử lý...'
-              : 'Declare Official'}
-          </button>
+  <p className={styles.emptyCell}>
+    Đang tải thông tin Race...
+  </p>
+) : !selectedRaceId ? (
+  <p className={styles.emptyCell}>
+    Vui lòng chọn một Race.
+  </p>
+) : !selectedUnofficialRace ? (
+  <p className={styles.emptyCell}>
+    Race đang chọn không ở trạng thái Unofficial.
+  </p>
+) : (
+  <div className={styles.pairingList}>
+    <div
+      key={selectedUnofficialRace.raceId}
+      className={styles.pairingItem}
+    >
+      <div>
+        <div className={styles.pairingHorse}>
+          Race #{selectedUnofficialRace.raceNumber}
         </div>
-      ))}
+
+        <div className={styles.pairingMeta}>
+          {selectedUnofficialRace.roundName
+            ? `${selectedUnofficialRace.roundName} · `
+            : ''}
+
+          {formatDateTime(
+            selectedUnofficialRace.scheduledTime
+          )}
+
+          {' · '}
+
+          {selectedUnofficialRace.status}
+        </div>
+      </div>
+
+      <div className={styles.raceActions}>
+        <button
+          type="button"
+          className={styles.detailBtn}
+          onClick={() => {
+            // Sẽ nối modal kết quả sơ bộ sau khi xác định API kết quả Race.
+          }}
+        >
+          View Detail
+        </button>
+
+        <button
+          type="button"
+          className={styles.allocateBtn}
+          onClick={() =>
+            handleDeclareOfficial(
+              selectedUnofficialRace.raceId
+            )
+          }
+          disabled={
+            declaringRaceId ===
+            selectedUnofficialRace.raceId
+          }
+        >
+          {declaringRaceId ===
+          selectedUnofficialRace.raceId
+            ? 'Đang xử lý...'
+            : 'Declare Official'}
+        </button>
+      </div>
     </div>
-  )}
+  </div>
+)}
 </div>
 
 

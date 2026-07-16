@@ -292,3 +292,53 @@
 @media (max-width: 900px) {
   .allocationGrid { grid-template-columns: 1fr; }
 }
+
+.raceActions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-shrink: 0;
+}
+
+.detailBtn {
+  padding: 0.6rem 1rem;
+
+  border: 1px solid #d1d5db;
+  border-radius: 2px;
+  background: #ffffff;
+
+  color: #374151;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease;
+
+  &:hover {
+    border-color: #2563eb;
+    background: #eff6ff;
+    color: #2563eb;
+  }
+}
+
+@media (max-width: 640px) {
+  .pairingItem {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .raceActions {
+    width: 100%;
+  }
+
+  .detailBtn,
+  .raceActions .allocateBtn {
+    flex: 1;
+    justify-content: center;
+  }
+}
