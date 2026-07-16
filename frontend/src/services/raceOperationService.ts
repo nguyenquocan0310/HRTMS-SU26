@@ -218,9 +218,40 @@ export const getUnofficialRaces = (
  * POST /api/races/{raceId}/declare-official
  * Admin công bố kết quả chính thức của một Race.
  */
+export interface DeclareOfficialPayload {
+  confirmedByAdmin: boolean;
+}
+
+interface DeclareOfficialResult {
+  raceId: number;
+  raceStatus: string;
+  officialAt: string;
+  predictionsSettledCount: number;
+  predictionsRefundedCount: number;
+  pursePayoutsCreatedCount: number;
+  remainderAmount: number;
+}
+
+/**
+ * POST /api/races/{raceId}/declare-official
+ * Chuyển Race từ Unofficial sang Official.
+ */
 export const declareRaceOfficial = (
-  raceId: number
-): Promise<void> =>
-  apiFetch(`/races/${raceId}/declare-official`, {
-    method: 'POST',
-  }).then(() => undefined);
+  raceId: number,
+  payload: DeclareOfficialPayload
+): Promise<DeclareOfficialResult> =>
+  apiFetch<ApiResponse<DeclareOfficialResult>>(
+    `/races/${raceId}/declare-official`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }
+  ).then((res) => {
+    if (!res.success || !res.data) {
+      throw new Error(
+        res.message || 'Không thể chuyển Race thành Official.'
+      );
+    }
+
+    return res.data;
+  });
