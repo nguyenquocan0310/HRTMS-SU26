@@ -160,6 +160,7 @@ const extractArray = (res: unknown): unknown[] => {
   if (Array.isArray(root.data)) return root.data;
   const data = asRecord(root.data);
   if (Array.isArray(data.items)) return data.items;
+  if (Array.isArray(data.entries)) return data.entries;
   return [];
 };
 
