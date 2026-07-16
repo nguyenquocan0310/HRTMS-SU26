@@ -137,15 +137,17 @@ public class StartingListService : IStartingListService
             throw new InvalidOperationException("NO_ELIGIBLE_STARTING_ENTRIES");
         }
 
-        // Danh sach xuat phat da duoc confirm chinh thuc -> KHOA lai bang cach chuyen
-        // Race sang "Pre-Race". Tu day 4 buoc check (weight/identity/clinical/independence)
-        // va Withdraw deu bi chan (guard != "Upcoming"), chi con Start Race di tiep.
+        // Danh sach xuat phat da duoc confirm chinh thuc -> khoa danh sach bang cach chuyen
+        // Race sang "Pre-Race" va mo cong du doan. Tu day 4 buoc check
+        // (weight/identity/clinical/independence) va Withdraw deu bi chan
+        // (guard != "Upcoming"), chi con Start Race di tiep.
         // Bọc transaction de update reject entries + doi status la nguyen tu.
         await using var tx = await _context.Database.BeginTransactionAsync();
         try
         {
             race.Status = "Pre-Race";
             race.IsPostPositionDrawn = true;
+            race.IsPredictionGateClosed = false;
             race.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
