@@ -1,12 +1,15 @@
-// ─── Service duyệt hồ sơ (Approval Center) ──────────────────────────────────
-// Gọi API thật BE: /api/admin/...
+// ─── Service duyệt hồ sơ — Approval Center ──────────────────────────────────
 
 import { apiFetch } from './apiClient';
 
-// ── NGỰA (Horse Entry / Enrollment) ─────────────────────────────────────────
+interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  data: T | null;
+}
 
-// Dữ liệu 1 dòng trong danh sách "pending" — theo đúng response thật
-// GET /api/admin/horse-entries/pending (xác nhận qua Swagger).
+// ─── HORSE ENROLLMENT ───────────────────────────────────────────────────────
+
 export interface HorseEnrollmentPending {
   enrollmentId: number;
   horseId: number;
@@ -22,26 +25,60 @@ export interface HorseEnrollmentPending {
   updatedAt: string;
 }
 
-export const getPendingHorses = async (): Promise<HorseEnrollmentPending[]> => {
-  // Không catch nuốt lỗi — để lỗi thật hiện ra thay vì bảng rỗng câm.
-  const res = await apiFetch<{ success: boolean; message: string; data: HorseEnrollmentPending[] }>(
-    '/admin/horse-entries/pending?page=1&pageSize=50'
+export const getPendingHorses =
+  async (): Promise<HorseEnrollmentPending[]> => {
+    const res = await apiFetch<
+      ApiResponse<HorseEnrollmentPending[]>
+    >('/admin/horse-entries/pending?page=1&pageSize=50');
+
+    if (!res.success) {
+      throw new Error(
+        res.message ||
+          'Không tải được danh sách hồ sơ ngựa.'
+      );
+    }
+
+    return res.data ?? [];
+  };
+
+export const approveHorse = async (
+  enrollmentId: number
+): Promise<void> => {
+  const res = await apiFetch<ApiResponse<unknown>>(
+    `/admin/horse-entries/${enrollmentId}/approve`,
+    {
+      method: 'PATCH',
+    }
   );
-  if (!res.success) throw new Error(res.message || 'Không tải được danh sách hồ sơ ngựa.');
-  return res.data ?? [];
+
+  if (!res.success) {
+    throw new Error(
+      res.message || 'Duyệt hồ sơ ngựa thất bại.'
+    );
+  }
 };
 
-export const approveHorse = (enrollmentId: number): Promise<unknown> =>
-  apiFetch(`/admin/horse-entries/${enrollmentId}/approve`, { method: 'PATCH' });
+export const rejectHorse = async (
+  enrollmentId: number,
+  reason: string
+): Promise<void> => {
+  const res = await apiFetch<ApiResponse<unknown>>(
+    `/admin/horse-entries/${enrollmentId}/reject`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ reason }),
+    }
+  );
 
-export const rejectHorse = (enrollmentId: number, reason: string): Promise<unknown> =>
-  apiFetch(`/admin/horse-entries/${enrollmentId}/reject`, {
-    method: 'PATCH',
-    body: JSON.stringify({ reason }),
-  });
+  if (!res.success) {
+    throw new Error(
+      res.message || 'Từ chối hồ sơ ngựa thất bại.'
+    );
+  }
+};
 
-// Chi tiết đầy đủ 1 con ngựa — theo đúng response thật GET /api/admin/horses/{id}.
-// Enrollment DTO ở trên không có breed/vaccination/doping nên phải gọi riêng.
+// ─── HORSE DETAIL ───────────────────────────────────────────────────────────
+
 export interface HorseDetail {
   horseId: number;
   ownerId: number;
@@ -66,15 +103,25 @@ export interface HorseDetail {
   updatedAt: string;
 }
 
-export const getHorseDetail = async (horseId: number): Promise<HorseDetail> => {
-  const res = await apiFetch<{ success: boolean; message: string; data: HorseDetail }>(
+export const getHorseDetail = async (
+  horseId: number
+): Promise<HorseDetail> => {
+  const res = await apiFetch<ApiResponse<HorseDetail>>(
     `/admin/horses/${horseId}`
   );
-  if (!res.success || !res.data) throw new Error(res.message || 'Không tải được chi tiết ngựa.');
+
+  if (!res.success || !res.data) {
+    throw new Error(
+      res.message ||
+        'Không tải được thông tin chi tiết ngựa.'
+    );
+  }
+
   return res.data;
 };
 
-// ── JOCKEY / REFEREE / DOCTOR (personnel) ───────────────────────────────────
+// ─── PERSONNEL PENDING APPROVALS ────────────────────────────────────────────
+
 export interface PersonPending {
   userId: number;
   username: string;
@@ -86,34 +133,155 @@ export interface PersonPending {
   createdAt: string;
 }
 
-interface PendingApprovalsData {
+export interface PendingApprovalsData {
   referees: PersonPending[];
   doctors: PersonPending[];
   jockeys: PersonPending[];
 }
 
-// ⚠️ Endpoint này hiện trả rỗng dù có tài khoản Pending thật — vấn đề đang
-// chờ BE xác nhận riêng, CHƯA có kết luận cuối cùng ở thời điểm sửa file này.
-export const getPendingApprovals = async (): Promise<PendingApprovalsData> => {
-  const res = await apiFetch<{ success: boolean; message: string; data: PendingApprovalsData }>(
-    '/admin/pending-approvals'
+export const getPendingApprovals =
+  async (): Promise<PendingApprovalsData> => {
+    const res = await apiFetch<
+      ApiResponse<PendingApprovalsData>
+    >('/admin/pending-approvals');
+
+    if (!res.success) {
+      throw new Error(
+        res.message ||
+          'Không tải được danh sách hồ sơ đang chờ duyệt.'
+      );
+    }
+
+    return (
+      res.data ?? {
+        referees: [],
+        doctors: [],
+        jockeys: [],
+      }
+    );
+  };
+
+// ─── JOCKEY APPROVAL ────────────────────────────────────────────────────────
+
+export const approveJockey = async (
+  userId: number
+): Promise<void> => {
+  const res = await apiFetch<ApiResponse<unknown>>(
+    `/admin/jockeys/${userId}/approve`,
+    {
+      method: 'PATCH',
+    }
   );
-  if (!res.success) throw new Error(res.message || 'Không tải được danh sách hồ sơ tài khoản.');
-  return res.data ?? { referees: [], doctors: [], jockeys: [] };
+
+  if (!res.success) {
+    throw new Error(
+      res.message || 'Duyệt hồ sơ Jockey thất bại.'
+    );
+  }
 };
 
-export const approveJockey = (id: number): Promise<unknown> =>
-  apiFetch(`/admin/jockeys/${id}/approve`, { method: 'PATCH' });
+export const rejectJockey = async (
+  userId: number,
+  reason: string
+): Promise<void> => {
+  const res = await apiFetch<ApiResponse<unknown>>(
+    `/admin/jockeys/${userId}/reject`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ reason }),
+    }
+  );
 
-export const approveReferee = (id: number): Promise<unknown> =>
-  apiFetch(`/admin/referees/${id}/approve`, { method: 'PATCH' });
+  if (!res.success) {
+    throw new Error(
+      res.message ||
+        'Từ chối hồ sơ Jockey thất bại.'
+    );
+  }
+};
 
-export const approveDoctor = (id: number): Promise<unknown> =>
-  apiFetch(`/admin/doctors/${id}/approve`, { method: 'PATCH' });
+// ─── REFEREE APPROVAL ───────────────────────────────────────────────────────
 
+export const approveReferee = async (
+  userId: number
+): Promise<void> => {
+  const res = await apiFetch<ApiResponse<unknown>>(
+    `/admin/referees/${userId}/approve`,
+    {
+      method: 'PATCH',
+    }
+  );
 
-// ── Referee/Doctor Active — dùng cho modal Assign Officials (khác với
-// pending-approvals vốn chỉ liệt kê hồ sơ đang CHỜ DUYỆT, không phải người đã Active) ──
+  if (!res.success) {
+    throw new Error(
+      res.message ||
+        'Duyệt hồ sơ Trọng tài thất bại.'
+    );
+  }
+};
+
+export const rejectReferee = async (
+  userId: number,
+  reason: string
+): Promise<void> => {
+  const res = await apiFetch<ApiResponse<unknown>>(
+    `/admin/referees/${userId}/reject`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ reason }),
+    }
+  );
+
+  if (!res.success) {
+    throw new Error(
+      res.message ||
+        'Từ chối hồ sơ Trọng tài thất bại.'
+    );
+  }
+};
+
+// ─── DOCTOR APPROVAL ────────────────────────────────────────────────────────
+
+export const approveDoctor = async (
+  userId: number
+): Promise<void> => {
+  const res = await apiFetch<ApiResponse<unknown>>(
+    `/admin/doctors/${userId}/approve`,
+    {
+      method: 'PATCH',
+    }
+  );
+
+  if (!res.success) {
+    throw new Error(
+      res.message ||
+        'Duyệt hồ sơ Bác sĩ thất bại.'
+    );
+  }
+};
+
+export const rejectDoctor = async (
+  userId: number,
+  reason: string
+): Promise<void> => {
+  const res = await apiFetch<ApiResponse<unknown>>(
+    `/admin/doctors/${userId}/reject`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ reason }),
+    }
+  );
+
+  if (!res.success) {
+    throw new Error(
+      res.message ||
+        'Từ chối hồ sơ Bác sĩ thất bại.'
+    );
+  }
+};
+
+// ─── ACTIVE USERS — ASSIGN OFFICIALS ────────────────────────────────────────
+
 export interface ActiveUser {
   userId: number;
   username: string;
@@ -124,9 +292,25 @@ export interface ActiveUser {
   createdAt: string;
 }
 
-export const getActiveUsersByRole = async (role: 'Referee' | 'Doctor'): Promise<ActiveUser[]> => {
-  const res = await apiFetch<{ success: boolean; data: ActiveUser[] }>(
-    `/admin/users?role=${role}&status=Active`
-  );
+export const getActiveUsersByRole = async (
+  role: 'Referee' | 'Doctor'
+): Promise<ActiveUser[]> => {
+  const params = new URLSearchParams({
+    role,
+    status: 'Active',
+  });
+
+  const res = await apiFetch<
+    ApiResponse<ActiveUser[]>
+  >(`/admin/users?${params.toString()}`);
+
+  if (!res.success) {
+    throw new Error(
+      res.message ||
+        'Không tải được danh sách người dùng khả dụng.'
+    );
+  }
+
   return res.data ?? [];
 };
+
