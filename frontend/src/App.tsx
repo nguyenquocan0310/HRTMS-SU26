@@ -171,7 +171,7 @@ export default function App() {
           <Route path="tournaments" element={<RefereeTournamentList />} />
           <Route path="race-console" element={<RefereeRaceConsole />} />
           <Route path="profile" element={<RefereeProfile />} />
-          <Route path="notifications" element={<SharedNotificationCenter />} />
+          <Route path="notifications" element={<SharedNotificationCenter iconless />} />
         </Route>
 
         {/* ── Cấu trúc Route của KHÁN GIẢ (Spectator) ── */}

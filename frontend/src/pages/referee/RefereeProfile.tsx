@@ -205,7 +205,7 @@ export default function RefereeProfile() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div><p className="text-xs font-semibold uppercase tracking-widest text-blue-600">Tài khoản trọng tài</p><h1 className="mt-2 text-3xl font-bold text-gray-900">Hồ sơ và bảo mật</h1><p className="mt-1 text-sm text-gray-500">Quản lý thông tin tài khoản, hồ sơ chuyên môn và mật khẩu đăng nhập.</p></div>
+      <div><p className="text-xs font-black uppercase tracking-[.16em] text-blue-700">Hồ sơ Referee</p><h1 className="mt-1 text-2xl font-black text-slate-950 sm:text-3xl">Hồ sơ và bảo mật</h1><p className="mt-2 text-sm text-slate-500">Quản lý thông tin tài khoản, hồ sơ chuyên môn và mật khẩu đăng nhập.</p></div>
 
       <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="border-b border-gray-100 pb-4"><h2 className="text-lg font-bold text-gray-900">Thông tin tài khoản</h2><p className="mt-1 text-sm text-gray-500">Username, role và trạng thái tài khoản là thông tin chỉ đọc.</p></div>
