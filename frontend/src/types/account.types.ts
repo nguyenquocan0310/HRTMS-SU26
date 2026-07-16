@@ -50,6 +50,10 @@ export interface RefereeRoleProfile {
   certificate: CertificateMetadata | null
 }
 
+export interface SpectatorRoleProfile {
+  balance: number
+}
+
 export interface UpdateBasicInfoPayload {
   fullName: string
   email: string
