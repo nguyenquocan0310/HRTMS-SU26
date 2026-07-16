@@ -2,7 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Horse } from '../../types/owner.types';
 import type { HorseEnrollmentResponse } from '../../services/ownerService';
-import { getMyHorses, getHorseEnrollments, enrollHorseToTournament } from '../../services/ownerService';
+import {
+  enrollHorseToTournament,
+  getHorseEnrollments,
+  getMyHorses,
+  withdrawHorseFromTournament,
+} from '../../services/ownerService';
 import { getMyTournamentParticipations, type ParticipationResponse } from '../../services/tournamentService';
 
 type BadgeVariant = 'green' | 'yellow' | 'red' | 'gray';
@@ -41,6 +46,7 @@ const getProfileBadge = (status: string | undefined): BadgeProps => {
 
 const getEnrollmentBadge = (enrollment: HorseEnrollmentResponse | null | undefined): BadgeProps => {
   if (!enrollment) return { label: 'Chưa đăng ký giải', variant: 'gray' };
+  if (enrollment.status === 'Withdrawn') return { label: 'Trong giải: Đã rút', variant: 'gray' };
   switch (enrollment.adminApprovalStatus) {
     case 'Approved': return { label: 'Trong giải: Đã duyệt', variant: 'green' };
     case 'Rejected': return { label: 'Trong giải: Bị từ chối', variant: 'red' };
@@ -159,7 +165,7 @@ const HorseRowCard: React.FC<HorseRowCardProps> = ({ horse, status, onViewDetail
           onClick={() => onEnroll(horse)}
           className="w-full text-xs font-bold text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 py-2 rounded-xl transition-colors"
         >
-          Đăng ký vào giải
+          Quản lý đăng ký giải
         </button>
         <button
           onClick={() => onViewDetail(horseId)}
@@ -177,6 +183,7 @@ interface EnrollModalProps {
   status: HorseStatus;
   onClose: () => void;
   onSuccess: (horseId: string, enrollment: HorseEnrollmentResponse) => void;
+  onWithdrawSuccess: (horseId: string, enrollmentId: number) => void;
 }
 
 const getTournamentStatus = (participation: ParticipationResponse): string | undefined => {
@@ -184,12 +191,14 @@ const getTournamentStatus = (participation: ParticipationResponse): string | und
   return anyParticipation.tournamentStatus ?? anyParticipation.statusName ?? anyParticipation.tournament?.status;
 };
 
-const EnrollModal: React.FC<EnrollModalProps> = ({ horse, status, onClose, onSuccess }) => {
+const EnrollModal: React.FC<EnrollModalProps> = ({ horse, status, onClose, onSuccess, onWithdrawSuccess }) => {
   const [participations, setParticipations] = useState<ParticipationResponse[]>([]);
   const [selectedTournamentId, setSelectedTournamentId] = useState<number | ''>('');
   const [confirmed, setConfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingParticipations, setLoadingParticipations] = useState(true);
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [confirmWithdraw, setConfirmWithdraw] = useState(false);
   const [message, setMessage] = useState<{ text: string; variant: BadgeVariant } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -198,6 +207,11 @@ const EnrollModal: React.FC<EnrollModalProps> = ({ horse, status, onClose, onSuc
     ? undefined
     : (status.enrollments || []).find((enrollment) => enrollment.tournamentId === selectedTournamentId);
   const selectedAlreadyEnrolled = Boolean(selectedEnrollment);
+  const canWithdrawSelected = Boolean(
+    selectedEnrollment &&
+    selectedEnrollment.status !== 'Withdrawn' &&
+    selectedEnrollment.adminApprovalStatus !== 'Rejected'
+  );
 
   useEffect(() => {
     const loadParticipations = async () => {
@@ -263,13 +277,31 @@ const EnrollModal: React.FC<EnrollModalProps> = ({ horse, status, onClose, onSuc
     }
   };
 
+  const handleWithdraw = async () => {
+    if (!selectedEnrollment || !horseId) return;
+
+    try {
+      setWithdrawing(true);
+      setError(null);
+      setMessage(null);
+      const backendMessage = await withdrawHorseFromTournament(horseId, selectedEnrollment.enrollmentId);
+      onWithdrawSuccess(horseId, selectedEnrollment.enrollmentId);
+      setMessage({ variant: 'green', text: backendMessage });
+      setConfirmWithdraw(false);
+    } catch (withdrawError) {
+      setError(withdrawError instanceof Error ? withdrawError.message : 'Rút ngựa khỏi giải thất bại.');
+    } finally {
+      setWithdrawing(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg border border-gray-200 shadow-xl w-full max-w-lg overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-200 flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-base font-bold text-gray-900">Đăng ký ngựa vào giải</h2>
-            <p className="text-sm text-gray-500 mt-0.5">Chọn giải để screening hồ sơ ngựa theo điều kiện giải.</p>
+            <h2 className="text-base font-bold text-gray-900">Quản lý đăng ký giải</h2>
+            <p className="text-sm text-gray-500 mt-0.5">Đăng ký ngựa vào giải hoặc rút một đăng ký chưa ghép cặp.</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none" type="button">×</button>
         </div>
@@ -301,22 +333,22 @@ const EnrollModal: React.FC<EnrollModalProps> = ({ horse, status, onClose, onSuc
                     setSelectedTournamentId(event.target.value ? Number(event.target.value) : '');
                     setError(null);
                     setMessage(null);
+                    setConfirmWithdraw(false);
                   }}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white"
                 >
                   <option value="">Chọn giải đấu</option>
                   {participations.map((participation: any) => {
                     const enrollment = (status.enrollments || []).find((item) => item.tournamentId === participation.tournamentId);
-                    const disabled = Boolean(enrollment);
-                    const suffix = enrollment?.adminApprovalStatus === 'Rejected'
-                      ? ' — Hồ sơ đã bị từ chối'
-                      : enrollment?.adminApprovalStatus === 'Pending'
-                        ? ' — Đang chờ duyệt'
-                        : enrollment?.status === 'Withdrawn'
-                          ? ' — Đã rút khỏi giải'
-                          : disabled ? ' — Đã được duyệt vào giải' : '';
+                    const suffix = enrollment?.status === 'Withdrawn'
+                      ? ' — Đã rút khỏi giải'
+                      : enrollment?.adminApprovalStatus === 'Rejected'
+                        ? ' — Hồ sơ đã bị từ chối'
+                        : enrollment?.adminApprovalStatus === 'Pending'
+                          ? ' — Đang chờ duyệt'
+                          : enrollment ? ' — Đã được duyệt vào giải' : '';
                     return (
-                      <option key={participation.participationId ?? participation.participantId ?? participation.tournamentId} value={participation.tournamentId} disabled={disabled}>
+                      <option key={participation.participationId ?? participation.participantId ?? participation.tournamentId} value={participation.tournamentId}>
                         {participation.tournamentName || `Giải #${participation.tournamentId}`}{suffix}
                       </option>
                     );
@@ -326,18 +358,43 @@ const EnrollModal: React.FC<EnrollModalProps> = ({ horse, status, onClose, onSuc
             </div>
 
             {selectedEnrollment && !message && (
-              <div className={`${selectedEnrollment.adminApprovalStatus === 'Rejected' ? BADGE_STYLES.red : BADGE_STYLES.yellow} rounded-lg border px-3 py-2 text-sm`}>
-                {selectedEnrollment.adminApprovalStatus === 'Rejected'
-                  ? `Hồ sơ của ngựa tại giải đang chọn đã bị từ chối.${selectedEnrollment.screeningReason ? ` Lý do: ${selectedEnrollment.screeningReason}` : ''}`
-                  : selectedEnrollment.adminApprovalStatus === 'Pending'
-                    ? 'Hồ sơ của ngựa tại giải đang chọn đang chờ duyệt.'
-                    : selectedEnrollment.status === 'Withdrawn'
-                      ? 'Ngựa đã được rút khỏi giải đang chọn.'
-                      : 'Ngựa đã được phê duyệt tham gia giải đang chọn.'}
+              <div className="space-y-3">
+                <div className={`${selectedEnrollment.adminApprovalStatus === 'Rejected' ? BADGE_STYLES.red : selectedEnrollment.status === 'Withdrawn' ? BADGE_STYLES.gray : BADGE_STYLES.yellow} rounded-lg border px-3 py-2 text-sm`}>
+                  {selectedEnrollment.status === 'Withdrawn'
+                    ? 'Ngựa đã được rút khỏi giải đang chọn.'
+                    : selectedEnrollment.adminApprovalStatus === 'Rejected'
+                      ? `Hồ sơ của ngựa tại giải đang chọn đã bị từ chối.${selectedEnrollment.screeningReason ? ` Lý do: ${selectedEnrollment.screeningReason}` : ''}`
+                      : selectedEnrollment.adminApprovalStatus === 'Pending'
+                        ? 'Hồ sơ của ngựa tại giải đang chọn đang chờ duyệt.'
+                        : 'Ngựa đã được phê duyệt tham gia giải đang chọn.'}
+                </div>
+
+                {canWithdrawSelected && !confirmWithdraw && (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmWithdraw(true)}
+                    className="w-full rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-100"
+                  >
+                    Rút ngựa khỏi giải
+                  </button>
+                )}
+
+                {canWithdrawSelected && confirmWithdraw && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                    <p className="text-sm font-semibold text-red-800">Bạn chắc chắn muốn rút ngựa khỏi giải này?</p>
+                    <p className="mt-1 text-xs text-red-700">Nếu ngựa đang có ghép cặp, hệ thống sẽ yêu cầu hủy ghép cặp trước.</p>
+                    <div className="mt-3 flex justify-end gap-2">
+                      <button type="button" onClick={() => setConfirmWithdraw(false)} disabled={withdrawing} className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-700">Không rút</button>
+                      <button type="button" onClick={() => void handleWithdraw()} disabled={withdrawing} className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60">
+                        {withdrawing ? 'Đang rút...' : 'Xác nhận rút'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
-            <label className="flex items-start gap-3 text-sm text-gray-700 border border-gray-200 rounded-lg p-3">
+            {!selectedAlreadyEnrolled && <label className="flex items-start gap-3 text-sm text-gray-700 border border-gray-200 rounded-lg p-3">
               <input
                 type="checkbox"
                 checked={confirmed}
@@ -345,18 +402,20 @@ const EnrollModal: React.FC<EnrollModalProps> = ({ horse, status, onClose, onSuc
                 className="mt-1"
               />
               <span>Tôi xác nhận hồ sơ ngựa này có thể được screening cho giải đã chọn và thông tin y tế là chính xác.</span>
-            </label>
+            </label>}
           </div>
 
           <div className="px-5 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-white transition-colors">Đóng</button>
-            <button
-              type="submit"
-              disabled={loading || loadingParticipations || participations.length === 0 || selectedAlreadyEnrolled}
-              className="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:bg-blue-300 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Đang đăng ký...' : 'Đăng ký vào giải'}
-            </button>
+            {!selectedAlreadyEnrolled && (
+              <button
+                type="submit"
+                disabled={loading || loadingParticipations || participations.length === 0}
+                className="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:bg-blue-300 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Đang đăng ký...' : 'Đăng ký vào giải'}
+              </button>
+            )}
           </div>
         </form>
       </div>
@@ -429,6 +488,23 @@ const MyHorses: React.FC = () => {
         [horseId]: {
           loading: false,
           enrollments: [enrollment, ...existing.filter((item) => item.enrollmentId !== enrollment.enrollmentId)],
+        },
+      };
+    });
+  };
+
+  const handleWithdrawSuccess = (horseId: string, enrollmentId: number) => {
+    setHorseStatuses((prev) => {
+      const current = prev[horseId];
+      return {
+        ...prev,
+        [horseId]: {
+          loading: false,
+          enrollments: (current?.enrollments || []).map((enrollment) =>
+            enrollment.enrollmentId === enrollmentId
+              ? { ...enrollment, status: 'Withdrawn', updatedAt: new Date().toISOString() }
+              : enrollment
+          ),
         },
       };
     });
@@ -516,6 +592,7 @@ const MyHorses: React.FC = () => {
           status={horseStatuses[getHorseId(enrollingHorse)] ?? { enrollments: [], loading: false }}
           onClose={() => setEnrollingHorse(null)}
           onSuccess={handleEnrollSuccess}
+          onWithdrawSuccess={handleWithdrawSuccess}
         />
       )}
     </div>

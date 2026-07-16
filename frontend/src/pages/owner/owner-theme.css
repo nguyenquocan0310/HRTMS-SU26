@@ -1,0 +1,60 @@
+.owner-shell {
+  --owner-ink: #082b20;
+  --owner-ink-soft: #123d30;
+  --owner-gold: #cfa73d;
+  --owner-gold-deep: #a97812;
+  --owner-canvas: #f3f5f4;
+  min-height: 100vh;
+  background: var(--owner-canvas);
+}
+
+.owner-sidebar {
+  background: linear-gradient(180deg, #082b20 0%, #09271e 100%);
+  color: #e6f3ed;
+}
+
+.owner-sidebar-brand {
+  background: linear-gradient(145deg, rgba(207, 167, 61, .2), rgba(207, 167, 61, .05));
+  border: 1px solid rgba(207, 167, 61, .72);
+}
+
+.owner-sidebar-nav::-webkit-scrollbar { width: 5px; }
+.owner-sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-radius: 99px; }
+
+.owner-main {
+  background:
+    radial-gradient(circle at 92% 2%, rgba(207, 167, 61, .08), transparent 24rem),
+    var(--owner-canvas);
+}
+
+.owner-content { width: min(100%, 1480px); margin-inline: auto; }
+
+.owner-shell .bg-blue-600 { background-color: var(--owner-gold) !important; }
+.owner-shell .hover\:bg-blue-700:hover { background-color: var(--owner-gold-deep) !important; }
+.owner-shell .bg-blue-50, .owner-shell .bg-blue-50\/60 { background-color: #fff8e8 !important; }
+.owner-shell .bg-blue-100 { background-color: #f8e9b9 !important; }
+.owner-shell .bg-blue-200\/40 { background-color: rgba(232, 207, 133, .45) !important; }
+.owner-shell .border-blue-100 { border-color: #f0dfaa !important; }
+.owner-shell .border-blue-200 { border-color: #e0c46e !important; }
+.owner-shell .text-blue-600, .owner-shell .text-blue-700 { color: var(--owner-gold-deep) !important; }
+.owner-shell .ring-blue-100 { --tw-ring-color: #f4e5b7 !important; }
+.owner-shell .focus\:ring-blue-500:focus { --tw-ring-color: var(--owner-gold) !important; }
+.owner-shell .focus\:border-blue-500:focus { border-color: var(--owner-gold) !important; }
+.owner-shell .shadow-blue-600\/20 { --tw-shadow-color: rgba(169, 120, 18, .2) !important; }
+
+.owner-main section,
+.owner-main article,
+.owner-main form,
+.owner-main table { scroll-margin-top: 6rem; }
+
+@media (max-width: 1023px) {
+  .owner-content { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .owner-shell *, .owner-shell *::before, .owner-shell *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+  }
+}

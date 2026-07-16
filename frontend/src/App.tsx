@@ -129,6 +129,7 @@ export default function App() {
           <Route index element={<OwnerDashboard />} />
           <Route path="horses" element={<MyHorses />} />
           <Route path="horses/register" element={<RegisterHorse />} />
+          <Route path="horses/edit/:id" element={<RegisterHorse />} />
           <Route path="horses/:id" element={<HorseDetail />} />
           <Route path="race-entries" element={<RaceEntries />} />
           <Route path="tournaments" element={<TournamentList />} />

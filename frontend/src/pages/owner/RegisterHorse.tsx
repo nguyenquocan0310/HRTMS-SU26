@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   createHorseProfile,
+  getHorseById,
+  updateHorse,
   type HorseCreateResponse,
 } from '../../services/ownerService';
 
@@ -16,7 +18,7 @@ interface FormData {
   identifyingMarks: string;
   vaccinationRecordRef: string;
   dopingTestDate: string;
-  dopingTestResult: 'Clean' | 'Pending' | 'Positive';
+  dopingTestResult: 'Clean' | 'Pending' | 'Failed';
   legalConsentAccepted: boolean;
 }
 
@@ -51,7 +53,7 @@ const breedOptions = [
 const dopingOptions = [
   { value: 'Clean', label: 'Âm tính' },
   { value: 'Pending', label: 'Chờ kết quả' },
-  { value: 'Positive', label: 'Dương tính' },
+  { value: 'Failed', label: 'Dương tính' },
 ] as const;
 
 function Field({
@@ -111,10 +113,61 @@ function CreatedResult({ result }: { result: HorseCreateResponse }) {
 
 export default function RegisterHorse() {
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const isEditing = Boolean(id);
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdHorse, setCreatedHorse] = useState<HorseCreateResponse | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+
+    const horseId = Number(id);
+    if (!Number.isInteger(horseId) || horseId <= 0) {
+      const invalidIdTimer = window.setTimeout(() => setError('Mã hồ sơ ngựa không hợp lệ.'), 0);
+      return () => window.clearTimeout(invalidIdTimer);
+    }
+
+    const loadTimer = window.setTimeout(() => {
+      const loadHorse = async () => {
+        try {
+          setInitialLoading(true);
+          setError(null);
+          const horse = await getHorseById(horseId);
+          setFormData({
+            name: horse.name || '',
+            breedCode: horse.breed || '',
+            birthYear: horse.birthYear || '',
+            gender: horse.gender || '',
+            color: horse.color || '',
+            pedigree: horse.pedigree || '',
+            weight: horse.weight ?? '',
+            identifyingMarks: horse.identifyingMarks || '',
+            vaccinationRecordRef:
+              horse.vaccinationRecordRef === 'Not provided' ? '' : horse.vaccinationRecordRef || '',
+            dopingTestDate: horse.dopingTestDate?.slice(0, 10) || '',
+            dopingTestResult:
+              horse.dopingTestResult === 'Clean' ||
+              horse.dopingTestResult === 'Failed' ||
+              horse.dopingTestResult === 'Pending'
+                ? horse.dopingTestResult
+                : 'Pending',
+            legalConsentAccepted: horse.legalConsentAccepted ?? true,
+          });
+        } catch (loadError: unknown) {
+          setError(loadError instanceof Error ? loadError.message : 'Không tải được hồ sơ ngựa.');
+        } finally {
+          setInitialLoading(false);
+        }
+      };
+
+      void loadHorse();
+    }, 0);
+
+    return () => window.clearTimeout(loadTimer);
+  }, [id]);
 
   const validateForm = (): boolean => {
     if (!formData.name.trim()) return setError('Tên ngựa là bắt buộc.'), false;
@@ -157,7 +210,7 @@ export default function RegisterHorse() {
       setError(null);
       setCreatedHorse(null);
 
-      const result = await createHorseProfile({
+      const payload = {
         name: formData.name,
         birthYear: formData.birthYear as number,
         gender: formData.gender,
@@ -171,11 +224,31 @@ export default function RegisterHorse() {
         dopingTestDate: formData.dopingTestDate || undefined,
         dopingTestResult: formData.dopingTestResult,
         legalConsentAccepted: formData.legalConsentAccepted,
-      });
+      };
+
+      if (isEditing && id) {
+        await updateHorse(Number(id), {
+          name: payload.name,
+          birthYear: payload.birthYear,
+          gender: payload.gender,
+          color: payload.color,
+          pedigree: payload.pedigree,
+          weight: payload.weight,
+          identifyingMarks: payload.identifyingMarks,
+          breed: payload.breed,
+          vaccinationRecordRef: payload.vaccinationRecordRef,
+          dopingTestDate: payload.dopingTestDate,
+          dopingTestResult: payload.dopingTestResult,
+        });
+        navigate(`/owner/horses/${id}`, { replace: true });
+        return;
+      }
+
+      const result = await createHorseProfile(payload);
 
       setCreatedHorse(result);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Lỗi khi tạo hồ sơ ngựa.');
+      setError(err instanceof Error ? err.message : isEditing ? 'Cập nhật hồ sơ ngựa thất bại.' : 'Lỗi khi tạo hồ sơ ngựa.');
     } finally {
       setLoading(false);
     }
@@ -190,11 +263,21 @@ export default function RegisterHorse() {
         >
           Quay lại danh sách
         </button>
-        <h1 className="text-3xl font-black tracking-tight text-slate-950">Đăng ký hồ sơ ngựa</h1>
+        <h1 className="text-3xl font-black tracking-tight text-slate-950">
+          {isEditing ? 'Cập nhật thông tin ngựa' : 'Đăng ký hồ sơ ngựa'}
+        </h1>
         <p className="text-base text-slate-500 mt-2">
-          Tạo hồ sơ ngựa dùng lại trong kho. Việc đăng ký ngựa vào giải thực hiện tại màn Ngựa của tôi.
+          {isEditing
+            ? 'Chỉnh sửa thông tin hồ sơ ngựa và lưu lại thay đổi.'
+            : 'Tạo hồ sơ ngựa dùng lại trong kho. Việc đăng ký ngựa vào giải thực hiện tại màn Ngựa của tôi.'}
         </p>
       </div>
+
+      {initialLoading && (
+        <div className="py-16 text-center text-sm font-medium text-slate-500">
+          Đang tải thông tin ngựa...
+        </div>
+      )}
 
       {createdHorse && (
         <div className="mb-6">
@@ -227,7 +310,7 @@ export default function RegisterHorse() {
         </div>
       )}
 
-      {!createdHorse && (
+      {!createdHorse && !initialLoading && (
         <form onSubmit={handleSubmit}>
           <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden">
             <div className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
@@ -298,7 +381,9 @@ export default function RegisterHorse() {
               </button>
               <button type="submit" disabled={loading} className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-full transition-colors disabled:bg-blue-300 disabled:cursor-not-allowed flex items-center gap-2">
                 {loading && <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white" />}
-                {loading ? 'Đang tạo hồ sơ...' : 'Tạo hồ sơ ngựa'}
+                {loading
+                  ? isEditing ? 'Đang cập nhật...' : 'Đang tạo hồ sơ...'
+                  : isEditing ? 'Lưu thay đổi' : 'Tạo hồ sơ ngựa'}
               </button>
             </div>
           </div>

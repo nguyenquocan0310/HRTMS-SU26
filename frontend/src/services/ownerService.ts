@@ -384,6 +384,30 @@ export const enrollHorseToTournament = async (
 };
 
 /**
+ * DELETE /api/horses/{horseId}/enrollments/{enrollmentId}
+ * Rút ngựa khỏi một giải. Backend sẽ chặn nếu enrollment đã rút hoặc ngựa
+ * đang có pairing active trong giải.
+ */
+export const withdrawHorseFromTournament = async (
+  horseId: number | string,
+  enrollmentId: number | string
+): Promise<string> => {
+  assertPositiveId(horseId, 'horseId');
+  assertPositiveId(enrollmentId, 'enrollmentId');
+
+  const res = await apiFetch<ApiResponse<string>>(
+    `/horses/${horseId}/enrollments/${enrollmentId}`,
+    { method: 'DELETE' }
+  );
+
+  if (!res.success) {
+    throw new Error(res.message || 'Rút ngựa khỏi giải thất bại.');
+  }
+
+  return res.message || res.data || 'Đã rút ngựa khỏi giải.';
+};
+
+/**
  * POST /api/horses
  * Chỉ tạo hồ sơ ngựa trong kho/stable, không gắn giải.
  */

@@ -73,7 +73,7 @@ const FEE_STATUS_OPTIONS = [
 function SkeletonRow() {
   return (
     <tr className="animate-pulse">
-      {[...Array(9)].map((_, i) => (
+      {[...Array(10)].map((_, i) => (
         <td key={i} className="px-4 py-3">
           <div className="h-3.5 bg-gray-100 rounded w-3/4" />
         </td>
@@ -256,6 +256,7 @@ export default function RaceEntries() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Lệ phí</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">TT phí</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">TT entry</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -263,7 +264,7 @@ export default function RaceEntries() {
                 [...Array(5)].map((_, i) => <SkeletonRow key={i} />)
               ) : entries.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-14 text-center">
+                  <td colSpan={10} className="py-14 text-center">
                     <p className="text-3xl mb-3">&#127943;</p>
                     <p className="text-sm font-semibold text-gray-700 mb-1">Chưa có đăng ký cuộc đua nào</p>
                     <p className="text-xs text-gray-500 mb-4">
@@ -313,8 +314,10 @@ export default function RaceEntries() {
                       <FeeStatusText status={entry.entryFeeStatus} />
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-col gap-1.5">
-                        <EntryStatusBadge status={entry.status} />
+                      <EntryStatusBadge status={entry.status} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex min-w-[116px] flex-col gap-1.5">
                         {(entry.status.toLowerCase() === 'pending' || entry.status.toLowerCase() === 'pendingconf') && (
                           <button
                             onClick={() => handleConfirm(entry.raceEntryId)}
@@ -333,14 +336,8 @@ export default function RaceEntries() {
                             Rút lui
                           </button>
                         )}
-                        {(entry.status.toLowerCase() === 'cancelled' || entry.status.toLowerCase() === 'withdrawn') && (
-                          <span className="text-[10px] text-gray-400 italic">Đã hủy</span>
-                        )}
-                        {entry.status.toLowerCase() === 'disqualified' && (
-                          <span className="text-[10px] text-gray-400 italic">Bị loại</span>
-                        )}
-                        {entry.status.toLowerCase() === 'rejected' && (
-                          <span className="text-[10px] text-gray-400 italic">Bị từ chối</span>
+                        {!['pending', 'pendingconf', 'confirmed'].includes(entry.status.toLowerCase()) && (
+                          <span className="text-center text-xs text-gray-400">—</span>
                         )}
                       </div>
                     </td>

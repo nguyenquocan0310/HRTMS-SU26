@@ -152,7 +152,7 @@ export default function HorseDetail() {
   }
 
   const age = new Date().getFullYear() - horse.birthYear;
-  const profileStatus = (horse as any).adminApprovalStatus ?? horse.status;
+  const profileStatus = horse.adminApprovalStatus ?? horse.status;
   const profileBadge = getProfileBadge(profileStatus);
 
   // Enrollment mới nhất
@@ -245,8 +245,6 @@ export default function HorseDetail() {
             )}
             <span className="text-blue-600">Mã đăng ký</span>
             <span className="font-medium">#{latestEnrollment.enrollmentId}</span>
-            <span className="text-blue-600">Screening</span>
-            <span className="font-medium">{latestEnrollment.screeningStatus}</span>
             <span className="text-blue-600">Đăng ký lúc</span>
             <span className="font-medium">{new Date(latestEnrollment.createdAt).toLocaleDateString('vi-VN')}</span>
           </div>
@@ -277,9 +275,7 @@ export default function HorseDetail() {
           Quay lại
         </button>
         <button
-          onClick={() =>
-            navigate(`/owner/horses/edit/${(horse as any).horseId || horse.horseID || id || ''}`)
-          }
+          onClick={() => navigate(`/owner/horses/edit/${horse.horseId || horse.horseID || id || ''}`)}
           className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-full transition-colors"
         >
           Cập nhật thông tin
