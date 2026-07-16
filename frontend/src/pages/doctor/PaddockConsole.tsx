@@ -3,11 +3,14 @@ import { useLocation } from 'react-router-dom'
 import {
   getDoctorRaceEntries,
   getMyDoctorRaceAssignments,
+  getRaceEntryHealthProfile,
   updateClinicalCheck,
   updateHorseIdentity,
+  updatePostRaceWeight,
   updatePreRaceWeight,
   type DoctorRaceAssignment,
   type DoctorRaceEntry,
+  type RaceEntryHealthProfile,
 } from '../../services/doctorService'
 
 type ActiveTab = 'weigh-in' | 'vet-check' | 'weigh-out'
@@ -23,6 +26,11 @@ const getFriendlyError = (err: unknown) => {
     return 'Race entry này đã bị hủy/rút/loại nên không thể cập nhật kiểm tra.'
   }
   return raw
+}
+
+const isEntryEligible = (entry: DoctorRaceEntry) => {
+  const status = (entry.raceEntryStatus ?? entry.status).toLowerCase()
+  return !entry.isEmergencyDisqualified && !['cancelled', 'withdrawn', 'disqualified'].includes(status)
 }
 
 const mergeEntryPatch = (entry: DoctorRaceEntry, patch: Partial<DoctorRaceEntry>) => ({
@@ -146,10 +154,15 @@ export default function PaddockConsole() {
   const [entriesError, setEntriesError] = useState<string | null>(null)
 
   const [weightInputs, setWeightInputs] = useState<Record<number, string>>({})
+  const [postWeightInputs, setPostWeightInputs] = useState<Record<number, string>>({})
   const [identityInputs, setIdentityInputs] = useState<Record<number, IdentityStatus>>({})
   const [clinicalInputs, setClinicalInputs] = useState<Record<number, ClinicalStatus>>({})
   const [unfitReasons, setUnfitReasons] = useState<Record<number, string>>({})
   const [savingKey, setSavingKey] = useState<string | null>(null)
+  const [healthEntryId, setHealthEntryId] = useState<number | null>(null)
+  const [healthProfile, setHealthProfile] = useState<RaceEntryHealthProfile | null>(null)
+  const [healthLoading, setHealthLoading] = useState(false)
+  const [healthError, setHealthError] = useState<string | null>(null)
 
   const showToast = (message: string) => {
     setToastMessage(message)
@@ -157,37 +170,49 @@ export default function PaddockConsole() {
   }
 
   useEffect(() => {
-    if (!hasValidRaceId || selectedRaceId === null) {
-      setSelectedRace(null)
-      return
-    }
+    const loadId = window.setTimeout(() => {
+      if (!hasValidRaceId || selectedRaceId === null) {
+        setSelectedRace(null)
+        return
+      }
 
-    setRaceLoading(true)
-    getMyDoctorRaceAssignments()
-      .then((list) => {
-        setSelectedRace(list.find((race) => race.raceId === selectedRaceId) ?? null)
-      })
-      .catch(() => setSelectedRace(null))
-      .finally(() => setRaceLoading(false))
+      setRaceLoading(true)
+      getMyDoctorRaceAssignments()
+        .then((list) => {
+          setSelectedRace(list.find((race) => race.raceId === selectedRaceId) ?? null)
+        })
+        .catch(() => setSelectedRace(null))
+        .finally(() => setRaceLoading(false))
+    }, 0)
+    return () => window.clearTimeout(loadId)
   }, [hasValidRaceId, selectedRaceId])
 
   useEffect(() => {
-    if (!hasValidRaceId || selectedRaceId === null) {
-      setEntries([])
-      setEntriesError('Không tìm thấy raceId để mở Paddock.')
-      return
-    }
+    const loadId = window.setTimeout(() => {
+      if (!hasValidRaceId || selectedRaceId === null) {
+        setEntries([])
+        setEntriesError('Không tìm thấy raceId để mở Paddock.')
+        return
+      }
 
-    setEntriesLoading(true)
-    setEntriesError(null)
-    getDoctorRaceEntries(selectedRaceId)
-      .then((data) => {
+      setEntriesLoading(true)
+      setEntriesError(null)
+      getDoctorRaceEntries(selectedRaceId)
+        .then((data) => {
         setEntries(data)
         setWeightInputs(
           Object.fromEntries(
             data.map((entry) => [
               entry.raceEntryId,
               entry.preRaceJockeyWeight != null ? String(entry.preRaceJockeyWeight) : '',
+            ])
+          )
+        )
+        setPostWeightInputs(
+          Object.fromEntries(
+            data.map((entry) => [
+              entry.raceEntryId,
+              entry.postRaceJockeyWeight != null ? String(entry.postRaceJockeyWeight) : '',
             ])
           )
         )
@@ -210,18 +235,38 @@ export default function PaddockConsole() {
         setUnfitReasons(
           Object.fromEntries(data.map((entry) => [entry.raceEntryId, entry.unfitReason ?? '']))
         )
-      })
-      .catch((err) => {
-        setEntries([])
-        setEntriesError(getFriendlyError(err) || 'Không tải được danh sách race entries.')
-      })
-      .finally(() => setEntriesLoading(false))
+        })
+        .catch((err) => {
+          setEntries([])
+          setEntriesError(getFriendlyError(err) || 'Không tải được danh sách race entries.')
+        })
+        .finally(() => setEntriesLoading(false))
+    }, 0)
+    return () => window.clearTimeout(loadId)
   }, [hasValidRaceId, selectedRaceId])
+
+  useEffect(() => {
+    if (healthEntryId === null) return
+    const loadId = window.setTimeout(() => {
+      setHealthLoading(true)
+      setHealthError(null)
+      getRaceEntryHealthProfile(healthEntryId)
+        .then(setHealthProfile)
+        .catch((error) => {
+          setHealthProfile(null)
+          setHealthError(getFriendlyError(error))
+        })
+        .finally(() => setHealthLoading(false))
+    }, 0)
+    return () => window.clearTimeout(loadId)
+  }, [healthEntryId])
 
   const thresholdLabel = useMemo(() => {
     const threshold = entries.find((entry) => entry.thresholdKg != null)?.thresholdKg
     return threshold != null ? threshold.toFixed(1) : 'theo cấu hình'
   }, [entries])
+  const preRaceWritable = !selectedRace || ['Upcoming', 'Sắp diễn ra'].includes(selectedRace.raceStatus)
+  const postRaceWritable = !selectedRace || ['Live', 'Active', 'Running', 'InProgress', 'Đang diễn ra'].includes(selectedRace.raceStatus)
 
   const updateEntry = (raceEntryId: number, patch: Partial<DoctorRaceEntry>) => {
     setEntries((prev) =>
@@ -232,8 +277,8 @@ export default function PaddockConsole() {
   const handleWeighInConfirm = async (entry: DoctorRaceEntry) => {
     const rawValue = weightInputs[entry.raceEntryId]
     const preRaceJockeyWeight = rawValue === '' ? Number.NaN : Number(rawValue)
-    if (!Number.isFinite(preRaceJockeyWeight) || preRaceJockeyWeight <= 0) {
-      showToast('Vui lòng nhập cân nặng trước đua hợp lệ.')
+    if (!Number.isFinite(preRaceJockeyWeight) || preRaceJockeyWeight < 1 || preRaceJockeyWeight > 300) {
+      showToast('Cân nặng trước đua phải từ 1 đến 300 kg.')
       return
     }
 
@@ -289,8 +334,8 @@ export default function PaddockConsole() {
     const clinicalStatus = clinicalInputs[entry.raceEntryId] ?? 'Fit'
     const unfitReason = unfitReasons[entry.raceEntryId]?.trim() ?? ''
 
-    if (clinicalStatus === 'Unfit' && unfitReason.length === 0) {
-      showToast('Vui lòng nhập lý do khi kết luận Unfit.')
+    if (clinicalStatus === 'Unfit' && unfitReason.length < 20) {
+      showToast('Lý do Unfit phải có ít nhất 20 ký tự.')
       return
     }
     if (
@@ -318,6 +363,46 @@ export default function PaddockConsole() {
       showToast(res.message ?? `Đã cập nhật khám lâm sàng cho ${entry.horseName}.`)
     } catch (err) {
       showToast(getFriendlyError(err))
+    } finally {
+      setSavingKey(null)
+    }
+  }
+
+  const openHealthProfile = (raceEntryId: number) => {
+    setHealthProfile(null)
+    setHealthError(null)
+    setHealthEntryId(raceEntryId)
+  }
+
+  const closeHealthProfile = () => {
+    setHealthEntryId(null)
+    setHealthProfile(null)
+    setHealthError(null)
+  }
+
+  const handleWeighOutConfirm = async (entry: DoctorRaceEntry) => {
+    const rawValue = postWeightInputs[entry.raceEntryId]
+    const postRaceJockeyWeight = rawValue === '' ? Number.NaN : Number(rawValue)
+    if (!Number.isFinite(postRaceJockeyWeight) || postRaceJockeyWeight < 1 || postRaceJockeyWeight > 300) {
+      showToast('Cân nặng sau đua phải từ 1 đến 300 kg.')
+      return
+    }
+
+    const key = `post-weight-${entry.raceEntryId}`
+    setSavingKey(key)
+    try {
+      const response = await updatePostRaceWeight(entry.raceEntryId, postRaceJockeyWeight)
+      updateEntry(entry.raceEntryId, {
+        preRaceJockeyWeight: response.preRaceJockeyWeight ?? entry.preRaceJockeyWeight,
+        postRaceJockeyWeight: response.postRaceJockeyWeight,
+        postRaceWeightDifference: response.weightDifference,
+        thresholdKg: response.thresholdKg ?? entry.thresholdKg,
+        postRaceWeightFlagged: response.isWeightFlagged,
+        message: response.message,
+      })
+      showToast(response.message || `Đã ghi nhận Weigh-Out cho ${entry.jockeyName}.`)
+    } catch (error) {
+      showToast(getFriendlyError(error))
     } finally {
       setSavingKey(null)
     }
@@ -398,16 +483,15 @@ export default function PaddockConsole() {
             <p className="mt-1 text-xs text-red-600">Không tìm thấy raceId để mở Paddock.</p>
           )}
         </div>
-        <div className="flex items-center gap-2 self-start rounded-md border border-blue-100 bg-blue-50 px-3 py-1.5 sm:self-center">
-          <span className="h-2 w-2 rounded-full bg-blue-600" />
+        <div className="self-start rounded-md border border-blue-100 bg-blue-50 px-3 py-1.5 sm:self-center">
           <span className="text-xs font-bold uppercase tracking-wider text-blue-700">Doctor Paddock</span>
         </div>
       </div>
 
-      <div className="flex rounded-lg border border-gray-200 bg-white p-1.5 shadow-sm">
+      <div className="flex overflow-x-auto rounded-lg border border-gray-200 bg-white p-1.5 shadow-sm">
         <button
           onClick={() => setActiveTab('weigh-in')}
-          className={`flex-1 rounded-lg py-2.5 text-center text-sm font-semibold transition-all ${
+          className={`min-w-48 flex-1 rounded-lg px-3 py-2.5 text-center text-sm font-semibold transition-all ${
             activeTab === 'weigh-in'
               ? 'bg-blue-600 text-white shadow-sm'
               : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -417,7 +501,7 @@ export default function PaddockConsole() {
         </button>
         <button
           onClick={() => setActiveTab('vet-check')}
-          className={`flex-1 rounded-lg py-2.5 text-center text-sm font-semibold transition-all ${
+          className={`min-w-48 flex-1 rounded-lg px-3 py-2.5 text-center text-sm font-semibold transition-all ${
             activeTab === 'vet-check'
               ? 'bg-blue-600 text-white shadow-sm'
               : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -427,7 +511,7 @@ export default function PaddockConsole() {
         </button>
         <button
           onClick={() => setActiveTab('weigh-out')}
-          className={`flex-1 rounded-lg py-2.5 text-center text-sm font-semibold transition-all ${
+          className={`min-w-48 flex-1 rounded-lg px-3 py-2.5 text-center text-sm font-semibold transition-all ${
             activeTab === 'weigh-out'
               ? 'bg-blue-600 text-white shadow-sm'
               : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -444,6 +528,11 @@ export default function PaddockConsole() {
               <h2 className="text-sm font-bold text-gray-900">Danh sách Kỵ sĩ cân trước cuộc đua</h2>
               <span className="text-xs text-gray-400">Ngưỡng cảnh báo: {thresholdLabel} kg</span>
             </div>
+            {!preRaceWritable && (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Cuộc đua không còn ở trạng thái cho phép cập nhật dữ liệu trước đua. Backend vẫn là nguồn xác nhận cuối cùng.
+              </p>
+            )}
 
             {stateBlock ?? (
               <div className="overflow-x-auto">
@@ -471,7 +560,8 @@ export default function PaddockConsole() {
                           : null)
                       const isExceeded =
                         entry.isWeightWarning ||
-                        (diff != null && entry.thresholdKg != null && Math.abs(diff) > entry.thresholdKg)
+                         (diff != null && entry.thresholdKg != null && Math.abs(diff) > entry.thresholdKg)
+                      const eligible = isEntryEligible(entry)
 
                       return (
                         <tr key={entry.raceEntryId} className="transition-colors hover:bg-gray-50/20">
@@ -496,6 +586,9 @@ export default function PaddockConsole() {
                               }`}
                               placeholder="Nhập cân"
                               value={input}
+                              min="1"
+                              max="300"
+                              disabled={!preRaceWritable || !eligible || savingKey !== null}
                               onChange={(event) =>
                                 setWeightInputs((prev) => ({
                                   ...prev,
@@ -526,7 +619,7 @@ export default function PaddockConsole() {
                           <td className="px-4 py-4 text-right">
                             <button
                               onClick={() => handleWeighInConfirm(entry)}
-                              disabled={input === '' || savingKey === key}
+                              disabled={input === '' || !preRaceWritable || !eligible || savingKey !== null}
                               className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white transition-all hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-30"
                             >
                               {savingKey === key ? 'Đang lưu...' : entry.preRaceJockeyWeight != null ? 'Cập nhật Weigh-In' : 'Xác nhận Weigh-In'}
@@ -548,6 +641,11 @@ export default function PaddockConsole() {
               <h2 className="text-sm font-bold text-gray-900">Kiểm tra danh tính ngựa & khám lâm sàng</h2>
               <span className="text-xs text-gray-400">Mismatch hoặc Unfit có thể loại entry</span>
             </div>
+            {!preRaceWritable && (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Cuộc đua không còn ở trạng thái cho phép xác minh danh tính hoặc khám lâm sàng.
+              </p>
+            )}
 
             {stateBlock ?? (
               <div className="overflow-x-auto">
@@ -567,6 +665,7 @@ export default function PaddockConsole() {
                       const identityKey = `identity-${entry.raceEntryId}`
                       const clinicalKey = `clinical-${entry.raceEntryId}`
                       const clinicalStatus = clinicalInputs[entry.raceEntryId] ?? 'Fit'
+                      const eligible = isEntryEligible(entry)
 
                       return (
                         <tr key={entry.raceEntryId} className="transition-colors hover:bg-gray-50/20">
@@ -582,6 +681,7 @@ export default function PaddockConsole() {
                             <div className="flex items-center gap-2">
                               <select
                                 value={identityInputs[entry.raceEntryId] ?? 'Matched'}
+                                disabled={!preRaceWritable || !eligible || savingKey !== null}
                                 onChange={(event) =>
                                   setIdentityInputs((prev) => ({
                                     ...prev,
@@ -603,6 +703,7 @@ export default function PaddockConsole() {
                           <td className="px-4 py-4">
                             <select
                               value={clinicalStatus}
+                              disabled={!preRaceWritable || !eligible || savingKey !== null}
                               onChange={(event) =>
                                 setClinicalInputs((prev) => ({
                                   ...prev,
@@ -623,7 +724,7 @@ export default function PaddockConsole() {
                             <input
                               type="text"
                               value={unfitReasons[entry.raceEntryId] ?? ''}
-                              disabled={clinicalStatus !== 'Unfit'}
+                              disabled={clinicalStatus !== 'Unfit' || !preRaceWritable || !eligible || savingKey !== null}
                               onChange={(event) =>
                                 setUnfitReasons((prev) => ({
                                   ...prev,
@@ -641,17 +742,25 @@ export default function PaddockConsole() {
                             <div className="flex justify-end gap-2">
                               <button
                                 onClick={() => handleHorseIdentityConfirm(entry)}
-                                disabled={savingKey === identityKey}
+                                disabled={!preRaceWritable || !eligible || savingKey !== null}
                                 className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-30"
                               >
                                 {savingKey === identityKey ? 'Đang lưu...' : 'Lưu danh tính'}
                               </button>
                               <button
                                 onClick={() => handleClinicalConfirm(entry)}
-                                disabled={savingKey === clinicalKey}
+                                disabled={!preRaceWritable || !eligible || savingKey !== null}
                                 className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-30"
                               >
                                 {savingKey === clinicalKey ? 'Đang lưu...' : 'Lưu khám'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openHealthProfile(entry.raceEntryId)}
+                                disabled={healthLoading}
+                                className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                              >
+                                Xem hồ sơ
                               </button>
                             </div>
                           </td>
@@ -669,11 +778,13 @@ export default function PaddockConsole() {
           <div className="space-y-4 p-4 sm:p-6">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h2 className="text-sm font-bold text-gray-900">Cân nặng sau đua (Weigh-Out)</h2>
-              <span className="text-xs text-gray-400">Chưa gắn API ở bước này</span>
+              <span className="text-xs text-gray-400">Chỉ ghi nhận khi cuộc đua đang Live</span>
             </div>
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              Backend hiện chưa có endpoint Weigh-Out trong scope prompt, nên màn này chỉ hiển thị thông tin entries thật và chưa cho lưu.
-            </div>
+            {!postRaceWritable && (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Cuộc đua hiện không ở trạng thái cho phép ghi nhận cân nặng sau đua.
+              </p>
+            )}
             {stateBlock ?? (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm text-gray-700">
@@ -682,12 +793,25 @@ export default function PaddockConsole() {
                       <th className="px-4 py-3">Post</th>
                       <th className="px-4 py-3">Kỵ sĩ / Ngựa</th>
                       <th className="px-4 py-3">Cân trước đua</th>
-                      <th className="px-4 py-3">Trạng thái</th>
+                      <th className="px-4 py-3">Cân sau đua</th>
+                      <th className="px-4 py-3">Chênh lệch</th>
+                      <th className="px-4 py-3">Kết quả</th>
+                      <th className="px-4 py-3 text-right">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {entries.map((entry) => (
-                      <tr key={entry.raceEntryId}>
+                    {entries.map((entry) => {
+                      const key = `post-weight-${entry.raceEntryId}`
+                      const input = postWeightInputs[entry.raceEntryId] ?? ''
+                      const enteredWeight = input === '' ? null : Number(input)
+                      const difference = entry.postRaceWeightDifference ?? (
+                        enteredWeight != null && entry.preRaceJockeyWeight != null
+                          ? Number((enteredWeight - entry.preRaceJockeyWeight).toFixed(1))
+                          : null
+                      )
+                      const eligible = isEntryEligible(entry)
+                      return (
+                      <tr key={entry.raceEntryId} className="hover:bg-gray-50/30">
                         <td className="px-4 py-4 font-mono text-xs font-bold text-gray-500">
                           {entry.postPosition ?? '-'}
                         </td>
@@ -699,10 +823,49 @@ export default function PaddockConsole() {
                           {formatWeight(entry.preRaceJockeyWeight)}
                         </td>
                         <td className="px-4 py-4">
-                          <EntryStatusBadge entry={entry} />
+                          <input
+                            type="number"
+                            min="1"
+                            max="300"
+                            step="0.1"
+                            value={input}
+                            onChange={(event) => setPostWeightInputs((current) => ({
+                              ...current,
+                              [entry.raceEntryId]: event.target.value,
+                            }))}
+                            disabled={!postRaceWritable || !eligible || savingKey !== null}
+                            placeholder="Nhập cân"
+                            className="w-28 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-semibold focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                          />
+                        </td>
+                        <td className="px-4 py-4 font-mono font-semibold">
+                          {difference == null ? 'Chưa có' : `${difference > 0 ? '+' : ''}${difference.toFixed(1)} kg`}
+                        </td>
+                        <td className="px-4 py-4">
+                          {entry.postRaceJockeyWeight == null ? (
+                            <EntryStatusBadge entry={entry} />
+                          ) : (
+                            <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${
+                              entry.postRaceWeightFlagged
+                                ? 'border-amber-200 bg-amber-50 text-amber-700'
+                                : 'border-emerald-100 bg-emerald-50 text-emerald-700'
+                            }`}>
+                              {entry.postRaceWeightFlagged ? 'Backend đánh dấu cảnh báo' : 'Đã ghi nhận'}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => void handleWeighOutConfirm(entry)}
+                            disabled={input === '' || !postRaceWritable || !eligible || savingKey !== null}
+                            className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-30"
+                          >
+                            {savingKey === key ? 'Đang lưu...' : entry.postRaceJockeyWeight != null ? 'Cập nhật Weigh-Out' : 'Xác nhận Weigh-Out'}
+                          </button>
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
               </div>
@@ -710,6 +873,104 @@ export default function PaddockConsole() {
           </div>
         )}
       </div>
+
+      {healthEntryId !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm"
+          onClick={closeHealthProfile}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="health-profile-title"
+            className="max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-gray-200 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-gray-100 bg-white px-5 py-4 sm:px-6">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-blue-700">Dữ liệu API hồ sơ sức khỏe</p>
+                <h2 id="health-profile-title" className="mt-1 text-lg font-bold text-gray-900">Chi tiết ngựa và Jockey</h2>
+              </div>
+              <button
+                type="button"
+                onClick={closeHealthProfile}
+                className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50"
+              >
+                Đóng
+              </button>
+            </div>
+
+            <div className="p-5 sm:p-6">
+              {healthLoading && <p className="py-10 text-center text-sm text-gray-500">Đang tải hồ sơ sức khỏe...</p>}
+              {!healthLoading && healthError && (
+                <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{healthError}</p>
+              )}
+              {!healthLoading && healthProfile && (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="border-b border-gray-100 pb-2 text-sm font-bold text-gray-900">Thông tin Jockey</h3>
+                    <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                      {[
+                        ['Họ tên', healthProfile.jockeyName],
+                        ['Giấy phép', healthProfile.licenseCertificate],
+                        ['Kinh nghiệm', `${healthProfile.experienceYears} năm`],
+                        ['Nhóm máu', healthProfile.bloodType || 'Chưa có dữ liệu'],
+                        ['Tình trạng sức khỏe', healthProfile.healthStatus || 'Chưa có dữ liệu'],
+                        ['Cân tự khai', `${healthProfile.selfDeclaredWeight} kg`],
+                      ].map(([label, value]) => (
+                        <div key={label} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                          <dt className="text-xs font-medium text-gray-500">{label}</dt>
+                          <dd className="mt-1 break-words text-sm font-semibold text-gray-800">{value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+
+                  <div>
+                    <h3 className="border-b border-gray-100 pb-2 text-sm font-bold text-gray-900">Thông tin ngựa</h3>
+                    <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                      {[
+                        ['Tên ngựa', healthProfile.horseName],
+                        ['Giống', healthProfile.breed],
+                        ['Màu lông', healthProfile.color],
+                        ['Giới tính', healthProfile.gender],
+                        ['Năm sinh', String(healthProfile.birthYear)],
+                        ['Dấu hiệu nhận dạng', healthProfile.identifyingMarks],
+                        ['Hồ sơ tiêm chủng', healthProfile.vaccinationRecordRef],
+                        ['Ngày xét nghiệm doping', healthProfile.dopingTestDate || 'Chưa có dữ liệu'],
+                        ['Kết quả doping', healthProfile.dopingTestResult || 'Chưa có dữ liệu'],
+                      ].map(([label, value]) => (
+                        <div key={label} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                          <dt className="text-xs font-medium text-gray-500">{label}</dt>
+                          <dd className="mt-1 break-words text-sm font-semibold text-gray-800">{value || 'Chưa có dữ liệu'}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+
+                  <div>
+                    <h3 className="border-b border-gray-100 pb-2 text-sm font-bold text-gray-900">Kết quả kiểm tra</h3>
+                    <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                      {[
+                        ['Cân trước đua', healthProfile.preRaceJockeyWeight == null ? 'Chưa ghi nhận' : `${healthProfile.preRaceJockeyWeight} kg`],
+                        ['Cân sau đua', healthProfile.postRaceJockeyWeight == null ? 'Chưa ghi nhận' : `${healthProfile.postRaceJockeyWeight} kg`],
+                        ['Danh tính ngựa', healthProfile.horseIdentityCheckStatus || 'Chưa kiểm tra'],
+                        ['Khám lâm sàng', healthProfile.clinicalStatus || 'Chưa kiểm tra'],
+                        ['Lý do Unfit', healthProfile.unfitReason || 'Không có'],
+                      ].map(([label, value]) => (
+                        <div key={label} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                          <dt className="text-xs font-medium text-gray-500">{label}</dt>
+                          <dd className="mt-1 break-words text-sm font-semibold text-gray-800">{value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   )
 }

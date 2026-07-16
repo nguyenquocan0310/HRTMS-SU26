@@ -42,6 +42,10 @@ function isRejectedStatus(status: string): boolean {
   return status === 'Rejected' || status === 'AutoRejected'
 }
 
+function isRegistrationOpen(status: string): boolean {
+  return status === 'Open Registration'
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function TournamentStatusBadge({ status }: { status: string }) {
   const cfg = TOURNAMENT_STATUS_CONFIG[status] ?? {
@@ -97,6 +101,7 @@ function TournamentDetailModal({ tournament, participation, onClose, onRegister 
 
   const partStatus = participation?.status ?? null
   const isRegistered = partStatus !== null
+  const canRegister = !isRegistered && isRegistrationOpen(tournament.status)
 
   const handleRegister = async () => {
     setRegistering(true)
@@ -246,24 +251,18 @@ function TournamentDetailModal({ tournament, participation, onClose, onRegister 
                   </p>
                 )}
               </div>
-            ) : (
+            ) : canRegister ? (
               <button
                 onClick={handleRegister}
                 disabled={registering}
                 className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold py-2.5 rounded-md text-sm transition-colors disabled:cursor-not-allowed shadow-sm"
               >
-                {registering ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                    </svg>
-                    Đang đăng ký...
-                  </>
-                ) : (
-                  'Đăng ký tham gia'
-                )}
+                {registering ? 'Đang đăng ký...' : 'Đăng ký tham gia'}
               </button>
+            ) : (
+              <p className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-center text-sm font-semibold text-gray-600">
+                Giải đấu hiện không mở đăng ký
+              </p>
             )}
           </div>
         </div>
@@ -282,6 +281,7 @@ interface TournamentCardProps {
 function TournamentCard({ tournament, participation, onDetail }: TournamentCardProps) {
   const partStatus = participation?.status ?? null
   const isRegistered = partStatus !== null
+  const canRegister = !isRegistered && isRegistrationOpen(tournament.status)
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm hover:border-blue-200 hover:bg-blue-50/30 transition-colors flex flex-col gap-3">
@@ -324,7 +324,7 @@ function TournamentCard({ tournament, participation, onDetail }: TournamentCardP
         onClick={() => onDetail(tournament)}
         className="w-full border border-blue-100 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-xs py-2 rounded-md transition-colors"
       >
-        Xem chi tiết {!isRegistered && '& Đăng ký'}
+        {canRegister ? 'Xem chi tiết và đăng ký' : 'Xem chi tiết'}
       </button>
     </div>
   )
@@ -348,16 +348,11 @@ const DoctorTournamentList: React.FC = () => {
   }
 
   const fetchParticipations = useCallback(async () => {
-    try {
-      const list = await getMyTournamentParticipations()
-      const map: Record<number, ParticipationResponse> = {}
-      for (const p of list) {
-        map[p.tournamentId] = p
-      }
-      setParticipationMap(map)
-    } catch {
-      // Không chặn UX nếu API participations lỗi
-    }
+    const list = await getMyTournamentParticipations()
+    const map: Record<number, ParticipationResponse> = {}
+    for (const participation of list) map[participation.tournamentId] = participation
+    setParticipationMap(map)
+    return map
   }, [])
 
   useEffect(() => {
@@ -365,9 +360,9 @@ const DoctorTournamentList: React.FC = () => {
       try {
         setLoading(true)
         setError(null)
-        const [all] = await Promise.all([getTournaments(), fetchParticipations()])
-        // Chỉ giữ giải "Open Registration" để Doctor đăng ký
-        setTournaments(all.filter((t) => t.status === 'Open Registration'))
+        const [all, participations] = await Promise.all([getTournaments(), fetchParticipations()])
+        // Hiển thị giải đang mở và mọi giải Doctor đã đăng ký để không làm mất trạng thái duyệt.
+        setTournaments(all.filter((t) => isRegistrationOpen(t.status) || participations[t.tournamentId]))
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Không thể tải danh sách giải đấu.')
       } finally {
@@ -388,14 +383,14 @@ const DoctorTournamentList: React.FC = () => {
 
   const selectedParticipation = selected ? (participationMap[selected.tournamentId] ?? null) : null
   const filtered = tournaments.filter((t) => t.name.toLowerCase().includes(search.toLowerCase()))
-  const registeredCount = filtered.filter((t) => participationMap[t.tournamentId] !== undefined).length
+  const registeredCount = tournaments.filter((t) => participationMap[t.tournamentId] !== undefined).length
+  const openCount = filtered.filter((t) => isRegistrationOpen(t.status)).length
 
   return (
     <div className="space-y-6">
       {/* Toast */}
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 z-50 bg-blue-700 text-white px-4 py-3 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-blue-300 flex-shrink-0" />
+        <div className="fixed bottom-6 right-6 z-50 bg-blue-700 text-white px-4 py-3 rounded-lg shadow-lg text-sm font-medium">
           {toastMsg}
         </div>
       )}
@@ -410,7 +405,7 @@ const DoctorTournamentList: React.FC = () => {
         </div>
         {!loading && (
           <span className="px-3 py-1.5 text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100 rounded-full self-start">
-            {filtered.length} giải mở đăng ký
+            {openCount} giải mở đăng ký
           </span>
         )}
       </div>
@@ -420,7 +415,7 @@ const DoctorTournamentList: React.FC = () => {
         <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 flex items-center gap-3">
           <div>
             <p className="text-sm font-semibold text-blue-800">
-              Bạn đã đăng ký {registeredCount} / {filtered.length} giải đang mở
+              Bạn đã đăng ký {registeredCount} giải đấu
             </p>
             <p className="text-xs text-blue-600 mt-0.5">
               Bấm "Xem chi tiết" để xem trạng thái duyệt của từng giải
