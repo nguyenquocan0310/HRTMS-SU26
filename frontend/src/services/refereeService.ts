@@ -58,6 +58,7 @@ export interface RefereeRaceEntry {
   preRaceJockeyWeight: number | null;
   horseIdentityCheckStatus: string | null;
   clinicalStatus: string | null;
+  rejectionReason: string | null;
 }
 
 export interface StartingListEntry {
@@ -221,6 +222,7 @@ const normalizeRaceEntry = (value: unknown): RefereeRaceEntry | null => {
     preRaceJockeyWeight: numberOrNull(item.preRaceJockeyWeight),
     horseIdentityCheckStatus: stringOrNull(item.horseIdentityCheckStatus),
     clinicalStatus: stringOrNull(item.clinicalStatus),
+    rejectionReason: stringOrNull(item.rejectionReason),
   };
 };
 
@@ -247,7 +249,7 @@ export const getMyRefereeRaceAssignments = async (): Promise<RefereeRaceAssignme
 };
 
 export const getRefereeRaceEntries = async (raceId: number): Promise<RefereeRaceEntry[]> => {
-  const res = await apiFetch<unknown>(`/races/${raceId}/entries`);
+  const res = await apiFetch<unknown>(`/referee/race-entries/races/${raceId}/entries`);
   return extractArray(res)
     .map(normalizeRaceEntry)
     .filter((item): item is RefereeRaceEntry => item !== null);
