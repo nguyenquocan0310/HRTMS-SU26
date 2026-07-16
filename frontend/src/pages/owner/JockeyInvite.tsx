@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { JockeyInvitation, Horse } from '../../types/owner.types';
-import { cancelPairing, getAvailableJockeys, getMyHorses, getOwnerPairings, inviteJockey, confirmPairing } from '../../services/ownerService';
+import { cancelPairing, getAvailableJockeys, getMyHorses, getMyTournamentHorseEnrollments, getOwnerPairings, inviteJockey, confirmPairing } from '../../services/ownerService';
 import { getMyTournamentParticipations, type ParticipationResponse } from '../../services/tournamentService';
 
 const PAIRING_STATUS: Record<string, { label: string; cls: string; dot: string }> = {
@@ -43,6 +43,7 @@ export default function JockeyInvite() {
   const [loadingJockeys, setLoadingJockeys] = useState(false);
   const [selectedJockeyId, setSelectedJockeyId] = useState('');
   const [horses, setHorses] = useState<Horse[]>([]);
+  const [eligibleHorses, setEligibleHorses] = useState<Horse[]>([]);
   const [loadingHorses, setLoadingHorses] = useState(false);
   const [selectedHorseId, setSelectedHorseId] = useState('');
   const [filterHorseId, setFilterHorseId] = useState('');
@@ -111,26 +112,44 @@ export default function JockeyInvite() {
     fetchHorses();
   }, []);
 
-  // ── Fetch available jockeys whenever selectedTournamentId changes ────────────
+  // ── Chỉ tải jockey và ngựa đã được duyệt trong đúng giải đang chọn ──────────
   useEffect(() => {
     if (!selectedTournamentId) {
       setAvailableJockeys([]);
+      setEligibleHorses([]);
+      setSelectedHorseId('');
       return;
     }
-    const fetchJockeys = async () => {
+    const fetchTournamentOptions = async () => {
       try {
         setLoadingJockeys(true);
-        const data = await getAvailableJockeys(selectedTournamentId, 1, 20);
-        setAvailableJockeys(data);
+        setLoadingHorses(true);
+        setSelectedHorseId('');
+        const [jockeyData, enrollments] = await Promise.all([
+          getAvailableJockeys(selectedTournamentId, 1, 20),
+          getMyTournamentHorseEnrollments(selectedTournamentId, 'Approved'),
+        ]);
+        setAvailableJockeys(jockeyData);
+
+        const eligibleHorseIds = new Set(
+          enrollments
+            .filter((entry) => entry.status === 'Enrolled' && entry.adminApprovalStatus === 'Approved')
+            .map((entry) => String(entry.horseId))
+        );
+        setEligibleHorses(horses.filter((horse) =>
+          eligibleHorseIds.has(String(horse.horseID || (horse as any).id || (horse as any).horseId || ''))
+        ));
       } catch (err) {
-        console.error('Failed to fetch available jockeys:', err);
+        console.error('Failed to fetch tournament invitation options:', err);
         setAvailableJockeys([]);
+        setEligibleHorses([]);
       } finally {
         setLoadingJockeys(false);
+        setLoadingHorses(false);
       }
     };
-    fetchJockeys();
-  }, [selectedTournamentId]);
+    fetchTournamentOptions();
+  }, [selectedTournamentId, horses]);
 
   useEffect(() => {
     const fetchInvitations = async () => {
@@ -649,7 +668,7 @@ export default function JockeyInvite() {
                     className={inputCls}
                   >
                     <option value="">— Chọn Ngựa —</option>
-                    {horses.map((h) => {
+                    {eligibleHorses.map((h) => {
                       const hId = h.horseID || (h as any).id || (h as any).horseId || '';
                       return (
                         <option key={hId} value={hId}>
@@ -658,6 +677,11 @@ export default function JockeyInvite() {
                       );
                     })}
                   </select>
+                )}
+                {!loadingHorses && selectedTournamentId && eligibleHorses.length === 0 && (
+                  <p className="mt-1.5 text-xs text-amber-600">
+                    Chưa có ngựa nào được duyệt và còn trong giải này.
+                  </p>
                 )}
               </div>
 

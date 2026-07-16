@@ -190,12 +190,14 @@ const EnrollModal: React.FC<EnrollModalProps> = ({ horse, status, onClose, onSuc
   const [confirmed, setConfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingParticipations, setLoadingParticipations] = useState(true);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ text: string; variant: BadgeVariant } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const horseId = getHorseId(horse);
-  const enrolledTournamentIds = new Set((status.enrollments || []).map((enrollment) => enrollment.tournamentId));
-  const selectedAlreadyEnrolled = selectedTournamentId !== '' && enrolledTournamentIds.has(selectedTournamentId);
+  const selectedEnrollment = selectedTournamentId === ''
+    ? undefined
+    : (status.enrollments || []).find((enrollment) => enrollment.tournamentId === selectedTournamentId);
+  const selectedAlreadyEnrolled = Boolean(selectedEnrollment);
 
   useEffect(() => {
     const loadParticipations = async () => {
@@ -231,7 +233,7 @@ const EnrollModal: React.FC<EnrollModalProps> = ({ horse, status, onClose, onSuc
       return;
     }
     if (selectedAlreadyEnrolled) {
-      setError('Ngựa đã vào giải này.');
+      setError('Ngựa đã có hồ sơ đăng ký riêng tại giải này.');
       return;
     }
 
@@ -240,9 +242,19 @@ const EnrollModal: React.FC<EnrollModalProps> = ({ horse, status, onClose, onSuc
       setError(null);
       setMessage(null);
       const enrollment = await enrollHorseToTournament(horseId, selectedTournamentId);
-      setMessage(
-        `Đăng ký vào giải thành công: ${enrollment.adminApprovalStatus}. ${enrollment.screeningReason || ''}`.trim()
-      );
+      if (enrollment.adminApprovalStatus === 'Rejected') {
+        setMessage({
+          variant: 'red',
+          text: `Ngựa không đủ điều kiện tham gia giải và đã bị từ chối.${enrollment.screeningReason ? ` Lý do: ${enrollment.screeningReason}` : ''}`,
+        });
+      } else if (enrollment.adminApprovalStatus === 'Approved') {
+        setMessage({ variant: 'green', text: 'Ngựa đã được đăng ký và phê duyệt vào giải.' });
+      } else {
+        setMessage({
+          variant: 'yellow',
+          text: `Đã gửi đăng ký ngựa vào giải và đang chờ duyệt.${enrollment.screeningReason ? ` Lý do cần xem xét: ${enrollment.screeningReason}` : ''}`,
+        });
+      }
       onSuccess(horseId, enrollment);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Đăng ký ngựa vào giải thất bại.');
@@ -270,7 +282,11 @@ const EnrollModal: React.FC<EnrollModalProps> = ({ horse, status, onClose, onSuc
             </div>
 
             {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-sm">{error}</div>}
-            {message && <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg px-3 py-2 text-sm">{message}</div>}
+            {message && (
+              <div className={`${BADGE_STYLES[message.variant]} rounded-lg border px-3 py-2 text-sm`}>
+                {message.text}
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1.5">Giải đấu <span className="text-red-500">*</span></label>
@@ -290,10 +306,18 @@ const EnrollModal: React.FC<EnrollModalProps> = ({ horse, status, onClose, onSuc
                 >
                   <option value="">Chọn giải đấu</option>
                   {participations.map((participation: any) => {
-                    const disabled = enrolledTournamentIds.has(participation.tournamentId);
+                    const enrollment = (status.enrollments || []).find((item) => item.tournamentId === participation.tournamentId);
+                    const disabled = Boolean(enrollment);
+                    const suffix = enrollment?.adminApprovalStatus === 'Rejected'
+                      ? ' — Hồ sơ đã bị từ chối'
+                      : enrollment?.adminApprovalStatus === 'Pending'
+                        ? ' — Đang chờ duyệt'
+                        : enrollment?.status === 'Withdrawn'
+                          ? ' — Đã rút khỏi giải'
+                          : disabled ? ' — Đã được duyệt vào giải' : '';
                     return (
                       <option key={participation.participationId ?? participation.participantId ?? participation.tournamentId} value={participation.tournamentId} disabled={disabled}>
-                        {participation.tournamentName || `Giải #${participation.tournamentId}`}{disabled ? ' — Đã vào giải này' : ''}
+                        {participation.tournamentName || `Giải #${participation.tournamentId}`}{suffix}
                       </option>
                     );
                   })}
@@ -301,8 +325,16 @@ const EnrollModal: React.FC<EnrollModalProps> = ({ horse, status, onClose, onSuc
               )}
             </div>
 
-            {selectedAlreadyEnrolled && (
-              <div className="text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">Đã vào giải này.</div>
+            {selectedEnrollment && !message && (
+              <div className={`${selectedEnrollment.adminApprovalStatus === 'Rejected' ? BADGE_STYLES.red : BADGE_STYLES.yellow} rounded-lg border px-3 py-2 text-sm`}>
+                {selectedEnrollment.adminApprovalStatus === 'Rejected'
+                  ? `Hồ sơ của ngựa tại giải đang chọn đã bị từ chối.${selectedEnrollment.screeningReason ? ` Lý do: ${selectedEnrollment.screeningReason}` : ''}`
+                  : selectedEnrollment.adminApprovalStatus === 'Pending'
+                    ? 'Hồ sơ của ngựa tại giải đang chọn đang chờ duyệt.'
+                    : selectedEnrollment.status === 'Withdrawn'
+                      ? 'Ngựa đã được rút khỏi giải đang chọn.'
+                      : 'Ngựa đã được phê duyệt tham gia giải đang chọn.'}
+              </div>
             )}
 
             <label className="flex items-start gap-3 text-sm text-gray-700 border border-gray-200 rounded-lg p-3">
