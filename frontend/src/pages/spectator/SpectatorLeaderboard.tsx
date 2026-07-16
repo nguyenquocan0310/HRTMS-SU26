@@ -143,8 +143,8 @@ export default function SpectatorLeaderboard() {
         <div className="border-b border-gray-200 px-4 pt-4 sm:px-6 sm:pt-5">
           <div className="flex gap-2" role="tablist" aria-label="Loại bảng xếp hạng">
             {([
-              { value: 'horses' as const, label: 'Ngựa', icon: '🐎' },
-              { value: 'jockeys' as const, label: 'Kỵ sĩ', icon: '🏇' },
+              { value: 'horses' as const, label: 'Ngựa' },
+              { value: 'jockeys' as const, label: 'Kỵ sĩ' },
             ]).map((tab) => (
               <button
                 key={tab.value}
@@ -158,7 +158,6 @@ export default function SpectatorLeaderboard() {
                     : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-800'
                 }`}
               >
-                <span aria-hidden="true">{tab.icon}</span>
                 {tab.label}
               </button>
             ))}
@@ -215,9 +214,6 @@ export default function SpectatorLeaderboard() {
 
         {tournamentError ? (
           <div className="flex min-h-64 flex-col items-center justify-center gap-3 p-8 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-xl" aria-hidden="true">
-              ⚠️
-            </div>
             <p className="font-bold text-gray-900">Không thể tải danh sách giải đấu</p>
             <p className="max-w-md text-sm text-red-600">{tournamentError}</p>
             <button
@@ -243,9 +239,6 @@ export default function SpectatorLeaderboard() {
           </div>
         ) : leaderboardError ? (
           <div className="flex min-h-64 flex-col items-center justify-center gap-3 p-8 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-xl" aria-hidden="true">
-              ⚠️
-            </div>
             <p className="font-bold text-gray-900">Không thể tải bảng xếp hạng</p>
             <p className="max-w-md text-sm text-red-600">{leaderboardError}</p>
             <button
@@ -258,9 +251,6 @@ export default function SpectatorLeaderboard() {
           </div>
         ) : selectedTournamentId == null || entries.length === 0 ? (
           <div className="flex min-h-64 flex-col items-center justify-center gap-3 p-8 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-50 text-2xl" aria-hidden="true">
-              🏆
-            </div>
             <p className="font-bold text-gray-900">Chưa có dữ liệu xếp hạng</p>
             <p className="max-w-lg text-sm leading-6 text-gray-500">
               Chưa có dữ liệu xếp hạng. Kết quả sẽ được cập nhật sau khi cuộc đua kết thúc.
@@ -330,6 +320,7 @@ export default function SpectatorLeaderboard() {
         <JockeyCareerStatsModal
           jockeyId={careerJockeyId}
           onClose={() => setCareerJockeyId(null)}
+          textOnly
         />
       )}
     </div>

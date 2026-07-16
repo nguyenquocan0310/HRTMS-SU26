@@ -30,7 +30,7 @@ export default function RaceHistory() {
   }, [loadStats])
 
   if (loading) {
-    return <div className="flex min-h-[50vh] items-center justify-center"><div className="text-center"><div className="mb-4 inline-block h-10 w-10 animate-spin rounded-full border-b-2 border-blue-600" /><p className="text-sm text-gray-500">Đang tải thống kê sự nghiệp...</p></div></div>
+    return <div className="space-y-6" aria-busy="true"><div className="h-20 animate-pulse rounded-xl bg-white" /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[0, 1, 2, 3].map((item) => <div key={item} className="h-32 animate-pulse rounded-xl border border-slate-200 bg-white" />)}</div><div className="h-64 animate-pulse rounded-xl border border-slate-200 bg-white" /></div>
   }
 
   if (error || !stats) {
@@ -39,7 +39,7 @@ export default function RaceHistory() {
 
   return (
     <div className="space-y-6">
-      <div><h1 className="text-2xl font-bold text-gray-900">Lịch sử thi đấu &amp; Thống kê sự nghiệp</h1><p className="mt-1 text-sm text-gray-500">Các chỉ số chỉ tính từ những cuộc đua đã có kết quả Official.</p></div>
+      <div><p className="text-xs font-black uppercase tracking-[.16em] text-blue-700">Sau cuộc đua</p><h1 className="mt-1 text-2xl font-black text-gray-900 sm:text-3xl">Lịch sử và thống kê sự nghiệp</h1></div>
 
       {stats.totalRaces === 0 ? (
         <div className="rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm"><h2 className="text-lg font-bold text-gray-900">Chưa có cuộc đua Official</h2><p className="mt-2 text-sm text-gray-500">Thống kê sẽ xuất hiện sau khi một cuộc đua của bạn được công nhận kết quả chính thức.</p></div>

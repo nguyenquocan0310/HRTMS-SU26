@@ -78,9 +78,11 @@ export default function SpectatorHome() {
 
   return (
     <div className="space-y-7 pb-12">
-      <header className="border-b border-gray-200 pb-5">
-        <h1 className="text-3xl font-extrabold text-gray-900">Không gian khán giả</h1>
-        <p className="mt-1 text-sm text-gray-500">Theo dõi cuộc đua và quản lý các dự đoán bằng dữ liệu thật.</p>
+      <header className="overflow-hidden rounded-3xl border border-[#d9c078] bg-[#0a3024] px-6 py-7 text-white shadow-sm sm:px-8">
+        <p className="text-xs font-black uppercase tracking-[.16em] text-[#e1bc58]">Tổng quan Khán giả</p>
+        <h1 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">Không gian khán giả</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-emerald-50/75">Theo dõi cuộc đua, quản lý dự đoán và ví điểm bằng dữ liệu trực tiếp từ hệ thống.</p>
+        <div className="mt-5 flex flex-wrap gap-3"><button type="button" onClick={() => navigate('/spectator/prediction')} className="rounded-xl bg-[#cfa73d] px-4 py-2.5 text-sm font-black text-[#082b20] hover:bg-[#e0b94f]">Mở sảnh dự đoán</button><button type="button" onClick={() => navigate('/spectator/leaderboard')} className="rounded-xl border border-white/20 bg-white/[.06] px-4 py-2.5 text-sm font-bold text-white hover:bg-white/10">Xem bảng xếp hạng</button></div>
       </header>
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}

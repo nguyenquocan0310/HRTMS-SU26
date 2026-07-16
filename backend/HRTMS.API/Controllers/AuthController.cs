@@ -24,6 +24,8 @@ public class AuthController : ControllerBase
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> Register([FromForm] RegisterDto dto)
     {
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
         var ua = HttpContext.Request.Headers["User-Agent"].ToString();
         var result = await _authService.RegisterAsync(dto, ip, ua);

@@ -941,7 +941,8 @@ namespace HRTMS.Infrastructure.Services
                 RaceDistanceOverride = dto.RaceDistanceOverride,
                 Status = "Upcoming",
                 IsPostPositionDrawn = false,
-                IsPredictionGateClosed = false,
+                // Chỉ mở sau khi Referee chốt official starting list.
+                IsPredictionGateClosed = true,
                 ConfirmationCutoffHours = dto.ConfirmationCutoffHours,
                 ProtestDeadlineMinutes = dto.ProtestDeadlineMinutes,
                 CreatedAt = DateTime.UtcNow,

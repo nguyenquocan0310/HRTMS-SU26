@@ -42,7 +42,9 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Không thể tải thông báo. Vui lòng thử lại.'
 }
 
-export default function NotificationCenter() {
+interface NotificationCenterProps { iconless?: boolean }
+
+export default function NotificationCenter({ iconless = false }: NotificationCenterProps) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
@@ -163,7 +165,7 @@ export default function NotificationCenter() {
           disabled={markingAll || unreadCount === 0}
           className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-bold text-blue-700 transition-colors hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-400"
         >
-          {markingAll ? <FiRefreshCw className="animate-spin" aria-hidden="true" /> : <FiCheck aria-hidden="true" />}
+          {!iconless && (markingAll ? <FiRefreshCw className="animate-spin" aria-hidden="true" /> : <FiCheck aria-hidden="true" />)}
           Đánh dấu tất cả đã đọc
         </button>
       </div>
@@ -186,14 +188,12 @@ export default function NotificationCenter() {
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
         {loading ? (
           <div className="flex min-h-56 items-center justify-center gap-3 text-sm text-gray-500">
-            <FiRefreshCw className="animate-spin" aria-hidden="true" />
+            {!iconless && <FiRefreshCw className="animate-spin" aria-hidden="true" />}
             Đang tải thông báo...
           </div>
         ) : notifications.length === 0 ? (
           <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center">
-            <span className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 text-gray-400">
-              <FiBell size={24} aria-hidden="true" />
-            </span>
+            {!iconless && <span className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 text-gray-400"><FiBell size={24} aria-hidden="true" /></span>}
             <h2 className="text-base font-bold text-gray-800">Chưa có thông báo</h2>
             <p className="mt-1 text-sm text-gray-500">Các cập nhật mới sẽ xuất hiện tại đây.</p>
           </div>
@@ -208,9 +208,7 @@ export default function NotificationCenter() {
                     notification.isRead ? 'bg-white' : 'bg-blue-50/60'
                   }`}
                 >
-                  <span className={`mt-0.5 inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${notification.isRead ? 'bg-gray-100 text-gray-500' : 'bg-blue-100 text-blue-700'}`}>
-                    <FiBell size={17} aria-hidden="true" />
-                  </span>
+                  {!iconless && <span className={`mt-0.5 inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${notification.isRead ? 'bg-gray-100 text-gray-500' : 'bg-blue-100 text-blue-700'}`}><FiBell size={17} aria-hidden="true" /></span>}
 
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
@@ -233,9 +231,9 @@ export default function NotificationCenter() {
                       disabled={marking}
                       aria-label={`Đánh dấu “${notification.title}” đã đọc`}
                       title="Đánh dấu đã đọc"
-                      className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-blue-700 transition-colors hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-wait disabled:opacity-50"
+                      className={`inline-flex flex-shrink-0 items-center justify-center rounded-lg text-blue-700 transition-colors hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-wait disabled:opacity-50 ${iconless ? 'min-h-9 px-3 text-xs font-bold' : 'h-9 w-9'}`}
                     >
-                      {marking ? <FiRefreshCw className="animate-spin" aria-hidden="true" /> : <FiCheck aria-hidden="true" />}
+                      {iconless ? (marking ? 'Đang xử lý...' : 'Đánh dấu đã đọc') : marking ? <FiRefreshCw className="animate-spin" aria-hidden="true" /> : <FiCheck aria-hidden="true" />}
                     </button>
                   )}
                 </li>
@@ -253,7 +251,7 @@ export default function NotificationCenter() {
             disabled={loadingMore}
             className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-gray-300 bg-white px-5 py-2 text-sm font-bold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
           >
-            {loadingMore && <FiRefreshCw className="animate-spin" aria-hidden="true" />}
+            {loadingMore && !iconless && <FiRefreshCw className="animate-spin" aria-hidden="true" />}
             {loadingMore ? 'Đang tải...' : 'Tải thêm'}
           </button>
         </div>

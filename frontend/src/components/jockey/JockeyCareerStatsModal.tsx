@@ -5,6 +5,7 @@ import type { JockeyCareerStats } from '../../types/jockey.types';
 interface JockeyCareerStatsModalProps {
   jockeyId: number;
   onClose?: () => void;
+  textOnly?: boolean;
 }
 
 const numberFormatter = new Intl.NumberFormat('vi-VN');
@@ -26,6 +27,7 @@ const getErrorMessage = (error: unknown) => {
 export default function JockeyCareerStatsModal({
   jockeyId,
   onClose,
+  textOnly = false,
 }: JockeyCareerStatsModalProps) {
   const [stats, setStats] = useState<JockeyCareerStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -101,10 +103,10 @@ export default function JockeyCareerStatsModal({
           <button
             type="button"
             onClick={close}
-            className="rounded-full p-2 text-xl leading-none text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+            className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 hover:text-gray-900"
             aria-label="Đóng"
           >
-            ×
+            {textOnly ? 'Đóng' : '×'}
           </button>
         </div>
 
@@ -120,9 +122,7 @@ export default function JockeyCareerStatsModal({
             </div>
           ) : error ? (
             <div className="flex min-h-56 flex-col items-center justify-center gap-3 text-center">
-              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-xl" aria-hidden="true">
-                !
-              </span>
+              {!textOnly && <span className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-xl" aria-hidden="true">!</span>}
               <p className="font-bold text-gray-900">{error}</p>
               <button
                 type="button"

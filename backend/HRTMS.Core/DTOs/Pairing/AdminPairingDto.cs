@@ -21,6 +21,9 @@ public class AdminPairingDto
 
     public string Status { get; set; } = null!;
 
+    // NULL cho round dau; Qualified/AlsoEligible khi allocate round sau.
+    public string? AdvancementStatus { get; set; }
+
     // true neu pairing da co RaceEntry dang active (Pending/Confirmed) gan voi no.
     public bool IsAllocated { get; set; }
 

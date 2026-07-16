@@ -179,14 +179,20 @@ export const createRace = (roundId: number, payload: CreateRacePayload): Promise
 // ─── Tournament Participation (Owner) ────────────────────────────────────────
 
 export interface ParticipationResponse {
-  participationId: number;
+  participantId: number;
+  participationId?: number;
   tournamentId: number;
-  tournamentName: string; // trả về ở root object từ BE
-  ownerId: number;
-  status: string; // "Pending" | "Approved" | "Rejected" | "ManualReview" | "AutoEligible" | "AutoRejected"
+  tournamentName: string | null;
+  userId: number;
+  fullName: string;
+  email: string;
+  role: string;
+  status: string;
+  screeningStatus: string;
   registeredAt: string;
-  screeningReason?: string | null;
-  rejectionReason?: string | null;
+  screeningReason: string | null;
+  rejectionReason: string | null;
+  approvedAt: string | null;
 }
 
 /**

@@ -19,6 +19,35 @@ public class StartingListController : ControllerBase
         _startingListService = startingListService;
     }
 
+    // GET /api/referee/race-entries/races/{raceId}/entries
+    // Preview read-only. Referee phai Active va duoc assign vao race.
+    [HttpGet("/api/referee/race-entries/races/{raceId:int}/entries")]
+    public async Task<IActionResult> GetRaceEntries(int raceId)
+    {
+        var refereeIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (!int.TryParse(refereeIdClaim, out var refereeId))
+        {
+            return Unauthorized(new { error = "INVALID_TOKEN", message = "Invalid referee token." });
+        }
+
+        try
+        {
+            var result = await _startingListService.GetRaceEntriesAsync(refereeId, raceId);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex) when (ex.Message == "REFEREE_NOT_FOUND")
+        { return NotFound(new { error = "REFEREE_NOT_FOUND", message = "Referee was not found." }); }
+        catch (KeyNotFoundException ex) when (ex.Message == "RACE_NOT_FOUND")
+        { return NotFound(new { error = "RACE_NOT_FOUND", message = "Race was not found." }); }
+        catch (InvalidOperationException ex) when (ex.Message == "USER_NOT_REFEREE")
+        { return UnprocessableEntity(new { error = "USER_NOT_REFEREE", message = "The current user is not a referee." }); }
+        catch (InvalidOperationException ex) when (ex.Message == "REFEREE_NOT_ACTIVE")
+        { return UnprocessableEntity(new { error = "REFEREE_NOT_ACTIVE", message = "The referee is not active." }); }
+        catch (InvalidOperationException ex) when (ex.Message == "REFEREE_NOT_ASSIGNED_TO_RACE")
+        { return Forbid(); }
+    }
+
     [HttpPost("{raceId:int}/confirm-starting-list")]
     public async Task<IActionResult> ConfirmStartingList(int raceId)
     {

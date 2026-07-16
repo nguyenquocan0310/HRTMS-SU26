@@ -37,6 +37,7 @@ public interface IPairingService
 
     // Module E — Admin liet ke pairing de allocate vao Race (mac dinh status "Confirmed").
     Task<PagedResult<AdminPairingDto>> GetAdminPairingsAsync(
+        int targetRaceId,
         int? tournamentId,
         string? status,
         bool unallocatedOnly,

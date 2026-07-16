@@ -427,28 +427,54 @@ export const createHorseProfile = async (
 };
 /**
  * PATCH /api/race-entries/{id}/confirm
+ * Backend trả trực tiếp RaceEntryResponseDto. apiFetch đã tự ném lỗi khi HTTP
+ * status không phải 2xx, vì vậy không được kiểm tra thuộc tính success ở đây.
  */
-export const confirmRaceEntry = async (id: number): Promise<any> => {
-  interface ApiResponse<T> { success: boolean; message: string; data: T | null }
-  const res = await apiFetch<ApiResponse<any>>(`/race-entries/${id}/confirm`, {
+export interface RaceEntryActionResponse {
+  raceEntryId: number;
+  raceId: number;
+  pairingId: number;
+  postPosition: number | null;
+  status: string;
+  entryFeeStatus: string;
+  isWithdrawn: boolean;
+  horseId: number;
+  horseName: string;
+  jockeyId: number;
+  jockeyName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const confirmRaceEntry = async (id: number): Promise<RaceEntryActionResponse> => {
+  assertPositiveId(id, 'raceEntryId');
+  return apiFetch<RaceEntryActionResponse>(`/race-entries/${id}/confirm`, {
     method: 'PATCH',
   });
-  if (!res.success) throw new Error(res.message || 'Xác nhận tham gia thất bại.');
-  return res.data;
 };
 
 /**
  * DELETE /api/race-entries/{id}?reason={reason}
+ * Endpoint này cũng trả trực tiếp WithdrawResultDto.
  */
-export const withdrawRaceEntry = async (id: number, reason: string): Promise<any> => {
-  interface ApiResponse<T> { success: boolean; message: string; data: T | null }
+export interface WithdrawRaceEntryResponse {
+  raceEntryId: number;
+  status: string;
+  refundedPredictions: number;
+  alreadyWithdrawn: boolean;
+  message: string;
+}
+
+export const withdrawRaceEntry = async (
+  id: number,
+  reason: string
+): Promise<WithdrawRaceEntryResponse> => {
+  assertPositiveId(id, 'raceEntryId');
   const params = new URLSearchParams();
   params.set('reason', reason);
-  const res = await apiFetch<ApiResponse<any>>(`/race-entries/${id}?${params.toString()}`, {
+  return apiFetch<WithdrawRaceEntryResponse>(`/race-entries/${id}?${params.toString()}`, {
     method: 'DELETE',
   });
-  if (!res.success) throw new Error(res.message || 'Rút lui thất bại.');
-  return res.data;
 };
 
 

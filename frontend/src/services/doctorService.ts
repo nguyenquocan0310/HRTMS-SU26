@@ -45,6 +45,9 @@ export interface DoctorRaceEntry {
   jockeyName: string;
   selfDeclaredWeight: number | null;
   preRaceJockeyWeight: number | null;
+  postRaceJockeyWeight: number | null;
+  postRaceWeightDifference: number | null;
+  postRaceWeightFlagged: boolean;
   weightDifference: number | null;
   thresholdKg: number | null;
   isWeightWarning: boolean;
@@ -85,43 +88,101 @@ export interface ClinicalCheckResponse {
   message?: string;
 }
 
-const normalizeRaceEntry = (item: any): DoctorRaceEntry | null => {
-  const rawId = item?.raceEntryId ?? item?.id;
+export interface PostRaceWeightResponse {
+  raceEntryId: number;
+  preRaceJockeyWeight: number;
+  postRaceJockeyWeight: number;
+  weightDifference: number;
+  thresholdKg: number;
+  isWeightFlagged: boolean;
+  message: string;
+}
+
+export interface RaceEntryHealthProfile {
+  raceEntryId: number;
+  raceId: number;
+  postPosition: number | null;
+  jockeyName: string;
+  licenseCertificate: string;
+  experienceYears: number;
+  bloodType: string | null;
+  healthStatus: string | null;
+  selfDeclaredWeight: number;
+  preRaceWeightThresholdKg: number;
+  preRaceJockeyWeight: number | null;
+  preRaceWeightDifference: number | null;
+  isPreRaceWeightWarning: boolean | null;
+  postRaceJockeyWeight: number | null;
+  postRaceWeightFlagged: boolean;
+  horseName: string;
+  breed: string;
+  color: string;
+  gender: string;
+  birthYear: number;
+  identifyingMarks: string;
+  vaccinationRecordRef: string;
+  dopingTestDate: string | null;
+  dopingTestResult: string;
+  horseIdentityCheckStatus: string | null;
+  clinicalStatus: string | null;
+  unfitReason: string | null;
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const nullableNumber = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+const nullableString = (value: unknown): string | null =>
+  typeof value === 'string' ? value : null;
+
+const normalizeRaceEntry = (value: unknown): DoctorRaceEntry | null => {
+  if (!isRecord(value)) return null;
+  const item = value;
+  const horse = isRecord(item.horse) ? item.horse : null;
+  const jockey = isRecord(item.jockey) ? item.jockey : null;
+  const rawId = item.raceEntryId ?? item.id;
   const raceEntryId = Number(rawId);
   if (!Number.isFinite(raceEntryId)) return null;
-  const selfDeclaredWeight = item?.selfDeclaredWeight ?? item?.jockey?.selfDeclaredWeight ?? null;
-  const preRaceJockeyWeight = item?.preRaceJockeyWeight ?? item?.preRaceWeight ?? null;
+  const selfDeclaredWeight = nullableNumber(item.selfDeclaredWeight ?? jockey?.selfDeclaredWeight);
+  const preRaceJockeyWeight = nullableNumber(item.preRaceJockeyWeight ?? item.preRaceWeight);
   const computedWeightDifference =
-    item?.weightDifference ??
+    nullableNumber(item.weightDifference) ??
     (typeof preRaceJockeyWeight === 'number' && typeof selfDeclaredWeight === 'number'
       ? Number((preRaceJockeyWeight - selfDeclaredWeight).toFixed(1))
       : null);
+  const status = nullableString(item.status ?? item.raceEntryStatus) ?? 'Confirmed';
 
   return {
     raceEntryId,
-    postPosition: item?.postPosition ?? null,
-    status: item?.status ?? item?.raceEntryStatus ?? 'Confirmed',
-    entryFeeStatus: item?.entryFeeStatus ?? null,
-    horseName: item?.horse?.name ?? item?.horseName ?? 'Chưa có tên',
-    horseBreed: item?.horse?.breed ?? item?.horseBreed ?? null,
-    jockeyName: item?.jockey?.fullName ?? item?.jockeyName ?? 'Chưa có tên',
+    postPosition: nullableNumber(item.postPosition),
+    status,
+    entryFeeStatus: nullableString(item.entryFeeStatus),
+    horseName: nullableString(horse?.name ?? item.horseName) ?? 'Chưa có tên',
+    horseBreed: nullableString(horse?.breed ?? item.horseBreed),
+    jockeyName: nullableString(jockey?.fullName ?? item.jockeyName) ?? 'Chưa có tên',
     selfDeclaredWeight,
     preRaceJockeyWeight,
+    postRaceJockeyWeight: nullableNumber(item.postRaceJockeyWeight ?? item.postRaceWeight),
+    postRaceWeightDifference: nullableNumber(item.postRaceWeightDifference),
+    postRaceWeightFlagged: Boolean(item.postRaceWeightFlagged ?? item.isWeightFlagged),
     weightDifference: computedWeightDifference,
-    thresholdKg: item?.thresholdKg ?? null,
-    isWeightWarning: Boolean(item?.isWeightWarning),
-    horseIdentityCheckStatus: item?.horseIdentityCheckStatus ?? item?.horseIdentityStatus ?? null,
-    clinicalStatus: item?.clinicalStatus ?? null,
-    unfitReason: item?.unfitReason ?? null,
-    isEmergencyDisqualified: Boolean(item?.isEmergencyDisqualified),
-    raceEntryStatus: item?.raceEntryStatus ?? item?.status ?? 'Confirmed',
+    thresholdKg: nullableNumber(item.thresholdKg),
+    isWeightWarning: Boolean(item.isWeightWarning),
+    horseIdentityCheckStatus: nullableString(item.horseIdentityCheckStatus ?? item.horseIdentityStatus),
+    clinicalStatus: nullableString(item.clinicalStatus),
+    unfitReason: nullableString(item.unfitReason),
+    isEmergencyDisqualified: Boolean(item.isEmergencyDisqualified),
+    raceEntryStatus: nullableString(item.raceEntryStatus) ?? status,
   };
 };
 
-const extractArray = (res: any): any[] => {
+const extractArray = (res: unknown): unknown[] => {
   if (Array.isArray(res)) return res;
-  if (Array.isArray(res?.data)) return res.data;
-  if (Array.isArray(res?.data?.items)) return res.data.items;
+  if (!isRecord(res)) return [];
+  if (Array.isArray(res.data)) return res.data;
+  if (isRecord(res.data) && Array.isArray(res.data.items)) return res.data.items;
   return [];
 };
 
@@ -144,18 +205,8 @@ export const updateDoctorProfile = async (
  * Backend có thể trả thẳng array hoặc ApiResponse<array>.
  */
 export const getMyDoctorRaceAssignments = async (): Promise<DoctorRaceAssignment[]> => {
-  const res = await apiFetch<any>('/doctors/race-assignments/my');
-
-  // Xử lý cả hai dạng response:
-  // 1. Thẳng array
-  if (Array.isArray(res)) return res;
-  // 2. ApiResponse { success, message, data: array }
-  if (Array.isArray(res?.data)) return res.data;
-  // 3. ApiResponse { data: { items: array } } (paged)
-  if (Array.isArray(res?.data?.items)) return res.data.items;
-
-  // Không có dữ liệu — trả về mảng rỗng thay vì crash
-  return [];
+  const res = await apiFetch<unknown>('/doctors/race-assignments/my');
+  return extractArray(res) as DoctorRaceAssignment[];
 };
 
 /**
@@ -163,7 +214,7 @@ export const getMyDoctorRaceAssignments = async (): Promise<DoctorRaceAssignment
  * Lấy danh sách RaceEntry thật để Doctor thao tác trong Paddock.
  */
 export const getDoctorRaceEntries = async (raceId: number): Promise<DoctorRaceEntry[]> => {
-  const res = await apiFetch<any>(`/doctor/race-entries/races/${raceId}/entries`);
+  const res = await apiFetch<unknown>(`/doctor/race-entries/races/${raceId}/entries`);
   return extractArray(res)
     .map(normalizeRaceEntry)
     .filter((item): item is DoctorRaceEntry => item !== null);
@@ -199,3 +250,17 @@ export const updateClinicalCheck = async (
     body: JSON.stringify({ clinicalStatus, unfitReason }),
   });
 };
+
+export const updatePostRaceWeight = async (
+  raceEntryId: number,
+  postRaceJockeyWeight: number
+): Promise<PostRaceWeightResponse> =>
+  apiFetch<PostRaceWeightResponse>(`/doctor/race-entries/${raceEntryId}/post-race-weight`, {
+    method: 'PATCH',
+    body: JSON.stringify({ postRaceJockeyWeight }),
+  });
+
+export const getRaceEntryHealthProfile = async (
+  raceEntryId: number
+): Promise<RaceEntryHealthProfile> =>
+  apiFetch<RaceEntryHealthProfile>(`/doctor/race-entries/${raceEntryId}/health-profile`);
