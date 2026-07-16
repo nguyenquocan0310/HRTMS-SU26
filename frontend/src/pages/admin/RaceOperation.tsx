@@ -1,25 +1,36 @@
 import { useEffect, useState } from 'react';
 import { FiChevronDown } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
-import { getTournaments, type TournamentResponse } from '../../services/tournamentService';
+import {
+  getTournaments,
+  type TournamentResponse,
+} from '../../services/tournamentService';
 import {
   getRaceEntries,
   allocateEntry,
   drawPostPositions,
   getAdminPairings,
-  getUnofficialRaces,
   declareRaceOfficial,
   type RaceScheduleEntry,
   type AdminPairing,
-  type UnofficialRace,
 } from '../../services/raceOperationService';
 import styles from './RaceOperation.module.scss';
 
-interface RaceOption { id: number; label: string; isDrawn: boolean; }
+interface RaceOption {
+  id: number;
+  label: string;
+  isDrawn: boolean;
+  status: string;
+  raceNumber: number;
+  roundName: string;
+  scheduledTime: string;
+}
 
 const formatDateTime = (iso: string) => {
-  const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:00 ${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+  const date = new Date(iso);
+  return `${String(date.getHours()).padStart(2, '0')}:${String(
+    date.getMinutes()
+  ).padStart(2, '0')}:00 ${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
 };
 
 const RaceOperations = () => {
@@ -35,31 +46,55 @@ const RaceOperations = () => {
   const [drawing, setDrawing] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
   const [actionError, setActionError] = useState('');
-  const [unofficialRaces, setUnofficialRaces] = useState<UnofficialRace[]>([]);
- const [loadingUnofficialRaces, setLoadingUnofficialRaces] = useState(false);
- const [declaringRaceId, setDeclaringRaceId] = useState<number | null>(null);
+  const [declaringRaceId, setDeclaringRaceId] = useState<number | null>(null);
 
   useEffect(() => {
-    getTournaments().then((list) => {
-      setTournamentList(list);
-      if (list.length > 0) setSelectedTournamentId(list[0].tournamentId);
-    }).catch(() => {});
+    getTournaments()
+      .then((list) => {
+        setTournamentList(list);
+        if (list.length > 0) {
+          setSelectedTournamentId(list[0].tournamentId);
+        }
+      })
+      .catch(() => setTournamentList([]));
   }, []);
 
   useEffect(() => {
-    if (!selectedTournamentId || tournamentList.length === 0) return;
-    const t = tournamentList.find((x) => x.tournamentId === selectedTournamentId);
-    if (!t) return;
-    const opts: RaceOption[] = t.rounds.flatMap((r) =>
-      r.races.map((race) => ({
+    if (!selectedTournamentId || tournamentList.length === 0) {
+      setRaces([]);
+      setSelectedRaceId(null);
+      return;
+    }
+
+    const tournament = tournamentList.find(
+      (item) => item.tournamentId === selectedTournamentId
+    );
+
+    if (!tournament) {
+      setRaces([]);
+      setSelectedRaceId(null);
+      return;
+    }
+
+    const options: RaceOption[] = tournament.rounds.flatMap((round) =>
+      round.races.map((race) => ({
         id: race.raceId,
         label: `Race #${race.raceNumber} · ${formatDateTime(race.scheduledTime)}`,
         isDrawn: race.isPostPositionDrawn,
+        status: race.status,
+        raceNumber: race.raceNumber,
+        roundName: round.name,
+        scheduledTime: race.scheduledTime,
       }))
     );
-    setRaces(opts);
-    if (opts.length > 0) setSelectedRaceId(opts[0].id);
-    else setSelectedRaceId(null);
+
+    setRaces(options);
+    setSelectedRaceId((currentRaceId) => {
+      if (currentRaceId && options.some((race) => race.id === currentRaceId)) {
+        return currentRaceId;
+      }
+      return options.length > 0 ? options[0].id : null;
+    });
   }, [selectedTournamentId, tournamentList]);
 
   const reloadEntries = (raceId: number) => {
@@ -71,12 +106,19 @@ const RaceOperations = () => {
   };
 
   useEffect(() => {
-    if (!selectedRaceId) { setEntries([]); return; }
+    if (!selectedRaceId) {
+      setEntries([]);
+      return;
+    }
     reloadEntries(selectedRaceId);
   }, [selectedRaceId]);
 
   const reloadUnallocatedPairings = () => {
-    if (!selectedTournamentId) return;
+    if (!selectedTournamentId) {
+      setUnallocatedPairings([]);
+      return;
+    }
+
     setLoadingPairings(true);
     getAdminPairings(selectedTournamentId, true)
       .then(setUnallocatedPairings)
@@ -89,111 +131,94 @@ const RaceOperations = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTournamentId]);
 
-  // Sau khi tournament/race đổi, cần tải lại danh sách round/race từ BE (không chỉ dùng cache
-  // tournamentList) để cập nhật đúng isDrawn — tránh trạng thái cũ sau khi Draw xong.
   const reloadTournamentList = async () => {
     try {
       const list = await getTournaments();
       setTournamentList(list);
-    } catch { /* giữ nguyên state cũ nếu lỗi mạng */ }
+    } catch {
+      // Giữ state cũ nếu lỗi mạng.
+    }
   };
-
-const reloadUnofficialRaces = async () => {
-  if (!selectedTournamentId) {
-    setUnofficialRaces([]);
-    return;
-  }
-
-  setLoadingUnofficialRaces(true);
-
-  try {
-    const data = await getUnofficialRaces(selectedTournamentId);
-    setUnofficialRaces(data);
-  } catch (error) {
-    console.error('Load unofficial races failed:', error);
-    setUnofficialRaces([]);
-  } finally {
-    setLoadingUnofficialRaces(false);
-  }
-};
-
-useEffect(() => {
-  reloadUnofficialRaces();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [selectedTournamentId]);
 
   const handleAllocate = async (pairingId: number) => {
     if (!selectedRaceId) return;
+
     setAllocatingId(pairingId);
-    setActionMsg(''); setActionError('');
+    setActionMsg('');
+    setActionError('');
+
     try {
       await allocateEntry(selectedRaceId, pairingId);
       setActionMsg('Allocate thành công!');
       reloadEntries(selectedRaceId);
       reloadUnallocatedPairings();
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Allocate thất bại.');
-    } finally { setAllocatingId(null); }
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Allocate thất bại.');
+    } finally {
+      setAllocatingId(null);
+    }
   };
 
   const handleDraw = async () => {
     if (!selectedRaceId) return;
+
     setDrawing(true);
-    setActionMsg(''); setActionError('');
+    setActionMsg('');
+    setActionError('');
+
     try {
       await drawPostPositions(selectedRaceId);
       setActionMsg('Bốc thăm thành công!');
       reloadEntries(selectedRaceId);
       await reloadTournamentList();
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Bốc thăm thất bại.');
-    } finally { setDrawing(false); }
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Bốc thăm thất bại.');
+    } finally {
+      setDrawing(false);
+    }
   };
 
-  const currentRace = races.find((r) => r.id === selectedRaceId);
-  const isDrawn = currentRace?.isDrawn ?? false;
-
-
-  const filteredUnofficialRaces = selectedTournamentId
-  ? unofficialRaces.filter(
-      (race) => race.tournamentId === selectedTournamentId
-    )
-  : [];
-
+  const selectedRace = races.find((race) => race.id === selectedRaceId) ?? null;
+  const isDrawn = selectedRace?.isDrawn ?? false;
+  const selectedRaceStatus = selectedRace?.status?.trim().toLowerCase() ?? '';
+  const selectedRaceIsUnofficial = selectedRaceStatus === 'unofficial';
+  const selectedRaceIsOfficial = selectedRaceStatus === 'official';
 
   const handleDeclareOfficial = async (raceId: number) => {
-  const confirmed = window.confirm(
-    'Bạn có chắc muốn công bố Race này thành Official không?'
-  );
-
-  if (!confirmed) return;
-
-  setDeclaringRaceId(raceId);
-  setActionMsg('');
-  setActionError('');
-
-  try {
-    await declareRaceOfficial(raceId);
-
-    setActionMsg('Đã công bố Race thành Official.');
-
-    // Race vừa chuyển Official nên loại khỏi danh sách ngay.
-    setUnofficialRaces((current) =>
-      current.filter((race) => race.raceId !== raceId)
+    const confirmed = window.confirm(
+      'Bạn có chắc muốn chuyển Race này sang trạng thái Official không?'
     );
 
-    // Tải lại tournament nếu trạng thái tổng có thay đổi.
-    await reloadTournamentList();
-  } catch (error) {
-    setActionError(
-      error instanceof Error
-        ? error.message
-        : 'Không thể công bố Race thành Official.'
-    );
-  } finally {
-    setDeclaringRaceId(null);
-  }
-};
+    if (!confirmed) return;
+
+    setDeclaringRaceId(raceId);
+    setActionMsg('');
+    setActionError('');
+
+    try {
+      await declareRaceOfficial(raceId);
+      setActionMsg('Race đã được chuyển sang trạng thái Official.');
+
+      // Không xóa race khỏi danh sách. Reload để status đổi ngay.
+      await reloadTournamentList();
+    } catch (error) {
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : 'Không thể chuyển Race thành Official.'
+      );
+    } finally {
+      setDeclaringRaceId(null);
+    }
+  };
+
+  const handleViewRaceDetail = () => {
+    if (!selectedRace) return;
+
+    setActionMsg(`Đang chọn View Detail cho Race #${selectedRace.raceNumber}.`);
+    setActionError('');
+  };
+
   return (
     <div className={styles.container}>
       <div className={styles.pageHeader}>
@@ -203,7 +228,9 @@ useEffect(() => {
 
       <div className={styles.sectionHeader}>
         <h2 className={styles.sectionTitle}>Race Operations</h2>
-        <p className={styles.sectionDesc}>Allocate pairing đã confirmed vào race và bốc thăm post position theo Module E.</p>
+        <p className={styles.sectionDesc}>
+          Allocate pairing đã confirmed vào race và bốc thăm post position theo Module E.
+        </p>
       </div>
 
       <div className={styles.filterCard}>
@@ -211,9 +238,25 @@ useEffect(() => {
           <div className={styles.filterGroup}>
             <label className={styles.filterLabel}>Tournament</label>
             <div className={styles.selectWrap}>
-              <select className={styles.select} value={selectedTournamentId ?? ''}
-                onChange={(e) => setSelectedTournamentId(Number(e.target.value))}>
-                {tournamentList.map((t) => <option key={t.tournamentId} value={t.tournamentId}>{t.name}</option>)}
+              <select
+                className={styles.select}
+                value={selectedTournamentId ?? ''}
+                onChange={(event) => {
+                  const value = Number(event.target.value);
+                  setSelectedTournamentId(value > 0 ? value : null);
+                  setActionMsg('');
+                  setActionError('');
+                }}
+              >
+                {tournamentList.length === 0 ? (
+                  <option value="">-- Chưa có Tournament --</option>
+                ) : (
+                  tournamentList.map((tournament) => (
+                    <option key={tournament.tournamentId} value={tournament.tournamentId}>
+                      {tournament.name}
+                    </option>
+                  ))
+                )}
               </select>
               <FiChevronDown className={styles.selectIcon} size={14} />
             </div>
@@ -222,12 +265,25 @@ useEffect(() => {
           <div className={styles.filterGroup}>
             <label className={styles.filterLabel}>Race hiện tại</label>
             <div className={styles.selectWrap}>
-              <select className={styles.select} value={selectedRaceId ?? ''}
-                onChange={(e) => setSelectedRaceId(Number(e.target.value))}>
-                {races.length === 0
-                  ? <option value="">-- Chưa có race --</option>
-                  : races.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)
-                }
+              <select
+                className={styles.select}
+                value={selectedRaceId ?? ''}
+                onChange={(event) => {
+                  const value = Number(event.target.value);
+                  setSelectedRaceId(value > 0 ? value : null);
+                  setActionMsg('');
+                  setActionError('');
+                }}
+              >
+                {races.length === 0 ? (
+                  <option value="">-- Chưa có race --</option>
+                ) : (
+                  races.map((race) => (
+                    <option key={race.id} value={race.id}>
+                      {race.label}
+                    </option>
+                  ))
+                )}
               </select>
               <FiChevronDown className={styles.selectIcon} size={14} />
             </div>
@@ -240,8 +296,12 @@ useEffect(() => {
               Assign Officials →
             </Link>
           ) : (
-            <button type="button" className={styles.drawBtn} onClick={handleDraw}
-              disabled={drawing || !selectedRaceId}>
+            <button
+              type="button"
+              className={styles.drawBtn}
+              onClick={handleDraw}
+              disabled={drawing || !selectedRaceId}
+            >
               {drawing ? 'Đang bốc...' : 'Draw post positions'}
             </button>
           )}
@@ -251,69 +311,74 @@ useEffect(() => {
         {actionError && <p className={styles.errorMsg}>{actionError}</p>}
       </div>
 
-      {/* Race List — chỉ hiển thị các Race Unofficial thuộc Tournament đang chọn */}
-<div className={styles.tableCard}>
-  <div className={styles.tableCardHeader}>
-    <h3 className={styles.tableTitle}>Race List</h3>
+      <div className={styles.tableCard}>
+        <div className={styles.tableCardHeader}>
+          <h3 className={styles.tableTitle}>Race List</h3>
+          <span className={styles.countBadge}>{selectedRace ? 1 : 0}</span>
+        </div>
 
-    <span className={styles.countBadge}>
-      {filteredUnofficialRaces.length}
-    </span>
-  </div>
+        <p className={styles.tableSubtext}>
+          Chỉ hiển thị Race đang được chọn trong dropdown Race hiện tại.
+        </p>
 
-  <p className={styles.tableSubtext}>
-    Danh sách các Race Unofficial của Tournament đang chọn.
-  </p>
+        {!selectedRace ? (
+          <p className={styles.emptyCell}>Vui lòng chọn một Race.</p>
+        ) : (
+          <div className={styles.pairingList}>
+            <div className={styles.pairingItem}>
+              <div>
+                <div className={styles.pairingHorse}>
+                  Race #{selectedRace.raceNumber}
+                </div>
+                <div className={styles.pairingMeta}>
+                  {selectedRace.roundName || '—'} ·{' '}
+                  {formatDateTime(selectedRace.scheduledTime)}
+                </div>
+                <div style={{ marginTop: '0.45rem' }}>
+                  <span
+                    className={`${styles.badge} ${
+                      selectedRaceIsOfficial ? styles.confirmed : styles.pending
+                    }`}
+                  >
+                    {selectedRace.status || 'Unknown'}
+                  </span>
+                </div>
+              </div>
 
-  {loadingUnofficialRaces ? (
-    <p className={styles.emptyCell}>Đang tải danh sách Race...</p>
-  ) : filteredUnofficialRaces.length === 0 ? (
-    <p className={styles.emptyCell}>
-      Không có Race Unofficial trong Tournament này.
-    </p>
-  ) : (
-    <div className={styles.pairingList}>
-      {filteredUnofficialRaces.map((race) => (
-        <div key={race.raceId} className={styles.pairingItem}>
-          <div>
-            <div className={styles.pairingHorse}>
-              Race #{race.raceNumber}
-            </div>
+              <div className={styles.raceActions}>
+                <button
+                  type="button"
+                  className={styles.detailBtn}
+                  onClick={handleViewRaceDetail}
+                >
+                  View Detail
+                </button>
 
-            <div className={styles.pairingMeta}>
-              {race.roundName ? `${race.roundName} · ` : ''}
-              {formatDateTime(race.scheduledTime)} · {race.status}
+                {selectedRaceIsUnofficial && (
+                  <button
+                    type="button"
+                    className={styles.allocateBtn}
+                    onClick={() => handleDeclareOfficial(selectedRace.id)}
+                    disabled={declaringRaceId === selectedRace.id}
+                  >
+                    {declaringRaceId === selectedRace.id ? 'Đang xử lý...' : 'Official'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
+        )}
+      </div>
 
-          <button
-            type="button"
-            className={styles.allocateBtn}
-            onClick={() => handleDeclareOfficial(race.raceId)}
-            disabled={declaringRaceId === race.raceId}
-          >
-            {declaringRaceId === race.raceId
-              ? 'Đang xử lý...'
-              : 'Declare Official'}
-          </button>
-        </div>
-      ))}
-    </div>
-  )}
-</div>
-
-
-
-
-
-      {/* Allocation picker — 2 cột */}
       <div className={styles.allocationGrid}>
         <div className={styles.tableCard}>
           <div className={styles.tableCardHeader}>
             <h3 className={styles.tableTitle}>Pairing chưa allocate</h3>
             <span className={styles.countBadge}>{unallocatedPairings.length}</span>
           </div>
-          <p className={styles.tableSubtext}>Confirmed, cùng tournament, chưa nằm trong race active nào.</p>
+          <p className={styles.tableSubtext}>
+            Confirmed, cùng tournament, chưa nằm trong race active nào.
+          </p>
 
           {loadingPairings ? (
             <p className={styles.emptyCell}>Đang tải...</p>
@@ -321,23 +386,24 @@ useEffect(() => {
             <p className={styles.emptyCell}>Không còn pairing nào chưa allocate.</p>
           ) : (
             <div className={styles.pairingList}>
-              {unallocatedPairings.map((p) => (
-                <div key={p.pairingId} className={styles.pairingItem}>
+              {unallocatedPairings.map((pairing) => (
+                <div key={pairing.pairingId} className={styles.pairingItem}>
                   <div>
                     <div className={styles.pairingHorse}>
-                      {p.horseName} <span className={styles.pairingBreed}>{p.horseBreed}</span>
+                      {pairing.horseName}{' '}
+                      <span className={styles.pairingBreed}>{pairing.horseBreed}</span>
                     </div>
                     <div className={styles.pairingMeta}>
-                      Jockey {p.jockeyName} · Owner {p.ownerName} · Pairing #{p.pairingId}
+                      Jockey {pairing.jockeyName} · Owner {pairing.ownerName} · Pairing #{pairing.pairingId}
                     </div>
                   </div>
                   <button
                     type="button"
                     className={styles.allocateBtn}
-                    onClick={() => handleAllocate(p.pairingId)}
-                    disabled={allocatingId === p.pairingId || !selectedRaceId}
+                    onClick={() => handleAllocate(pairing.pairingId)}
+                    disabled={allocatingId === pairing.pairingId || !selectedRaceId}
                   >
-                    {allocatingId === p.pairingId ? 'Đang xử lý...' : 'Allocate'}
+                    {allocatingId === pairing.pairingId ? 'Đang xử lý...' : 'Allocate'}
                   </button>
                 </div>
               ))}
@@ -350,7 +416,7 @@ useEffect(() => {
             <h3 className={styles.tableTitle}>Pairing đã allocate vào race hiện tại</h3>
             <span className={styles.countBadge}>{entries.length}</span>
           </div>
-          <p className={styles.tableSubtext}>{currentRace?.label ?? '—'}</p>
+          <p className={styles.tableSubtext}>{selectedRace?.label ?? '—'}</p>
 
           {loadingSchedule ? (
             <p className={styles.emptyCell}>Đang tải...</p>
@@ -366,7 +432,11 @@ useEffect(() => {
                       Jockey {entry.jockeyName} · Gate {entry.postPosition ?? '—'}
                     </div>
                   </div>
-                  <span className={`${styles.badge} ${entry.status === 'Confirmed' ? styles.confirmed : styles.pending}`}>
+                  <span
+                    className={`${styles.badge} ${
+                      entry.status === 'Confirmed' ? styles.confirmed : styles.pending
+                    }`}
+                  >
                     {entry.status}
                   </span>
                 </div>
@@ -376,19 +446,29 @@ useEffect(() => {
         </div>
       </div>
 
-      {/* Starting list */}
       <div className={styles.tableCard}>
         <h3 className={styles.tableTitle}>Starting list</h3>
         <div className={styles.tableWrap}>
           <table className={styles.table}>
             <thead>
-              <tr><th>Gate</th><th>Horse</th><th>Jockey</th><th>Owner</th><th>Status</th><th>Fee</th></tr>
+              <tr>
+                <th>Gate</th>
+                <th>Horse</th>
+                <th>Jockey</th>
+                <th>Owner</th>
+                <th>Status</th>
+                <th>Fee</th>
+              </tr>
             </thead>
             <tbody>
               {loadingSchedule ? (
-                <tr><td colSpan={6} className={styles.emptyCell}>Đang tải...</td></tr>
+                <tr>
+                  <td colSpan={6} className={styles.emptyCell}>Đang tải...</td>
+                </tr>
               ) : entries.length === 0 ? (
-                <tr><td colSpan={6} className={styles.emptyCell}>Chưa có entry nào.</td></tr>
+                <tr>
+                  <td colSpan={6} className={styles.emptyCell}>Chưa có entry nào.</td>
+                </tr>
               ) : (
                 entries.map((entry) => (
                   <tr key={entry.raceEntryId}>
@@ -397,7 +477,11 @@ useEffect(() => {
                     <td>{entry.jockeyName}</td>
                     <td>{entry.ownerName ?? '—'}</td>
                     <td>
-                      <span className={`${styles.badge} ${entry.status === 'Confirmed' ? styles.confirmed : styles.pending}`}>
+                      <span
+                        className={`${styles.badge} ${
+                          entry.status === 'Confirmed' ? styles.confirmed : styles.pending
+                        }`}
+                      >
                         {entry.status}
                       </span>
                     </td>
