@@ -1,153 +1,198 @@
-import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { useCallback, useEffect, useState } from 'react';
-import { logout } from '../../services/authService';
-import { getMyAccountProfile } from '../../services/accountService';
-import useAuthStore from '../../store/authStore';
-import NotificationBell from '../../components/notifications/NotificationBell';
-import type { JockeyRoleProfile, UserProfile } from '../../types/account.types';
+import { useCallback, useEffect, useState } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { getMyAccountProfile } from '../../services/accountService'
+import { logout } from '../../services/authService'
+import {
+  getUnreadNotificationCount,
+  NOTIFICATIONS_CHANGED_EVENT,
+} from '../../services/notificationService'
+import useAuthStore from '../../store/authStore'
+import type { JockeyRoleProfile, UserProfile } from '../../types/account.types'
+import './jockey-theme.css'
 
-type JockeyAccountProfile = UserProfile<JockeyRoleProfile>;
+type JockeyAccountProfile = UserProfile<JockeyRoleProfile>
+interface NavItem { to: string; label: string; end?: boolean }
 
-const navItems = [
-  { to: '/jockey', label: 'Tổng quan', end: true },
-  { to: '/jockey/invitations', label: 'Lời mời tham gia', end: false },
-  { to: '/jockey/races', label: 'Cuộc đua của tôi', end: false },
-  { to: '/jockey/tournaments', label: 'Đăng ký giải đấu', end: false },
-  { to: '/jockey/history', label: 'Lịch sử thi đấu', end: false },
-  { to: '/jockey/profile-declaration', label: 'Thông tin kỵ sĩ', end: false },
-  { to: '/jockey/protest', label: 'Khiếu nại giải đấu', end: false },
-  { to: '/jockey/notifications', label: 'Thông báo', end: false },
-];
+const overview: NavItem = { to: '/jockey', label: 'Tổng quan', end: true }
+const navGroups: Array<{ title: string; items: NavItem[] }> = [
+  { title: 'Tham gia giải', items: [
+    { to: '/jockey/tournaments', label: 'Giải đấu của tôi' },
+  ] },
+  { title: 'Ghép cặp và thi đấu', items: [
+    { to: '/jockey/invitations', label: 'Lời mời ghép cặp' },
+    { to: '/jockey/races', label: 'Cuộc đua của tôi' },
+    { to: '/jockey/history', label: 'Lịch sử thi đấu' },
+    { to: '/jockey/protest', label: 'Khiếu nại' },
+  ] },
+  { title: 'Hồ sơ', items: [
+    { to: '/jockey/profile-declaration', label: 'Hồ sơ Jockey' },
+  ] },
+  { title: 'Khác', items: [
+    { to: '/jockey/notifications', label: 'Thông báo' },
+  ] },
+]
+const navItems = [overview, ...navGroups.flatMap((group) => group.items)]
+
+function isActive(pathname: string, item: NavItem) {
+  return item.end ? pathname === item.to : pathname === item.to || pathname.startsWith(`${item.to}/`)
+}
+
+function SidebarLink({ item, pathname, close }: { item: NavItem; pathname: string; close: () => void }) {
+  const active = isActive(pathname, item)
+  return (
+    <NavLink
+      to={item.to}
+      end={item.end}
+      onClick={close}
+      className={`flex min-h-11 items-center rounded-xl border-l-2 px-3 py-2.5 text-sm transition-colors ${
+        active
+          ? 'border-[#cfa73d] bg-white/10 font-bold text-white'
+          : 'border-transparent font-medium text-emerald-50/80 hover:bg-white/[.06] hover:text-white'
+      }`}
+    >
+      {item.label}
+    </NavLink>
+  )
+}
 
 export default function JockeyLayout() {
-  const [profile, setProfile] = useState<JockeyAccountProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const location = useLocation();
-  const navigate = useNavigate();
-  const clearAuth = useAuthStore((s) => s.clearAuth);
+  const [profile, setProfile] = useState<JockeyAccountProfile | null>(null)
+  const [profileLoading, setProfileLoading] = useState(true)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
+  const location = useLocation()
+  const navigate = useNavigate()
+  const clearAuth = useAuthStore((state) => state.clearAuth)
 
-  const loadProfile = useCallback(() => {
-    return getMyAccountProfile<JockeyRoleProfile>()
-      .then(setProfile)
-      .catch(() => {
-        // Sidebar still renders navigation if profile cannot be loaded.
-      })
-      .finally(() => setLoading(false));
-  }, []);
+  const loadProfile = useCallback(async () => {
+    try {
+      setProfile(await getMyAccountProfile<JockeyRoleProfile>())
+    } catch {
+      setProfile(null)
+    } finally {
+      setProfileLoading(false)
+    }
+  }, [])
+
+  const loadUnreadCount = useCallback(async () => {
+    try {
+      setUnreadCount(await getUnreadNotificationCount())
+    } catch {
+      setUnreadCount(0)
+    }
+  }, [])
 
   useEffect(() => {
-    void loadProfile();
-    const handleProfileChanged = () => { void loadProfile(); };
-    window.addEventListener('hrtms:profile-changed', handleProfileChanged);
-    return () => window.removeEventListener('hrtms:profile-changed', handleProfileChanged);
-  }, [loadProfile]);
+    const initialLoadId = window.setTimeout(() => {
+      void loadProfile()
+      void loadUnreadCount()
+    }, 0)
+    const handleProfileChanged = () => void loadProfile()
+    const handleNotificationsChanged = () => void loadUnreadCount()
+    window.addEventListener('hrtms:profile-changed', handleProfileChanged)
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, handleNotificationsChanged)
+    return () => {
+      window.clearTimeout(initialLoadId)
+      window.removeEventListener('hrtms:profile-changed', handleProfileChanged)
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, handleNotificationsChanged)
+    }
+  }, [loadProfile, loadUnreadCount])
 
-  const currentNav = navItems.find((item) => {
-    if (item.end) return location.pathname === item.to;
-    return location.pathname.startsWith(item.to);
-  });
-  const pageTitle = currentNav?.label ?? 'Tổng quan';
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [menuOpen])
+
+  const currentNav = navItems.find((item) => isActive(location.pathname, item))
+  const pageTitle = currentNav?.label ?? 'Tổng quan'
+  const initials = profile?.fullName
+    ? profile.fullName.split(/\s+/).filter(Boolean).slice(-2).map((part) => part[0]).join('').toUpperCase()
+    : 'J'
 
   const handleLogout = async () => {
-    if (isLoggingOut) return;
-    setIsLoggingOut(true);
+    if (loggingOut) return
+    setLoggingOut(true)
     try {
-      await logout();
+      await logout()
     } finally {
-      clearAuth();
-      localStorage.removeItem('token');
-      sessionStorage.removeItem('token');
-      sessionStorage.removeItem('authReason');
-      navigate('/login', { replace: true });
+      clearAuth()
+      localStorage.removeItem('token')
+      sessionStorage.removeItem('token')
+      sessionStorage.removeItem('authReason')
+      navigate('/login', { replace: true })
     }
-  };
+  }
+
+  const sidebar = (
+    <aside className="jockey-sidebar flex h-full w-[286px] flex-col border-r border-white/10">
+      <div className="flex h-[76px] items-center px-5">
+        <div className="min-w-0">
+          <p className="truncate text-lg font-black tracking-tight text-white">HRTMS-SU26</p>
+          <p className="text-[11px] font-medium text-emerald-100/65">Tournament Management</p>
+        </div>
+      </div>
+      <nav className="jockey-sidebar-nav flex-1 overflow-y-auto border-t border-white/10 px-3 py-5" aria-label="Điều hướng Jockey">
+        <p className="mb-3 inline-flex rounded-full border border-[#cfa73d]/40 bg-[#cfa73d]/10 px-3 py-1 text-[11px] font-black uppercase tracking-[.12em] text-[#e1bc58]">Jockey</p>
+        <SidebarLink item={overview} pathname={location.pathname} close={() => setMenuOpen(false)} />
+        {navGroups.map((group) => (
+          <div key={group.title} className="mt-6">
+            <p className="mb-2 px-2 text-[10px] font-black uppercase tracking-[.14em] text-emerald-100/55">{group.title}</p>
+            <div className="space-y-1">
+              {group.items.map((item) => <SidebarLink key={item.to} item={item} pathname={location.pathname} close={() => setMenuOpen(false)} />)}
+            </div>
+          </div>
+        ))}
+      </nav>
+      <div className="border-t border-white/10 p-3">
+        <button type="button" onClick={() => { navigate('/jockey/profile-declaration'); setMenuOpen(false) }} className="flex w-full items-center gap-3 rounded-xl p-2 text-left hover:bg-white/[.06]">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#cfa73d] text-sm font-black text-[#082b20]">{initials}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-bold text-white">{profileLoading ? 'Đang tải...' : profile?.fullName || 'Jockey'}</span>
+            <span className="block truncate text-xs text-emerald-100/55">{profile?.email || 'Hồ sơ tài khoản'}</span>
+          </span>
+        </button>
+        <button type="button" onClick={() => void handleLogout()} disabled={loggingOut} className="mt-1 w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-emerald-100/65 hover:bg-red-500/10 hover:text-red-200 disabled:opacity-50">
+          {loggingOut ? 'Đang đăng xuất...' : 'Đăng xuất'}
+        </button>
+      </div>
+    </aside>
+  )
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col flex-shrink-0">
-        <div className="px-5 py-4 border-b border-gray-100">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">HRTMS</p>
-          <p className="text-sm font-bold text-gray-800 mt-0.5">Cổng kỵ sĩ</p>
-        </div>
-
-        <div className="px-4 py-4 border-b border-gray-100">
-          {loading ? (
-            <div className="space-y-1.5 animate-pulse">
-              <div className="h-3.5 bg-gray-200 rounded w-3/4" />
-              <div className="h-3 bg-gray-100 rounded w-1/2" />
-            </div>
-          ) : profile ? (
-            <div>
-              <p className="text-sm font-semibold text-gray-800 truncate">{profile.fullName}</p>
-              <p className="text-xs text-gray-400 truncate mt-0.5">{profile.email}</p>
-              <div className="mt-2 flex items-center gap-1.5">
-                <span className="inline-flex px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 rounded border border-blue-100">
-                  Kỵ sĩ
-                </span>
-                {profile.status && (
-                  <span className="inline-flex px-2 py-0.5 text-xs font-medium bg-green-50 text-green-700 rounded border border-green-100">
-                    {profile.status}
-                  </span>
-                )}
-              </div>
-            </div>
-          ) : (
-            <p className="text-xs text-red-500">Không tải được thông tin</p>
-          )}
-        </div>
-
-        <nav className="flex-1 py-3 overflow-y-auto">
-          <p className="px-5 pt-2 pb-1.5 text-xs font-semibold text-gray-400 uppercase tracking-widest">
-            Quản lý
-          </p>
-          <ul className="space-y-0.5 px-2">
-            {navItems.map((item) => (
-              <li key={item.to}>
-                <NavLink
-                  to={item.to}
-                  end={item.end}
-                  className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-sm rounded-md transition-colors ${
-                      isActive
-                        ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600 rounded-l-none pl-[10px]'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium border-l-2 border-transparent rounded-l-none pl-[10px]'
-                    }`
-                  }
-                >
-                  {item.label}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        </nav>
-
-        <div className="px-4 py-3 border-t border-gray-100 space-y-2">
-          <button
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-            className="w-full px-3 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-md hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isLoggingOut ? 'Đang đăng xuất...' : 'Đăng xuất'}
-          </button>
-          <p className="text-xs text-gray-400 text-center">Horse Racing TMS &copy; 2026</p>
-        </div>
-      </aside>
-
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between gap-4 flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400">Kỵ sĩ</span>
-            <span className="text-xs text-gray-300">/</span>
-            <span className="text-xs font-semibold text-gray-700">{pageTitle}</span>
+    <div className="jockey-shell flex text-slate-950">
+      <div className="fixed inset-y-0 left-0 z-40 hidden lg:block">{sidebar}</div>
+      {menuOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button type="button" className="absolute inset-0 bg-slate-950/55 backdrop-blur-sm" onClick={() => setMenuOpen(false)} aria-label="Đóng lớp phủ menu" />
+          <div className="relative h-full w-[286px] max-w-[86vw] shadow-2xl">
+            {sidebar}
+            <button type="button" onClick={() => setMenuOpen(false)} className="absolute right-3 top-4 rounded-lg border border-white/20 px-3 py-2 text-xs font-bold text-white hover:bg-white/10">Đóng</button>
           </div>
-          <NotificationBell notificationsPath="/jockey/notifications" />
+        </div>
+      )}
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col lg:pl-[286px]">
+        <header className="sticky top-0 z-30 flex min-h-[68px] items-center justify-between gap-3 border-b border-slate-200/90 bg-white/95 px-4 py-3 backdrop-blur lg:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <button type="button" onClick={() => setMenuOpen(true)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 lg:hidden">Menu</button>
+            <div className="flex min-w-0 items-center gap-2 text-sm">
+              <span className="hidden text-slate-500 sm:inline">Jockey</span>
+              <span className="hidden text-slate-300 sm:inline">/</span>
+              <strong className="truncate text-slate-900">{pageTitle}</strong>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button type="button" onClick={() => navigate('/jockey/notifications')} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
+              Thông báo
+              {unreadCount > 0 && <span className="rounded-full bg-[#cfa73d] px-2 py-0.5 text-xs font-black text-[#082b20]">{unreadCount > 99 ? '99+' : unreadCount}</span>}
+            </button>
+            <button type="button" onClick={() => navigate('/jockey/profile-declaration')} className="flex h-10 w-10 items-center justify-center rounded-full bg-[#cfa73d] text-xs font-black text-[#082b20]" aria-label="Mở hồ sơ Jockey">{initials}</button>
+          </div>
         </header>
-
-        <main className="flex-1 overflow-auto p-6">
-          <Outlet />
+        <main className="jockey-main flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <div className="jockey-content"><Outlet /></div>
         </main>
       </div>
     </div>
-  );
+  )
 }

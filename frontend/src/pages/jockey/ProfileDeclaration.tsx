@@ -116,7 +116,7 @@ export default function ProfileDeclaration() {
 
   const [professional, setProfessional] = useState<JockeyProfile | null>(null)
   const [professionalForm, setProfessionalForm] = useState<UpdateProfilePayload>({
-    licenseCertificate: '', experienceYears: 0, selfDeclaredWeight: 0, bloodType: null, healthStatus: null,
+    licenseCertificate: '', selfDeclaredWeight: 0, bloodType: null, healthStatus: null,
   })
   const [professionalLoading, setProfessionalLoading] = useState(true)
   const [professionalSaving, setProfessionalSaving] = useState(false)
@@ -131,7 +131,6 @@ export default function ProfileDeclaration() {
       setProfessional(profile)
       setProfessionalForm({
         licenseCertificate: profile.licenseCertificate || '',
-        experienceYears: profile.experienceYears,
         selfDeclaredWeight: profile.selfDeclaredWeight,
         bloodType: profile.bloodType,
         healthStatus: profile.healthStatus,
@@ -152,14 +151,14 @@ export default function ProfileDeclaration() {
     event.preventDefault()
     setProfessionalSuccess('')
     setProfessionalError('')
-    if (professionalForm.experienceYears < 0) return setProfessionalError('Số năm kinh nghiệm không được âm.')
-    if (professionalForm.selfDeclaredWeight <= 0) return setProfessionalError('Cân nặng phải lớn hơn 0.')
+    if (professionalForm.selfDeclaredWeight == null || professionalForm.selfDeclaredWeight <= 0 || professionalForm.selfDeclaredWeight > 300) return setProfessionalError('Cân nặng phải lớn hơn 0 và không vượt quá 300 kg.')
+    if ((professionalForm.licenseCertificate?.trim().length ?? 0) > 100) return setProfessionalError('Chứng chỉ hành nghề không được vượt quá 100 ký tự.')
 
     setProfessionalSaving(true)
     try {
       const result = await updateMyProfile({
         ...professionalForm,
-        licenseCertificate: professionalForm.licenseCertificate.trim(),
+        licenseCertificate: professionalForm.licenseCertificate?.trim() || null,
       })
       setProfessionalSuccess(result.message || 'Cập nhật hồ sơ thành công.')
       await loadProfessional()
@@ -204,13 +203,12 @@ export default function ProfileDeclaration() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Hồ sơ &amp; Khai báo</h1>
-        <p className="mt-1 text-sm text-gray-500">Quản lý tài khoản, hồ sơ chuyên môn và bảo mật.</p>
+        <p className="text-xs font-black uppercase tracking-[.16em] text-blue-700">Hồ sơ</p>
+        <h1 className="mt-1 text-2xl font-black text-gray-900 sm:text-3xl">Hồ sơ Jockey</h1>
       </div>
 
       <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-bold text-gray-900">Thông tin tài khoản</h2>
-        <p className="mt-1 text-sm text-gray-500">Username, role và trạng thái là thông tin chỉ đọc.</p>
         <div className="mt-6">
           {accountLoading ? <SectionSkeleton /> : accountLoadError || !account ? (
             <div className="space-y-3">
@@ -238,16 +236,15 @@ export default function ProfileDeclaration() {
 
       <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-bold text-gray-900">Hồ sơ chuyên môn</h2>
-        <p className="mt-1 text-sm text-gray-500">Cập nhật thông tin chuyên môn đang được Backend hỗ trợ.</p>
         <div className="mt-6">
           {professionalLoading ? <SectionSkeleton /> : !professional ? (
             <div className="space-y-3"><Feedback type="error">{professionalError || 'Dữ liệu hồ sơ không tồn tại.'}</Feedback><button type="button" onClick={() => void loadProfessional()} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Thử lại</button></div>
           ) : (
             <form onSubmit={handleProfessionalSubmit} className="space-y-5" noValidate>
               <div className="grid gap-5 sm:grid-cols-2">
-                <label className="text-sm font-semibold text-gray-700">Chứng chỉ hành nghề<input value={professionalForm.licenseCertificate} onChange={(e) => setProfessionalForm((p) => ({ ...p, licenseCertificate: e.target.value }))} disabled={professionalSaving} className={inputClass} /></label>
-                <label className="text-sm font-semibold text-gray-700">Số năm kinh nghiệm<input type="number" min="0" value={professionalForm.experienceYears} onChange={(e) => setProfessionalForm((p) => ({ ...p, experienceYears: Number(e.target.value) }))} disabled={professionalSaving} className={inputClass} /></label>
-                <label className="text-sm font-semibold text-gray-700">Cân nặng tự khai báo (kg)<input type="number" min="0.01" step="0.1" value={professionalForm.selfDeclaredWeight} onChange={(e) => setProfessionalForm((p) => ({ ...p, selfDeclaredWeight: Number(e.target.value) }))} disabled={professionalSaving} className={inputClass} /></label>
+                <label className="text-sm font-semibold text-gray-700">Chứng chỉ hành nghề<input maxLength={100} value={professionalForm.licenseCertificate ?? ''} onChange={(e) => setProfessionalForm((p) => ({ ...p, licenseCertificate: e.target.value }))} disabled={professionalSaving} className={inputClass} /></label>
+                <div><p className="text-sm font-semibold text-gray-700">Số năm kinh nghiệm (chỉ đọc)</p><p className={readOnlyClass}>{professional.experienceYears}</p></div>
+                <label className="text-sm font-semibold text-gray-700">Cân nặng tự khai báo (kg)<input type="number" min="0.01" max="300" step="0.1" value={professionalForm.selfDeclaredWeight ?? ''} onChange={(e) => setProfessionalForm((p) => ({ ...p, selfDeclaredWeight: e.target.value === '' ? null : Number(e.target.value) }))} disabled={professionalSaving} className={inputClass} /></label>
                 <label className="text-sm font-semibold text-gray-700">Nhóm máu<select value={professionalForm.bloodType || ''} onChange={(e) => setProfessionalForm((p) => ({ ...p, bloodType: e.target.value || null }))} disabled={professionalSaving} className={inputClass}><option value="">Chưa cập nhật</option>{['A', 'B', 'AB', 'O'].map((value) => <option key={value}>{value}</option>)}</select></label>
                 <label className="text-sm font-semibold text-gray-700">Tình trạng sức khỏe<select value={professionalForm.healthStatus || ''} onChange={(e) => setProfessionalForm((p) => ({ ...p, healthStatus: e.target.value || null }))} disabled={professionalSaving} className={inputClass}><option value="">Chưa cập nhật</option>{healthStatusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
                 <div><p className="text-sm font-semibold text-gray-700">Trạng thái hồ sơ</p><p className={readOnlyClass}>{professional.status}</p></div>
@@ -268,7 +265,6 @@ export default function ProfileDeclaration() {
 
       <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-bold text-gray-900">Bảo mật</h2>
-        <p className="mt-1 text-sm text-gray-500">Đổi mật khẩu đăng nhập mà không làm gián đoạn phiên hiện tại.</p>
         <form onSubmit={handlePasswordSubmit} className="mt-6 space-y-5" noValidate>
           <div className="grid gap-5 lg:grid-cols-3">
             <label className="text-sm font-semibold text-gray-700">Mật khẩu hiện tại<input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} disabled={passwordSaving} autoComplete="current-password" className={inputClass} /></label>
