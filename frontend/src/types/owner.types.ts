@@ -65,3 +65,44 @@ export interface Breed {
   breedCode: string;
   breedName: string;
 }
+
+export interface OwnerPayout {
+  pursePayoutId: number;
+  raceEntryId: number;
+  recipientUserId: number;
+  recipientName: string;
+  role: string;
+  finishPosition: number;
+  horseName: string;
+  calculatedAmount: number;
+  payoutStatus: string;
+  paidAt: string | null;
+  updatedByAdminId: number | null;
+  updatedAt: string;
+}
+
+export interface OwnerEarnings {
+  ownerUserId: number;
+  totalEarnings: number;
+  paidAmount: number;
+  unpaidAmount: number;
+  payoutCount: number;
+  payouts: OwnerPayout[];
+}
+
+export interface RacePurseSummary {
+  raceId: number;
+  raceNumber: number;
+  raceName: string;
+  roundName: string;
+  tournamentName: string;
+  allocatedFund: number;
+  paidAmount: number;
+  pendingAmount: number;
+  remainingAmount: number;
+  payoutStatus: string;
+  resultStatus: string;
+  hasDiscrepancy: boolean;
+  discrepancyAmount: number | null;
+  payouts: OwnerPayout[];
+}
