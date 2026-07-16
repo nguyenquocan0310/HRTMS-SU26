@@ -45,10 +45,6 @@ public partial class User
 
     public virtual DoctorProfile? DoctorProfile { get; set; }
 
-    public virtual ICollection<FamilyRelationshipDeclaration> FamilyRelationshipDeclarationDeclarantUsers { get; set; } = new List<FamilyRelationshipDeclaration>();
-
-    public virtual ICollection<FamilyRelationshipDeclaration> FamilyRelationshipDeclarationRelatedUsers { get; set; } = new List<FamilyRelationshipDeclaration>();
-
     public virtual JockeyProfile? JockeyProfile { get; set; }
 
     public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();

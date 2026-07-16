@@ -57,24 +57,6 @@ export interface RefereeRaceEntry {
   preRaceJockeyWeight: number | null;
   horseIdentityCheckStatus: string | null;
   clinicalStatus: string | null;
-  independenceCheckStatus: string | null;
-  independenceViolationReason: string | null;
-  hasIndependenceWarning: boolean;
-}
-
-export interface IndependenceCheckResult {
-  raceEntryId: number;
-  raceId: number;
-  refereeId: number;
-  refereeName: string;
-  horseName: string;
-  jockeyId: number;
-  jockeyName: string;
-  independenceCheckStatus: string;
-  hasWarning: boolean;
-  violationReason: string | null;
-  raceEntryStatus: string;
-  message: string;
 }
 
 export interface StartingListEntry {
@@ -89,7 +71,6 @@ export interface StartingListEntry {
   preRaceJockeyWeight: number | null;
   horseIdentityCheckStatus: string | null;
   clinicalStatus: string | null;
-  independenceCheckStatus: string | null;
   rejectionReason?: string | null;
 }
 
@@ -214,9 +195,6 @@ const normalizeRaceEntry = (item: any): RefereeRaceEntry | null => {
     preRaceJockeyWeight: item?.preRaceJockeyWeight ?? null,
     horseIdentityCheckStatus: item?.horseIdentityCheckStatus ?? null,
     clinicalStatus: item?.clinicalStatus ?? null,
-    independenceCheckStatus: item?.independenceCheckStatus ?? null,
-    independenceViolationReason: item?.independenceViolationReason ?? item?.violationReason ?? null,
-    hasIndependenceWarning: Boolean(item?.hasIndependenceWarning ?? item?.hasWarning),
   };
 };
 
@@ -247,15 +225,6 @@ export const getRefereeRaceEntries = async (raceId: number): Promise<RefereeRace
   return extractArray(res)
     .map(normalizeRaceEntry)
     .filter((item): item is RefereeRaceEntry => item !== null);
-};
-
-export const checkJockeyIndependence = async (
-  raceEntryId: number
-): Promise<IndependenceCheckResult> => {
-  return apiFetch<IndependenceCheckResult>(
-    `/referee/race-entries/${raceEntryId}/independence-check`,
-    { method: 'PATCH' }
-  );
 };
 
 export const confirmStartingList = async (

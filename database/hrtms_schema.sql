@@ -136,35 +136,6 @@ CREATE TABLE SpectatorProfiles (
 );
 GO
 
-CREATE TABLE FamilyRelationshipDeclarations (
-    DeclarationId            INT             IDENTITY(1,1) NOT NULL,
-    DeclarantUserId          INT             NOT NULL,
-    RelatedPersonName        NVARCHAR(100)   NOT NULL,
-    RelatedUserId            INT             NULL,
-    RelationType             VARCHAR(20)     NOT NULL,
-    IndustryRole             VARCHAR(20)     NULL,
-    RelatedIdentityHash      VARBINARY(32)   NULL,
-    RelatedEmailNormalized   VARCHAR(100)    NULL,
-    RelatedPhoneNormalized   VARCHAR(20)     NULL,
-    RelatedDateOfBirth       DATE            NULL,
-    MatchConfidence          VARCHAR(20)     NOT NULL DEFAULT 'Unresolved',
-    Notes                    NVARCHAR(255)   NULL,
-    DeclaredAt               DATETIME2       NOT NULL DEFAULT GETUTCDATE(),
-
-    CONSTRAINT PK_FRD PRIMARY KEY (DeclarationId),
-    CONSTRAINT FK_FRD_Declarant FOREIGN KEY (DeclarantUserId) REFERENCES Users(UserId) ON DELETE NO ACTION,
-    CONSTRAINT FK_FRD_Related FOREIGN KEY (RelatedUserId) REFERENCES Users(UserId) ON DELETE NO ACTION,
-    CONSTRAINT CHK_FRD_RelationType CHECK (RelationType IN ('Spouse','Parent','Child','Sibling')),
-    CONSTRAINT CHK_FRD_IndustryRole CHECK (IndustryRole IS NULL OR IndustryRole IN ('Owner','Jockey','Referee','Doctor','Spectator','Unknown')),
-    CONSTRAINT CHK_FRD_MatchConfidence CHECK (MatchConfidence IN ('Unresolved','Low','Medium','High','Exact'))
-);
-GO
-
-CREATE UNIQUE INDEX UQ_FRD_DeclarantRelated
-    ON FamilyRelationshipDeclarations (DeclarantUserId, RelatedUserId)
-    WHERE RelatedUserId IS NOT NULL;
-GO
-
 -- =============================================================================
 -- GROUP 2: TOURNAMENT STRUCTURE
 -- =============================================================================
@@ -375,10 +346,6 @@ CREATE TABLE RaceEntries (
     ClinicalStatus                    VARCHAR(20)     NULL,
     ClinicalCheckedByDoctorId         INT             NULL,
     ClinicalCheckedAt                 DATETIME2       NULL,
-    IndependenceCheckStatus           VARCHAR(20)     NOT NULL DEFAULT 'NotChecked',
-    IndependenceCheckedByRefereeId    INT             NULL,
-    IndependenceCheckedAt             DATETIME2       NULL,
-    IndependenceViolationReason       NVARCHAR(500)   NULL,
     PostRaceJockeyWeight              DECIMAL(5,2)    NULL,
     PostRaceWeightByDoctorId          INT             NULL,
     FinishPosition                    INT             NULL,
@@ -401,7 +368,6 @@ CREATE TABLE RaceEntries (
     CONSTRAINT FK_RaceEntries_PreDoctor FOREIGN KEY (PreRaceWeightByDoctorId) REFERENCES DoctorProfiles(DoctorId),
     CONSTRAINT FK_RaceEntries_HorseIdentityDoctor FOREIGN KEY (HorseIdentityCheckedByDoctorId) REFERENCES DoctorProfiles(DoctorId),
     CONSTRAINT FK_RaceEntries_ClinicalDoctor FOREIGN KEY (ClinicalCheckedByDoctorId) REFERENCES DoctorProfiles(DoctorId),
-    CONSTRAINT FK_RaceEntries_IndependenceReferee FOREIGN KEY (IndependenceCheckedByRefereeId) REFERENCES RefereeProfiles(RefereeId),
     CONSTRAINT FK_RaceEntries_PostDoctor FOREIGN KEY (PostRaceWeightByDoctorId) REFERENCES DoctorProfiles(DoctorId),
     CONSTRAINT FK_RaceEntries_FeeConfirmedBy FOREIGN KEY (EntryFeeConfirmedBy) REFERENCES Users(UserId),
     CONSTRAINT UQ_RaceEntries_RacePairing UNIQUE (RaceId, PairingId),
@@ -409,7 +375,6 @@ CREATE TABLE RaceEntries (
     CONSTRAINT CHK_RaceEntries_Status CHECK ([Status] IN ('Pending','Confirmed','Cancelled','Disqualified')),
     CONSTRAINT CHK_RaceEntries_HorseIdentity CHECK (HorseIdentityCheckStatus IS NULL OR HorseIdentityCheckStatus IN ('Matched','Mismatch')),
     CONSTRAINT CHK_RaceEntries_Clinical CHECK (ClinicalStatus IS NULL OR ClinicalStatus IN ('Fit','Unfit')),
-    CONSTRAINT CHK_RaceEntries_Independence CHECK (IndependenceCheckStatus IN ('NotChecked','Passed','Failed','ManualReview')),
     CONSTRAINT CHK_RaceEntries_FinishPos CHECK (FinishPosition IS NULL OR FinishPosition > 0),
     CONSTRAINT CHK_RaceEntries_FeeStatus CHECK (EntryFeeStatus IN ('Unpaid','Paid','Refund Pending','Refunded'))
 );
@@ -428,16 +393,12 @@ CREATE TABLE RefereeAssignments (
     RaceId              INT             NOT NULL,
     RefereeId           INT             NOT NULL,
     [Role]              VARCHAR(30)     NOT NULL,
-    CoiCheckStatus      VARCHAR(20)     NOT NULL DEFAULT 'NotChecked',
-    CoiCheckedAt        DATETIME2       NULL,
-    CoiViolationReason  NVARCHAR(500)   NULL,
     AssignedAt          DATETIME2       NOT NULL DEFAULT GETUTCDATE(),
 
     CONSTRAINT PK_RefereeAssignments PRIMARY KEY (RaceId, RefereeId),
     CONSTRAINT FK_RefAssign_Race FOREIGN KEY (RaceId) REFERENCES Races(RaceId) ON DELETE CASCADE,
     CONSTRAINT FK_RefAssign_Referee FOREIGN KEY (RefereeId) REFERENCES RefereeProfiles(RefereeId),
-    CONSTRAINT CHK_RefAssign_Role CHECK ([Role] IN ('Lead Referee','Assistant Referee')),
-    CONSTRAINT CHK_RefAssign_Coi CHECK (CoiCheckStatus IN ('NotChecked','Passed','Failed','ManualReview'))
+    CONSTRAINT CHK_RefAssign_Role CHECK ([Role] IN ('Lead Referee','Assistant Referee'))
 );
 GO
 
@@ -449,16 +410,12 @@ GO
 CREATE TABLE DoctorAssignments (
     RaceId              INT             NOT NULL,
     DoctorId            INT             NOT NULL,
-    CoiCheckStatus      VARCHAR(20)     NOT NULL DEFAULT 'NotChecked',
-    CoiCheckedAt        DATETIME2       NULL,
-    CoiViolationReason  NVARCHAR(500)   NULL,
     AssignedAt          DATETIME2       NOT NULL DEFAULT GETUTCDATE(),
     CertifiedAt         DATETIME2       NULL,
 
     CONSTRAINT PK_DoctorAssignments PRIMARY KEY (RaceId, DoctorId),
     CONSTRAINT FK_DocAssign_Race FOREIGN KEY (RaceId) REFERENCES Races(RaceId) ON DELETE CASCADE,
-    CONSTRAINT FK_DocAssign_Doctor FOREIGN KEY (DoctorId) REFERENCES DoctorProfiles(DoctorId),
-    CONSTRAINT CHK_DocAssign_Coi CHECK (CoiCheckStatus IN ('NotChecked','Passed','Failed','ManualReview'))
+    CONSTRAINT FK_DocAssign_Doctor FOREIGN KEY (DoctorId) REFERENCES DoctorProfiles(DoctorId)
 );
 GO
 
@@ -719,11 +676,6 @@ CREATE INDEX IX_Users_Status ON Users ([Status]);
 CREATE INDEX IX_Users_IdentityHash ON Users (IdentityHash) WHERE IdentityHash IS NOT NULL;
 CREATE INDEX IX_Users_NormalizedPhone ON Users (NormalizedPhone) WHERE NormalizedPhone IS NOT NULL;
 
-CREATE INDEX IX_FRD_RelatedIdentityHash ON FamilyRelationshipDeclarations (RelatedIdentityHash) WHERE RelatedIdentityHash IS NOT NULL;
-CREATE INDEX IX_FRD_RelatedEmail ON FamilyRelationshipDeclarations (RelatedEmailNormalized) WHERE RelatedEmailNormalized IS NOT NULL;
-CREATE INDEX IX_FRD_RelatedPhone ON FamilyRelationshipDeclarations (RelatedPhoneNormalized) WHERE RelatedPhoneNormalized IS NOT NULL;
-CREATE INDEX IX_FRD_NameDob ON FamilyRelationshipDeclarations (RelatedPersonName, RelatedDateOfBirth) WHERE RelatedDateOfBirth IS NOT NULL;
-
 CREATE INDEX IX_Tournaments_Status ON Tournaments ([Status]);
 CREATE INDEX IX_TP_Roster ON TournamentParticipants (TournamentId, [Role], [Status]);
 CREATE INDEX IX_TP_User ON TournamentParticipants (UserId);
@@ -748,10 +700,6 @@ CREATE UNIQUE INDEX UQ_Pairings_ActiveHorseTournament
 CREATE INDEX IX_RaceEntries_Race ON RaceEntries (RaceId);
 CREATE INDEX IX_RaceEntries_Pairing ON RaceEntries (PairingId);
 CREATE INDEX IX_RaceEntries_Status ON RaceEntries ([Status]);
-CREATE INDEX IX_RaceEntries_Independence ON RaceEntries (IndependenceCheckStatus);
-
-CREATE INDEX IX_RefAssign_Coi ON RefereeAssignments (RaceId, CoiCheckStatus);
-CREATE INDEX IX_DocAssign_Coi ON DoctorAssignments (RaceId, CoiCheckStatus);
 
 CREATE INDEX IX_TicketRewardCodes_Status ON TicketRewardCodes ([Status], ExpiresAt);
 CREATE INDEX IX_TicketRewardCodes_RedeemedBy ON TicketRewardCodes (RedeemedBySpectatorId) WHERE RedeemedBySpectatorId IS NOT NULL;
@@ -769,9 +717,9 @@ GO
 
 -- =============================================================================
 -- SUMMARY
--- 27 tables - SQL Server 2022 - 3NF
+-- 26 tables - SQL Server 2022 - 3NF
 -- Users, JockeyProfiles, OwnerProfiles, RefereeProfiles, DoctorProfiles,
--- SpectatorProfiles, FamilyRelationshipDeclarations,
+-- SpectatorProfiles,
 -- Tournaments, TournamentParticipants, PrizeDistributions, Rounds, Races,
 -- Horses, Pairings, RaceEntries,
 -- RefereeAssignments, DoctorAssignments, RaceReports, Violations, Protests,

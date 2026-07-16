@@ -17,8 +17,6 @@ public partial class RefereeProfile
 
     public DateTime UpdatedAt { get; set; }
 
-    public virtual ICollection<RaceEntry> RaceEntries { get; set; } = new List<RaceEntry>();
-
     public virtual ICollection<RaceReport> RaceReports { get; set; } = new List<RaceReport>();
 
     public virtual User Referee { get; set; } = null!;

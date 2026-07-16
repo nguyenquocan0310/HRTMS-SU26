@@ -11,7 +11,6 @@ type DoctorAccountProfile = UserProfile<DoctorRoleProfile>
 const navItems = [
   { to: '/doctor', label: 'Tổng quan', end: true },
   { to: '/doctor/tournaments', label: 'Đăng ký giải đấu', end: false },
-  { to: '/doctor/coi', label: 'Khai báo COI', end: false },
   { to: '/doctor/profile', label: 'Hồ sơ tài khoản', end: false },
   { to: '/doctor/notifications', label: 'Thông báo', end: false },
 ]

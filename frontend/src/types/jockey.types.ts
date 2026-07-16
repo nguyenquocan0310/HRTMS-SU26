@@ -71,7 +71,6 @@ export interface JockeyRaceEntry {
   preRaceJockeyWeight: number | null;
   horseIdentityCheckStatus: string | null;
   clinicalStatus: string | null;
-  independenceCheckStatus: string;
   postRaceJockeyWeight: number | null;
   finishPosition: number | null;
   finishTime: string | null;

@@ -12,7 +12,6 @@ type RefereeAccountProfile = UserProfile<RefereeRoleProfile>;
 const navItems = [
   { to: '/referee', label: 'Tổng quan', end: true },
   { to: '/referee/tournaments', label: 'Đăng ký giải đấu', end: false },
-  { to: '/referee/coi', label: 'Khai báo COI', end: false },
   { to: '/referee/race-console', label: 'Race Console', end: false },
   { to: '/referee/profile', label: 'Hồ sơ tài khoản', end: false },
 ];

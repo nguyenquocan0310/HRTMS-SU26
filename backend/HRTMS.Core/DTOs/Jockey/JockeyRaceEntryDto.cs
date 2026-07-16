@@ -43,8 +43,6 @@ public class JockeyRaceEntryDto
 
     public string? ClinicalStatus { get; set; }
 
-    public string IndependenceCheckStatus { get; set; } = string.Empty;
-
     public decimal? PostRaceJockeyWeight { get; set; }
 
     public int? FinishPosition { get; set; }

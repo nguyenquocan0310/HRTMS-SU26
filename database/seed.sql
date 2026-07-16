@@ -261,12 +261,11 @@ BEGIN TRY
             (RaceEntryId, RaceId, PairingId, PostPosition, [Status], PreRaceJockeyWeight,
              PreRaceWeightByDoctorId, HorseIdentityCheckStatus, HorseIdentityCheckedByDoctorId,
              HorseIdentityCheckedAt, ClinicalStatus, ClinicalCheckedByDoctorId, ClinicalCheckedAt,
-             IndependenceCheckStatus, IndependenceCheckedByRefereeId, IndependenceCheckedAt,
-             IndependenceViolationReason, EntryFeeStatus, EntryFeeConfirmedBy, EntryFeeConfirmedAt,
+             EntryFeeStatus, EntryFeeConfirmedBy, EntryFeeConfirmedAt,
              CreatedAt, UpdatedAt)
         VALUES
             (9701, 9001, 9601, 1, N'Confirmed', 53.60, 9005, N'Matched', 9005, @Now,
-             N'Fit', 9005, @Now, N'Passed', 9004, @Now, NULL, N'Paid', 9001, @Now, @Now, @Now);
+             N'Fit', 9005, @Now, N'Paid', 9001, @Now, @Now, @Now);
 
         SET IDENTITY_INSERT dbo.RaceEntries OFF;
     END

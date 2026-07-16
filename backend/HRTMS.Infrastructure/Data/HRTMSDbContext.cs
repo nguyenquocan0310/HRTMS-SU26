@@ -20,7 +20,6 @@ public partial class HRTMSDbContext : DbContext
 
     public virtual DbSet<DoctorProfile> DoctorProfiles { get; set; }
 
-    public virtual DbSet<FamilyRelationshipDeclaration> FamilyRelationshipDeclarations { get; set; }
 
     public virtual DbSet<Horse> Horses { get; set; }
 
@@ -133,14 +132,7 @@ public partial class HRTMSDbContext : DbContext
         {
             entity.HasKey(e => new { e.RaceId, e.DoctorId });
 
-            entity.HasIndex(e => new { e.RaceId, e.CoiCheckStatus }, "IX_DocAssign_Coi");
-
             entity.Property(e => e.AssignedAt).HasDefaultValueSql("(getutcdate())");
-            entity.Property(e => e.CoiCheckStatus)
-                .HasMaxLength(20)
-                .IsUnicode(false)
-                .HasDefaultValue("NotChecked");
-            entity.Property(e => e.CoiViolationReason).HasMaxLength(500);
 
             entity.HasOne(d => d.Doctor).WithMany(p => p.DoctorAssignments)
                 .HasForeignKey(d => d.DoctorId)
@@ -174,53 +166,6 @@ public partial class HRTMSDbContext : DbContext
                 .HasForeignKey<DoctorProfile>(d => d.DoctorId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_DoctorProfiles_Users");
-        });
-
-        modelBuilder.Entity<FamilyRelationshipDeclaration>(entity =>
-        {
-            entity.HasKey(e => e.DeclarationId).HasName("PK_FRD");
-
-            entity.HasIndex(e => new { e.RelatedPersonName, e.RelatedDateOfBirth }, "IX_FRD_NameDob").HasFilter("([RelatedDateOfBirth] IS NOT NULL)");
-
-            entity.HasIndex(e => e.RelatedEmailNormalized, "IX_FRD_RelatedEmail").HasFilter("([RelatedEmailNormalized] IS NOT NULL)");
-
-            entity.HasIndex(e => e.RelatedIdentityHash, "IX_FRD_RelatedIdentityHash").HasFilter("([RelatedIdentityHash] IS NOT NULL)");
-
-            entity.HasIndex(e => e.RelatedPhoneNormalized, "IX_FRD_RelatedPhone").HasFilter("([RelatedPhoneNormalized] IS NOT NULL)");
-
-            entity.HasIndex(e => new { e.DeclarantUserId, e.RelatedUserId }, "UQ_FRD_DeclarantRelated")
-                .IsUnique()
-                .HasFilter("([RelatedUserId] IS NOT NULL)");
-
-            entity.Property(e => e.DeclaredAt).HasDefaultValueSql("(getutcdate())");
-            entity.Property(e => e.IndustryRole)
-                .HasMaxLength(20)
-                .IsUnicode(false);
-            entity.Property(e => e.MatchConfidence)
-                .HasMaxLength(20)
-                .IsUnicode(false)
-                .HasDefaultValue("Unresolved");
-            entity.Property(e => e.Notes).HasMaxLength(255);
-            entity.Property(e => e.RelatedEmailNormalized)
-                .HasMaxLength(100)
-                .IsUnicode(false);
-            entity.Property(e => e.RelatedIdentityHash).HasMaxLength(32);
-            entity.Property(e => e.RelatedPersonName).HasMaxLength(100);
-            entity.Property(e => e.RelatedPhoneNormalized)
-                .HasMaxLength(20)
-                .IsUnicode(false);
-            entity.Property(e => e.RelationType)
-                .HasMaxLength(20)
-                .IsUnicode(false);
-
-            entity.HasOne(d => d.DeclarantUser).WithMany(p => p.FamilyRelationshipDeclarationDeclarantUsers)
-                .HasForeignKey(d => d.DeclarantUserId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_FRD_Declarant");
-
-            entity.HasOne(d => d.RelatedUser).WithMany(p => p.FamilyRelationshipDeclarationRelatedUsers)
-                .HasForeignKey(d => d.RelatedUserId)
-                .HasConstraintName("FK_FRD_Related");
         });
 
         modelBuilder.Entity<Horse>(entity =>
@@ -562,8 +507,6 @@ public partial class HRTMSDbContext : DbContext
 
         modelBuilder.Entity<RaceEntry>(entity =>
         {
-            entity.HasIndex(e => e.IndependenceCheckStatus, "IX_RaceEntries_Independence");
-
             entity.HasIndex(e => e.PairingId, "IX_RaceEntries_Pairing");
 
             entity.HasIndex(e => e.RaceId, "IX_RaceEntries_Race");
@@ -593,11 +536,6 @@ public partial class HRTMSDbContext : DbContext
             entity.Property(e => e.HorseIdentityCheckStatus)
                 .HasMaxLength(20)
                 .IsUnicode(false);
-            entity.Property(e => e.IndependenceCheckStatus)
-                .HasMaxLength(20)
-                .IsUnicode(false)
-                .HasDefaultValue("NotChecked");
-            entity.Property(e => e.IndependenceViolationReason).HasMaxLength(500);
             entity.Property(e => e.PostRaceJockeyWeight).HasColumnType("decimal(5, 2)");
             entity.Property(e => e.PreRaceJockeyWeight).HasColumnType("decimal(5, 2)");
             entity.Property(e => e.Status)
@@ -621,10 +559,6 @@ public partial class HRTMSDbContext : DbContext
             entity.HasOne(d => d.HorseIdentityCheckedByDoctor).WithMany(p => p.RaceEntryHorseIdentityCheckedByDoctors)
                 .HasForeignKey(d => d.HorseIdentityCheckedByDoctorId)
                 .HasConstraintName("FK_RaceEntries_HorseIdentityDoctor");
-
-            entity.HasOne(d => d.IndependenceCheckedByReferee).WithMany(p => p.RaceEntries)
-                .HasForeignKey(d => d.IndependenceCheckedByRefereeId)
-                .HasConstraintName("FK_RaceEntries_IndependenceReferee");
 
             entity.HasOne(d => d.Pairing).WithMany(p => p.RaceEntries)
                 .HasForeignKey(d => d.PairingId)
@@ -668,18 +602,11 @@ public partial class HRTMSDbContext : DbContext
         {
             entity.HasKey(e => new { e.RaceId, e.RefereeId });
 
-            entity.HasIndex(e => new { e.RaceId, e.CoiCheckStatus }, "IX_RefAssign_Coi");
-
             entity.HasIndex(e => e.RaceId, "UQ_RefereeAssignments_LeadReferee")
                 .IsUnique()
                 .HasFilter("([Role]='Lead Referee')");
 
             entity.Property(e => e.AssignedAt).HasDefaultValueSql("(getutcdate())");
-            entity.Property(e => e.CoiCheckStatus)
-                .HasMaxLength(20)
-                .IsUnicode(false)
-                .HasDefaultValue("NotChecked");
-            entity.Property(e => e.CoiViolationReason).HasMaxLength(500);
             entity.Property(e => e.Role)
                 .HasMaxLength(30)
                 .IsUnicode(false);

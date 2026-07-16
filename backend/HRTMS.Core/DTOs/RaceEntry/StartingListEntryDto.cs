@@ -24,7 +24,5 @@ public class StartingListEntryDto
 
     public string? ClinicalStatus { get; set; }
 
-    public string? IndependenceCheckStatus { get; set; }
-
     public string? RejectionReason { get; set; }
 }

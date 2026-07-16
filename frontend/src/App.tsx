@@ -48,7 +48,6 @@ import DoctorLayout from './pages/doctor/DoctorLayout'
 import DoctorDashboard from './pages/doctor/DoctorDashboard'
 import PaddockConsole from './pages/doctor/PaddockConsole'
 import DoctorTournamentList from './pages/doctor/DoctorTournamentList'
-import DoctorCoiDeclarations from './pages/doctor/DoctorCoiDeclarations'
 import DoctorProfile from './pages/doctor/DoctorProfile'
 
 // ── Import các trang Referee ──
@@ -56,7 +55,6 @@ import RefereeLayout from './pages/referee/RefereeLayout'
 import RefereeDashboard from './pages/referee/RefereeDashboard'
 import RefereeRaceConsole from './pages/referee/RefereeRaceConsole'
 import RefereeTournamentList from './pages/referee/RefereeTournamentList'
-import RefereeCoiDeclarations from './pages/referee/RefereeCoiDeclarations'
 import RefereeProfile from './pages/referee/RefereeProfile'
 
 // ── Import các trang Spectator ──
@@ -167,7 +165,6 @@ export default function App() {
           <Route index element={<DoctorDashboard />} />
           <Route path="paddock" element={<PaddockConsole />} />
           <Route path="tournaments" element={<DoctorTournamentList />} />
-          <Route path="coi" element={<DoctorCoiDeclarations />} />
           <Route path="profile" element={<DoctorProfile />} />
           <Route path="notifications" element={<SharedNotificationCenter />} />
         </Route>
@@ -180,7 +177,6 @@ export default function App() {
         }>
           <Route index element={<RefereeDashboard />} />
           <Route path="tournaments" element={<RefereeTournamentList />} />
-          <Route path="coi" element={<RefereeCoiDeclarations />} />
           <Route path="race-console" element={<RefereeRaceConsole />} />
           <Route path="profile" element={<RefereeProfile />} />
           <Route path="notifications" element={<SharedNotificationCenter />} />

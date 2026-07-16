@@ -6,7 +6,6 @@ using System.Text.RegularExpressions;
 using BCrypt.Net;
 using HRTMS.Core.Common;
 using HRTMS.Core.DTOs.Auth;
-using HRTMS.Core.DTOs.FamilyDeclaration;
 using HRTMS.Core.Entities;
 using HRTMS.Core.Interfaces.Services;
 using HRTMS.Infrastructure.Data;
@@ -21,8 +20,6 @@ public class AuthService : IAuthService
     private readonly HRTMSDbContext _context;
     private readonly JwtService _jwtService;
     private readonly IAuditLogService _auditLog;
-    private readonly IFamilyDeclarationValidator _frdValidator;
-    private readonly IIdentityResolveService _identityResolveService;
     private readonly ITokenBlacklistService _tokenBlacklistService;
     private readonly IEmailService _emailService;
     private readonly INotificationService _notificationService;
@@ -39,12 +36,6 @@ public class AuthService : IAuthService
     private static readonly string[] ProfessionalRoles =
         ["Owner", "Jockey", "Referee", "Doctor"];
 
-    // Cả 4 role (Owner/Jockey/Referee/Doctor) khai báo người thân (FRD)
-    // NGAY LÚC ĐĂNG KÝ — quyết định cập nhật: Doctor KHÔNG còn hoãn khai báo
-    // sang Dashboard (UI-S30) nữa; Owner cũng khai (dù là phía hay bị match).
-    private static readonly string[] RolesRequireFrdAtRegister =
-        ["Owner", "Jockey", "Referee", "Doctor"];
-
     // Role bắt buộc upload file chứng chỉ/bằng cấp khi đăng ký (ACC.1A).
     private static readonly string[] RolesRequireCertificate =
         ["Jockey", "Referee", "Doctor"];
@@ -58,8 +49,6 @@ public class AuthService : IAuthService
         HRTMSDbContext context,
         JwtService jwtService,
         IAuditLogService auditLog,
-        IFamilyDeclarationValidator frdValidator,
-        IIdentityResolveService identityResolveService,
         ITokenBlacklistService tokenBlacklistService,
         IEmailService emailService,
         INotificationService notificationService,
@@ -69,8 +58,6 @@ public class AuthService : IAuthService
         _context = context;
         _jwtService = jwtService;
         _auditLog = auditLog;
-        _frdValidator = frdValidator;
-        _identityResolveService = identityResolveService;
         _tokenBlacklistService = tokenBlacklistService;
         _emailService = emailService;
         _notificationService = notificationService;
@@ -193,24 +180,6 @@ public class AuthService : IAuthService
         if (!await IsEmailDomainValidAsync(normalizedEmail))
             return ApiResponse<int>.Fail("Email không hợp lệ hoặc domain email không tồn tại.");
 
-        if (RolesRequireFrdAtRegister.Contains(dto.Role) && dto.FamilyDeclarations == null)
-            return ApiResponse<int>.Fail(
-                $"Role {dto.Role} bắt buộc phải khai báo mục người thân (gửi mảng rỗng nếu không có người thân nào trong ngành).");
-
-        if (dto.FamilyDeclarations != null && dto.FamilyDeclarations.Count > 0)
-        {
-            // Cả 4 role Owner/Jockey/Referee/Doctor được khai FRD lúc đăng ký.
-            // Admin/Spectator không thuộc diện này — từ chối nếu lỡ gửi kèm.
-            if (!RolesRequireFrdAtRegister.Contains(dto.Role))
-                return ApiResponse<int>.Fail(
-                    $"Role {dto.Role} không khai báo người thân lúc đăng ký.");
-
-            var frdValidation = await _frdValidator.ValidateAsync(
-                dto.FamilyDeclarations, declarantUserId: 0, isRegister: true);
-            if (frdValidation != null)
-                return ApiResponse<int>.Fail(frdValidation);
-        }
-
         string initialStatus = dto.Role is "Spectator" or "Owner" ? "Active" : "Pending";
 
         byte[]? encrypted = null;
@@ -247,31 +216,6 @@ public class AuthService : IAuthService
             await _context.SaveChangesAsync();
 
             await CreateRoleProfileAsync(user.UserId, dto.Role, dto, now, dto.CertificateFile);
-
-            if (RolesRequireFrdAtRegister.Contains(dto.Role)
-                && dto.FamilyDeclarations != null
-                && dto.FamilyDeclarations.Count > 0)
-            {
-                // CCCD-only resolve cho tung khai bao - dong bo voi FamilyDeclarationService.
-                foreach (var f in dto.FamilyDeclarations)
-                {
-                    var resolveResult = await _identityResolveService.ResolveAsync(f.RelatedIdentityNumber);
-
-                    _context.FamilyRelationshipDeclarations.Add(new FamilyRelationshipDeclaration
-                    {
-                        DeclarantUserId = user.UserId,
-                        RelatedPersonName = f.RelatedPersonName.Trim(),
-                        RelatedUserId = resolveResult.RelatedUserId,
-                        RelationType = f.RelationType,
-                        IndustryRole = f.IndustryRole,
-                        RelatedIdentityHash = resolveResult.RelatedIdentityHash,
-                        MatchConfidence = resolveResult.MatchConfidence,
-                        Notes = f.Notes,
-                        DeclaredAt = now
-                    });
-                }
-                await _context.SaveChangesAsync();
-            }
 
             await transaction.CommitAsync();
 

@@ -31,14 +31,6 @@ public partial class RaceEntry
 
     public DateTime? ClinicalCheckedAt { get; set; }
 
-    public string IndependenceCheckStatus { get; set; } = null!;
-
-    public int? IndependenceCheckedByRefereeId { get; set; }
-
-    public DateTime? IndependenceCheckedAt { get; set; }
-
-    public string? IndependenceViolationReason { get; set; }
-
     public decimal? PostRaceJockeyWeight { get; set; }
 
     public int? PostRaceWeightByDoctorId { get; set; }
@@ -86,8 +78,6 @@ public partial class RaceEntry
     public virtual User? EntryFeeConfirmedByNavigation { get; set; }
 
     public virtual DoctorProfile? HorseIdentityCheckedByDoctor { get; set; }
-
-    public virtual RefereeProfile? IndependenceCheckedByReferee { get; set; }
 
     public virtual Pairing Pairing { get; set; } = null!;
 

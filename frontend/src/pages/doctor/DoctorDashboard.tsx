@@ -199,32 +199,8 @@ export default function DoctorDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Khu vực khai báo COI thật */}
-        <div className="lg:col-span-1 bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col justify-between">
-          <div className="p-6">
-            <h2 className="text-base font-bold text-gray-900 border-b border-gray-100 pb-3">
-              Khai báo quan hệ COI
-            </h2>
-            <p className="text-xs text-gray-500 mt-3 leading-relaxed">
-              Khai báo người thân hoặc quan hệ có thể ảnh hưởng đến phân công y tế trong giải đấu. Doctor chỉ khai báo dữ liệu, hệ thống sẽ tự kiểm tra COI khi Admin phân công vào Race.
-            </p>
-            <div className="mt-5 rounded-lg border border-blue-100 bg-blue-50 px-3 py-3 text-xs text-blue-800">
-              Dữ liệu khai báo được dùng cho Phase 4: Official Assignment & COI Clearance.
-            </div>
-          </div>
-          <div className="border-t border-gray-100 p-6 pt-4">
-            <button
-              onClick={() => navigate('/doctor/coi')}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-4 rounded-md text-sm font-semibold transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            >
-              Mở khai báo COI
-            </button>
-          </div>
-        </div>
-
-        {/* ── Khu vực "Race được phân công" ── thay mock bằng API thật */}
-        <div className="lg:col-span-2 bg-white border border-gray-200 rounded-lg shadow-sm p-6 flex flex-col">
+      {/* ── Khu vực "Race được phân công" ── thay mock bằng API thật */}
+      <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6 flex flex-col">
           <h2 className="text-base font-bold text-gray-900 flex items-center gap-2 border-b border-gray-100 pb-3">
             Race được phân công
           </h2>
@@ -299,7 +275,6 @@ export default function DoctorDashboard() {
             </div>
           )}
         </div>
-      </div>
     </div>
   )
 }

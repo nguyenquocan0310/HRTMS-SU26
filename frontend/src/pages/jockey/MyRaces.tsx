@@ -64,24 +64,6 @@ const getPairingStatusBadge = (status: string) => {
   return <span className={`${badgeBase} ${cls}`}>{label}</span>;
 };
 
-const getIndependenceCheckBadge = (status: string) => {
-  let cls = 'bg-gray-50 text-gray-700 border-gray-200';
-  let label = status;
-
-  if (status === 'NotChecked') {
-    cls = 'bg-yellow-50 text-yellow-700 border-yellow-200';
-    label = 'Chưa kiểm tra';
-  } else if (status === 'Checked' || status === 'Approved' || status === 'Passed') {
-    cls = 'bg-green-50 text-green-700 border-green-200';
-    label = 'Đạt';
-  } else if (status === 'Failed') {
-    cls = 'bg-red-50 text-red-700 border-red-200';
-    label = 'Không đạt';
-  }
-
-  return <span className={`${badgeBase} ${cls}`}>{label}</span>;
-};
-
 export default function MyRaces() {
   const [races, setRaces] = useState<JockeyRaceEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -170,7 +152,6 @@ export default function MyRaces() {
                     'Trạng thái race',
                     'Trạng thái entry',
                     'Trạng thái pairing',
-                    'Kiểm tra độc lập',
                   ].map((heading) => (
                     <th key={heading} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
                       {heading}
@@ -208,7 +189,6 @@ export default function MyRaces() {
                     <td className="px-4 py-4 whitespace-nowrap">{getRaceStatusBadge(race.raceStatus)}</td>
                     <td className="px-4 py-4 whitespace-nowrap">{getEntryStatusBadge(race.entryStatus)}</td>
                     <td className="px-4 py-4 whitespace-nowrap">{getPairingStatusBadge(race.pairingStatus)}</td>
-                    <td className="px-4 py-4 whitespace-nowrap">{getIndependenceCheckBadge(race.independenceCheckStatus)}</td>
                   </tr>
                 ))}
               </tbody>

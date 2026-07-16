@@ -106,51 +106,6 @@ public class RefereeAssignmentService : IRefereeAssignmentService
                 throw new InvalidOperationException("LEAD_REFEREE_ALREADY_EXISTS");
             }
         }
-        // Kiem tra COI cua Referee voi Owner co ngua trong Race
-        // Referee khong duoc la Spouse, Parent, Child, Sibling cua bat ky Owner nao trong Race
-        var ownerIdsInRace = await (
-            from raceEntry in _context.RaceEntries
-            join pairing in _context.Pairings
-                on raceEntry.PairingId equals pairing.PairingId
-            join horse in _context.Horses
-                on pairing.HorseId equals horse.HorseId
-            where raceEntry.RaceId == raceId
-                  && raceEntry.Status != "Cancelled"
-            select horse.OwnerId
-        )
-                .Distinct()
-                .ToListAsync();
-
-        var directFamilyRelations = new[]
-        {
-                "Spouse",
-                "Parent",
-                "Child",
-                "Sibling"
-};
-
-        var hasConflictOfInterest = await _context.FamilyRelationshipDeclarations
-                .AnyAsync(f =>
-                f.RelatedUserId.HasValue &&
-                directFamilyRelations.Contains(f.RelationType) &&
-                (
-            (
-                f.DeclarantUserId == dto.RefereeId &&
-                ownerIdsInRace.Contains(f.RelatedUserId.Value)
-            )
-            ||
-            (
-                ownerIdsInRace.Contains(f.DeclarantUserId) &&
-                f.RelatedUserId.Value == dto.RefereeId
-            )
-        ));
-
-        if (hasConflictOfInterest)
-        {
-            throw new InvalidOperationException(
-                "REFEREE_CONFLICT_OF_INTEREST");
-        }
-
         var now = DateTime.UtcNow;
 
         var assignment = new RefereeAssignment
@@ -158,9 +113,7 @@ public class RefereeAssignmentService : IRefereeAssignmentService
             RaceId = raceId,
             RefereeId = dto.RefereeId,
             Role = dto.Role,
-            AssignedAt = now,
-            CoiCheckStatus = "Passed",
-            CoiCheckedAt = now
+            AssignedAt = now
         };
 
         _context.RefereeAssignments.Add(assignment);

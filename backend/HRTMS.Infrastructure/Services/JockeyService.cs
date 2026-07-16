@@ -391,7 +391,6 @@ public class JockeyService : IJockeyService
                 PreRaceJockeyWeight = re.PreRaceJockeyWeight,
                 HorseIdentityCheckStatus = re.HorseIdentityCheckStatus,
                 ClinicalStatus = re.ClinicalStatus,
-                IndependenceCheckStatus = re.IndependenceCheckStatus,
                 PostRaceJockeyWeight = re.PostRaceJockeyWeight,
 
                 FinishPosition = re.FinishPosition,

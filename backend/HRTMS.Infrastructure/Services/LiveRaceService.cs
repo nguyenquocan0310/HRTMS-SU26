@@ -116,8 +116,7 @@ public class LiveRaceService : ILiveRaceService
                 e.Status != "Confirmed" ||
                 e.PreRaceJockeyWeight == null ||
                 e.ClinicalStatus != "Fit" ||
-                e.HorseIdentityCheckStatus != "Matched" ||
-                e.IndependenceCheckStatus != "Passed"))
+                e.HorseIdentityCheckStatus != "Matched"))
         {
             throw new InvalidOperationException("STARTING_LIST_INVALID");
         }
