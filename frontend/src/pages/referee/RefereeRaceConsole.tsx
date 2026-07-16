@@ -1,643 +1,172 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   confirmStartingList,
   createRaceViolation,
+  deleteRaceViolation,
   finishRace,
   getMyRefereeRaceAssignments,
   getRaceLiveStatus,
   getRaceViolations,
   getRefereeRaceEntries,
+  getViolationCodes,
   startRace,
-  type CreateViolationPayload,
+  updateRaceViolation,
   type ConfirmStartingListResult,
+  type CreateViolationPayload,
   type FinishRacePayload,
   type RaceLiveStatus,
   type RaceViolation,
   type RefereeRaceAssignment,
   type RefereeRaceEntry,
   type StartingListEntry,
-} from '../../services/refereeService';
+  type ViolationCodeOption,
+} from '../../services/refereeService'
 
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return 'Chưa có lịch';
-  return new Date(value).toLocaleString('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+const PENALTIES = ['Disqualified', 'PlaceBehind', 'Warning', 'Scratch'] as const
+const inactiveEntry = (entry: { status: string; isWithdrawn?: boolean }) => entry.isWithdrawn || ['cancelled', 'withdrawn', 'disqualified'].includes(entry.status.toLowerCase())
+const formatDateTime = (value?: string | null) => value ? new Date(value).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Chưa có lịch'
+const errorMessage = (error: unknown, fallback: string) => error instanceof Error && error.message ? error.message : fallback
 
-function statusBadge(status: string | null | undefined) {
-  const normalized = status || 'Chưa kiểm tra';
-  const cls =
-    normalized === 'Passed' || normalized === 'Clear' || normalized === 'Đạt'
-      ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
-      : normalized === 'Warning' || normalized === 'Conflict'
-        ? 'border-amber-200 bg-amber-50 text-amber-700'
-        : normalized === 'Disqualified'
-          ? 'border-red-100 bg-red-50 text-red-700'
-          : 'border-gray-100 bg-gray-50 text-gray-500';
-
-  return (
-    <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${cls}`}>
-      {normalized}
-    </span>
-  );
+function StatusBadge({ status }: { status?: string | null }) {
+  const value = status || 'Chưa có dữ liệu'
+  const normalized = value.toLowerCase()
+  const style = normalized === 'live' ? 'border-red-200 bg-red-50 text-red-700' : normalized === 'unofficial' ? 'border-amber-200 bg-amber-50 text-amber-700' : normalized === 'official' || normalized === 'fit' || normalized === 'matched' || normalized === 'confirmed' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : normalized === 'cancelled' || normalized === 'withdrawn' || normalized === 'disqualified' || normalized === 'unfit' ? 'border-red-200 bg-red-50 text-red-700' : 'border-slate-200 bg-slate-50 text-slate-600'
+  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${style}`}>{value}</span>
 }
 
 function ResultTable({ title, items }: { title: string; items: StartingListEntry[] }) {
-  if (items.length === 0) return null;
-
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white">
-      <div className="border-b border-gray-100 px-4 py-3">
-        <h3 className="text-sm font-bold text-gray-900">{title}</h3>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-            <tr>
-              <th className="px-4 py-3 font-semibold">Post</th>
-              <th className="px-4 py-3 font-semibold">Ngựa</th>
-              <th className="px-4 py-3 font-semibold">Kỵ sĩ</th>
-              <th className="px-4 py-3 font-semibold">Owner</th>
-              <th className="px-4 py-3 font-semibold">Trạng thái</th>
-              <th className="px-4 py-3 font-semibold">Lý do</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {items.map((item) => (
-              <tr key={item.raceEntryId}>
-                <td className="px-4 py-3 font-mono text-xs font-bold text-gray-500">{item.postPosition ?? '-'}</td>
-                <td className="px-4 py-3 font-semibold text-gray-900">{item.horseName}</td>
-                <td className="px-4 py-3 text-gray-700">{item.jockeyName}</td>
-                <td className="px-4 py-3 text-gray-700">{item.ownerName}</td>
-                <td className="px-4 py-3">{statusBadge(item.status)}</td>
-                <td className="px-4 py-3 text-xs text-gray-500">{item.rejectionReason || '-'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+  if (items.length === 0) return null
+  return <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-100 px-5 py-4"><h3 className="font-bold text-slate-900">{title}</h3></div><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-5 py-3">Post</th><th className="px-5 py-3">Ngựa</th><th className="px-5 py-3">Kỵ sĩ</th><th className="px-5 py-3">Owner</th><th className="px-5 py-3">Trạng thái</th><th className="px-5 py-3">Lý do</th></tr></thead><tbody className="divide-y divide-slate-100">{items.map((item) => <tr key={item.raceEntryId}><td className="px-5 py-4 font-bold">{item.postPosition ?? '—'}</td><td className="px-5 py-4 font-bold text-slate-900">{item.horseName}</td><td className="px-5 py-4">{item.jockeyName}</td><td className="px-5 py-4">{item.ownerName || '—'}</td><td className="px-5 py-4"><StatusBadge status={item.status} /></td><td className="px-5 py-4 text-slate-500">{item.rejectionReason || '—'}</td></tr>)}</tbody></table></div></section>
 }
 
 export default function RefereeRaceConsole() {
-  const location = useLocation();
-  const searchParams = new URLSearchParams(location.search);
-  const raceIdParam = searchParams.get('raceId');
-  const raceId = raceIdParam ? Number(raceIdParam) : null;
-  const hasValidRaceId = raceId != null && Number.isFinite(raceId);
+  const location = useLocation()
+  const navigate = useNavigate()
+  const rawRaceId = new URLSearchParams(location.search).get('raceId')
+  const raceId = rawRaceId && Number.isInteger(Number(rawRaceId)) && Number(rawRaceId) > 0 ? Number(rawRaceId) : null
+  const [assignments, setAssignments] = useState<RefereeRaceAssignment[]>([])
+  const [assignment, setAssignment] = useState<RefereeRaceAssignment | null>(null)
+  const [entries, setEntries] = useState<RefereeRaceEntry[]>([])
+  const [liveStatus, setLiveStatus] = useState<RaceLiveStatus | null>(null)
+  const [violations, setViolations] = useState<RaceViolation[]>([])
+  const [violationCodes, setViolationCodes] = useState<ViolationCodeOption[]>([])
+  const [startingListResult, setStartingListResult] = useState<ConfirmStartingListResult | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+  const [savingKey, setSavingKey] = useState<string | null>(null)
+  const [showViolationForm, setShowViolationForm] = useState(false)
+  const [editingViolationId, setEditingViolationId] = useState<number | null>(null)
+  const [showFinishForm, setShowFinishForm] = useState(false)
+  const [violationForm, setViolationForm] = useState<CreateViolationPayload>({ raceEntryId: 0, violationCode: '', penalty: '', description: '' })
+  const [finishNotes, setFinishNotes] = useState('')
+  const [finishValues, setFinishValues] = useState<Record<number, { position: string; time: string }>>({})
 
-  const [assignment, setAssignment] = useState<RefereeRaceAssignment | null>(null);
-  const [entries, setEntries] = useState<RefereeRaceEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [savingKey, setSavingKey] = useState<string | null>(null);
-  const [toast, setToast] = useState('');
-  const [startingListResult, setStartingListResult] = useState<ConfirmStartingListResult | null>(null);
-  const [liveStatus, setLiveStatus] = useState<RaceLiveStatus | null>(null);
-  const [violations, setViolations] = useState<RaceViolation[]>([]);
-  const [liveLoading, setLiveLoading] = useState(false);
-  const [liveError, setLiveError] = useState('');
-  const [showViolationForm, setShowViolationForm] = useState(false);
-  const [showFinishForm, setShowFinishForm] = useState(false);
-  const [violationForm, setViolationForm] = useState<CreateViolationPayload>({
-    raceEntryId: 0,
-    violationCode: '',
-    penalty: '',
-    description: '',
-  });
-  const [finishNotes, setFinishNotes] = useState('');
-  const [finishValues, setFinishValues] = useState<Record<number, { position: string; time: string }>>({});
-
-  const showToast = (message: string) => {
-    setToast(message);
-    window.setTimeout(() => setToast(''), 3500);
-  };
-
-  useEffect(() => {
-    if (!hasValidRaceId || raceId == null) {
-      setError('Không tìm thấy raceId để mở Race Console.');
-      setLoading(false);
-      return;
-    }
-
-    const load = async () => {
-      try {
-        setLoading(true);
-        setError('');
-        const [assignments, entryList, statusResult, violationList] = await Promise.all([
-          getMyRefereeRaceAssignments().catch(() => []),
-          getRefereeRaceEntries(raceId),
-          getRaceLiveStatus(raceId).catch(() => null),
-          getRaceViolations(raceId).catch(() => []),
-        ]);
-        setAssignment(assignments.find((item) => item.raceId === raceId) ?? null);
-        setEntries(entryList);
-        setLiveStatus(statusResult);
-        setViolations(violationList);
-        if (!statusResult) {
-          setLiveError('Không tải được trạng thái Live Race. Hãy thử bấm Làm mới.');
-        }
-      } catch (err) {
-        setEntries([]);
-        setError(err instanceof Error ? err.message : 'Không tải được danh sách race entries.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    load();
-  }, [hasValidRaceId, raceId]);
-
-  const refreshLiveData = async (showLoading = false) => {
-    if (!raceId) return;
+  const loadConsole = useCallback(async (showRefresh = false) => {
+    if (showRefresh) setRefreshing(true); else setLoading(true)
+    setError('')
     try {
-      if (showLoading) setLiveLoading(true);
-      setLiveError('');
-      const [statusResult, violationList] = await Promise.all([
-        getRaceLiveStatus(raceId),
-        getRaceViolations(raceId),
-      ]);
-      setLiveStatus(statusResult);
-      setViolations(violationList);
-    } catch (err) {
-      setLiveError(err instanceof Error ? err.message : 'Không tải được trạng thái cuộc đua.');
-    } finally {
-      if (showLoading) setLiveLoading(false);
-    }
-  };
+      const assigned = await getMyRefereeRaceAssignments()
+      setAssignments(assigned)
+      if (!raceId) { setAssignment(null); setEntries([]); setLiveStatus(null); setViolations([]); return }
+      const matched = assigned.find((item) => item.raceId === raceId) ?? null
+      setAssignment(matched)
+      if (!matched) {
+        setEntries([]); setLiveStatus(null); setViolations([])
+        setError('Cuộc đua này không thuộc phạm vi được phân công của bạn.')
+        return
+      }
+      const [entryList, statusResult, violationList, codeList] = await Promise.all([
+        getRefereeRaceEntries(raceId), getRaceLiveStatus(raceId), getRaceViolations(raceId), getViolationCodes(),
+      ])
+      setEntries(entryList); setLiveStatus(statusResult); setViolations(violationList); setViolationCodes(codeList)
+    } catch (loadError) { setError(errorMessage(loadError, 'Không tải được dữ liệu bàn điều hành.')) }
+    finally { setLoading(false); setRefreshing(false) }
+  }, [raceId])
 
-  useEffect(() => {
-    if (!raceId || liveStatus?.status?.toLowerCase() !== 'live') return;
-    const intervalId = window.setInterval(() => refreshLiveData(false), 4000);
-    return () => window.clearInterval(intervalId);
-  }, [raceId, liveStatus?.status]);
+  useEffect(() => { const id = window.setTimeout(() => void loadConsole(), 0); return () => window.clearTimeout(id) }, [loadConsole])
+  useEffect(() => { if (!raceId || liveStatus?.status !== 'Live' || !assignment) return; const id = window.setInterval(() => { void Promise.all([getRaceLiveStatus(raceId), getRaceViolations(raceId)]).then(([status, items]) => { setLiveStatus(status); setViolations(items) }).catch(() => undefined) }, 5000); return () => window.clearInterval(id) }, [assignment, liveStatus?.status, raceId])
+
+  const raceStatus = liveStatus?.status ?? assignment?.raceStatus ?? ''
+  const eligibleLiveEntries = useMemo(() => liveStatus?.entries.filter((entry) => !inactiveEntry(entry)) ?? [], [liveStatus])
+  const notify = (value: string) => { setMessage(value); window.setTimeout(() => setMessage(''), 4000) }
 
   const handleConfirmStartingList = async () => {
-    if (!raceId) return;
-    try {
-      setSavingKey('starting-list');
-      const result = await confirmStartingList(raceId);
-      setStartingListResult(result);
-      showToast(result.message || 'Đã xác nhận starting list.');
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Không thể xác nhận starting list.');
-    } finally {
-      setSavingKey(null);
-    }
-  };
+    if (!raceId || !assignment || raceStatus !== 'Upcoming') return
+    setSavingKey('starting-list')
+    try { const result = await confirmStartingList(raceId); setStartingListResult(result); notify(result.message || 'Đã xác nhận danh sách xuất phát.'); await loadConsole(true) }
+    catch (actionError) { notify(errorMessage(actionError, 'Không thể xác nhận danh sách xuất phát.')) }
+    finally { setSavingKey(null) }
+  }
 
   const handleStartRace = async () => {
-    if (!raceId || !window.confirm('Bạn có chắc muốn bắt đầu cuộc đua?')) return;
-    try {
-      setSavingKey('start-race');
-      await startRace(raceId);
-      await refreshLiveData();
-      showToast('Cuộc đua đã bắt đầu.');
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Không thể bắt đầu cuộc đua.');
-    } finally {
-      setSavingKey(null);
-    }
-  };
+    if (!raceId || !assignment || raceStatus !== 'Pre-Race' || !window.confirm('Xác nhận bắt đầu cuộc đua này?')) return
+    setSavingKey('start-race')
+    try { await startRace(raceId); await loadConsole(true); notify('Cuộc đua đã chuyển sang Live.') }
+    catch (actionError) { notify(errorMessage(actionError, 'Không thể bắt đầu cuộc đua.')) }
+    finally { setSavingKey(null) }
+  }
 
-  const handleCreateViolation = async () => {
-    if (!raceId) return;
-    if (!violationForm.raceEntryId || !violationForm.violationCode.trim() || !violationForm.penalty.trim()) {
-      showToast('Vui lòng chọn entry, nhập mã vi phạm và hình phạt.');
-      return;
-    }
+  const resetViolationForm = () => { setViolationForm({ raceEntryId: 0, violationCode: '', penalty: '', description: '' }); setEditingViolationId(null); setShowViolationForm(false) }
+  const editViolation = (item: RaceViolation) => {
+    if (!item.violationId || !item.raceEntryId) return
+    setViolationForm({ raceEntryId: item.raceEntryId, violationCode: item.violationCode, penalty: item.penalty, placeBehindEntryId: item.placeBehindEntryId ?? undefined, description: item.description ?? '' })
+    setEditingViolationId(item.violationId); setShowViolationForm(true)
+  }
+  const handleSaveViolation = async () => {
+    if (!raceId || raceStatus !== 'Live') return
+    if (!violationForm.raceEntryId || !violationForm.violationCode || !PENALTIES.includes(violationForm.penalty as typeof PENALTIES[number]) || !violationForm.description.trim()) { notify('Vui lòng nhập đầy đủ entry, mã, hình phạt và mô tả vi phạm.'); return }
+    if (violationForm.penalty === 'PlaceBehind' && !violationForm.placeBehindEntryId) { notify('Vui lòng chọn entry xếp sau cho hình phạt PlaceBehind.'); return }
+    const payload = { violationCode: violationForm.violationCode, penalty: violationForm.penalty, description: violationForm.description.trim(), ...(violationForm.penalty === 'PlaceBehind' && violationForm.placeBehindEntryId ? { placeBehindEntryId: violationForm.placeBehindEntryId } : {}) }
+    setSavingKey('violation')
     try {
-      setSavingKey('violation');
-      await createRaceViolation(raceId, {
-        ...violationForm,
-        violationCode: violationForm.violationCode.trim(),
-        penalty: violationForm.penalty.trim(),
-        description: violationForm.description.trim(),
-      });
-      setViolationForm({ raceEntryId: 0, violationCode: '', penalty: '', description: '' });
-      setShowViolationForm(false);
-      setViolations(await getRaceViolations(raceId));
-      showToast('Đã ghi nhận vi phạm.');
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Không thể ghi nhận vi phạm.');
-    } finally {
-      setSavingKey(null);
-    }
-  };
+      if (editingViolationId) await updateRaceViolation(raceId, editingViolationId, payload)
+      else await createRaceViolation(raceId, { raceEntryId: violationForm.raceEntryId, ...payload })
+      setViolations(await getRaceViolations(raceId)); notify(editingViolationId ? 'Đã cập nhật vi phạm.' : 'Đã ghi nhận vi phạm.'); resetViolationForm()
+    } catch (actionError) { notify(errorMessage(actionError, 'Không thể lưu vi phạm.')) }
+    finally { setSavingKey(null) }
+  }
+  const handleDeleteViolation = async (item: RaceViolation) => {
+    if (!raceId || !item.violationId || raceStatus !== 'Live' || !window.confirm(`Xóa vi phạm ${item.violationCode}?`)) return
+    setSavingKey(`delete-${item.violationId}`)
+    try { await deleteRaceViolation(raceId, item.violationId); setViolations(await getRaceViolations(raceId)); notify('Đã xóa vi phạm.') }
+    catch (actionError) { notify(errorMessage(actionError, 'Không thể xóa vi phạm.')) }
+    finally { setSavingKey(null) }
+  }
 
   const handleFinishRace = async () => {
-    if (!raceId || !liveStatus) return;
-    const activeEntries = liveStatus.entries.filter((entry) => !entry.isWithdrawn);
-    const results = activeEntries.map((entry) => ({
-      raceEntryId: entry.raceEntryId,
-      finishPosition: Number(finishValues[entry.raceEntryId]?.position),
-      finishTime: Number(finishValues[entry.raceEntryId]?.time),
-    }));
-    const positions = results.map((item) => item.finishPosition);
-    if (results.some((item) => !Number.isInteger(item.finishPosition) || item.finishPosition <= 0 || item.finishTime <= 0)) {
-      showToast('Mỗi entry phải có thứ hạng nguyên dương và thời gian lớn hơn 0.');
-      return;
-    }
-    if (new Set(positions).size !== positions.length) {
-      showToast('Thứ hạng không được trùng nhau.');
-      return;
-    }
-    if (!window.confirm('Kết thúc cuộc đua và lưu kết quả? Thao tác này khó hoàn tác.')) return;
-    const payload: FinishRacePayload = { notes: finishNotes.trim(), results };
-    try {
-      setSavingKey('finish-race');
-      await finishRace(raceId, payload);
-      setShowFinishForm(false);
-      await refreshLiveData();
-      showToast('Đã kết thúc cuộc đua.');
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Không thể kết thúc cuộc đua.');
-    } finally {
-      setSavingKey(null);
-    }
-  };
+    if (!raceId || raceStatus !== 'Live') return
+    const results = eligibleLiveEntries.map((entry) => ({ raceEntryId: entry.raceEntryId, finishPosition: Number(finishValues[entry.raceEntryId]?.position), ...(finishValues[entry.raceEntryId]?.time ? { finishTime: Number(finishValues[entry.raceEntryId].time) } : {}) }))
+    if (results.length === 0 || results.some((item) => !Number.isInteger(item.finishPosition) || item.finishPosition <= 0 || (item.finishTime !== undefined && item.finishTime <= 0))) { notify('Mỗi entry hợp lệ phải có thứ hạng nguyên dương; thời gian nếu nhập phải lớn hơn 0.'); return }
+    let expected = 1
+    const groups = [...new Set(results.map((item) => item.finishPosition))].sort((a, b) => a - b)
+    for (const position of groups) { if (position !== expected) { notify('Thứ hạng phải theo chuẩn thi đấu, ví dụ 1,2,3 hoặc đồng hạng 1,1,3.'); return } expected += results.filter((item) => item.finishPosition === position).length }
+    if (!window.confirm('Chốt kết quả sơ bộ và chuyển cuộc đua sang Unofficial?')) return
+    const payload: FinishRacePayload = { notes: finishNotes.trim(), results }
+    setSavingKey('finish-race')
+    try { await finishRace(raceId, payload); setShowFinishForm(false); await loadConsole(true); notify('Đã chốt kết quả sơ bộ. Kết quả đang chờ Admin công bố Official.') }
+    catch (actionError) { notify(errorMessage(actionError, 'Không thể chốt kết quả sơ bộ.')) }
+    finally { setSavingKey(null) }
+  }
 
-  const liveState = liveStatus?.status?.toLowerCase() ?? '';
-  const isLive = liveState === 'live';
-  const isFinished = liveState === 'finished' || liveState === 'completed';
+  if (loading) return <div className="space-y-5" aria-busy="true"><div className="h-24 animate-pulse rounded-xl bg-white" /><div className="h-80 animate-pulse rounded-xl border border-slate-200 bg-white" /></div>
 
-  return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      {toast && (
-        <div className="fixed right-4 top-4 z-50 rounded-lg bg-gray-900 px-4 py-3 text-xs font-semibold text-white shadow-lg">
-          {toast}
-        </div>
-      )}
+  return <div className="space-y-6">
+    {message && <div role="status" className="fixed bottom-5 right-5 z-50 max-w-sm rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white shadow-xl">{message}</div>}
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-black uppercase tracking-[.16em] text-blue-700">Điều hành cuộc đua</p><h1 className="mt-1 text-2xl font-black text-slate-950 sm:text-3xl">Bàn điều hành Referee</h1><p className="mt-2 text-sm text-slate-500">Chỉ các cuộc đua được Admin phân công mới có thể mở và thao tác.</p></div>{raceId && <button type="button" onClick={() => navigate('/referee/race-console')} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700">Đổi cuộc đua</button>}</div>
 
-      <div className="flex flex-col gap-4 border-b border-gray-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Race Console</h1>
-          {assignment ? (
-            <div className="mt-1.5 space-y-0.5">
-              <p className="text-xs text-gray-500">
-                <span className="font-semibold text-gray-700">{assignment.tournamentName ?? 'Tournament'}</span>
-                {' - '}
-                {assignment.roundName ?? 'Round'}
-                {' - '}
-                <span className="font-mono font-bold text-blue-700">
-                  Race #{assignment.raceNumber ?? assignment.raceId}
-                </span>
-              </p>
-              <p className="text-xs text-gray-400">{formatDateTime(assignment.scheduledTime)}</p>
-            </div>
-          ) : hasValidRaceId ? (
-            <p className="mt-1 text-xs text-amber-600">
-              Không tìm thấy race này trong assignment của bạn, nhưng vẫn thử tải entries.
-            </p>
-          ) : (
-            <p className="mt-1 text-xs text-red-600">Thiếu raceId.</p>
-          )}
-        </div>
+    {!raceId ? <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-100 px-5 py-4"><h2 className="font-bold text-slate-900">Cuộc đua được phân công</h2><p className="mt-1 text-xs text-slate-500">Chọn một race để mở bàn điều hành.</p></div>{assignments.length === 0 ? <div className="px-6 py-14 text-center"><p className="font-bold text-slate-700">Chưa có cuộc đua được phân công.</p><p className="mt-1 text-sm text-slate-500">Admin sẽ phân công sau khi bạn được duyệt vào roster.</p></div> : <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-5 py-3">Giải đấu / vòng</th><th className="px-5 py-3">Race</th><th className="px-5 py-3">Thời gian</th><th className="px-5 py-3">Vai trò</th><th className="px-5 py-3">Trạng thái</th><th className="px-5 py-3 text-right">Thao tác</th></tr></thead><tbody className="divide-y divide-slate-100">{assignments.map((item) => <tr key={`${item.raceId}-${item.assignedAt}`}><td className="px-5 py-4"><p className="font-bold text-slate-900">{item.tournamentName ?? '—'}</p><p className="mt-1 text-xs text-slate-500">{item.roundName ?? '—'}</p></td><td className="px-5 py-4 font-bold">#{item.raceNumber ?? item.raceId}</td><td className="whitespace-nowrap px-5 py-4">{formatDateTime(item.scheduledTime)}</td><td className="px-5 py-4">{item.assignmentRole ?? item.role ?? 'Referee'}</td><td className="px-5 py-4"><StatusBadge status={item.raceStatus} /></td><td className="px-5 py-4 text-right"><button type="button" onClick={() => navigate(`/referee/race-console?raceId=${item.raceId}`)} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold">Mở bàn điều hành</button></td></tr>)}</tbody></table></div>}</section> : error || !assignment ? <section className="rounded-xl border border-red-200 bg-white p-6 shadow-sm"><h2 className="font-bold text-slate-900">Không thể mở cuộc đua</h2><p role="alert" className="mt-2 text-sm text-red-700">{error || 'Không tìm thấy phân công phù hợp.'}</p><button type="button" onClick={() => navigate('/referee/race-console')} className="mt-4 rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold">Về danh sách phân công</button></section> : <>
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div><div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-black text-slate-950">{assignment.tournamentName ?? 'Giải đấu'} · Race #{assignment.raceNumber ?? assignment.raceId}</h2><StatusBadge status={raceStatus} /></div><p className="mt-2 text-sm text-slate-500">{assignment.roundName ?? '—'} · {formatDateTime(assignment.scheduledTime)} · {assignment.assignmentRole ?? assignment.role ?? 'Referee'}</p></div><div className="flex flex-wrap gap-2"><button type="button" onClick={() => void loadConsole(true)} disabled={refreshing} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 disabled:opacity-50">{refreshing ? 'Đang tải...' : 'Làm mới'}</button>{raceStatus === 'Upcoming' && <button type="button" onClick={() => void handleConfirmStartingList()} disabled={savingKey === 'starting-list' || entries.length === 0} className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold disabled:opacity-50">{savingKey === 'starting-list' ? 'Đang xác nhận...' : 'Xác nhận starting list'}</button>}{raceStatus === 'Pre-Race' && <button type="button" onClick={() => void handleStartRace()} disabled={savingKey === 'start-race'} className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold disabled:opacity-50">{savingKey === 'start-race' ? 'Đang bắt đầu...' : 'Bắt đầu cuộc đua'}</button>}{raceStatus === 'Live' && <><button type="button" onClick={() => { resetViolationForm(); setShowViolationForm(true) }} className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-900">Ghi nhận vi phạm</button><button type="button" onClick={() => setShowFinishForm((value) => !value)} className="rounded-lg bg-slate-950 px-4 py-2 text-xs font-bold text-white">Chốt kết quả sơ bộ</button></>}</div></div>{raceStatus === 'Unofficial' && <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">Kết quả đang ở trạng thái Unofficial và chờ Admin công bố chính thức.</p>}{raceStatus === 'Official' && <p className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">Kết quả đã được Admin công bố Official. Referee chỉ có quyền xem.</p>}</section>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-md border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-blue-700">
-            Referee Pre-Race
-          </span>
-          <button
-            onClick={handleConfirmStartingList}
-            disabled={entries.length === 0 || savingKey === 'starting-list'}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
-          >
-            {savingKey === 'starting-list' ? 'Đang xác nhận...' : 'Xác nhận starting list'}
-          </button>
-        </div>
-      </div>
+      {showViolationForm && raceStatus === 'Live' && <section className="rounded-xl border border-amber-200 bg-amber-50 p-5"><h2 className="font-bold text-amber-950">{editingViolationId ? 'Cập nhật vi phạm' : 'Ghi nhận vi phạm'}</h2><div className="mt-4 grid gap-4 md:grid-cols-2"><label className="text-sm font-bold text-slate-700">Race entry<select value={violationForm.raceEntryId} onChange={(event) => setViolationForm((prev) => ({ ...prev, raceEntryId: Number(event.target.value) }))} disabled={editingViolationId !== null} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal"><option value={0}>Chọn entry hợp lệ</option>{eligibleLiveEntries.map((entry) => <option key={entry.raceEntryId} value={entry.raceEntryId}>Post {entry.postPosition ?? '—'} · {entry.horseName} / {entry.jockeyName}</option>)}</select></label><label className="text-sm font-bold text-slate-700">Mã vi phạm<select value={violationForm.violationCode} onChange={(event) => setViolationForm((prev) => ({ ...prev, violationCode: event.target.value }))} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal"><option value="">Chọn mã backend hỗ trợ</option>{violationCodes.map((item) => <option key={item.code} value={item.code}>{item.code} · {item.name}</option>)}</select></label><label className="text-sm font-bold text-slate-700">Hình phạt<select value={violationForm.penalty} onChange={(event) => setViolationForm((prev) => ({ ...prev, penalty: event.target.value, placeBehindEntryId: undefined }))} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal"><option value="">Chọn hình phạt</option>{PENALTIES.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>{violationForm.penalty === 'PlaceBehind' && <label className="text-sm font-bold text-slate-700">Xếp sau entry<select value={violationForm.placeBehindEntryId ?? ''} onChange={(event) => setViolationForm((prev) => ({ ...prev, placeBehindEntryId: event.target.value ? Number(event.target.value) : undefined }))} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal"><option value="">Chọn entry</option>{eligibleLiveEntries.filter((entry) => entry.raceEntryId !== violationForm.raceEntryId).map((entry) => <option key={entry.raceEntryId} value={entry.raceEntryId}>{entry.horseName} / {entry.jockeyName}</option>)}</select></label>}<label className="text-sm font-bold text-slate-700 md:col-span-2">Mô tả<textarea rows={3} value={violationForm.description} onChange={(event) => setViolationForm((prev) => ({ ...prev, description: event.target.value }))} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal" /></label></div><div className="mt-4 flex justify-end gap-2"><button type="button" onClick={resetViolationForm} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold">Hủy</button><button type="button" onClick={() => void handleSaveViolation()} disabled={savingKey === 'violation'} className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{savingKey === 'violation' ? 'Đang lưu...' : 'Lưu vi phạm'}</button></div></section>}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Entries</p>
-          <p className="mt-2 text-2xl font-bold text-gray-900">{entries.length}</p>
-        </div>
-      </div>
+      {showFinishForm && raceStatus === 'Live' && <section className="rounded-xl border border-slate-300 bg-white p-5 shadow-sm"><h2 className="font-bold text-slate-950">Chốt kết quả sơ bộ</h2><p className="mt-1 text-sm text-slate-500">Nhập đủ entry hợp lệ. Đồng hạng được phép theo chuẩn 1,1,3.</p><div className="mt-4 space-y-3">{eligibleLiveEntries.map((entry) => <div key={entry.raceEntryId} className="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-[1fr_150px_170px] sm:items-center"><div><p className="font-bold text-slate-900">{entry.horseName}</p><p className="text-xs text-slate-500">{entry.jockeyName}</p></div><input type="number" min={1} step={1} value={finishValues[entry.raceEntryId]?.position ?? ''} onChange={(event) => setFinishValues((prev) => ({ ...prev, [entry.raceEntryId]: { position: event.target.value, time: prev[entry.raceEntryId]?.time ?? '' } }))} placeholder="Thứ hạng" className="rounded-lg border border-slate-300 px-3 py-2" /><input type="number" min={0.01} step={0.01} value={finishValues[entry.raceEntryId]?.time ?? ''} onChange={(event) => setFinishValues((prev) => ({ ...prev, [entry.raceEntryId]: { position: prev[entry.raceEntryId]?.position ?? '', time: event.target.value } }))} placeholder="Thời gian, không bắt buộc" className="rounded-lg border border-slate-300 px-3 py-2" /></div>)}<textarea rows={3} value={finishNotes} onChange={(event) => setFinishNotes(event.target.value)} placeholder="Ghi chú cuộc đua, không bắt buộc" className="w-full rounded-lg border border-slate-300 px-3 py-2.5" /></div><div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setShowFinishForm(false)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold">Hủy</button><button type="button" onClick={() => void handleFinishRace()} disabled={savingKey === 'finish-race'} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{savingKey === 'finish-race' ? 'Đang chốt...' : 'Xác nhận Unofficial'}</button></div></section>}
 
-      <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-gray-900">Điều hành cuộc đua</h2>
-              {liveStatus && (
-                <span
-                  className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
-                    isLive
-                      ? 'border-red-100 bg-red-50 text-red-700'
-                      : isFinished
-                        ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
-                        : 'border-blue-100 bg-blue-50 text-blue-700'
-                  }`}
-                >
-                  {isLive ? 'Đang diễn ra' : isFinished ? 'Đã hoàn thành' : liveStatus.status}
-                </span>
-              )}
-            </div>
-            <p className="mt-1 text-xs text-gray-500">
-              {liveStatus?.actualStartTime
-                ? `Bắt đầu: ${formatDateTime(liveStatus.actualStartTime)}`
-                : 'Cuộc đua chưa bắt đầu'}
-              {liveStatus?.raceDurationSeconds != null && ` · Thời lượng: ${liveStatus.raceDurationSeconds} giây`}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => refreshLiveData(true)}
-              disabled={liveLoading}
-              className="rounded-md border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            >
-              {liveLoading ? 'Đang tải...' : 'Làm mới'}
-            </button>
-            {!isLive && !isFinished && (
-              <button
-                type="button"
-                onClick={handleStartRace}
-                disabled={!liveStatus || savingKey === 'start-race'}
-                className="rounded-md bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-500"
-              >
-                {savingKey === 'start-race' ? 'Đang bắt đầu...' : 'Bắt đầu cuộc đua'}
-              </button>
-            )}
-            {isLive && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setShowViolationForm((value) => !value)}
-                  className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100"
-                >
-                  Ghi nhận vi phạm
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowFinishForm((value) => !value)}
-                  className="rounded-md bg-gray-900 px-4 py-2 text-xs font-semibold text-white hover:bg-gray-800"
-                >
-                  Kết thúc cuộc đua
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {liveError && (
-          <div className="m-5 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{liveError}</div>
-        )}
-
-        {!liveStatus && !liveError ? (
-          <div className="p-8 text-center text-sm text-gray-500">Đang tải trạng thái cuộc đua...</div>
-        ) : liveStatus?.entries.length === 0 ? (
-          <div className="p-8 text-center text-sm text-gray-500">Chưa có entry trong cuộc đua.</div>
-        ) : liveStatus ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-gray-100 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                <tr>
-                  <th className="px-5 py-3 font-semibold">Post</th>
-                  <th className="px-5 py-3 font-semibold">Ngựa / Kỵ sĩ</th>
-                  <th className="px-5 py-3 font-semibold">Entry</th>
-                  <th className="px-5 py-3 font-semibold">Thứ hạng</th>
-                  <th className="px-5 py-3 font-semibold">Thời gian</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {liveStatus.entries.map((entry) => (
-                  <tr key={entry.raceEntryId}>
-                    <td className="px-5 py-4 font-mono text-xs font-bold text-gray-500">{entry.postPosition ?? '—'}</td>
-                    <td className="px-5 py-4">
-                      <p className="font-semibold text-gray-900">{entry.horseName}</p>
-                      <p className="text-xs text-gray-400">{entry.jockeyName}</p>
-                    </td>
-                    <td className="px-5 py-4">{statusBadge(entry.isWithdrawn ? 'Withdrawn' : entry.status)}</td>
-                    <td className="px-5 py-4 text-gray-700">{entry.finishPosition ?? '—'}</td>
-                    <td className="px-5 py-4 text-gray-700">
-                      {entry.finishTime != null ? `${entry.finishTime} giây` : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : null}
-
-        {showViolationForm && isLive && liveStatus && (
-          <div className="border-t border-gray-100 bg-gray-50 p-5">
-            <h3 className="text-sm font-bold text-gray-900">Ghi nhận vi phạm</h3>
-            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-              <select
-                value={violationForm.raceEntryId}
-                onChange={(event) => setViolationForm((prev) => ({ ...prev, raceEntryId: Number(event.target.value) }))}
-                className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm"
-              >
-                <option value={0}>Chọn ngựa / kỵ sĩ</option>
-                {liveStatus.entries.filter((entry) => !entry.isWithdrawn).map((entry) => (
-                  <option key={entry.raceEntryId} value={entry.raceEntryId}>
-                    Post {entry.postPosition ?? '—'} · {entry.horseName} / {entry.jockeyName}
-                  </option>
-                ))}
-              </select>
-              <input
-                value={violationForm.violationCode}
-                onChange={(event) => setViolationForm((prev) => ({ ...prev, violationCode: event.target.value }))}
-                placeholder="Mã vi phạm"
-                className="rounded-md border border-gray-200 px-3 py-2 text-sm"
-              />
-              <input
-                value={violationForm.penalty}
-                onChange={(event) => setViolationForm((prev) => ({ ...prev, penalty: event.target.value }))}
-                placeholder="Hình phạt"
-                className="rounded-md border border-gray-200 px-3 py-2 text-sm"
-              />
-              <select
-                value={violationForm.placeBehindEntryId ?? ''}
-                onChange={(event) =>
-                  setViolationForm((prev) => ({
-                    ...prev,
-                    placeBehindEntryId: event.target.value ? Number(event.target.value) : undefined,
-                  }))
-                }
-                className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm"
-              >
-                <option value="">Không xếp sau entry khác</option>
-                {liveStatus.entries
-                  .filter((entry) => entry.raceEntryId !== violationForm.raceEntryId)
-                  .map((entry) => (
-                    <option key={entry.raceEntryId} value={entry.raceEntryId}>{entry.horseName}</option>
-                  ))}
-              </select>
-              <textarea
-                value={violationForm.description}
-                onChange={(event) => setViolationForm((prev) => ({ ...prev, description: event.target.value }))}
-                placeholder="Mô tả chi tiết"
-                rows={3}
-                className="rounded-md border border-gray-200 px-3 py-2 text-sm md:col-span-2"
-              />
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setShowViolationForm(false)} className="rounded-md border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700">Hủy</button>
-              <button type="button" onClick={handleCreateViolation} disabled={savingKey === 'violation'} className="rounded-md bg-amber-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">
-                {savingKey === 'violation' ? 'Đang lưu...' : 'Lưu vi phạm'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {showFinishForm && isLive && liveStatus && (
-          <div className="border-t border-gray-100 bg-gray-50 p-5">
-            <h3 className="text-sm font-bold text-gray-900">Nhập kết quả cuộc đua</h3>
-            <div className="mt-4 space-y-3">
-              {liveStatus.entries.filter((entry) => !entry.isWithdrawn).map((entry) => (
-                <div key={entry.raceEntryId} className="grid grid-cols-1 gap-3 rounded-md border border-gray-200 bg-white p-3 sm:grid-cols-[1fr_160px_160px] sm:items-center">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">{entry.horseName}</p>
-                    <p className="text-xs text-gray-400">{entry.jockeyName}</p>
-                  </div>
-                  <input
-                    type="number"
-                    min={1}
-                    step={1}
-                    value={finishValues[entry.raceEntryId]?.position ?? ''}
-                    onChange={(event) => setFinishValues((prev) => ({ ...prev, [entry.raceEntryId]: { position: event.target.value, time: prev[entry.raceEntryId]?.time ?? '' } }))}
-                    placeholder="Thứ hạng"
-                    className="rounded-md border border-gray-200 px-3 py-2 text-sm"
-                  />
-                  <input
-                    type="number"
-                    min={0.01}
-                    step={0.01}
-                    value={finishValues[entry.raceEntryId]?.time ?? ''}
-                    onChange={(event) => setFinishValues((prev) => ({ ...prev, [entry.raceEntryId]: { position: prev[entry.raceEntryId]?.position ?? '', time: event.target.value } }))}
-                    placeholder="Thời gian (giây)"
-                    className="rounded-md border border-gray-200 px-3 py-2 text-sm"
-                  />
-                </div>
-              ))}
-              <textarea value={finishNotes} onChange={(event) => setFinishNotes(event.target.value)} placeholder="Ghi chú cuộc đua" rows={3} className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm" />
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setShowFinishForm(false)} className="rounded-md border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700">Hủy</button>
-              <button type="button" onClick={handleFinishRace} disabled={savingKey === 'finish-race'} className="rounded-md bg-gray-900 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">
-                {savingKey === 'finish-race' ? 'Đang kết thúc...' : 'Xác nhận kết thúc'}
-              </button>
-            </div>
-          </div>
-        )}
-      </section>
-
-      <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-        <div className="border-b border-gray-100 px-5 py-4">
-          <h2 className="text-base font-bold text-gray-900">Vi phạm cuộc đua</h2>
-        </div>
-        {violations.length === 0 ? (
-          <div className="p-8 text-center text-sm text-gray-500">Chưa có vi phạm nào được ghi nhận.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-gray-100 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                <tr>
-                  <th className="px-5 py-3 font-semibold">Entry</th>
-                  <th className="px-5 py-3 font-semibold">Mã vi phạm</th>
-                  <th className="px-5 py-3 font-semibold">Hình phạt</th>
-                  <th className="px-5 py-3 font-semibold">Mô tả</th>
-                  <th className="px-5 py-3 font-semibold">Thời gian</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {violations.map((violation, index) => (
-                  <tr key={violation.violationId ?? `${violation.raceEntryId}-${index}`}>
-                    <td className="px-5 py-4 text-gray-700">{violation.horseName || violation.jockeyName || violation.raceEntryId || '—'}</td>
-                    <td className="px-5 py-4 font-semibold text-gray-900">{violation.violationCode || '—'}</td>
-                    <td className="px-5 py-4 text-gray-700">{violation.penalty || '—'}</td>
-                    <td className="px-5 py-4 text-gray-500">{violation.description || '—'}</td>
-                    <td className="px-5 py-4 text-gray-500">{violation.recordedAt ? formatDateTime(violation.recordedAt) : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-          <div>
-            <h2 className="text-base font-bold text-gray-900">Race entries</h2>
-            <p className="mt-1 text-xs text-gray-500">Entries chỉ hiện sau khi Admin bốc thăm post position.</p>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="p-10 text-center text-sm text-gray-500">Đang tải race entries...</div>
-        ) : error ? (
-          <div className="m-5 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-        ) : entries.length === 0 ? (
-          <div className="p-12 text-center">
-            <p className="text-sm font-semibold text-gray-700">Chưa có race entry nào trong race này.</p>
-            <p className="mt-1 text-xs text-gray-400">Hãy kiểm tra race đã được bốc thăm post position chưa.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-gray-100 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                <tr>
-                  <th className="px-5 py-3 font-semibold">Post</th>
-                  <th className="px-5 py-3 font-semibold">Ngựa / Kỵ sĩ</th>
-                  <th className="px-5 py-3 font-semibold">Owner</th>
-                  <th className="px-5 py-3 font-semibold">Entry status</th>
-                  <th className="px-5 py-3 font-semibold">Doctor checks</th>
-                  <th className="px-5 py-3 text-right font-semibold">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {entries.map((entry) => {
-                  return (
-                    <tr key={entry.raceEntryId} className="hover:bg-gray-50/50">
-                      <td className="px-5 py-4 font-mono text-xs font-bold text-gray-500">
-                        {entry.postPosition ?? '-'}
-                      </td>
-                      <td className="px-5 py-4">
-                        <p className="font-semibold text-gray-900">{entry.horseName}</p>
-                        <p className="mt-0.5 text-xs text-gray-400">{entry.jockeyName}</p>
-                      </td>
-                      <td className="px-5 py-4 text-gray-700">{entry.ownerName ?? '-'}</td>
-                      <td className="px-5 py-4">{statusBadge(entry.raceEntryStatus ?? entry.status)}</td>
-                      <td className="px-5 py-4">
-                        <div className="space-y-1 text-xs text-gray-500">
-                          <p>Danh tính: {entry.horseIdentityCheckStatus || 'Chưa kiểm tra'}</p>
-                          <p>Khám: {entry.clinicalStatus || 'Chưa khám'}</p>
-                          <p>Cân trước đua: {entry.preRaceJockeyWeight ?? 'Chưa cân'}</p>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      {startingListResult && (
-        <section className="space-y-4">
-          <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            <p className="font-semibold">{startingListResult.message || 'Đã xác nhận starting list.'}</p>
-            <p className="mt-1 text-xs">
-              Accepted: {startingListResult.confirmedEntriesCount} - Rejected:{' '}
-              {startingListResult.rejectedEntriesCount}
-            </p>
-          </div>
-          <ResultTable title="Entries được xác nhận vào starting list" items={startingListResult.confirmedEntries ?? []} />
-          <ResultTable title="Entries bị loại khỏi starting list" items={startingListResult.rejectedEntries ?? []} />
-        </section>
-      )}
-    </div>
-  );
+      <div className="grid gap-6 xl:grid-cols-2"><section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-100 px-5 py-4"><h2 className="font-bold text-slate-900">Race entries</h2><p className="mt-1 text-xs text-slate-500">Dữ liệu xuất phát và điều kiện y tế do backend cung cấp.</p></div>{entries.length === 0 ? <p className="px-5 py-12 text-center text-sm text-slate-500">Chưa có race entry.</p> : <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Post</th><th className="px-4 py-3">Ngựa / Kỵ sĩ</th><th className="px-4 py-3">Trạng thái</th><th className="px-4 py-3">Kiểm tra</th></tr></thead><tbody className="divide-y divide-slate-100">{entries.map((entry) => <tr key={entry.raceEntryId} className={inactiveEntry({ status: entry.raceEntryStatus ?? entry.status, isWithdrawn: entry.isWithdrawn }) ? 'bg-slate-50 text-slate-500' : ''}><td className="px-4 py-4 font-bold">{entry.postPosition ?? '—'}</td><td className="px-4 py-4"><p className="font-bold text-slate-900">{entry.horseName}</p><p className="text-xs text-slate-500">{entry.jockeyName}</p>{entry.ownerName && <p className="mt-1 text-xs text-slate-400">Owner: {entry.ownerName}</p>}</td><td className="px-4 py-4"><StatusBadge status={entry.isWithdrawn ? 'Withdrawn' : entry.raceEntryStatus ?? entry.status} /></td><td className="px-4 py-4 text-xs leading-5 text-slate-600"><p>Danh tính: {entry.horseIdentityCheckStatus ?? 'Chưa kiểm tra'}</p><p>Lâm sàng: {entry.clinicalStatus ?? 'Chưa kiểm tra'}</p><p>Cân trước đua: {entry.preRaceJockeyWeight != null ? `${entry.preRaceJockeyWeight} kg` : 'Chưa cân'}</p></td></tr>)}</tbody></table></div>}</section>
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-100 px-5 py-4"><h2 className="font-bold text-slate-900">Vi phạm</h2><p className="mt-1 text-xs text-slate-500">Chỉ có thể sửa hoặc xóa khi race đang Live.</p></div>{violations.length === 0 ? <p className="px-5 py-12 text-center text-sm text-slate-500">Chưa có vi phạm được ghi nhận.</p> : <div className="divide-y divide-slate-100">{violations.map((item, index) => <article key={item.violationId ?? index} className="p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-bold text-slate-900">{item.violationCode}</p><StatusBadge status={item.penalty} /></div><p className="mt-1 text-sm text-slate-600">{item.horseName || item.jockeyName || `Entry ${item.raceEntryId}`}</p><p className="mt-2 text-sm text-slate-500">{item.description || '—'}</p><p className="mt-2 text-xs text-slate-400">{formatDateTime(item.loggedAt ?? item.recordedAt)}</p></div>{raceStatus === 'Live' && item.violationId && <div className="flex gap-2"><button type="button" onClick={() => editViolation(item)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold">Sửa</button><button type="button" onClick={() => void handleDeleteViolation(item)} disabled={savingKey === `delete-${item.violationId}`} className="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 disabled:opacity-50">{savingKey === `delete-${item.violationId}` ? 'Đang xóa...' : 'Xóa'}</button></div>}</div></article>)}</div>}</section></div>
+      {startingListResult && <div className="space-y-4"><div className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-900"><p className="font-bold">{startingListResult.message || 'Đã xác nhận danh sách xuất phát.'}</p><p className="mt-1">Được xác nhận: {startingListResult.confirmedEntriesCount} · Bị loại: {startingListResult.rejectedEntriesCount}</p></div><ResultTable title="Entries được xác nhận" items={startingListResult.confirmedEntries ?? []} /><ResultTable title="Entries bị loại" items={startingListResult.rejectedEntries ?? []} /></div>}
+    </>}
+  </div>
 }

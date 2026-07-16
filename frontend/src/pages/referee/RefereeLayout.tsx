@@ -1,163 +1,111 @@
-import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { useCallback, useEffect, useState } from 'react';
-import { getMyAccountProfile } from '../../services/accountService';
-import { logout } from '../../services/authService';
-import { getRefereeProfile } from '../../services/refereeService';
-import useAuthStore from '../../store/authStore';
-import NotificationBell from '../../components/notifications/NotificationBell';
-import type { RefereeRoleProfile, UserProfile } from '../../types/account.types';
+import { useCallback, useEffect, useState } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import NotificationBell from '../../components/notifications/NotificationBell'
+import { getMyAccountProfile } from '../../services/accountService'
+import { logout } from '../../services/authService'
+import { getRefereeProfile } from '../../services/refereeService'
+import useAuthStore from '../../store/authStore'
+import type { RefereeRoleProfile, UserProfile } from '../../types/account.types'
+import './referee-theme.css'
 
-type RefereeAccountProfile = UserProfile<RefereeRoleProfile>;
+type RefereeAccountProfile = UserProfile<RefereeRoleProfile>
+interface NavItem { to: string; label: string; end?: boolean }
 
-const navItems = [
-  { to: '/referee', label: 'Tổng quan', end: true },
-  { to: '/referee/tournaments', label: 'Đăng ký giải đấu', end: false },
-  { to: '/referee/race-console', label: 'Race Console', end: false },
-  { to: '/referee/profile', label: 'Hồ sơ tài khoản', end: false },
-];
+const overview: NavItem = { to: '/referee', label: 'Tổng quan', end: true }
+const navGroups: Array<{ title: string; items: NavItem[] }> = [
+  { title: 'Giải đấu và phân công', items: [{ to: '/referee/tournaments', label: 'Giải đấu của tôi' }] },
+  { title: 'Điều hành cuộc đua', items: [{ to: '/referee/race-console', label: 'Bàn điều hành cuộc đua' }] },
+  { title: 'Hồ sơ', items: [{ to: '/referee/profile', label: 'Hồ sơ Referee' }] },
+  { title: 'Khác', items: [{ to: '/referee/notifications', label: 'Thông báo' }] },
+]
+const navItems = [overview, ...navGroups.flatMap((group) => group.items)]
+
+function isActive(pathname: string, item: NavItem) {
+  return item.end ? pathname === item.to : pathname === item.to || pathname.startsWith(`${item.to}/`)
+}
+
+function SidebarLink({ item, pathname, close }: { item: NavItem; pathname: string; close: () => void }) {
+  const active = isActive(pathname, item)
+  return (
+    <NavLink to={item.to} end={item.end} onClick={close} className={`flex min-h-11 items-center rounded-xl border-l-2 px-3 py-2.5 text-sm transition-colors ${active ? 'border-[#cfa73d] bg-white/10 font-bold text-white' : 'border-transparent font-medium text-emerald-50/80 hover:bg-white/[.06] hover:text-white'}`}>
+      {item.label}
+    </NavLink>
+  )
+}
 
 export default function RefereeLayout() {
-  const [profile, setProfile] = useState<RefereeAccountProfile | null>(null);
-  const [professionalStatus, setProfessionalStatus] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const location = useLocation();
-  const navigate = useNavigate();
-  const clearAuth = useAuthStore((state) => state.clearAuth);
+  const [profile, setProfile] = useState<RefereeAccountProfile | null>(null)
+  const [professionalStatus, setProfessionalStatus] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const location = useLocation()
+  const navigate = useNavigate()
+  const clearAuth = useAuthStore((state) => state.clearAuth)
 
   const loadProfile = useCallback(async () => {
     try {
       const [accountResult, professionalResult] = await Promise.allSettled([
         getMyAccountProfile<RefereeRoleProfile>(),
         getRefereeProfile(),
-      ]);
-      setProfile(accountResult.status === 'fulfilled' ? accountResult.value : null);
-      setProfessionalStatus(
-        professionalResult.status === 'fulfilled'
-          ? professionalResult.value.status
-          : accountResult.status === 'fulfilled'
-            ? accountResult.value.profile?.status ?? ''
-            : '',
-      );
+      ])
+      setProfile(accountResult.status === 'fulfilled' ? accountResult.value : null)
+      setProfessionalStatus(professionalResult.status === 'fulfilled' ? professionalResult.value.status : accountResult.status === 'fulfilled' ? accountResult.value.profile?.status ?? '' : '')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, []);
+  }, [])
 
   useEffect(() => {
-    void loadProfile();
-    const handleProfileChanged = () => { void loadProfile(); };
-    window.addEventListener('hrtms:profile-changed', handleProfileChanged);
-    return () => window.removeEventListener('hrtms:profile-changed', handleProfileChanged);
-  }, [loadProfile]);
+    const initialLoadId = window.setTimeout(() => void loadProfile(), 0)
+    const handleProfileChanged = () => void loadProfile()
+    window.addEventListener('hrtms:profile-changed', handleProfileChanged)
+    return () => { window.clearTimeout(initialLoadId); window.removeEventListener('hrtms:profile-changed', handleProfileChanged) }
+  }, [loadProfile])
 
-  const currentNav = navItems.find((item) => {
-    if (item.end) return location.pathname === item.to;
-    return location.pathname.startsWith(item.to);
-  });
-  const pageTitle = location.pathname === '/referee/notifications'
-    ? 'Thông báo'
-    : currentNav?.label ?? 'Tổng quan';
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [menuOpen])
+
+  const currentNav = navItems.find((item) => isActive(location.pathname, item))
+  const initials = profile?.fullName ? profile.fullName.split(/\s+/).filter(Boolean).slice(-2).map((part) => part[0]).join('').toUpperCase() : 'R'
 
   const handleLogout = async () => {
-    if (isLoggingOut) return;
-    setIsLoggingOut(true);
-    try {
-      await logout();
-    } finally {
-      clearAuth();
-      localStorage.removeItem('token');
-      sessionStorage.removeItem('token');
-      sessionStorage.removeItem('authReason');
-      navigate('/login', { replace: true });
+    if (isLoggingOut) return
+    setIsLoggingOut(true)
+    try { await logout() } finally {
+      clearAuth()
+      localStorage.removeItem('token')
+      sessionStorage.removeItem('token')
+      sessionStorage.removeItem('authReason')
+      navigate('/login', { replace: true })
     }
-  };
+  }
+
+  const sidebar = (
+    <aside className="referee-sidebar flex h-full w-[286px] flex-col border-r border-white/10">
+      <div className="flex h-[76px] items-center border-b border-white/10 px-5"><div className="min-w-0"><p className="truncate text-lg font-black tracking-tight text-white">HRTMS-SU26</p><p className="text-[11px] font-medium text-emerald-100/65">Tournament Management</p></div></div>
+      <nav className="referee-sidebar-nav flex-1 overflow-y-auto px-3 py-5" aria-label="Điều hướng Referee">
+        <p className="mb-3 inline-flex rounded-full border border-[#cfa73d]/40 bg-[#cfa73d]/10 px-3 py-1 text-[11px] font-black uppercase tracking-[.12em] text-[#e1bc58]">Referee</p>
+        <SidebarLink item={overview} pathname={location.pathname} close={() => setMenuOpen(false)} />
+        {navGroups.map((group) => <div key={group.title} className="mt-6"><p className="mb-2 px-2 text-[10px] font-black uppercase tracking-[.14em] text-emerald-100/55">{group.title}</p><div className="space-y-1">{group.items.map((item) => <SidebarLink key={item.to} item={item} pathname={location.pathname} close={() => setMenuOpen(false)} />)}</div></div>)}
+      </nav>
+      <div className="border-t border-white/10 p-3">
+        <button type="button" onClick={() => { navigate('/referee/profile'); setMenuOpen(false) }} className="flex w-full items-center gap-3 rounded-xl p-2 text-left hover:bg-white/[.06]"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#cfa73d] text-sm font-black text-[#082b20]">{initials}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-white">{loading ? 'Đang tải...' : profile?.fullName || 'Referee'}</span><span className="block truncate text-xs text-emerald-100/55">{profile?.email || 'Hồ sơ tài khoản'}</span>{professionalStatus && <span className="mt-1 block truncate text-[10px] font-bold uppercase tracking-wide text-[#e1bc58]">{professionalStatus}</span>}</span></button>
+        <button type="button" onClick={() => void handleLogout()} disabled={isLoggingOut} className="mt-1 w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-emerald-100/65 hover:bg-red-500/10 hover:text-red-200 disabled:opacity-50">{isLoggingOut ? 'Đang đăng xuất...' : 'Đăng xuất'}</button>
+      </div>
+    </aside>
+  )
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <aside className="flex w-64 flex-shrink-0 flex-col border-r border-gray-200 bg-white">
-        <div className="border-b border-gray-100 px-5 py-4">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">HRTMS</p>
-          <p className="mt-0.5 text-sm font-bold text-gray-800">Cổng trọng tài</p>
-        </div>
-
-        <div className="border-b border-gray-100 px-4 py-4">
-          {loading ? (
-            <div className="space-y-1.5 animate-pulse">
-              <div className="h-3.5 w-3/4 rounded bg-gray-200" />
-              <div className="h-3 w-1/2 rounded bg-gray-100" />
-            </div>
-          ) : profile ? (
-            <div>
-              <p className="truncate text-sm font-semibold text-gray-800">{profile.fullName}</p>
-              <p className="mt-0.5 truncate text-xs text-gray-400">{profile.email}</p>
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <span className="inline-flex rounded border border-blue-100 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
-                  Trọng tài
-                </span>
-                {professionalStatus && (
-                  <span className={`inline-flex rounded border px-2 py-0.5 text-xs font-medium ${professionalStatus.toLowerCase() === 'pending' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-green-100 bg-green-50 text-green-700'}`}>
-                    {professionalStatus}
-                  </span>
-                )}
-              </div>
-            </div>
-          ) : (
-            <p className="text-xs text-gray-400">Thông tin tài khoản chưa sẵn sàng</p>
-          )}
-        </div>
-
-        <nav className="flex-1 overflow-y-auto py-3">
-          <p className="px-5 pb-1.5 pt-2 text-xs font-semibold uppercase tracking-widest text-gray-400">
-            Quản lý
-          </p>
-          <ul className="space-y-0.5 px-2">
-            {navItems.map((item) => (
-              <li key={item.to}>
-                <NavLink
-                  to={item.to}
-                  end={item.end}
-                  className={({ isActive }) =>
-                    `flex items-center rounded-md border-l-2 px-3 py-2 pl-[10px] text-sm transition-colors ${
-                      isActive
-                        ? 'rounded-l-none border-blue-600 bg-blue-50 font-semibold text-blue-700'
-                        : 'rounded-l-none border-transparent font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    }`
-                  }
-                >
-                  {item.label}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        </nav>
-
-        <div className="space-y-2 border-t border-gray-100 px-4 py-3">
-          <button
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-            className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isLoggingOut ? 'Đang đăng xuất...' : 'Đăng xuất'}
-          </button>
-          <p className="text-center text-xs text-gray-400">Horse Racing TMS &copy; 2026</p>
-        </div>
-      </aside>
-
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex flex-shrink-0 items-center justify-between gap-4 border-b border-gray-200 bg-white px-6 py-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="text-xs text-gray-400">Trọng tài</span>
-            <span className="text-xs text-gray-300">/</span>
-            <span className="truncate text-xs font-semibold text-gray-700">{pageTitle}</span>
-          </div>
-          <NotificationBell notificationsPath="/referee/notifications" />
-        </header>
-
-        <main className="flex-1 overflow-auto p-6">
-          <Outlet />
-        </main>
+    <div className="referee-shell flex text-slate-950">
+      <div className="fixed inset-y-0 left-0 z-40 hidden lg:block">{sidebar}</div>
+      {menuOpen && <div className="fixed inset-0 z-50 lg:hidden"><button type="button" className="absolute inset-0 bg-slate-950/55 backdrop-blur-sm" onClick={() => setMenuOpen(false)} aria-label="Đóng lớp phủ menu" /><div className="relative h-full w-[286px] max-w-[86vw] shadow-2xl">{sidebar}<button type="button" onClick={() => setMenuOpen(false)} className="absolute right-3 top-4 rounded-lg border border-white/20 px-3 py-2 text-xs font-bold text-white hover:bg-white/10">Đóng</button></div></div>}
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col lg:pl-[286px]">
+        <header className="sticky top-0 z-30 flex min-h-[68px] items-center justify-between gap-3 border-b border-slate-200/90 bg-white/95 px-4 py-3 backdrop-blur lg:px-8"><div className="flex min-w-0 items-center gap-3"><button type="button" onClick={() => setMenuOpen(true)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 lg:hidden">Menu</button><div className="flex min-w-0 items-center gap-2 text-sm"><span className="hidden text-slate-500 sm:inline">Referee</span><span className="hidden text-slate-300 sm:inline">/</span><strong className="truncate text-slate-900">{currentNav?.label ?? 'Tổng quan'}</strong></div></div><div className="flex items-center gap-2 sm:gap-3"><NotificationBell notificationsPath="/referee/notifications" textOnly /><button type="button" onClick={() => navigate('/referee/profile')} className="flex h-10 w-10 items-center justify-center rounded-full bg-[#cfa73d] text-xs font-black text-[#082b20]" aria-label="Mở hồ sơ Referee">{initials}</button></div></header>
+        <main className="referee-main flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8"><div className="referee-content"><Outlet /></div></main>
       </div>
     </div>
-  );
+  )
 }
