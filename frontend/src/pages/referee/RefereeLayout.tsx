@@ -1,82 +1,56 @@
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
-import { apiFetch } from '../../services/apiClient';
+import { useCallback, useEffect, useState } from 'react';
+import { getMyAccountProfile } from '../../services/accountService';
 import { logout } from '../../services/authService';
-import { getRefereeProfile, type RefereeProfile } from '../../services/refereeService';
+import { getRefereeProfile } from '../../services/refereeService';
 import useAuthStore from '../../store/authStore';
 import NotificationBell from '../../components/notifications/NotificationBell';
+import type { RefereeRoleProfile, UserProfile } from '../../types/account.types';
 
-interface RefereeAuthProfile {
-  userId: number;
-  username: string;
-  fullName: string;
-  email: string;
-  role: string;
-  status: string;
-}
-
-interface ProfileApiResponse {
-  success: boolean;
-  message: string;
-  data: RefereeAuthProfile | null;
-}
+type RefereeAccountProfile = UserProfile<RefereeRoleProfile>;
 
 const navItems = [
   { to: '/referee', label: 'Tổng quan', end: true },
   { to: '/referee/tournaments', label: 'Đăng ký giải đấu', end: false },
   { to: '/referee/coi', label: 'Khai báo COI', end: false },
   { to: '/referee/race-console', label: 'Race Console', end: false },
+  { to: '/referee/profile', label: 'Hồ sơ tài khoản', end: false },
 ];
 
 export default function RefereeLayout() {
-  const [profile, setProfile] = useState<RefereeAuthProfile | null>(null);
+  const [profile, setProfile] = useState<RefereeAccountProfile | null>(null);
+  const [professionalStatus, setProfessionalStatus] = useState('');
   const [loading, setLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const clearAuth = useAuthStore((state) => state.clearAuth);
 
-  useEffect(() => {
-    const normalizeProfile = (
-      data: RefereeProfile | RefereeAuthProfile | null | undefined
-    ): RefereeAuthProfile | null => {
-      if (!data) return null;
-      return {
-        userId: 'userId' in data ? data.userId : data.refereeId,
-        username: data.username,
-        fullName: data.fullName,
-        email: data.email,
-        role: 'role' in data ? data.role : 'Referee',
-        status: data.status,
-      };
-    };
-
-    const loadProfile = async () => {
-      try {
-        const refereeProfile = await getRefereeProfile();
-        setProfile(normalizeProfile(refereeProfile));
-      } catch {
-        try {
-          const fallback = await apiFetch<ProfileApiResponse | RefereeAuthProfile>('/auth/profile');
-          const fallbackData =
-            fallback && typeof fallback === 'object' && 'data' in fallback
-              ? fallback.data
-              : fallback;
-          setProfile(normalizeProfile(fallbackData));
-        } catch {
-          setProfile(null);
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadProfile().catch(() => {
-        // Vẫn render navigation nếu profile không tải được.
-        setProfile(null);
-        setLoading(false);
-      });
+  const loadProfile = useCallback(async () => {
+    try {
+      const [accountResult, professionalResult] = await Promise.allSettled([
+        getMyAccountProfile<RefereeRoleProfile>(),
+        getRefereeProfile(),
+      ]);
+      setProfile(accountResult.status === 'fulfilled' ? accountResult.value : null);
+      setProfessionalStatus(
+        professionalResult.status === 'fulfilled'
+          ? professionalResult.value.status
+          : accountResult.status === 'fulfilled'
+            ? accountResult.value.profile?.status ?? ''
+            : '',
+      );
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadProfile();
+    const handleProfileChanged = () => { void loadProfile(); };
+    window.addEventListener('hrtms:profile-changed', handleProfileChanged);
+    return () => window.removeEventListener('hrtms:profile-changed', handleProfileChanged);
+  }, [loadProfile]);
 
   const currentNav = navItems.find((item) => {
     if (item.end) return location.pathname === item.to;
@@ -122,9 +96,9 @@ export default function RefereeLayout() {
                 <span className="inline-flex rounded border border-blue-100 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
                   Trọng tài
                 </span>
-                {profile.status && (
-                  <span className="inline-flex rounded border border-green-100 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
-                    {profile.status}
+                {professionalStatus && (
+                  <span className={`inline-flex rounded border px-2 py-0.5 text-xs font-medium ${professionalStatus.toLowerCase() === 'pending' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-green-100 bg-green-50 text-green-700'}`}>
+                    {professionalStatus}
                   </span>
                 )}
               </div>

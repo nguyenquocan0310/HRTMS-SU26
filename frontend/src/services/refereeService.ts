@@ -20,6 +20,12 @@ export interface UpdateRefereeProfilePayload {
   certificationLevel: string;
 }
 
+export interface UpdateRefereeProfileResult {
+  refereeId: number;
+  status: string;
+  message: string;
+}
+
 export interface RefereeRaceAssignment {
   raceId: number;
   raceNumber?: number | null;
@@ -221,8 +227,8 @@ export const getRefereeProfile = async (): Promise<RefereeProfile> => {
 
 export const updateRefereeProfile = async (
   payload: UpdateRefereeProfilePayload
-): Promise<RefereeProfile> => {
-  const res = await apiFetch<ApiResponse<RefereeProfile> | RefereeProfile>('/referees/profile', {
+): Promise<UpdateRefereeProfileResult> => {
+  const res = await apiFetch<ApiResponse<UpdateRefereeProfileResult> | UpdateRefereeProfileResult>('/referees/profile', {
     method: 'PATCH',
     body: JSON.stringify(payload),
   });
