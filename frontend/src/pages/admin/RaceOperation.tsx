@@ -196,7 +196,9 @@ const RaceOperations = () => {
     setActionError('');
 
     try {
-      await declareRaceOfficial(raceId);
+      await declareRaceOfficial(raceId, {
+    confirmedByAdmin: true,
+  });
       setActionMsg('Race đã được chuyển sang trạng thái Official.');
 
       // Không xóa race khỏi danh sách. Reload để status đổi ngay.
