@@ -4,6 +4,7 @@ import { getMyAccountProfile } from '../../services/accountService'
 import { logout } from '../../services/authService'
 import useAuthStore from '../../store/authStore'
 import type { OwnerRoleProfile, UserProfile } from '../../types/account.types'
+import NotificationBell from '../../components/notifications/NotificationBell'
 
 
 type OwnerProfile = UserProfile<OwnerRoleProfile>
@@ -99,7 +100,9 @@ export default function OwnerLayout() {
     if (item.end) return location.pathname === item.to
     return location.pathname.startsWith(item.to)
   })
-  const pageTitle = currentNav?.label ?? 'Tổng quan'
+  const pageTitle = location.pathname === '/owner/notifications'
+    ? 'Thông báo'
+    : currentNav?.label ?? 'Tổng quan'
 
   const handleLogout = async () => {
     if (isLoggingOut) return
@@ -216,13 +219,16 @@ export default function OwnerLayout() {
             <span className="text-sm text-slate-300">/</span>
             <span className="text-sm font-bold text-slate-900">{pageTitle}</span>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate('/owner/horses/register')}
-            className="hidden sm:inline-flex rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 transition-colors"
-          >
-            Tạo hồ sơ ngựa
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate('/owner/horses/register')}
+              className="hidden sm:inline-flex rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 transition-colors"
+            >
+              Tạo hồ sơ ngựa
+            </button>
+            <NotificationBell notificationsPath="/owner/notifications" />
+          </div>
         </header>
 
         <main className="flex-1 overflow-auto px-4 lg:px-8 py-6 lg:py-8">
