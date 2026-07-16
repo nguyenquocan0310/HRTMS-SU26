@@ -12,7 +12,6 @@ import TournamentBuilder from './components/admin/TournamentBuilder'
 import TournamentHub from './pages/admin/TournamentHub'
 import Leaderboard from './pages/admin/Leaderboard'
 import LiveRaceView from './pages/admin/LiveRaceView'
-import NotificationCenter from './pages/admin/NotificationCenter'
 import MyAccount from './pages/admin/MyAccount'
 import AssignOfficials from './pages/admin/AssignOfficials'
 
@@ -25,7 +24,6 @@ import OwnerLayout from './pages/owner/OwnerLayout'
 import OwnerProfile from './pages/owner/OwnerProfile'
 import RegisterHorse from './pages/owner/RegisterHorse'
 import HorseDetail from './pages/owner/HorseDetail'
-import ScheduleConfirm from './pages/owner/ScheduleConfirm'
 import RaceEntries from './pages/owner/RaceEntries'
 import JockeyInvite from './pages/owner/JockeyInvite'
 import TournamentList from './pages/owner/TournamentList'
@@ -38,6 +36,7 @@ import MyRaces from './pages/jockey/MyRaces'
 import RaceHistory from './pages/jockey/RaceHistory'
 import ProfileDeclaration from './pages/jockey/ProfileDeclaration'
 import JockeyTournamentList from './pages/jockey/JockeyTournamentList'
+import JockeyDashboard from './pages/jockey/JockeyDashboard'
 
 // ── Import các trang shared ──
 import Protest from './pages/shared/Protest'
@@ -78,9 +77,9 @@ interface ProtectedRouteProps {
 }
 
 function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
+  const { isAuthenticated, user } = useAuthStore()
   if (import.meta.env.DEV) return <>{children}</>
 
-  const { isAuthenticated, user } = useAuthStore()
   if (!isAuthenticated) return <Navigate to="/login" replace />
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
     return <Navigate to="/unauthorized" replace />
@@ -88,6 +87,7 @@ function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
   return <>{children}</>
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function getRoleHomePath(role: Role): string {
   switch (role) {
     case 'Admin': return '/admin'
@@ -98,14 +98,6 @@ export function getRoleHomePath(role: Role): string {
     case 'Referee': return '/referee'
     case 'Doctor': return '/doctor'
     case 'Spectator': return '/spectator'
-    case 'Admin':       return '/admin'
-    case 'HorseOwner':
-    case 'Owner':  return '/owner'
-    case 'Jockey':      return '/jockey'
-    case 'RaceReferee': 
-    case 'Referee':     return '/referee'    
-    case 'Doctor':      return '/doctor'
-    case 'Spectator':   return '/spectator'
   }
 }
 
@@ -146,14 +138,14 @@ export default function App() {
             <JockeyLayout />
           </ProtectedRoute>
         }>
-          <Route index element={<div>Jockey Dashboard</div>} />
+          <Route index element={<JockeyDashboard />} />
           <Route path="invitations" element={<InvitationList />} />
           <Route path="races" element={<MyRaces />} />
           <Route path="history" element={<RaceHistory />} />
           <Route path="profile-declaration" element={<ProfileDeclaration />} />
           <Route path="tournaments" element={<JockeyTournamentList />} />
-          <Route path="protest" element={<Protest userRole="Jockey" />} />
-          <Route path="notifications" element={<SharedNotificationCenter />} />
+          <Route path="protest" element={<Protest userRole="Jockey" iconless />} />
+          <Route path="notifications" element={<SharedNotificationCenter iconless />} />
         </Route>
 
         {/* ── Cấu trúc Route của BÁC SĨ (Doctor) ── */}

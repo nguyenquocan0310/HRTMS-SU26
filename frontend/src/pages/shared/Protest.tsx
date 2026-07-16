@@ -12,6 +12,7 @@ import type { Protest as ProtestRecord } from '../../types/protest.types'
 
 interface ProtestProps {
   userRole: 'HorseOwner' | 'Jockey'
+  iconless?: boolean
 }
 
 interface RaceOption {
@@ -32,12 +33,12 @@ const statusConfig: Record<string, { label: string; cls: string; dot: string }> 
   Rejected: { label: 'Bác bỏ', cls: 'border-red-200 bg-red-50 text-red-700', dot: 'bg-red-500' },
 }
 
-function ProtestStatusBadge({ status }: { status: string }) {
+function ProtestStatusBadge({ status, iconless = false }: { status: string; iconless?: boolean }) {
   const config = statusConfig[status] ?? { label: status, cls: 'border-gray-200 bg-gray-100 text-gray-600', dot: 'bg-gray-400' }
-  return <span className={`inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-xs font-medium ${config.cls}`}><span className={`h-1.5 w-1.5 rounded-full ${config.dot}`} />{config.label}</span>
+  return <span className={`inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-xs font-medium ${config.cls}`}>{!iconless && <span className={`h-1.5 w-1.5 rounded-full ${config.dot}`} />}{config.label}</span>
 }
 
-export default function Protest({ userRole }: ProtestProps) {
+export default function Protest({ userRole, iconless = false }: ProtestProps) {
   const [currentUserId, setCurrentUserId] = useState<number | null>(null)
   const [races, setRaces] = useState<RaceOption[]>([])
   const [protests, setProtests] = useState<ProtestRecord[]>([])
@@ -163,12 +164,12 @@ export default function Protest({ userRole }: ProtestProps) {
 
   return (
     <div className="max-w-4xl">
-      <div className="mb-5 flex items-center gap-2"><div><h1 className="text-xl font-bold text-gray-900">Khiếu nại kết quả</h1><p className="mt-0.5 text-sm text-gray-500">Nộp khiếu nại và theo dõi tiến trình xử lý.</p></div><span className="ml-2 rounded border border-blue-100 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">{roleLabel}</span></div>
+      <div className="mb-5 flex items-center gap-2"><div><h1 className="text-xl font-bold text-gray-900">Khiếu nại kết quả</h1>{!iconless && <p className="mt-0.5 text-sm text-gray-500">Nộp khiếu nại và theo dõi tiến trình xử lý.</p>}</div><span className="ml-2 rounded border border-blue-100 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">{roleLabel}</span></div>
 
       {loadError && <div role="alert" className="mb-5 flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><span>{loadError}</span><button type="button" onClick={() => void loadPage()} className="font-semibold underline">Thử lại</button></div>}
 
       <div className="mb-5 overflow-hidden rounded-lg border border-gray-200 bg-white">
-        <div className="flex items-center gap-2 border-b border-gray-100 bg-gray-50 px-5 py-3"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">1</span><p className="text-sm font-semibold text-gray-700">Nộp khiếu nại mới</p></div>
+        <div className="flex items-center gap-2 border-b border-gray-100 bg-gray-50 px-5 py-3">{!iconless && <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">1</span>}<p className="text-sm font-semibold text-gray-700">Nộp khiếu nại mới</p></div>
         <div className="p-5">
           {success && <div role="status" className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">{success}</div>}
           {formError && <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{formError}</div>}
@@ -182,8 +183,8 @@ export default function Protest({ userRole }: ProtestProps) {
       </div>
 
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-        <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-5 py-3"><div className="flex items-center gap-2"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">2</span><p className="text-sm font-semibold text-gray-700">Danh sách khiếu nại đã nộp</p></div><span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500">{protests.length} khiếu nại</span></div>
-        {loading ? <div className="py-12 text-center text-sm text-gray-400">Đang tải danh sách khiếu nại...</div> : protests.length === 0 ? <div className="py-12 text-center text-sm text-gray-400">Bạn chưa nộp khiếu nại nào.</div> : <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-gray-200 bg-gray-50"><tr>{['Mã KN', 'Cuộc đua', 'Ngày nộp', 'Trạng thái', 'Phán quyết'].map((heading) => <th key={heading} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">{heading}</th>)}</tr></thead><tbody className="divide-y divide-gray-100">{protests.map((protest) => <tr key={protest.protestId} className="transition-colors hover:bg-gray-50"><td className="px-4 py-3 font-mono text-xs font-semibold text-blue-700">KN-{String(protest.protestId).padStart(3, '0')}</td><td className="px-4 py-3 text-gray-700">{raceNames.get(protest.raceId) || `Race #${protest.raceId}`}</td><td className="px-4 py-3 text-xs text-gray-500">{new Date(protest.submittedAt).toLocaleDateString('vi-VN')}</td><td className="px-4 py-3"><ProtestStatusBadge status={protest.status} /></td><td className="max-w-xs px-4 py-3 text-xs text-gray-600">{protest.refereeDecision || <span className="italic text-gray-400">Chưa có phán quyết</span>}</td></tr>)}</tbody></table></div>}
+        <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-5 py-3"><div className="flex items-center gap-2">{!iconless && <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">2</span>}<p className="text-sm font-semibold text-gray-700">Danh sách khiếu nại đã nộp</p></div><span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500">{protests.length} khiếu nại</span></div>
+        {loading ? <div className="py-12 text-center text-sm text-gray-400">Đang tải danh sách khiếu nại...</div> : protests.length === 0 ? <div className="py-12 text-center text-sm text-gray-400">Bạn chưa nộp khiếu nại nào.</div> : <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-gray-200 bg-gray-50"><tr>{['Mã KN', 'Cuộc đua', 'Ngày nộp', 'Trạng thái', 'Phán quyết'].map((heading) => <th key={heading} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">{heading}</th>)}</tr></thead><tbody className="divide-y divide-gray-100">{protests.map((protest) => <tr key={protest.protestId} className="transition-colors hover:bg-gray-50"><td className="px-4 py-3 font-mono text-xs font-semibold text-blue-700">KN-{String(protest.protestId).padStart(3, '0')}</td><td className="px-4 py-3 text-gray-700">{raceNames.get(protest.raceId) || `Race #${protest.raceId}`}</td><td className="px-4 py-3 text-xs text-gray-500">{new Date(protest.submittedAt).toLocaleDateString('vi-VN')}</td><td className="px-4 py-3"><ProtestStatusBadge status={protest.status} iconless={iconless} /></td><td className="max-w-xs px-4 py-3 text-xs text-gray-600">{protest.refereeDecision || <span className="italic text-gray-400">Chưa có phán quyết</span>}</td></tr>)}</tbody></table></div>}
       </div>
     </div>
   )
