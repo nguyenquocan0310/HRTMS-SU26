@@ -298,3 +298,219 @@
   background: #fef3c7;
   color: #b45309;
 }
+
+/* ─── Race View Detail ─────────────────────────────────────────────────── */
+
+.raceActions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.detailBtn {
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  color: #111827;
+  padding: 0.55rem 0.9rem;
+  border-radius: 3px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    border-color: #2563eb;
+    color: #2563eb;
+    background: #eff6ff;
+  }
+}
+
+.detailOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.detailPanel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 1001;
+  width: min(760px, 100%);
+  height: 100vh;
+  overflow-y: auto;
+  background: #fff;
+  border-left: 1px solid #e5e7eb;
+  box-shadow: -12px 0 30px rgba(15, 23, 42, 0.15);
+  padding: 1.25rem;
+}
+
+.detailHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.detailTitle {
+  margin: 0;
+  color: #111827;
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+
+.detailSubtitle {
+  margin: 0.25rem 0 0;
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+.detailCloseBtn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e5e7eb;
+  border-radius: 50%;
+  background: #fff;
+  color: #374151;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    background: #f3f4f6;
+  }
+}
+
+.detailStatusRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  color: #374151;
+  font-size: 0.85rem;
+}
+
+.detailLoading {
+  color: #6b7280;
+  padding: 2rem 0;
+}
+
+.detailError {
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.detailSection {
+  margin-top: 1.4rem;
+}
+
+.detailSectionTitle {
+  margin: 0 0 0.8rem;
+  color: #111827;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.detailTableWrap {
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+}
+
+.detailTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+
+  th {
+    text-align: left;
+    color: #6b7280;
+    background: #f9fafb;
+    padding: 0.75rem;
+    border-bottom: 1px solid #e5e7eb;
+    white-space: nowrap;
+  }
+
+  td {
+    color: #374151;
+    padding: 0.8rem 0.75rem;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
+}
+
+.detailEmpty {
+  text-align: center;
+  color: #9ca3af !important;
+  padding: 1.5rem !important;
+}
+
+.detailEmptyBox {
+  margin: 0;
+  padding: 1rem;
+  color: #6b7280;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.protestList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.protestItem {
+  padding: 1rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+
+  p {
+    margin: 0.65rem 0;
+    color: #374151;
+    line-height: 1.5;
+  }
+
+  small {
+    color: #6b7280;
+  }
+}
+
+.protestTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: #111827;
+}
+
+.protestStatus {
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  color: #92400e;
+  background: #fef3c7;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+@media (max-width: 700px) {
+  .detailPanel {
+    width: 100%;
+  }
+
+  .detailTable {
+    min-width: 680px;
+  }
+}
