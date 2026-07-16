@@ -58,25 +58,6 @@ interface RaceEntriesData {
   entries: RawRaceEntryApiItem[];
 }
 
-/**
- * GET /api/races/{raceId}/entries
- *
- * API trả:
- * {
- *   success: true,
- *   data: {
- *     raceId,
- *     roundId,
- *     raceNumber,
- *     scheduledTime,
- *     status,
- *     isPostPositionDrawn,
- *     entries: [...]
- *   }
- * }
- *
- * apiFetch không unwrap data, nên phải đọc res.data.entries.
- */
 export const getRaceEntries = (
   raceId: number
 ): Promise<RaceScheduleEntry[]> =>
@@ -97,10 +78,6 @@ export const getRaceEntries = (
     }))
   );
 
-/**
- * POST /api/admin/races/{raceId}/entries
- * Allocate pairing vào Race.
- */
 export const allocateEntry = (
   raceId: number,
   pairingId: number
@@ -112,16 +89,15 @@ export const allocateEntry = (
       body: JSON.stringify({ pairingId }),
     }
   ).then((res) => {
-    if (!res.data) {
-      throw new Error(res.message || 'Allocate không trả về dữ liệu.');
+    if (!res.success || !res.data) {
+      throw new Error(
+        res.message || 'Allocate không trả về dữ liệu.'
+      );
     }
 
     return res.data;
   });
 
-/**
- * POST /api/admin/races/{raceId}/draw
- */
 export const drawPostPositions = (
   raceId: number
 ): Promise<unknown> =>
@@ -153,16 +129,6 @@ interface PagedResult<T> {
   totalPages?: number;
 }
 
-/**
- * GET /api/admin/pairings
- *
- * Theo ảnh Network trước đó, endpoint này đang trả PagedResult trực tiếp:
- * {
- *   items: [],
- *   totalCount: 0,
- *   ...
- * }
- */
 export const getAdminPairings = (
   tournamentId: number,
   unallocatedOnly = true,
@@ -181,48 +147,11 @@ export const getAdminPairings = (
   ).then((res) => res.items ?? []);
 };
 
-export interface UnofficialRace {
-  raceId: number;
-  tournamentId: number;
-  tournamentName?: string;
-  roundId?: number;
-  roundName?: string;
-  raceNumber: number;
-  scheduledTime: string;
-  status: string;
-}
-
-interface UnofficialRaceApiResponse {
-  success: boolean;
-  message?: string;
-  data: UnofficialRace[] | null;
-}
-
-/**
- * GET /api/races/unofficial
- * Lấy danh sách tất cả race đang ở trạng thái Unofficial.
- */
-export const getUnofficialRaces = (
-  tournamentId?: number
-): Promise<UnofficialRace[]> => {
-  const query = tournamentId
-    ? `?tournamentId=${tournamentId}`
-    : '';
-
-  return apiFetch<ApiResponse<UnofficialRace[]>>(
-    `/races/unofficial${query}`
-  ).then((res) => res.data ?? []);
-};
-
-/**
- * POST /api/races/{raceId}/declare-official
- * Admin công bố kết quả chính thức của một Race.
- */
 export interface DeclareOfficialPayload {
   confirmedByAdmin: boolean;
 }
 
-interface DeclareOfficialResult {
+export interface DeclareOfficialResult {
   raceId: number;
   raceStatus: string;
   officialAt: string;
@@ -232,10 +161,6 @@ interface DeclareOfficialResult {
   remainderAmount: number;
 }
 
-/**
- * POST /api/races/{raceId}/declare-official
- * Chuyển Race từ Unofficial sang Official.
- */
 export const declareRaceOfficial = (
   raceId: number,
   payload: DeclareOfficialPayload

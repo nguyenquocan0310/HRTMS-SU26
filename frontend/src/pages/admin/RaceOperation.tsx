@@ -318,11 +318,7 @@ const RaceOperations = () => {
         <div className={styles.tableCardHeader}>
           <h3 className={styles.tableTitle}>Race List</h3>
           <span className={styles.countBadge}>{selectedRace ? 1 : 0}</span>
-        </div>
-
-        <p className={styles.tableSubtext}>
-          Chỉ hiển thị Race đang được chọn trong dropdown Race hiện tại.
-        </p>
+        </div>      
 
         {!selectedRace ? (
           <p className={styles.emptyCell}>Vui lòng chọn một Race.</p>
