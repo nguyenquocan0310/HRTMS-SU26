@@ -174,9 +174,56 @@ export const declareRaceOfficial = (
   ).then((res) => {
     if (!res.success || !res.data) {
       throw new Error(
-        res.message || 'Không thể chuyển Race thành Official.'
+        res.message ||
+          'Không thể chuyển Race thành Official.'
       );
     }
 
     return res.data;
   });
+
+export interface RacePayout {
+  pursePayoutId: number;
+  raceEntryId: number;
+  recipientUserId: number;
+  recipientName: string;
+  role: string;
+  finishPosition: number;
+  horseName: string;
+  calculatedAmount: number;
+  payoutStatus: string;
+  paidAt: string | null;
+  updatedByAdminId: number | null;
+  updatedAt: string;
+}
+
+interface RacePayoutData {
+  raceId: number;
+  raceNumber: number;
+  roundName: string;
+  tournamentName: string;
+  raceStatus: string;
+  purseAmount: number;
+  totalAllocated: number;
+  remainderAmount: number;
+  payouts: RacePayout[];
+}
+
+/**
+ * GET /api/races/{raceId}/payouts
+ */
+export const getRacePayouts = async (
+  raceId: number
+): Promise<RacePayout[]> => {
+  const res = await apiFetch<ApiResponse<RacePayoutData>>(
+    `/races/${raceId}/payouts`
+  );
+
+  if (!res.success || !res.data) {
+    throw new Error(
+      res.message || 'Không tải được dữ liệu chi thưởng.'
+    );
+  }
+
+  return res.data.payouts ?? [];
+};
