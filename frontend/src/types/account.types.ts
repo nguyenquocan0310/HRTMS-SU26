@@ -44,6 +44,12 @@ export interface DoctorRoleProfile {
   certificate: CertificateMetadata | null
 }
 
+export interface RefereeRoleProfile {
+  certificationLevel: string
+  status: string
+  certificate: CertificateMetadata | null
+}
+
 export interface UpdateBasicInfoPayload {
   fullName: string
   email: string

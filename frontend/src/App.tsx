@@ -57,6 +57,7 @@ import RefereeDashboard from './pages/referee/RefereeDashboard'
 import RefereeRaceConsole from './pages/referee/RefereeRaceConsole'
 import RefereeTournamentList from './pages/referee/RefereeTournamentList'
 import RefereeCoiDeclarations from './pages/referee/RefereeCoiDeclarations'
+import RefereeProfile from './pages/referee/RefereeProfile'
 
 // ── Import các trang Spectator ──
 import SpectatorLayout from './pages/spectator/SpectatorLayout'
@@ -179,6 +180,7 @@ export default function App() {
           <Route path="tournaments" element={<RefereeTournamentList />} />
           <Route path="coi" element={<RefereeCoiDeclarations />} />
           <Route path="race-console" element={<RefereeRaceConsole />} />
+          <Route path="profile" element={<RefereeProfile />} />
           <Route path="notifications" element={<SharedNotificationCenter />} />
         </Route>
 
