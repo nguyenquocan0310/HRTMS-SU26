@@ -44,10 +44,6 @@ export type ApprovalGroup =
   | 'registration'
   | 'horse';
 
-export type RegistrationSubTab =
-  | 'personnel'
-  | 'tournament';
-
 export interface HorseApproval {
   id: string;
 
@@ -140,19 +136,6 @@ const GROUPS: Array<{
   },
 ];
 
-const REGISTRATION_SUB_TABS: Array<{
-  key: RegistrationSubTab;
-  label: string;
-}> = [
-  {
-    key: 'personnel',
-    label: 'Nhân viên',
-  },
-  {
-    key: 'tournament',
-    label: 'Đăng ký Tournament',
-  },
-];
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -233,12 +216,6 @@ const ApprovalCenter = () => {
     useState<ApprovalGroup>(
       'registration'
     );
-
-  const [
-    registrationSubTab,
-    setRegistrationSubTab,
-  ] =
-    useState<RegistrationSubTab>('personnel');
 
   const [
     personnelItems,
@@ -360,34 +337,24 @@ const ApprovalCenter = () => {
       }
     }, []);
 
-  useEffect(() => {
-    if (activeGroup === 'horse') {
-      loadHorses();
-      return;
-    }
+useEffect(() => {
+  if (activeGroup === 'horse') {
+    loadHorses();
+    return;
+  }
 
-    if (
-      registrationSubTab !==
-      'tournament'
-    ) {
-      loadPersonnel();
-    }
-  }, [
-    activeGroup,
-    registrationSubTab,
-    loadHorses,
-    loadPersonnel,
-  ]);
+  loadPersonnel();
+}, [
+  activeGroup,
+  loadHorses,
+  loadPersonnel,
+]);
 
   // ─── Filter personnel theo tab ───────────────────────────────────────────
 
 const displayedPersonnel = useMemo(() => {
-  if (registrationSubTab === 'personnel') {
-    return personnelItems;
-  }
-
-  return [];
-}, [personnelItems, registrationSubTab]);
+  return personnelItems;
+}, [personnelItems]);
 
   // ─── Approve personnel ───────────────────────────────────────────────────
 
@@ -666,10 +633,7 @@ const displayedPersonnel = useMemo(() => {
   const displayedCount =
     activeGroup === 'horse'
       ? horseItems.length
-      : registrationSubTab ===
-          'tournament'
-        ? null
-        : displayedPersonnel.length;
+      : displayedPersonnel.length;
 
   return (
     <div
@@ -774,41 +738,7 @@ const displayedPersonnel = useMemo(() => {
             Jockey, Trọng tài, Bác sĩ
             và các lượt đăng ký tham
             gia Tournament.
-          </div>
-
-          <div
-            className={styles.subTabs}
-          >
-            {REGISTRATION_SUB_TABS.map(
-              (tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  className={`${
-                    styles.subTabBtn
-                  } ${
-                    registrationSubTab ===
-                    tab.key
-                      ? styles.subTabBtnActive
-                      : ''
-                  }`}
-                  onClick={() => {
-                    setRegistrationSubTab(
-                      tab.key
-                    );
-
-                    setSelectedPersonnel(
-                      null
-                    );
-
-                    setError('');
-                  }}
-                >
-                  {tab.label}
-                </button>
-              )
-            )}
-          </div>
+          </div>          
         </>
       )}
 
@@ -838,48 +768,37 @@ const displayedPersonnel = useMemo(() => {
       <div
         className={styles.lightTable}
       >
-        {activeGroup ===
-        'horse' ? (
-          loading ? (
-            <p
-              className={
-                styles.loadingText
-              }
-            >
-              Đang tải danh sách hồ sơ
-              ngựa...
-            </p>
-          ) : (
-            <DataTable
-              columns={horseColumns}
-              data={horseItems}
-              rowKey={(row) => row.id}
-              emptyMessage="Không có hồ sơ ngựa nào đang chờ duyệt."
-            />
-          )
-        ) : registrationSubTab ===
-          'tournament' ? (
-          <RosterApprovalTable />
-        ) : loading ? (
-          <p
-            className={
-              styles.loadingText
-            }
-          >
-            Đang tải danh sách hồ sơ...
-          </p>
-        ) : (
-          <DataTable
-            columns={
-              personnelColumns
-            }
-            data={
-              displayedPersonnel
-            }
-            rowKey={(row) => row.id}
-            emptyMessage="Không có hồ sơ nào đang chờ duyệt."
-          />
-        )}
+{activeGroup === 'horse' ? (
+  loading ? (
+    <p className={styles.loadingText}>
+      Đang tải danh sách hồ sơ ngựa...
+    </p>
+  ) : (
+    <DataTable
+      columns={horseColumns}
+      data={horseItems}
+      rowKey={(row) => row.id}
+      emptyMessage="Không có hồ sơ ngựa nào đang chờ duyệt."
+    />
+  )
+) : (
+  <>
+    {loading ? (
+      <p className={styles.loadingText}>
+        Đang tải danh sách hồ sơ...
+      </p>
+    ) : (
+      <DataTable
+        columns={personnelColumns}
+        data={displayedPersonnel}
+        rowKey={(row) => row.id}
+        emptyMessage="Không có hồ sơ nhân viên nào đang chờ duyệt."
+      />
+    )}
+
+    <RosterApprovalTable />
+  </>
+)}
       </div>
 
       {/* Personnel detail:
