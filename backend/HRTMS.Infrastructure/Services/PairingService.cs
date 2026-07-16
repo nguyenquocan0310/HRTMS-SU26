@@ -543,6 +543,7 @@ public class PairingService : IPairingService
     }
 
     public async Task<PagedResult<AdminPairingDto>> GetAdminPairingsAsync(
+        int targetRaceId,
         int? tournamentId,
         string? status,
         bool unallocatedOnly,
@@ -569,14 +570,32 @@ public class PairingService : IPairingService
             throw new ArgumentException("INVALID_PAIRING_STATUS");
         }
 
+        // Allocation list phai biet Race dich. Khong duoc liet ke pairing chung
+        // ca tournament vi round sau chi nhan pairing da qualify o round truoc.
+        var targetRace = await _context.Races
+            .AsNoTracking()
+            .Include(r => r.Round)
+            .FirstOrDefaultAsync(r => r.RaceId == targetRaceId)
+            ?? throw new KeyNotFoundException("TARGET_RACE_NOT_FOUND");
+
+        var targetTournamentId = targetRace.Round.TournamentId;
+        if (tournamentId.HasValue && tournamentId.Value != targetTournamentId)
+        {
+            throw new ArgumentException("TARGET_RACE_TOURNAMENT_MISMATCH");
+        }
+
+        var previousRound = await _context.Rounds
+            .AsNoTracking()
+            .Where(r => r.TournamentId == targetTournamentId &&
+                        r.SequenceOrder < targetRace.Round.SequenceOrder)
+            .OrderByDescending(r => r.SequenceOrder)
+            .FirstOrDefaultAsync();
+
+        var previousRoundId = previousRound?.RoundId;
+
         var query = _context.Pairings
             .AsNoTracking()
-            .Where(p => p.Status == effectiveStatus);
-
-        if (tournamentId.HasValue)
-        {
-            query = query.Where(p => p.TournamentId == tournamentId.Value);
-        }
+            .Where(p => p.TournamentId == targetTournamentId && p.Status == effectiveStatus);
 
         // Chi giu pairing CHUA co RaceEntry active (Pending/Confirmed) trong race CHUA ket thuc.
         // Race da Official/Cancelled khong con "chiem cho" — pairing phai xuat hien lai
@@ -588,6 +607,23 @@ public class PairingService : IPairingService
                     (re.Status == "Pending" || re.Status == "Confirmed") &&
                     re.Race.Status != "Official" &&
                     re.Race.Status != "Cancelled"));
+        }
+
+        // Round dau: pairing Confirmed chua allocate. Round sau: round truoc phai
+        // Completed va chi RaceEntry Qualified/AlsoEligible moi duoc hien thi.
+        if (previousRound != null)
+        {
+            if (previousRound.Status != "Completed")
+            {
+                query = query.Where(_ => false);
+            }
+            else
+            {
+                query = query.Where(p => p.RaceEntries.Any(re =>
+                    re.Race.RoundId == previousRound.RoundId &&
+                    (re.AdvancementStatus == "Qualified" ||
+                     re.AdvancementStatus == "AlsoEligible")));
+            }
         }
 
         var total = await query.CountAsync();
@@ -609,6 +645,14 @@ public class PairingService : IPairingService
                 OwnerId = p.Horse.OwnerId,
                 OwnerName = p.Horse.Owner.Owner.FullName,
                 Status = p.Status,
+                AdvancementStatus = previousRoundId == null
+                    ? null
+                    : p.RaceEntries
+                        .Where(re => re.Race.RoundId == previousRoundId &&
+                                     (re.AdvancementStatus == "Qualified" ||
+                                      re.AdvancementStatus == "AlsoEligible"))
+                        .Select(re => re.AdvancementStatus)
+                        .FirstOrDefault(),
                 IsAllocated = p.RaceEntries.Any(re =>
                     (re.Status == "Pending" || re.Status == "Confirmed") &&
                     re.Race.Status != "Official" &&

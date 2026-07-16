@@ -192,14 +192,14 @@ const RaceOperations = () => {
   }, [selectedRaceId]);
 
   const reloadUnallocatedPairings = () => {
-    if (!selectedTournamentId) {
+    if (!selectedTournamentId || !selectedRaceId) {
       setUnallocatedPairings([]);
       return;
     }
 
     setLoadingPairings(true);
 
-    getAdminPairings(selectedTournamentId, true)
+    getAdminPairings(selectedTournamentId, selectedRaceId, true)
       .then(setUnallocatedPairings)
       .catch(() => setUnallocatedPairings([]))
       .finally(() => setLoadingPairings(false));
@@ -208,7 +208,7 @@ const RaceOperations = () => {
   useEffect(() => {
     reloadUnallocatedPairings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTournamentId]);
+  }, [selectedTournamentId, selectedRaceId]);
 
   const reloadTournamentList = async () => {
     try {
@@ -258,6 +258,7 @@ const RaceOperations = () => {
       setActionMsg('Bốc thăm thành công!');
       reloadEntries(selectedRaceId);
       await reloadTournamentList();
+      reloadUnallocatedPairings();
     } catch (error) {
       setActionError(
         error instanceof Error
@@ -570,15 +571,14 @@ const RaceOperations = () => {
           </div>
 
           <p className={styles.tableSubtext}>
-            Confirmed, cùng tournament, chưa nằm trong race active
-            nào.
+            Chỉ pairing đủ điều kiện cho race đang chọn.
           </p>
 
           {loadingPairings ? (
             <p className={styles.emptyCell}>Đang tải...</p>
           ) : unallocatedPairings.length === 0 ? (
             <p className={styles.emptyCell}>
-              Không còn pairing nào chưa allocate.
+              Chưa có pairing đủ điều kiện để allocate vào race này.
             </p>
           ) : (
             <div className={styles.pairingList}>
@@ -599,6 +599,11 @@ const RaceOperations = () => {
                       Jockey {pairing.jockeyName} · Owner{' '}
                       {pairing.ownerName} · Pairing #
                       {pairing.pairingId}
+                      {pairing.advancementStatus === 'AlsoEligible'
+                        ? ' · Đồng hạng — đủ điều kiện'
+                        : pairing.advancementStatus === 'Qualified'
+                          ? ' · Đủ điều kiện'
+                          : ''}
                     </div>
                   </div>
 

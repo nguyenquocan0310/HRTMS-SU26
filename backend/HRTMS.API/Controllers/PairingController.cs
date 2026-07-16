@@ -298,15 +298,26 @@ public class PairingController : ControllerBase
     [HttpGet("admin/pairings")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetAdminPairings(
+        [FromQuery] int targetRaceId,
         [FromQuery] int? tournamentId,
         [FromQuery] string? status,
         [FromQuery] bool unallocatedOnly = false,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
+        if (targetRaceId <= 0)
+        {
+            return BadRequest(new
+            {
+                error = "TARGET_RACE_REQUIRED",
+                message = "Cần chọn race đích để lấy pairing đủ điều kiện."
+            });
+        }
+
         try
         {
             var result = await _pairingService.GetAdminPairingsAsync(
+                targetRaceId,
                 tournamentId,
                 status,
                 unallocatedOnly,
@@ -315,13 +326,28 @@ public class PairingController : ControllerBase
 
             return Ok(result);
         }
-        catch (ArgumentException ex)
-            when (ex.Message == "INVALID_PAIRING_STATUS")
+        catch (ArgumentException ex) when (ex.Message == "INVALID_PAIRING_STATUS")
         {
             return BadRequest(new
             {
                 error = "VALIDATION_ERROR",
                 message = "Trạng thái lọc không hợp lệ."
+            });
+        }
+        catch (ArgumentException ex) when (ex.Message == "TARGET_RACE_TOURNAMENT_MISMATCH")
+        {
+            return BadRequest(new
+            {
+                error = "TARGET_RACE_TOURNAMENT_MISMATCH",
+                message = "Race được chọn không thuộc tournament đang xem."
+            });
+        }
+        catch (KeyNotFoundException ex) when (ex.Message == "TARGET_RACE_NOT_FOUND")
+        {
+            return NotFound(new
+            {
+                error = "TARGET_RACE_NOT_FOUND",
+                message = "Không tìm thấy race cần allocate pairing."
             });
         }
     }
