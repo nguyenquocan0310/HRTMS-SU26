@@ -22,7 +22,8 @@ import styles from './RegisterPage.module.scss';
 const RegisterPage = () => {
   const navigate = useNavigate();
 
-  const [currentStep, setCurrentStep] = useState<number>(1);
+  const [currentStep, setCurrentStep] =
+    useState<number>(1);
 
   const [formData, setFormData] =
     useState<RegisterFormData>(initialFormData);
@@ -42,7 +43,7 @@ const RegisterPage = () => {
   const validateCurrentStep = (): boolean => {
     const newErrors: RegisterFormErrors = {};
 
-    // ─── Step 1: Role ──────────────────────────────────────────────────────
+    // ─── Step 1: Role ────────────────────────────────────────────────────
 
     if (currentStep === 1) {
       if (!formData.role) {
@@ -51,16 +52,21 @@ const RegisterPage = () => {
       }
     }
 
-    // ─── Step 2: Identity ──────────────────────────────────────────────────
+    // ─── Step 2: Identity ────────────────────────────────────────────────
 
     if (currentStep === 2) {
       const identityErrors: NonNullable<
         RegisterFormErrors['identity']
       > = {};
 
-      const username = formData.identity.username.trim();
-      const fullName = formData.identity.fullName.trim();
-      const email = formData.identity.email.trim();
+      const username =
+        formData.identity.username.trim();
+
+      const fullName =
+        formData.identity.fullName.trim();
+
+      const email =
+        formData.identity.email.trim();
 
       if (!username) {
         identityErrors.username =
@@ -88,19 +94,23 @@ const RegisterPage = () => {
           'Email không đúng định dạng.';
       }
 
-      if (Object.keys(identityErrors).length > 0) {
+      if (
+        Object.keys(identityErrors).length > 0
+      ) {
         newErrors.identity = identityErrors;
       }
     }
 
-    // ─── Step 3: Credentials ───────────────────────────────────────────────
+    // ─── Step 3: Credentials ─────────────────────────────────────────────
 
     if (currentStep === 3) {
       const credentialErrors: NonNullable<
         RegisterFormErrors['credentials']
       > = {};
 
-      const password = formData.credentials.password;
+      const password =
+        formData.credentials.password;
+
       const confirmPassword =
         formData.credentials.confirmPassword;
 
@@ -115,13 +125,223 @@ const RegisterPage = () => {
       if (!confirmPassword) {
         credentialErrors.confirmPassword =
           'Vui lòng xác nhận mật khẩu.';
-      } else if (password !== confirmPassword) {
+      } else if (
+        password !== confirmPassword
+      ) {
         credentialErrors.confirmPassword =
           'Mật khẩu xác nhận không khớp.';
       }
 
-      if (Object.keys(credentialErrors).length > 0) {
-        newErrors.credentials = credentialErrors;
+      if (
+        Object.keys(credentialErrors).length > 0
+      ) {
+        newErrors.credentials =
+          credentialErrors;
+      }
+    }
+
+    // ─── Step 4: Verification ────────────────────────────────────────────
+
+    if (currentStep === 4) {
+      // ── Owner ─────────────────────────────────────────────────────────
+
+      if (formData.role === RegRole.Owner) {
+        const ownerErrors: NonNullable<
+          RegisterFormErrors['ownerVerification']
+        > = {};
+
+        const verification =
+          formData.ownerVerification;
+
+        if (!verification.phoneNumber.trim()) {
+          ownerErrors.phoneNumber =
+            'Vui lòng nhập số điện thoại.';
+        }
+
+        if (!verification.identityNumber.trim()) {
+          ownerErrors.identityNumber =
+            'Vui lòng nhập CCCD.';
+        } else if (
+          verification.identityNumber.length !== 12
+        ) {
+          ownerErrors.identityNumber =
+            'CCCD phải có đúng 12 số.';
+        }
+
+        if (!verification.dateOfBirth) {
+          ownerErrors.dateOfBirth =
+            'Vui lòng chọn ngày sinh.';
+        }
+
+        if (
+          Object.keys(ownerErrors).length > 0
+        ) {
+          newErrors.ownerVerification =
+            ownerErrors;
+        }
+      }
+
+      // ── Jockey ────────────────────────────────────────────────────────
+
+      if (formData.role === RegRole.Jockey) {
+        const jockeyErrors: NonNullable<
+          RegisterFormErrors['jockeyVerification']
+        > = {};
+
+        const verification =
+          formData.jockeyVerification;
+
+        if (!verification.phoneNumber.trim()) {
+          jockeyErrors.phoneNumber =
+            'Vui lòng nhập số điện thoại.';
+        }
+
+        if (!verification.identityNumber.trim()) {
+          jockeyErrors.identityNumber =
+            'Vui lòng nhập CCCD.';
+        } else if (
+          verification.identityNumber.length !== 12
+        ) {
+          jockeyErrors.identityNumber =
+            'CCCD phải có đúng 12 số.';
+        }
+
+        if (!verification.dateOfBirth) {
+          jockeyErrors.dateOfBirth =
+            'Vui lòng chọn ngày sinh.';
+        }
+
+        if (!verification.certificateFile) {
+          jockeyErrors.certificateFile =
+            'Vui lòng chọn file chứng chỉ.';
+        }
+
+        if (
+          verification.experienceYears === ''
+        ) {
+          jockeyErrors.experienceYears =
+            'Vui lòng nhập số năm kinh nghiệm.';
+        } else if (
+          verification.experienceYears < 0
+        ) {
+          jockeyErrors.experienceYears =
+            'Số năm kinh nghiệm không hợp lệ.';
+        }
+
+        if (
+          verification.selfDeclaredWeight === ''
+        ) {
+          jockeyErrors.selfDeclaredWeight =
+            'Vui lòng nhập cân nặng.';
+        } else if (
+          verification.selfDeclaredWeight <= 0
+        ) {
+          jockeyErrors.selfDeclaredWeight =
+            'Cân nặng phải lớn hơn 0.';
+        }
+
+        if (!verification.bloodType) {
+          jockeyErrors.bloodType =
+            'Vui lòng chọn nhóm máu.';
+        }
+
+        if (!verification.healthStatus) {
+          jockeyErrors.healthStatus =
+            'Vui lòng chọn tình trạng sức khỏe.';
+        }
+
+        if (
+          Object.keys(jockeyErrors).length > 0
+        ) {
+          newErrors.jockeyVerification =
+            jockeyErrors;
+        }
+      }
+
+      // ── Referee ───────────────────────────────────────────────────────
+
+      if (formData.role === RegRole.Referee) {
+        const refereeErrors: NonNullable<
+          RegisterFormErrors['refereeVerification']
+        > = {};
+
+        const verification =
+          formData.refereeVerification;
+
+        if (!verification.phoneNumber.trim()) {
+          refereeErrors.phoneNumber =
+            'Vui lòng nhập số điện thoại.';
+        }
+
+        if (!verification.identityNumber.trim()) {
+          refereeErrors.identityNumber =
+            'Vui lòng nhập CCCD.';
+        } else if (
+          verification.identityNumber.length !== 12
+        ) {
+          refereeErrors.identityNumber =
+            'CCCD phải có đúng 12 số.';
+        }
+
+        if (!verification.dateOfBirth) {
+          refereeErrors.dateOfBirth =
+            'Vui lòng chọn ngày sinh.';
+        }
+
+        if (!verification.certificateFile) {
+          refereeErrors.certificateFile =
+            'Vui lòng chọn file chứng chỉ.';
+        }
+
+        if (
+          Object.keys(refereeErrors).length > 0
+        ) {
+          newErrors.refereeVerification =
+            refereeErrors;
+        }
+      }
+
+      // ── Doctor ────────────────────────────────────────────────────────
+
+      if (formData.role === RegRole.Doctor) {
+        const doctorErrors: NonNullable<
+          RegisterFormErrors['doctorVerification']
+        > = {};
+
+        const verification =
+          formData.doctorVerification;
+
+        if (!verification.phoneNumber.trim()) {
+          doctorErrors.phoneNumber =
+            'Vui lòng nhập số điện thoại.';
+        }
+
+        if (!verification.identityNumber.trim()) {
+          doctorErrors.identityNumber =
+            'Vui lòng nhập CCCD.';
+        } else if (
+          verification.identityNumber.length !== 12
+        ) {
+          doctorErrors.identityNumber =
+            'CCCD phải có đúng 12 số.';
+        }
+
+        if (!verification.dateOfBirth) {
+          doctorErrors.dateOfBirth =
+            'Vui lòng chọn ngày sinh.';
+        }
+
+        if (!verification.certificateFile) {
+          doctorErrors.certificateFile =
+            'Vui lòng chọn file chứng chỉ.';
+        }
+
+        if (
+          Object.keys(doctorErrors).length > 0
+        ) {
+          newErrors.doctorVerification =
+            doctorErrors;
+        }
       }
     }
 
@@ -227,7 +447,17 @@ const RegisterPage = () => {
             role={formData.role}
             formData={formData}
             errors={errors}
-            onChange={updateFormData}
+            onChange={(partial) => {
+              updateFormData(partial);
+
+              setErrors((previous) => ({
+                ...previous,
+                ownerVerification: undefined,
+                jockeyVerification: undefined,
+                refereeVerification: undefined,
+                doctorVerification: undefined,
+              }));
+            }}
           />
         );
 
@@ -256,7 +486,9 @@ const RegisterPage = () => {
     <div className={styles.page}>
       {/* Header */}
       <div className={styles.header}>
-        <h1 className={styles.logo}>HRTMS</h1>
+        <h1 className={styles.logo}>
+          HRTMS
+        </h1>
 
         <p className={styles.subtitle}>
           TOURNAMENT REGISTRATION PORTAL
@@ -303,7 +535,9 @@ const RegisterPage = () => {
 
       {/* Bottom bar */}
       <div className={styles.bottomBar}>
-        <span>🛡 System Integrity Verified</span>
+        <span>
+          🛡 System Integrity Verified
+        </span>
 
         <span>
           © 2024 Horse Race Tournament Management System

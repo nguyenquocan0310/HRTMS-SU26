@@ -550,33 +550,48 @@ const StepVerification = ({
             )}
           </div>
 
-          <div className={styles.field}>
-            <label className={styles.label}>
-              Health Status
-            </label>
+ <div className={styles.field}>
+  <label className={styles.label}>
+    Health Status
+  </label>
 
-            <input
-              type="text"
-              className={inputClass(
-                verificationErrors?.healthStatus
-              )}
-              placeholder="Enter your current health status"
-              value={verification.healthStatus}
-              onChange={(event) =>
-                onChange({
-                  jockeyVerification: {
-                    ...verification,
-                    healthStatus:
-                      event.target.value,
-                  },
-                })
-              }
-            />
+  <select
+    className={inputClass(
+      verificationErrors?.healthStatus
+    )}
+    value={verification.healthStatus}
+    onChange={(event) =>
+      onChange({
+        jockeyVerification: {
+          ...verification,
+          healthStatus: event.target.value,
+        },
+      })
+    }
+  >
+    <option value="">
+      -- Chọn tình trạng sức khỏe --
+    </option>
 
-            {renderError(
-              verificationErrors?.healthStatus
-            )}
-          </div>
+    <option value="Good">
+      Tốt
+    </option>
+
+    <option value="Fair">
+      Trung bình
+    </option>
+
+    <option value="Under Treatment">
+      Đang điều trị
+    </option>
+  </select>
+
+  {renderError(
+    verificationErrors?.healthStatus
+  )}
+</div>
+
+
         </div>
       </div>
     );
