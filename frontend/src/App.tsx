@@ -64,6 +64,7 @@ import PredictionPage from './pages/spectator/PredictionPage'
 import WalletTransactions from './pages/spectator/WalletTransactions'
 import MyPredictions from './pages/spectator/MyPredictions'
 import SpectatorLiveRace from './pages/spectator/SpectatorLiveRace'
+import SpectatorLeaderboard from './pages/spectator/SpectatorLeaderboard'
 import RaceOperations from './pages/admin/RaceOperation'
 import EntryFees from './pages/admin/EntryFees'
 
@@ -190,6 +191,7 @@ export default function App() {
           <Route path="wallet" element={<WalletTransactions />} />
           <Route path="my-predictions" element={<MyPredictions />} />
           <Route path="live-race" element={<SpectatorLiveRace />} />
+          <Route path="leaderboard" element={<SpectatorLeaderboard />} />
           <Route path="notifications" element={<SharedNotificationCenter />} />
         </Route>
 
