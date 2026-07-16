@@ -1,4 +1,5 @@
 export interface Horse {
+  horseId?: number;
   breed: string;
   name: string;
   birthYear: number;

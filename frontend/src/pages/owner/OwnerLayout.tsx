@@ -1,115 +1,149 @@
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { useCallback, useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import {
+  FiAward,
+  FiBell,
+  FiCalendar,
+  FiChevronRight,
+  FiClipboard,
+  FiDollarSign,
+  FiFlag,
+  FiGrid,
+  FiLink2,
+  FiLogOut,
+  FiMenu,
+  FiPlusCircle,
+  FiShield,
+  FiUser,
+  FiX,
+} from 'react-icons/fi'
+import type { IconType } from 'react-icons'
 import { getMyAccountProfile } from '../../services/accountService'
 import { logout } from '../../services/authService'
 import useAuthStore from '../../store/authStore'
 import type { OwnerRoleProfile, UserProfile } from '../../types/account.types'
 import NotificationBell from '../../components/notifications/NotificationBell'
-
+import './owner-theme.css'
 
 type OwnerProfile = UserProfile<OwnerRoleProfile>
 
-const navGroups = [
+interface NavItem {
+  to: string
+  label: string
+  icon: IconType
+  end?: boolean
+}
+
+const overviewItem: NavItem = { to: '/owner', label: 'Tổng quan', icon: FiGrid, end: true }
+
+const navGroups: Array<{ title: string; icon: IconType; items: NavItem[] }> = [
   {
-    title: 'Workspace',
+    title: 'Chuẩn bị dự giải',
+    icon: FiFlag,
     items: [
-      { to: '/owner', label: 'Tổng quan', end: true },
-      { to: '/owner/horses', label: 'Ngựa của tôi', end: false },
-      { to: '/owner/horses/register', label: 'Đăng ký hồ sơ ngựa', end: false },
-      { to: '/owner/earnings', label: 'Thu nhập', end: false },
-      { to: '/owner/profile', label: 'Hồ sơ tài khoản', end: false },
+      { to: '/owner/horses', label: 'Ngựa của tôi', icon: FiAward },
+      { to: '/owner/horses/register', label: 'Tạo hồ sơ ngựa', icon: FiPlusCircle },
+      { to: '/owner/tournaments', label: 'Tham gia giải đấu', icon: FiClipboard },
     ],
   },
   {
-    title: 'Quản lý cuộc đua',
+    title: 'Ghép cặp & thi đấu',
+    icon: FiLink2,
     items: [
-      { to: '/owner/tournaments', label: 'Giải đấu', end: false },
-      { to: '/owner/race-entries', label: 'Đăng ký cuộc đua', end: false },
-      { to: '/owner/jockey-invite', label: 'Mời Jockey', end: false },
-      { to: '/owner/protest', label: 'Khiếu nại', end: false },
+      { to: '/owner/jockey-invite', label: 'Ghép cặp với Jockey', icon: FiLink2 },
+      { to: '/owner/race-entries', label: 'Lịch & xác nhận thi đấu', icon: FiCalendar },
+      { to: '/owner/protest', label: 'Khiếu nại', icon: FiShield },
+    ],
+  },
+  {
+    title: 'Sau cuộc đua',
+    icon: FiAward,
+    items: [
+      { to: '/owner/earnings', label: 'Kết quả & tiền thưởng', icon: FiDollarSign },
+    ],
+  },
+  {
+    title: 'Khác',
+    icon: FiGrid,
+    items: [
+      { to: '/owner/notifications', label: 'Thông báo', icon: FiBell },
+      { to: '/owner/profile', label: 'Hồ sơ tài khoản', icon: FiUser },
     ],
   },
 ]
 
-const navItems = navGroups.flatMap((group) => group.items)
+const navItems = [overviewItem, ...navGroups.flatMap((group) => group.items)]
 
-const isNavItemActive = (pathname: string, item: (typeof navItems)[number]) => {
+function isNavItemActive(pathname: string, item: NavItem): boolean {
   if (item.to === '/owner') return pathname === '/owner'
-  if (item.to === '/owner/horses') {
-    return pathname === '/owner/horses' || (
-      pathname.startsWith('/owner/horses/') && !pathname.startsWith('/owner/horses/register')
-    )
-  }
+  if (item.to === '/owner/horses') return pathname === item.to || /^\/owner\/horses\/\d+/.test(pathname)
   return pathname === item.to || pathname.startsWith(`${item.to}/`)
 }
 
-const EGG_STYLE_ID = 'logout-egg-style'
-function ensureEggStyle() {
-  if (document.getElementById(EGG_STYLE_ID)) return
-  const style = document.createElement('style')
-  style.id = EGG_STYLE_ID
-  style.textContent = `
-    @keyframes logoutEggRise {
-      0% { opacity: 0; transform: translateY(0px); }
-      15% { opacity: 1; }
-      75% { opacity: 1; transform: translateY(-28px); }
-      100% { opacity: 0; transform: translateY(-36px); }
-    }
-    .logout-egg {
-      animation: logoutEggRise 1.6s ease-out forwards;
-      pointer-events: none;
-      user-select: none;
-    }
-  `
-  document.head.appendChild(style)
+function SidebarLink({ item, pathname, onNavigate }: { item: NavItem; pathname: string; onNavigate: () => void }) {
+  const Icon = item.icon
+  const active = isNavItemActive(pathname, item)
+  return (
+    <NavLink
+      to={item.to}
+      end={item.end}
+      onClick={onNavigate}
+      className={`group flex min-h-11 items-center gap-3 rounded-xl border-l-2 px-3 py-2.5 text-sm transition-colors ${
+        active
+          ? 'border-[#cfa73d] bg-white/10 font-bold text-white'
+          : 'border-transparent font-medium text-emerald-50/80 hover:bg-white/[.06] hover:text-white'
+      }`}
+    >
+      <Icon className={active ? 'text-[#e1bc58]' : 'text-emerald-100/60 group-hover:text-[#e1bc58]'} size={17} aria-hidden="true" />
+      <span className="min-w-0 flex-1">{item.label}</span>
+      {active && <FiChevronRight className="text-[#e1bc58]" size={15} aria-hidden="true" />}
+    </NavLink>
+  )
 }
 
 export default function OwnerLayout() {
   const [profile, setProfile] = useState<OwnerProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
-  const [showLogoutEgg, setShowLogoutEgg] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
-  const clearAuth = useAuthStore((s) => s.clearAuth)
+  const clearAuth = useAuthStore((state) => state.clearAuth)
 
   const loadProfile = useCallback(async () => {
     try {
       setProfile(await getMyAccountProfile())
     } catch {
-      // Sidebar still renders navigation if profile loading fails.
+      setProfile(null)
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    void loadProfile()
-
-    const handleProfileChanged = () => {
-      void loadProfile()
-    }
+    const initialLoadId = window.setTimeout(() => { void loadProfile() }, 0)
+    const handleProfileChanged = () => void loadProfile()
     window.addEventListener('hrtms:profile-changed', handleProfileChanged)
-    return () => window.removeEventListener('hrtms:profile-changed', handleProfileChanged)
+    return () => {
+      window.clearTimeout(initialLoadId)
+      window.removeEventListener('hrtms:profile-changed', handleProfileChanged)
+    }
   }, [loadProfile])
 
   useEffect(() => {
-    ensureEggStyle()
-  }, [])
+    document.body.style.overflow = menuOpen ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [menuOpen])
 
-  const currentNav = navItems.find((item) => {
-    if (item.end) return location.pathname === item.to
-    return location.pathname.startsWith(item.to)
-  })
-  const pageTitle = location.pathname === '/owner/notifications'
-    ? 'Thông báo'
-    : currentNav?.label ?? 'Tổng quan'
+  const currentNav = navItems.find((item) => isNavItemActive(location.pathname, item))
+  const pageTitle = currentNav?.label ?? 'Tổng quan'
+  const initials = profile?.fullName
+    ? profile.fullName.split(/\s+/).filter(Boolean).slice(-2).map((part) => part[0]).join('').toUpperCase()
+    : 'O'
 
   const handleLogout = async () => {
     if (isLoggingOut) return
     setIsLoggingOut(true)
-    setShowLogoutEgg(true)
-
     try {
       await logout()
     } finally {
@@ -117,123 +151,90 @@ export default function OwnerLayout() {
       localStorage.removeItem('token')
       sessionStorage.removeItem('token')
       sessionStorage.removeItem('authReason')
-
-      setTimeout(() => {
-        navigate('/login', { replace: true })
-      }, 700)
+      navigate('/login', { replace: true })
     }
   }
 
-  return (
-    <div className="flex flex-col lg:flex-row min-h-screen bg-[#f7f9fc] text-slate-950">
-      <aside className="w-full lg:w-[280px] bg-white border-b lg:border-b-0 lg:border-r border-slate-200 flex flex-col flex-shrink-0">
-        <div className="px-6 py-6 border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center text-lg font-black shadow-sm shadow-blue-600/20">
-              H
-            </div>
-            <div>
-              <p className="text-lg font-black tracking-tight text-slate-950">HRTMS</p>
-              <p className="text-xs font-medium text-slate-500">Owner Workspace</p>
-            </div>
-          </div>
+  const sidebar = (
+    <aside className="owner-sidebar flex h-full w-[286px] flex-col border-r border-white/10">
+      <div className="flex h-[76px] items-center gap-3 border-b border-white/10 px-5">
+        <div className="owner-sidebar-brand flex h-11 w-11 items-center justify-center rounded-xl text-xl" aria-hidden="true">♞</div>
+        <div className="min-w-0">
+          <p className="truncate text-lg font-black tracking-tight text-white">HRTMS-SU26</p>
+          <p className="text-[11px] font-medium text-emerald-100/65">Tournament Management</p>
         </div>
+      </div>
 
-        <div className="px-6 py-5 border-b border-slate-100">
-          {loading ? (
-            <div className="space-y-2 animate-pulse">
-              <div className="h-4 bg-slate-200 rounded w-3/4" />
-              <div className="h-3 bg-slate-100 rounded w-1/2" />
-            </div>
-          ) : profile ? (
-            <div>
-              <p className="text-sm font-bold text-slate-950 truncate">{profile.fullName}</p>
-              <p className="text-xs text-slate-500 truncate mt-1">{profile.email}</p>
-              <div className="mt-3 flex items-center gap-1.5">
-                <span className="inline-flex px-2.5 py-1 text-xs font-semibold bg-blue-50 text-blue-700 rounded-full border border-blue-100">
-                  Chủ ngựa
-                </span>
-                {profile.status && (
-                  <span className="inline-flex px-2.5 py-1 text-xs font-semibold bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100">
-                    {profile.status}
-                  </span>
-                )}
+      <nav className="owner-sidebar-nav flex-1 overflow-y-auto px-3 py-5" aria-label="Điều hướng Chủ ngựa">
+        <p className="mb-3 inline-flex rounded-full border border-[#cfa73d]/40 bg-[#cfa73d]/10 px-3 py-1 text-[11px] font-black uppercase tracking-[.12em] text-[#e1bc58]">Chủ ngựa</p>
+        <SidebarLink item={overviewItem} pathname={location.pathname} onNavigate={() => setMenuOpen(false)} />
+
+        {navGroups.map((group) => {
+          const GroupIcon = group.icon
+          return (
+            <div key={group.title} className="mt-6">
+              <p className="mb-2 flex items-center gap-2 px-2 text-[10px] font-black uppercase tracking-[.14em] text-emerald-100/55">
+                <GroupIcon size={12} aria-hidden="true" /> {group.title}
+              </p>
+              <div className="space-y-1">
+                {group.items.map((item) => <SidebarLink key={item.to} item={item} pathname={location.pathname} onNavigate={() => setMenuOpen(false)} />)}
               </div>
             </div>
-          ) : (
-            <p className="text-xs text-red-500">Không tải được thông tin</p>
-          )}
-        </div>
+          )
+        })}
+      </nav>
 
-        <nav className="flex-1 py-5 overflow-y-auto">
-          {navGroups.map((group) => (
-            <div key={group.title} className="mb-6">
-              <p className="px-6 pb-2 text-[11px] font-bold text-slate-400 uppercase tracking-[0.18em]">
-                {group.title}
-              </p>
-              <ul className="space-y-1 px-3">
-                {group.items.map((item) => (
-                  <li key={item.to}>
-                    <NavLink
-                      to={item.to}
-                      end={item.end}
-                      className={() =>
-                        `flex items-center px-4 py-3 text-sm rounded-xl transition-colors ${
-                          isNavItemActive(location.pathname, item)
-                            ? 'bg-blue-50 text-blue-700 font-bold ring-1 ring-blue-100'
-                            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950 font-semibold'
-                        }`
-                      }
-                    >
-                      {item.label}
-                    </NavLink>
-                  </li>
-                ))}
-              </ul>
+      <div className="border-t border-white/10 p-3">
+        <button type="button" onClick={() => { navigate('/owner/profile'); setMenuOpen(false) }} className="flex w-full items-center gap-3 rounded-xl p-2 text-left hover:bg-white/[.06]">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#cfa73d] text-sm font-black text-[#082b20]">{initials}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-bold text-white">{loading ? 'Đang tải...' : profile?.fullName || 'Chủ ngựa'}</span>
+            <span className="block truncate text-xs text-emerald-100/55">{profile?.email || 'Hồ sơ tài khoản'}</span>
+          </span>
+        </button>
+        <button type="button" onClick={() => void handleLogout()} disabled={isLoggingOut} className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-xs font-semibold text-emerald-100/65 hover:bg-red-500/10 hover:text-red-200 disabled:opacity-50">
+          <FiLogOut aria-hidden="true" /> {isLoggingOut ? 'Đang đăng xuất...' : 'Đăng xuất'}
+        </button>
+      </div>
+    </aside>
+  )
+
+  return (
+    <div className="owner-shell flex text-slate-950">
+      <div className="fixed inset-y-0 left-0 z-40 hidden lg:block">{sidebar}</div>
+      {menuOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button type="button" className="absolute inset-0 bg-slate-950/55 backdrop-blur-sm" onClick={() => setMenuOpen(false)} aria-label="Đóng lớp phủ menu" />
+          <div className="relative h-full w-[286px] max-w-[86vw] shadow-2xl">
+            {sidebar}
+            <button type="button" onClick={() => setMenuOpen(false)} className="absolute right-3 top-3 rounded-lg p-2 text-emerald-50 hover:bg-white/10" aria-label="Đóng menu"><FiX size={20} /></button>
+          </div>
+        </div>
+      )}
+
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col lg:pl-[286px]">
+        <header className="sticky top-0 z-30 flex h-[68px] items-center justify-between gap-3 border-b border-slate-200/90 bg-white/95 px-4 backdrop-blur lg:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <button type="button" onClick={() => setMenuOpen(true)} className="rounded-lg border border-slate-200 p-2 text-slate-700 lg:hidden" aria-label="Mở menu"><FiMenu size={20} /></button>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="hidden text-slate-500 sm:inline">Chủ ngựa</span>
+                <span className="hidden text-slate-300 sm:inline">/</span>
+                <strong className="truncate text-slate-900">{pageTitle}</strong>
+              </div>
             </div>
-          ))}
-        </nav>
-
-        <div className="px-5 py-5 border-t border-slate-100 space-y-3">
-          <div className="relative">
-            {showLogoutEgg && (
-              <span className="logout-egg absolute left-1/2 -translate-x-1/2 bottom-full mb-1 text-xs font-medium text-slate-500 whitespace-nowrap">
-                Hẹn gặp lại ở đường đua tiếp theo
-              </span>
-            )}
-
-            <button
-              onClick={handleLogout}
-              disabled={isLoggingOut}
-              className="w-full px-4 py-3 text-sm font-bold text-slate-700 border border-slate-200 rounded-xl hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoggingOut ? 'Đang đăng xuất...' : 'Đăng xuất'}
-            </button>
           </div>
-        </div>
-      </aside>
-
-      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-        <header className="bg-white/90 backdrop-blur border-b border-slate-200 px-4 lg:px-8 py-4 flex items-center justify-between gap-4 flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-400">Chủ ngựa</span>
-            <span className="text-sm text-slate-300">/</span>
-            <span className="text-sm font-bold text-slate-900">{pageTitle}</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => navigate('/owner/horses/register')}
-              className="hidden sm:inline-flex rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 transition-colors"
-            >
-              Tạo hồ sơ ngựa
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button type="button" onClick={() => navigate('/owner/horses/register')} className="hidden min-h-10 items-center gap-2 rounded-xl bg-[#cfa73d] px-4 text-sm font-bold text-[#082b20] hover:bg-[#bd9229] sm:inline-flex">
+              <FiPlusCircle aria-hidden="true" /> Tạo hồ sơ ngựa
             </button>
             <NotificationBell notificationsPath="/owner/notifications" />
+            <button type="button" onClick={() => navigate('/owner/profile')} className="flex h-10 w-10 items-center justify-center rounded-full bg-[#cfa73d] text-xs font-black text-[#082b20]" aria-label="Mở hồ sơ tài khoản">{initials}</button>
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto px-4 lg:px-8 py-6 lg:py-8">
-          <Outlet />
+        <main className="owner-main flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <div className="owner-content"><Outlet /></div>
         </main>
       </div>
     </div>
