@@ -132,6 +132,7 @@ export default function App() {
           <Route path="jockey-invite" element={<JockeyInvite />} />
           <Route path="protest" element={<Protest userRole="HorseOwner" />} />
           <Route path="profile" element={<OwnerProfile />} />
+          <Route path="notifications" element={<SharedNotificationCenter />} />
 
         </Route>
 
@@ -175,6 +176,7 @@ export default function App() {
           <Route path="tournaments" element={<RefereeTournamentList />} />
           <Route path="coi" element={<RefereeCoiDeclarations />} />
           <Route path="race-console" element={<RefereeRaceConsole />} />
+          <Route path="notifications" element={<SharedNotificationCenter />} />
         </Route>
 
         {/* ── Cấu trúc Route của KHÁN GIẢ (Spectator) ── */}
@@ -188,6 +190,7 @@ export default function App() {
           <Route path="wallet" element={<WalletTransactions />} />
           <Route path="my-predictions" element={<MyPredictions />} />
           <Route path="live-race" element={<SpectatorLiveRace />} />
+          <Route path="notifications" element={<SharedNotificationCenter />} />
         </Route>
 
         {/* Admin */}
