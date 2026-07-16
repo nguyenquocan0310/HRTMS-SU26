@@ -1,19 +1,22 @@
 import { RegRole } from './role.types';
 
 // ─── Step 2: Identity ───────────────────────────────────────────────────────
+
 export interface IdentityData {
   username: string;
   fullName: string;
   email: string;
 }
+
 // ─── Step 3: Credentials ────────────────────────────────────────────────────
+
 export interface CredentialsData {
   password: string;
   confirmPassword: string;
 }
 
-// ─── Step 4: Verification (theo từng role) ──────────────────────────────────
-// Owner/Jockey/Referee/Doctor đều bắt buộc PhoneNumber + DateOfBirth + IdentityNumber (ACC.1A).
+// ─── Step 4: Verification ───────────────────────────────────────────────────
+
 export interface OwnerVerification {
   phoneNumber: string;
   identityNumber: string;
@@ -45,9 +48,8 @@ export interface DoctorVerification {
   certificateFile: File | null;
 }
 
-// Spectator không có verification data
+// ─── Toàn bộ dữ liệu Register ───────────────────────────────────────────────
 
-// ─── Toàn bộ form data xuyên suốt 6 bước ────────────────────────────────────
 export interface RegisterFormData {
   role: RegRole | null;
   identity: IdentityData;
@@ -58,23 +60,54 @@ export interface RegisterFormData {
   doctorVerification: DoctorVerification;
 }
 
-// ─── Giá trị khởi tạo ────────────────────────────────────────────────────────
+// ─── Validation errors ──────────────────────────────────────────────────────
+
+export interface RegisterFormErrors {
+  role?: string;
+
+  identity?: Partial<Record<keyof IdentityData, string>>;
+
+  credentials?: Partial<Record<keyof CredentialsData, string>>;
+
+  ownerVerification?: Partial<
+    Record<keyof OwnerVerification, string>
+  >;
+
+  jockeyVerification?: Partial<
+    Record<keyof JockeyVerification, string>
+  >;
+
+  refereeVerification?: Partial<
+    Record<keyof RefereeVerification, string>
+  >;
+
+  doctorVerification?: Partial<
+    Record<keyof DoctorVerification, string>
+  >;
+}
+
+// ─── Giá trị khởi tạo ───────────────────────────────────────────────────────
+
 export const initialFormData: RegisterFormData = {
   role: null,
+
   identity: {
     username: '',
     fullName: '',
     email: '',
   },
+
   credentials: {
     password: '',
     confirmPassword: '',
   },
+
   ownerVerification: {
     phoneNumber: '',
     identityNumber: '',
     dateOfBirth: '',
   },
+
   jockeyVerification: {
     phoneNumber: '',
     identityNumber: '',
@@ -85,12 +118,14 @@ export const initialFormData: RegisterFormData = {
     healthStatus: '',
     certificateFile: null,
   },
+
   refereeVerification: {
     phoneNumber: '',
     identityNumber: '',
     dateOfBirth: '',
     certificateFile: null,
   },
+
   doctorVerification: {
     phoneNumber: '',
     identityNumber: '',

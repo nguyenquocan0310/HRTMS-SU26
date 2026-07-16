@@ -1,79 +1,207 @@
-import { useCallback, useEffect, useState } from 'react';
-import { FiShield, FiFlag, FiActivity } from 'react-icons/fi';
-import DataTable, { type DataTableColumn } from '../../components/common/DataTable';
-import StatusBadge, { type StatusType } from '../../components/common/StatusBadge';
-import ApprovalDetailPanel from './ApprovalDetailPanel';
-import RosterApprovalTable from './RosterApprovalTable';
 import {
-  getPendingHorses,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+
+import {
+  FiActivity,
+  FiFlag,
+} from 'react-icons/fi';
+
+import DataTable, {
+  type DataTableColumn,
+} from '../../components/common/DataTable';
+
+import StatusBadge, {
+  type StatusType,
+} from '../../components/common/StatusBadge';
+
+import UserDetailModal from '../../components/common/UserDetailModal';
+import ApprovalDetailPanel from './ApprovalDetailPanel';
+
+import {
+  approveParticipant,
+  getRoster,
+  rejectParticipant,
+  type ParticipantResponse,
+} from '../../services/participantService';
+
+import {
+  getTournaments,
+} from '../../services/tournamentService';
+
+import {
+  approveDoctor,
+  approveJockey,
+  approveReferee,
   getPendingApprovals,
+  getPendingHorses,
+  rejectDoctor,
+  rejectJockey,
+  rejectReferee,
   type HorseEnrollmentPending,
   type PersonPending,
 } from '../../services/approvalService';
+
 import styles from './ApprovalCenter.module.scss';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
-export type ApprovalGroup = 'account' | 'roster' | 'horse';
-export type AccountSubTab = 'jockey' | 'onboarding';
+
+export type ApprovalGroup =
+  | 'registration'
+  | 'horse';
 
 export interface HorseApproval {
   id: string;
-  entityId: number; // = enrollmentId, dùng để approve/reject
-  horseId: number;  // dùng để gọi chi tiết ngựa riêng (GET /admin/horses/{horseId})
+
+  // enrollmentId: dùng cho approve/reject Horse Enrollment.
+  entityId: number;
+
+  // horseId: dùng cho GET /admin/horses/{horseId}.
+  horseId: number;
+
   type: 'horse';
   subject: string;
   submittedDate: string;
   stable: string;
   status: StatusType;
-  // breed/dopingTestResult/vaccinationRecordRef không có sẵn từ danh sách
-  // pending nữa — load riêng ở Detail Panel qua getHorseDetail().
+
   breed: string;
   allowedBreed: string;
-  dopingTestResult: 'Passed' | 'Failed' | 'Pending' | string;
+
+  dopingTestResult:
+    | 'Passed'
+    | 'Failed'
+    | 'Pending'
+    | string;
+
   vaccinationRecordRef: string;
-  entryFeeStatus: 'Paid' | 'Unpaid';
+
+  entryFeeStatus:
+    | 'Paid'
+    | 'Unpaid';
 }
 
-export interface JockeyApproval {
+export interface PersonnelApproval {
   id: string;
+
+  // userId: dùng xem detail/certificate và approve/reject personnel.
   entityId: number;
-  type: 'jockey';
+
+  type: 'personnel';
+
   subject: string;
+  username: string;
+  email: string;
+
+  role:
+    | 'Jockey'
+    | 'Referee'
+    | 'Doctor';
+
   submittedDate: string;
-  stable: string;
   status: StatusType;
-  licenseCertificate: string;
-  experienceYears?: number;
 }
 
-export interface OnboardingApproval {
+export type ApprovalItem =
+  | HorseApproval
+  | PersonnelApproval;
+
+interface CombinedRegistrationRow {
   id: string;
-  entityId: number;
-  type: 'onboarding';
-  subject: string;
+
+  /**
+   * profile: hồ sơ tài khoản Jockey/Referee/Doctor.
+   * tournament: lượt đăng ký tham gia Tournament.
+   */
+  source: 'profile' | 'tournament';
+
+  userId: number;
+  participantId?: number;
+
+  fullName: string;
+  username: string;
+  email: string;
+  role: string;
+  tournamentName: string;
+
   submittedDate: string;
-  stable: string;
   status: StatusType;
-  role: 'Referee' | 'Doctor';
-  certificationLevel?: string;
-  medicalLicenseNumber?: string;
 }
 
-export type ApprovalItem = HorseApproval | JockeyApproval | OnboardingApproval;
+interface TournamentOption {
+  id: number;
+  name: string;
+}
 
-// ─── Map dữ liệu BE → item hiển thị ─────────────────────────────────────────
-const formatDate = (iso: string): string =>
-  iso ? new Date(iso).toLocaleDateString('vi-VN') : '—';
+// ─── Constants ──────────────────────────────────────────────────────────────
 
-const mapHorse = (h: HorseEnrollmentPending): HorseApproval => ({
-  id: `h${h.enrollmentId}`,
-  entityId: h.enrollmentId,
-  horseId: h.horseId,
+const GROUPS: Array<{
+  key: ApprovalGroup;
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+}> = [
+  {
+    key: 'registration',
+    title: 'Đăng ký vào giải',
+    description:
+      'Jockey, Trọng tài, Bác sĩ và Tournament Roster',
+    icon: <FiFlag size={18} />,
+  },
+  {
+    key: 'horse',
+    title: 'Hồ sơ ngựa',
+    description:
+      'Sức khỏe và định danh ngựa',
+    icon: <FiActivity size={18} />,
+  },
+];
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+const formatDate = (
+  iso: string | null | undefined
+): string => {
+  if (!iso) {
+    return '—';
+  }
+
+  const date = new Date(iso);
+
+  if (Number.isNaN(date.getTime())) {
+    return '—';
+  }
+
+  return date.toLocaleDateString('vi-VN');
+};
+
+const normalizeStatus = (
+  status: string
+): StatusType => {
+  return status as StatusType;
+};
+
+const mapHorse = (
+  horse: HorseEnrollmentPending
+): HorseApproval => ({
+  id: `horse-${horse.enrollmentId}`,
+  entityId: horse.enrollmentId,
+  horseId: horse.horseId,
   type: 'horse',
-  subject: h.horseName,
-  submittedDate: formatDate(h.createdAt),
-  stable: h.tournamentName, // không có ownerId trong DTO này, dùng tên giải thay thế
-  status: h.adminApprovalStatus as StatusType, // đúng field duyệt, không dùng h.status
+  subject: horse.horseName,
+  submittedDate: formatDate(
+    horse.createdAt
+  ),
+  stable:
+    horse.tournamentName || '—',
+  status: normalizeStatus(
+    horse.adminApprovalStatus
+  ),
+
+  // Chi tiết đầy đủ được tải riêng trong ApprovalDetailPanel.
   breed: '',
   allowedBreed: '',
   dopingTestResult: 'Pending',
@@ -81,245 +209,1064 @@ const mapHorse = (h: HorseEnrollmentPending): HorseApproval => ({
   entryFeeStatus: 'Paid',
 });
 
-const mapJockey = (p: PersonPending): JockeyApproval => ({
-  id: `j${p.userId}`,
-  entityId: p.userId,
-  type: 'jockey',
-  subject: p.fullName,
-  submittedDate: formatDate(p.createdAt),
-  stable: '—',
-  status: p.profileStatus as StatusType,
-  licenseCertificate: p.certificationLevel ?? '—',
-});
-
-const mapPerson = (p: PersonPending, role: 'Referee' | 'Doctor'): OnboardingApproval => ({
-  id: `o${p.userId}`,
-  entityId: p.userId,
-  type: 'onboarding',
-  subject: p.fullName,
-  submittedDate: formatDate(p.createdAt),
-  stable: role,
-  status: p.profileStatus as StatusType,
+const mapPersonnel = (
+  person: PersonPending,
+  role: PersonnelApproval['role']
+): PersonnelApproval => ({
+  id: `${role.toLowerCase()}-${person.userId}`,
+  entityId: person.userId,
+  type: 'personnel',
+  subject: person.fullName,
+  username: person.username,
+  email: person.email,
   role,
-  certificationLevel: role === 'Referee' ? p.certificationLevel ?? undefined : undefined,
-  medicalLicenseNumber: role === 'Doctor' ? p.certificationLevel ?? undefined : undefined,
+  submittedDate: formatDate(
+    person.createdAt
+  ),
+  status: normalizeStatus(
+    person.profileStatus
+  ),
 });
 
-// ─── 3 nhóm chính (group card) ───────────────────────────────────────────────
-const GROUPS: { key: ApprovalGroup; title: string; desc: string; icon: React.ReactNode }[] = [
-  { key: 'account', title: 'Hồ sơ tài khoản', desc: 'Jockey, Trọng tài, Bác sĩ', icon: <FiShield size={18} /> },
-  { key: 'roster', title: 'Đăng ký vào giải', desc: 'Roster theo từng tournament', icon: <FiFlag size={18} /> },
-  { key: 'horse', title: 'Hồ sơ ngựa', desc: 'Sức khỏe và định danh ngựa', icon: <FiActivity size={18} /> },
-];
-
-const ACCOUNT_SUB_TABS: { key: AccountSubTab; label: string }[] = [
-  { key: 'jockey', label: 'Jockey' },
-  { key: 'onboarding', label: 'Trọng tài / Bác sĩ' },
-];
+// ─── Component ──────────────────────────────────────────────────────────────
 
 const ApprovalCenter = () => {
-  const [activeGroup, setActiveGroup] = useState<ApprovalGroup>('account');
-  const [accountSubTab, setAccountSubTab] = useState<AccountSubTab>('jockey');
-  const [selectedItem, setSelectedItem] = useState<ApprovalItem | null>(null);
+  const [activeGroup, setActiveGroup] =
+    useState<ApprovalGroup>(
+      'registration'
+    );
 
-  const [items, setItems] = useState<ApprovalItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [
+    personnelItems,
+    setPersonnelItems,
+  ] =
+    useState<PersonnelApproval[]>([]);
 
-  const loadData = useCallback(async () => {
-    if (activeGroup === 'roster') {
-      setError('');
-      return;
-    } // Roster tự load trong RosterApprovalTable.
-    setLoading(true);
-    setError('');
-    try {
-      if (activeGroup === 'horse') {
-        const horses = await getPendingHorses();
-        setItems(horses.map(mapHorse));
-      } else {
-        const { referees, doctors, jockeys } = await getPendingApprovals();
-        if (accountSubTab === 'jockey') {
-          setItems(jockeys.map(mapJockey));
-        } else {
-          setItems([
-            ...referees.map((r) => mapPerson(r, 'Referee')),
-            ...doctors.map((d) => mapPerson(d, 'Doctor')),
-          ]);
-        }
+  const [
+    rosterItems,
+    setRosterItems,
+  ] =
+    useState<ParticipantResponse[]>([]);
+
+  const [
+    horseItems,
+    setHorseItems,
+  ] =
+    useState<HorseApproval[]>([]);
+
+  const [
+    tournaments,
+    setTournaments,
+  ] =
+    useState<TournamentOption[]>([]);
+
+  const [
+    selectedTournamentId,
+    setSelectedTournamentId,
+  ] =
+    useState<number | null>(null);
+
+  const [
+    selectedRegistration,
+    setSelectedRegistration,
+  ] =
+    useState<CombinedRegistrationRow | null>(
+      null
+    );
+
+  const [
+    selectedHorse,
+    setSelectedHorse,
+  ] =
+    useState<HorseApproval | null>(
+      null
+    );
+
+  const [statusFilter, setStatusFilter] =
+    useState('');
+
+  const [roleFilter, setRoleFilter] =
+    useState('');
+
+  const [
+    registrationLoading,
+    setRegistrationLoading,
+  ] =
+    useState(false);
+
+  const [
+    horseLoading,
+    setHorseLoading,
+  ] =
+    useState(false);
+
+  const [
+    actionLoading,
+    setActionLoading,
+  ] =
+    useState(false);
+
+  const [error, setError] =
+    useState('');
+
+  // ─── Load personnel ──────────────────────────────────────────────────────
+
+  const loadPersonnel =
+    useCallback(async () => {
+      try {
+        const {
+          jockeys,
+          referees,
+          doctors,
+        } =
+          await getPendingApprovals();
+
+        const mapped: PersonnelApproval[] =
+          [
+            ...jockeys.map((item) =>
+              mapPersonnel(
+                item,
+                'Jockey'
+              )
+            ),
+
+            ...referees.map((item) =>
+              mapPersonnel(
+                item,
+                'Referee'
+              )
+            ),
+
+            ...doctors.map((item) =>
+              mapPersonnel(
+                item,
+                'Doctor'
+              )
+            ),
+          ];
+
+        setPersonnelItems(mapped);
+      } catch (err) {
+        setPersonnelItems([]);
+
+        throw err;
       }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không tải được danh sách hồ sơ.');
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [activeGroup, accountSubTab]);
+    }, []);
+
+  // ─── Load Tournament list ────────────────────────────────────────────────
+
+  const loadTournaments =
+    useCallback(async () => {
+      try {
+        const list =
+          await getTournaments();
+
+        const mapped: TournamentOption[] =
+          list.map((tournament) => ({
+            id: tournament.tournamentId,
+            name: tournament.name,
+          }));
+
+        setTournaments(mapped);
+
+        setSelectedTournamentId(
+          (currentId) => {
+            if (
+              currentId &&
+              mapped.some(
+                (item) =>
+                  item.id === currentId
+              )
+            ) {
+              return currentId;
+            }
+
+            return mapped.length > 0
+              ? mapped[0].id
+              : null;
+          }
+        );
+      } catch (err) {
+        setTournaments([]);
+
+        throw err;
+      }
+    }, []);
+
+  // ─── Load Tournament roster ──────────────────────────────────────────────
+
+  const loadRoster =
+    useCallback(async () => {
+      if (!selectedTournamentId) {
+        setRosterItems([]);
+        return;
+      }
+
+      try {
+        const data = await getRoster(
+          selectedTournamentId
+        );
+
+        setRosterItems(data);
+      } catch (err) {
+        setRosterItems([]);
+
+        throw err;
+      }
+    }, [selectedTournamentId]);
+
+  // ─── Load combined registration section ─────────────────────────────────
+
+  const loadRegistrationData =
+    useCallback(async () => {
+      setRegistrationLoading(true);
+      setError('');
+
+      try {
+        await Promise.all([
+          loadPersonnel(),
+          loadTournaments(),
+        ]);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Không tải được dữ liệu đăng ký.'
+        );
+      } finally {
+        setRegistrationLoading(false);
+      }
+    }, [
+      loadPersonnel,
+      loadTournaments,
+    ]);
+
+  // ─── Load horses ─────────────────────────────────────────────────────────
+
+  const loadHorses =
+    useCallback(async () => {
+      setHorseLoading(true);
+      setError('');
+
+      try {
+        const horses =
+          await getPendingHorses();
+
+        setHorseItems(
+          horses.map(mapHorse)
+        );
+      } catch (err) {
+        setHorseItems([]);
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Không tải được danh sách hồ sơ ngựa.'
+        );
+      } finally {
+        setHorseLoading(false);
+      }
+    }, []);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (activeGroup === 'horse') {
+      loadHorses();
+      return;
+    }
 
-  const columns: DataTableColumn<ApprovalItem>[] = [
-    {
-      key: 'subject',
-      header: 'Người đăng ký',
-      render: (row) => <span className={styles.subjectCell}>{row.subject}</span>,
-    },
-    {
-      key: 'type',
-      header: 'Nhóm',
-      render: (row) => {
-        if (row.type === 'onboarding') return row.role;
-        return row.type === 'horse' ? 'Horse' : 'Jockey';
+    loadRegistrationData();
+  }, [
+    activeGroup,
+    loadHorses,
+    loadRegistrationData,
+  ]);
+
+  useEffect(() => {
+    if (
+      activeGroup !== 'registration' ||
+      !selectedTournamentId
+    ) {
+      return;
+    }
+
+    setRegistrationLoading(true);
+    setError('');
+
+    loadRoster()
+      .catch((err) => {
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Không tải được danh sách đăng ký Tournament.'
+        );
+      })
+      .finally(() => {
+        setRegistrationLoading(false);
+      });
+  }, [
+    activeGroup,
+    selectedTournamentId,
+    loadRoster,
+  ]);
+
+  // ─── Merge personnel + roster thành một bảng duy nhất ───────────────────
+
+  const combinedRegistrationRows =
+    useMemo<CombinedRegistrationRow[]>(() => {
+      const profileRows: CombinedRegistrationRow[] =
+        personnelItems.map((item) => ({
+          id: `profile-${item.entityId}`,
+          source: 'profile',
+
+          userId: item.entityId,
+
+          fullName: item.subject,
+          username: item.username,
+          email: item.email,
+          role: item.role,
+
+          // Hồ sơ tài khoản chưa gắn Tournament cụ thể.
+          tournamentName: '—',
+
+          submittedDate:
+            item.submittedDate,
+
+          status: item.status,
+        }));
+
+      const tournamentRows: CombinedRegistrationRow[] =
+        rosterItems.map((item) => ({
+          id: `tournament-${item.participantId}`,
+          source: 'tournament',
+
+          userId: item.userId,
+          participantId:
+            item.participantId,
+
+          fullName: item.fullName,
+          username:
+            item.email.split('@')[0] ||
+            '—',
+          email: item.email,
+          role: item.role,
+
+          tournamentName:
+            item.tournamentName ?? '—',
+
+          submittedDate:
+            formatDate(
+              item.registeredAt
+            ),
+
+          status:
+            item.status as StatusType,
+        }));
+
+      return [
+        ...profileRows,
+        ...tournamentRows,
+      ].filter((row) => {
+        const matchRole =
+          !roleFilter ||
+          row.role === roleFilter;
+
+        const matchStatus =
+          !statusFilter ||
+          String(row.status) ===
+            statusFilter;
+
+        return (
+          matchRole &&
+          matchStatus
+        );
+      });
+    }, [
+      personnelItems,
+      rosterItems,
+      roleFilter,
+      statusFilter,
+    ]);
+
+  // ─── Approve / Reject dòng đang chọn ────────────────────────────────────
+
+  const handleApproveRegistration =
+    async () => {
+      if (
+        !selectedRegistration ||
+        actionLoading
+      ) {
+        return;
+      }
+
+      setActionLoading(true);
+      setError('');
+
+      try {
+        if (
+          selectedRegistration.source ===
+          'tournament'
+        ) {
+          if (
+            selectedRegistration.participantId ===
+            undefined
+          ) {
+            throw new Error(
+              'Không tìm thấy Participant ID.'
+            );
+          }
+
+          await approveParticipant(
+            selectedRegistration.participantId
+          );
+        } else if (
+          selectedRegistration.role ===
+          'Jockey'
+        ) {
+          await approveJockey(
+            selectedRegistration.userId
+          );
+        } else if (
+          selectedRegistration.role ===
+          'Referee' ||
+          selectedRegistration.role ===
+          'RaceReferee'
+        ) {
+          await approveReferee(
+            selectedRegistration.userId
+          );
+        } else if (
+          selectedRegistration.role ===
+          'Doctor'
+        ) {
+          await approveDoctor(
+            selectedRegistration.userId
+          );
+        }
+
+        setSelectedRegistration(null);
+
+        await Promise.all([
+          loadPersonnel(),
+          loadRoster(),
+        ]);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Duyệt hồ sơ thất bại.'
+        );
+      } finally {
+        setActionLoading(false);
+      }
+    };
+
+  const handleRejectRegistration =
+    async () => {
+      if (
+        !selectedRegistration ||
+        actionLoading
+      ) {
+        return;
+      }
+
+      const reason = window.prompt(
+        'Nhập lý do từ chối, tối thiểu 10 ký tự:'
+      );
+
+      if (reason === null) {
+        return;
+      }
+
+      const trimmedReason =
+        reason.trim();
+
+      if (
+        trimmedReason.length < 10
+      ) {
+        setError(
+          'Lý do từ chối phải có ít nhất 10 ký tự.'
+        );
+
+        return;
+      }
+
+      setActionLoading(true);
+      setError('');
+
+      try {
+        if (
+          selectedRegistration.source ===
+          'tournament'
+        ) {
+          if (
+            selectedRegistration.participantId ===
+            undefined
+          ) {
+            throw new Error(
+              'Không tìm thấy Participant ID.'
+            );
+          }
+
+          await rejectParticipant(
+            selectedRegistration.participantId,
+            trimmedReason
+          );
+        } else if (
+          selectedRegistration.role ===
+          'Jockey'
+        ) {
+          await rejectJockey(
+            selectedRegistration.userId,
+            trimmedReason
+          );
+        } else if (
+          selectedRegistration.role ===
+            'Referee' ||
+          selectedRegistration.role ===
+            'RaceReferee'
+        ) {
+          await rejectReferee(
+            selectedRegistration.userId,
+            trimmedReason
+          );
+        } else if (
+          selectedRegistration.role ===
+          'Doctor'
+        ) {
+          await rejectDoctor(
+            selectedRegistration.userId,
+            trimmedReason
+          );
+        }
+
+        setSelectedRegistration(null);
+
+        await Promise.all([
+          loadPersonnel(),
+          loadRoster(),
+        ]);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Từ chối hồ sơ thất bại.'
+        );
+      } finally {
+        setActionLoading(false);
+      }
+    };
+
+  // ─── Combined registration table ─────────────────────────────────────────
+
+  const registrationColumns: DataTableColumn<CombinedRegistrationRow>[] =
+    [
+      {
+        key: 'fullName',
+        header: 'Người đăng ký',
+        render: (row) => (
+          <span
+            className={
+              styles.subjectCell
+            }
+          >
+            {row.fullName}
+          </span>
+        ),
       },
-    },
-    {
-      key: 'submittedDate',
-      header: 'Ngày nộp',
-      render: (row) => row.submittedDate,
-    },
-    {
-      key: 'stable',
-      header:
-        activeGroup === 'account' && accountSubTab === 'onboarding'
-          ? 'Role'
-          : activeGroup === 'horse'
-          ? 'Tournament'
-          : 'Origin / Stable',
-      render: (row) => row.stable,
-    },
-    {
-      key: 'status',
-      header: 'Trạng thái',
-      render: (row) => <StatusBadge status={row.status} />,
-    },
-    {
-      key: 'action',
-      header: '',
-      width: '140px',
-      render: (row) => (
-        <button
-          type="button"
-          className={styles.detailBtn}
-          onClick={() => setSelectedItem(row)}
-        >
-          Xem chi tiết
-        </button>
-      ),
-    },
-  ];
-
-  const totalCount = items.length;
-
-  return (
-    <div className={styles.container}>
-      {/* ═══ HEADER ═══════════════════════════════════════════ */}
-      <div className={styles.header}>
-        <div>
-          <h1 className={styles.heading}>Admin Workspace</h1>
-        </div>
-      </div>
-
-      <div className={styles.subHeader}>
-        <div>
-          <h2 className={styles.subHeading}>Approval Center</h2>         
-        </div>
-        {activeGroup !== 'roster' && (
-          <span className={styles.countBadge}>{totalCount} hồ sơ</span>
-        )}
-      </div>
-
-      {/* ═══ GROUP CARDS ══════════════════════════════════════ */}
-      <div className={styles.groupGrid}>
-        {GROUPS.map((g) => (
+      {
+        key: 'email',
+        header: 'Email',
+        render: (row) =>
+          row.email || '—',
+      },
+      {
+        key: 'role',
+        header: 'Role',
+        render: (row) =>
+          row.role || '—',
+      },
+      {
+        key: 'tournamentName',
+        header: 'Tournament',
+        render: (row) =>
+          row.tournamentName ||
+          '—',
+      },
+      {
+        key: 'submittedDate',
+        header: 'Ngày nộp',
+        render: (row) =>
+          row.submittedDate,
+      },
+      {
+        key: 'status',
+        header: 'Trạng thái',
+        render: (row) => (
+          <StatusBadge
+            status={row.status}
+          />
+        ),
+      },
+      {
+        key: 'action',
+        header: '',
+        width: '140px',
+        render: (row) => (
           <button
-            key={g.key}
             type="button"
-            className={`${styles.groupCard} ${activeGroup === g.key ? styles.groupCardActive : ''}`}
+            className={
+              styles.detailBtn
+            }
             onClick={() => {
-              setActiveGroup(g.key);
-              setSelectedItem(null);
+              setError('');
+              setSelectedRegistration(
+                row
+              );
             }}
           >
-            <span className={styles.groupTitle}>{g.title}</span>
-            <span className={styles.groupDesc}>{g.desc}</span>
+            Xem chi tiết
+          </button>
+        ),
+      },
+    ];
+
+  // ─── Horse table ─────────────────────────────────────────────────────────
+
+  const horseColumns: DataTableColumn<HorseApproval>[] =
+    [
+      {
+        key: 'subject',
+        header: 'Tên ngựa',
+        render: (row) => (
+          <span
+            className={
+              styles.subjectCell
+            }
+          >
+            {row.subject}
+          </span>
+        ),
+      },
+      {
+        key: 'stable',
+        header: 'Tournament',
+        render: (row) =>
+          row.stable,
+      },
+      {
+        key: 'submittedDate',
+        header: 'Ngày nộp',
+        render: (row) =>
+          row.submittedDate,
+      },
+      {
+        key: 'status',
+        header: 'Trạng thái',
+        render: (row) => (
+          <StatusBadge
+            status={row.status}
+          />
+        ),
+      },
+      {
+        key: 'action',
+        header: '',
+        width: '140px',
+        render: (row) => (
+          <button
+            type="button"
+            className={
+              styles.detailBtn
+            }
+            onClick={() => {
+              setError('');
+              setSelectedHorse(row);
+            }}
+          >
+            Xem chi tiết
+          </button>
+        ),
+      },
+    ];
+
+  const displayedCount =
+    activeGroup === 'horse'
+      ? horseItems.length
+      : combinedRegistrationRows.length;
+
+  return (
+    <div
+      className={styles.container}
+    >
+      {/* Header */}
+
+      <div className={styles.header}>
+        <h1
+          className={styles.heading}
+        >
+          Admin Workspace
+        </h1>
+      </div>
+
+      <div
+        className={styles.subHeader}
+      >
+        <div>
+          <h2
+            className={
+              styles.subHeading
+            }
+          >
+            Approval Center
+          </h2>
+        </div>
+
+        <span
+          className={
+            styles.countBadge
+          }
+        >
+          {displayedCount} hồ sơ
+        </span>
+      </div>
+
+      {/* Main groups */}
+
+      <div
+        className={styles.groupGrid}
+      >
+        {GROUPS.map((group) => (
+          <button
+            key={group.key}
+            type="button"
+            className={`${
+              styles.groupCard
+            } ${
+              activeGroup ===
+              group.key
+                ? styles.groupCardActive
+                : ''
+            }`}
+            onClick={() => {
+              setActiveGroup(
+                group.key
+              );
+
+              setSelectedRegistration(
+                null
+              );
+
+              setSelectedHorse(null);
+              setError('');
+            }}
+          >
+            <span>
+              {group.icon}
+            </span>
+
+            <span
+              className={
+                styles.groupTitle
+              }
+            >
+              {group.title}
+            </span>
+
+            <span
+              className={
+                styles.groupDesc
+              }
+            >
+              {group.description}
+            </span>
           </button>
         ))}
       </div>
 
-      {/* ═══ BANNER MÔ TẢ NHÓM ════════════════════════════════ */}
-      {activeGroup === 'account' && (
-        <div className={styles.banner}>
-          Duyệt hồ sơ năng lực của Jockey, Trọng tài và Bác sĩ trước khi họ được dùng workspace vận hành.
+      {/* Banner */}
+
+      {activeGroup ===
+        'registration' ? (
+        <div
+          className={styles.banner}
+        >
+          Quản lý chung hồ sơ đăng ký
+          tài khoản của Jockey, Trọng
+          tài, Bác sĩ và các lượt đăng
+          ký tham gia Tournament.
         </div>
-      )}
-      {activeGroup === 'roster' && (
-        <div className={styles.banner}>
-          Duyệt đơn đăng ký Horse tham gia một Tournament cụ thể. Sau khi Approve, hồ sơ sẽ vào Tournament Roster.
-        </div>
-      )}
-      {activeGroup === 'horse' && (
-        <div className={styles.banner}>
-          Duyệt hồ sơ sức khỏe và định danh của ngựa trước khi được phép đăng ký vào bất kỳ giải nào.
+      ) : (
+        <div
+          className={styles.banner}
+        >
+          Duyệt hồ sơ sức khỏe và định
+          danh của ngựa.
         </div>
       )}
 
-      {/* ═══ SUB-TABS (chỉ nhóm Hồ sơ tài khoản) ══════════════ */}
-      {activeGroup === 'account' && (
-        <div className={styles.subTabs}>
-          {ACCOUNT_SUB_TABS.map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              className={`${styles.subTabBtn} ${accountSubTab === tab.key ? styles.subTabBtnActive : ''}`}
-              onClick={() => {
-                setAccountSubTab(tab.key);
-                setSelectedItem(null);
+      {error && (
+        <div
+          className={styles.errorBox}
+        >
+          {error}
+        </div>
+      )}
+
+      {/* Content */}
+
+      <div
+        className={styles.lightTable}
+      >
+        {activeGroup === 'horse' ? (
+          horseLoading ? (
+            <p
+              className={
+                styles.loadingText
+              }
+            >
+              Đang tải danh sách hồ sơ
+              ngựa...
+            </p>
+          ) : (
+            <DataTable
+              columns={horseColumns}
+              data={horseItems}
+              rowKey={(row) => row.id}
+              emptyMessage="Không có hồ sơ ngựa nào đang chờ duyệt."
+            />
+          )
+        ) : (
+          <>
+            {/* Một bộ lọc duy nhất cho bảng đã gộp */}
+
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '12px',
+                marginBottom: '16px',
               }}
             >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      )}
+              <select
+                value={
+                  selectedTournamentId ??
+                  ''
+                }
+                onChange={(event) =>
+                  setSelectedTournamentId(
+                    Number(
+                      event.target.value
+                    ) || null
+                  )
+                }
+                style={{
+                  minWidth: '280px',
+                  padding: '10px 12px',
+                  border:
+                    '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  background: '#fff',
+                }}
+              >
+                {tournaments.length ===
+                  0 && (
+                  <option value="">
+                    Chưa có Tournament
+                  </option>
+                )}
 
-      {error && <div className={styles.errorBox}>{error}</div>}
+                {tournaments.map(
+                  (tournament) => (
+                    <option
+                      key={
+                        tournament.id
+                      }
+                      value={
+                        tournament.id
+                      }
+                    >
+                      {
+                        tournament.name
+                      }
+                    </option>
+                  )
+                )}
+              </select>
 
-      {/* ═══ NỘI DUNG THEO NHÓM ════════════════════════════════ */}
-      <div className={styles.lightTable}>
-      {activeGroup === 'roster' ? (
-        <RosterApprovalTable />
-      ) : loading ? (
-        <p className={styles.loadingText}>Đang tải danh sách hồ sơ...</p>
-      ) : (
-        <DataTable
-          columns={columns}
-          data={items}
-          rowKey={(row) => row.id}
-          emptyMessage={
-            activeGroup === 'horse'
-              ? 'Không có hồ sơ ngựa nào đang chờ duyệt.'
-              : 'Không có hồ sơ tài khoản nào đang chờ duyệt.'
+              <select
+                value={statusFilter}
+                onChange={(event) =>
+                  setStatusFilter(
+                    event.target.value
+                  )
+                }
+                style={{
+                  padding: '10px 12px',
+                  border:
+                    '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  background: '#fff',
+                }}
+              >
+                <option value="">
+                  Tất cả trạng thái
+                </option>
+
+                <option value="Pending">
+                  Pending
+                </option>
+
+                <option value="Approved">
+                  Approved
+                </option>
+
+                <option value="Rejected">
+                  Rejected
+                </option>
+              </select>
+
+              <select
+                value={roleFilter}
+                onChange={(event) =>
+                  setRoleFilter(
+                    event.target.value
+                  )
+                }
+                style={{
+                  padding: '10px 12px',
+                  border:
+                    '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  background: '#fff',
+                }}
+              >
+                <option value="">
+                  Tất cả role
+                </option>
+
+                <option value="Owner">
+                  Owner
+                </option>
+
+                <option value="Jockey">
+                  Jockey
+                </option>
+
+                <option value="Referee">
+                  Referee
+                </option>
+
+                <option value="Doctor">
+                  Doctor
+                </option>
+              </select>
+            </div>
+
+            {registrationLoading ? (
+              <p
+                className={
+                  styles.loadingText
+                }
+              >
+                Đang tải danh sách đăng
+                ký...
+              </p>
+            ) : (
+              <DataTable
+                columns={
+                  registrationColumns
+                }
+                data={
+                  combinedRegistrationRows
+                }
+                rowKey={(row) =>
+                  row.id
+                }
+                emptyMessage="Không có hồ sơ đăng ký phù hợp."
+              />
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Combined registration detail */}
+
+      {selectedRegistration && (
+        <UserDetailModal
+          userId={String(
+            selectedRegistration.userId
+          )}
+          role={
+            selectedRegistration.role
+          }
+          basicInfo={{
+            username:
+              selectedRegistration.username,
+            'Full Name':
+              selectedRegistration.fullName,
+            email:
+              selectedRegistration.email,
+            role:
+              selectedRegistration.role,
+            status: String(
+              selectedRegistration.status
+            ),
+            joinedDate:
+              selectedRegistration.submittedDate,
+            Tournament:
+              selectedRegistration.tournamentName,
+          }}
+          showActions={
+            String(
+              selectedRegistration.status
+            ).toLowerCase() ===
+              'pending' &&
+            !actionLoading
+          }
+          onApprove={
+            handleApproveRegistration
+          }
+          onReject={
+            handleRejectRegistration
+          }
+          onClose={() =>
+            setSelectedRegistration(
+              null
+            )
           }
         />
       )}
-      </div>
 
+      {/* Horse detail */}
 
-      {/* ═══ DETAIL PANEL ══════════════════════════════════════ */}
-{selectedItem && (
-  <ApprovalDetailPanel
-    item={selectedItem}
-    onClose={() => setSelectedItem(null)}
-    onSuccess={(newStatus) => {
-      setItems((prev) =>
-        prev.map((it) => (it.id === selectedItem.id ? { ...it, status: newStatus } : it))
-      );
-      setSelectedItem(null);
-    }}
-  />
-)}
+      {selectedHorse && (
+        <ApprovalDetailPanel
+          item={selectedHorse}
+          onClose={() =>
+            setSelectedHorse(null)
+          }
+          onSuccess={(
+            newStatus
+          ) => {
+            setHorseItems(
+              (currentItems) =>
+                currentItems.map(
+                  (item) =>
+                    item.id ===
+                    selectedHorse.id
+                      ? {
+                          ...item,
+                          status:
+                            newStatus as StatusType,
+                        }
+                      : item
+                )
+            );
+
+            setSelectedHorse(null);
+          }}
+        />
+      )}
     </div>
   );
 };
