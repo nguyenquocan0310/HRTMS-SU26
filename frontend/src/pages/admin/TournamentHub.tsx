@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { FiUserPlus } from 'react-icons/fi';
+import { Link } from 'react-router-dom';
+import { FiSettings } from 'react-icons/fi';
 import { getTournaments, type TournamentResponse } from '../../services/tournamentService';
-import { getRaceEntries, type RaceSchedule } from '../../services/raceOperationService';
-import useAuthStore from '../../store/authStore';
-import { apiFetch } from '../../services/apiClient';
+import { getRaceSchedule, type RaceEntriesData } from '../../services/raceOperationService';
 import styles from './TournamentHub.module.scss';
 
 const formatVND = (n: number) => n.toLocaleString('vi-VN') + ' VND';
@@ -22,12 +21,9 @@ const statusLabel = (s: string) => {
 };
 
 const TournamentHub = () => {
-  const user = useAuthStore((s) => s.user);
   const [tournaments, setTournaments] = useState<TournamentResponse[]>([]);
   const [loading, setLoading] = useState(true);
-  const [raceSchedules, setRaceSchedules] = useState<Record<number, RaceSchedule>>({});
-  const [regMsgs, setRegMsgs] = useState<Record<number, string>>({});
-  const [registering, setRegistering] = useState<number | null>(null);
+  const [raceSchedules, setRaceSchedules] = useState<Record<number, RaceEntriesData>>({});
 
   useEffect(() => {
     getTournaments()
@@ -35,31 +31,17 @@ const TournamentHub = () => {
         setTournaments(list);
         // Load tất cả race schedules
         const allRaces = list.flatMap((t) => t.rounds.flatMap((r) => r.races));
-        const results: Record<number, RaceSchedule> = {};
+        const results: Record<number, RaceEntriesData> = {};
         await Promise.allSettled(
           allRaces.map(async (race) => {
-            try { results[race.raceId] = await getRaceEntries(race.raceId); } catch {}
+            try { results[race.raceId] = await getRaceSchedule(race.raceId); } catch { /* A schedule is optional in this overview. */ }
           })
         );
         setRaceSchedules(results);
       })
-      .catch(() => {})
+      .catch(() => { /* The empty-state handles an unavailable tournament list. */ })
       .finally(() => setLoading(false));
   }, []);
-
-  const canRegister = user?.role && ['Owner','Jockey','Doctor','Referee'].includes(user.role);
-
-  const handleRegister = async (tournamentId: number) => {
-    setRegistering(tournamentId);
-    try {
-      await apiFetch(`/tournament/${tournamentId}/participants`, { method: 'POST' });
-      setRegMsgs((prev) => ({ ...prev, [tournamentId]: 'Đăng ký thành công! Chờ Admin duyệt.' }));
-    } catch (e) {
-      setRegMsgs((prev) => ({ ...prev, [tournamentId]: e instanceof Error ? e.message : 'Đăng ký thất bại.' }));
-    } finally {
-      setRegistering(null);
-    }
-  };
 
   if (loading) return <div className={styles.container}><p className={styles.loading}>Đang tải...</p></div>;
 
@@ -95,26 +77,17 @@ const TournamentHub = () => {
               <span className={styles.statusBadge}>{statusLabel(t.status)}</span>
             </div>
 
-            {/* Registration */}
+            {/* Admin manages a tournament; it is not a participant role. */}
             {(t.status === 'OpenRegistration' || t.status === 'Open Registration') && (
               <div className={styles.regCard}>
                 <div className={styles.regLeft}>
-                  <FiUserPlus size={20} className={styles.regIcon} />
+                  <FiSettings size={20} className={styles.regIcon} />
                   <div>
-                    <h4 className={styles.regTitle}>Registration</h4>
-                    <p className={styles.regDesc}>Registration is open for eligible workspace roles.</p>
+                    <h4 className={styles.regTitle}>Quản lý đăng ký</h4>
+                    <p className={styles.regDesc}>Giải đang mở đăng ký. Quản trị viên có thể theo dõi và điều chỉnh cấu hình giải.</p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className={styles.registerBtn}
-                  onClick={() => handleRegister(t.tournamentId)}
-                  disabled={registering === t.tournamentId || !canRegister}
-                >
-                  {registering === t.tournamentId ? 'Đang đăng ký...' : '🗒 Register for tournament'}
-                </button>
-                {!canRegister && <p className={styles.regNote}>Your role can view this hub but cannot join the tournament roster.</p>}
-                {regMsgs[t.tournamentId] && <p className={styles.regMsg}>{regMsgs[t.tournamentId]}</p>}
+                <Link className={styles.registerBtn} to={`/admin/tournament-builder/${t.tournamentId}`}>Mở trang quản lý</Link>
               </div>
             )}
 

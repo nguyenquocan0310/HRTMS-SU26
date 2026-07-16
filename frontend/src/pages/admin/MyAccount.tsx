@@ -1,123 +1,43 @@
+/* eslint-disable react-hooks/set-state-in-effect -- Initial profile data comes from the authenticated API. */
 import { useEffect, useState } from 'react';
-import { FiHash, FiUser, FiMail, FiShield, FiCheckCircle } from 'react-icons/fi';
-import { apiFetch } from '../../services/apiClient';
-import useAuthStore from '../../store/authStore';
+import { FiCheckCircle, FiMail, FiShield, FiUser } from 'react-icons/fi';
+import { changeMyPassword, getMyAccountProfile, updateMyBasicInfo } from '../../services/accountService';
+import type { UserProfile } from '../../types/account.types';
 import styles from './MyAccount.module.scss';
 
-interface ProfileData {
-  userId: number;
-  username: string;
-  fullName: string;
-  email: string;
-  role: string;
-  status: string;
-  phoneNumber?: string;
-  dateOfBirth?: string;
-  nationalId?: string;
-  certificationLevel?: string;
-  medicalLicenseNumber?: string;
-  experienceYears?: number;
-}
+type Profile = UserProfile<Record<string, unknown>>;
 
 const MyAccount = () => {
-  const user = useAuthStore((s) => s.user);
-  const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [fullName, setFullName] = useState(''); const [email, setEmail] = useState('');
+  const [currentPassword, setCurrentPassword] = useState(''); const [newPassword, setNewPassword] = useState(''); const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(true); const [savingProfile, setSavingProfile] = useState(false); const [savingPassword, setSavingPassword] = useState(false); const [error, setError] = useState(''); const [message, setMessage] = useState('');
 
-  useEffect(() => {
-    apiFetch<{ success: boolean; data: ProfileData }>('/auth/profile')
-      .then((res) => setProfile(res.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  const loadProfile = async () => { setLoading(true); try { const data = await getMyAccountProfile<Record<string, unknown>>(); setProfile(data); setFullName(data.fullName); setEmail(data.email); } catch (requestError) { setError(requestError instanceof Error ? requestError.message : 'Không tải được thông tin tài khoản.'); } finally { setLoading(false); } };
+  useEffect(() => { void loadProfile(); }, []);
 
-  const statusLabel = profile?.status ?? user?.role ?? 'Active';
+  const handleProfileSubmit = async (event: React.FormEvent) => {
+    event.preventDefault(); setError(''); setMessage('');
+    if (!fullName.trim()) return setError('Vui lòng nhập họ và tên.');
+    if (!/^\S+@\S+\.\S+$/.test(email)) return setError('Email không đúng định dạng.');
+    setSavingProfile(true);
+    try { await updateMyBasicInfo({ fullName: fullName.trim(), email: email.trim() }); setProfile((previous) => previous ? { ...previous, fullName: fullName.trim(), email: email.trim() } : previous); setMessage('Đã cập nhật thông tin cá nhân.'); }
+    catch (requestError) { setError(requestError instanceof Error ? requestError.message : 'Không thể cập nhật thông tin cá nhân.'); }
+    finally { setSavingProfile(false); }
+  };
 
-  const INFO_CARDS = profile ? [
-    { icon: <FiHash size={20} />, label: 'User ID', value: String(profile.userId) },
-    { icon: <FiUser size={20} />, label: 'Username', value: profile.username },
-    { icon: <FiUser size={20} />, label: 'Full name', value: profile.fullName },
-    { icon: <FiMail size={20} />, label: 'Email', value: profile.email },
-    { icon: <FiShield size={20} />, label: 'Role', value: profile.role },
-    { icon: <FiCheckCircle size={20} />, label: 'Status', value: profile.status || 'Active' },
-  ] : [];
+  const handlePasswordSubmit = async (event: React.FormEvent) => {
+    event.preventDefault(); setError(''); setMessage('');
+    if (!currentPassword || !newPassword || !confirmPassword) return setError('Vui lòng nhập đầy đủ thông tin đổi mật khẩu.');
+    if (newPassword.length < 6) return setError('Mật khẩu mới phải có ít nhất 6 ký tự.');
+    if (newPassword !== confirmPassword) return setError('Xác nhận mật khẩu mới chưa khớp.');
+    setSavingPassword(true);
+    try { await changeMyPassword({ currentPassword, newPassword }); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); setMessage('Đã đổi mật khẩu thành công. Phiên đăng nhập hiện tại vẫn được giữ theo cơ chế của hệ thống.'); }
+    catch (requestError) { setError(requestError instanceof Error ? requestError.message : 'Không thể đổi mật khẩu.'); }
+    finally { setSavingPassword(false); }
+  };
 
-  // Role-specific fields
-  const roleFields: { label: string; value: string }[] = [];
-  if (profile) {
-    if (profile.phoneNumber) roleFields.push({ label: 'Phone', value: profile.phoneNumber });
-    if (profile.dateOfBirth) roleFields.push({ label: 'Date of birth', value: new Date(profile.dateOfBirth).toLocaleDateString('vi-VN') });
-    if (profile.nationalId) roleFields.push({ label: 'National ID', value: profile.nationalId });
-    if (profile.certificationLevel) roleFields.push({ label: 'Certification', value: profile.certificationLevel });
-    if (profile.medicalLicenseNumber) roleFields.push({ label: 'Medical license', value: profile.medicalLicenseNumber });
-    if (profile.experienceYears !== undefined) roleFields.push({ label: 'Experience (years)', value: String(profile.experienceYears) });
-  }
-
-  return (
-    <div className={styles.container}>
-      <div className={styles.pageHeader}>
-        <h1 className={styles.heading}>Admin Workspace</h1>
-        <p className={styles.subtext}>System operations and governance</p>
-      </div>
-
-      <div className={styles.sectionHeader}>
-        <span className={styles.statusBadge}>{statusLabel}</span>
-        <h2 className={styles.sectionTitle}>My Account</h2>
-        <p className={styles.sectionDesc}>Profile, role and access information shared across every authenticated workspace.</p>
-      </div>
-
-      {loading ? (
-        <p className={styles.loading}>Đang tải...</p>
-      ) : (
-        <>
-          {/* Info grid */}
-          <div className={styles.infoGrid}>
-            {INFO_CARDS.map((card) => (
-              <div key={card.label} className={styles.infoCard}>
-                <span className={styles.cardIcon}>{card.icon}</span>
-                <span className={styles.cardLabel}>{card.label}</span>
-                <strong className={styles.cardValue}>{card.value}</strong>
-              </div>
-            ))}
-          </div>
-
-          {/* Role profile */}
-          <div className={styles.section}>
-            <h3 className={styles.sectionSubTitle}>Role profile</h3>
-            <p className={styles.sectionSubDesc}>Extended fields from the backend profile endpoint for this role.</p>
-            <div className={styles.roleCard}>
-              {roleFields.length === 0 ? (
-                <div className={styles.empty}>
-                  <div className={styles.emptyIcon}><FiUser size={22} /></div>
-                  <h4 className={styles.emptyTitle}>No role profile</h4>
-                  <p className={styles.emptyDesc}>This role does not expose extra profile fields yet.</p>
-                </div>
-              ) : (
-                <div className={styles.roleGrid}>
-                  {roleFields.map((f) => (
-                    <div key={f.label} className={styles.roleItem}>
-                      <span className={styles.roleLabel}>{f.label}</span>
-                      <strong className={styles.roleValue}>{f.value}</strong>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Security */}
-          <div className={styles.section}>
-            <h3 className={styles.sectionSubTitle}>Security and preferences</h3>
-            <div className={styles.secGrid}>
-              <div className={styles.secCard}>Password changes are handled by <code>/api/auth/change-password</code>.</div>
-              <div className={styles.secCard}>Identity number is encrypted and not returned by API.</div>
-              <div className={styles.secCard}>Notification preferences can be connected when BE exposes settings.</div>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
+  return <div className={styles.container}><div className={styles.pageHeader}><h1 className={styles.heading}>Tài khoản của tôi</h1><p className={styles.subtext}>Cập nhật thông tin cá nhân và bảo mật tài khoản.</p></div>{error && <div className={styles.error} role="alert">{error}</div>}{message && <div className={styles.success}>{message}</div>}{loading ? <p className={styles.loading}>Đang tải thông tin tài khoản...</p> : profile && <><div className={styles.infoGrid}><div className={styles.infoCard}><FiUser size={20} /><span>Tên đăng nhập</span><strong>{profile.username}</strong></div><div className={styles.infoCard}><FiShield size={20} /><span>Vai trò</span><strong>{profile.role === 'Admin' ? 'Quản trị viên' : profile.role}</strong></div><div className={styles.infoCard}><FiCheckCircle size={20} /><span>Trạng thái</span><strong>{profile.status === 'Active' ? 'Đang hoạt động' : profile.status}</strong></div><div className={styles.infoCard}><FiMail size={20} /><span>Email</span><strong>{profile.email}</strong></div></div><div className={styles.formsGrid}><section className={styles.section}><h2>Thông tin cá nhân</h2><form onSubmit={handleProfileSubmit}><label>Họ và tên<input value={fullName} onChange={(event) => setFullName(event.target.value)} maxLength={100} autoComplete="name" /></label><label>Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} maxLength={100} autoComplete="email" /></label><button type="submit" disabled={savingProfile}>{savingProfile ? 'Đang lưu...' : 'Lưu thông tin'}</button></form></section><section className={styles.section}><h2>Đổi mật khẩu</h2><form onSubmit={handlePasswordSubmit}><label>Mật khẩu hiện tại<input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} autoComplete="current-password" /></label><label>Mật khẩu mới<input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={6} autoComplete="new-password" /></label><label>Xác nhận mật khẩu mới<input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} minLength={6} autoComplete="new-password" /></label><button type="submit" disabled={savingPassword}>{savingPassword ? 'Đang đổi mật khẩu...' : 'Đổi mật khẩu'}</button></form></section></div></>}</div>;
 };
 
 export default MyAccount;

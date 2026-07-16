@@ -1,333 +1,43 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
-import { FiSearch, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+/* eslint-disable react-hooks/set-state-in-effect -- User state is hydrated from the administration API. */
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { FiChevronLeft, FiChevronRight, FiPlus, FiSearch } from 'react-icons/fi';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import DataTable, { type DataTableColumn } from '../../components/common/DataTable';
 import StatusBadge, { type StatusType } from '../../components/common/StatusBadge';
-import ConfirmDialog from '../../components/common/ConfirmDialog';
+import UserDetailModal from '../../components/common/UserDetailModal';
 import { apiFetch } from '../../services/apiClient';
 import styles from './UserManagement.module.scss';
-import UserDetailModal from '../../components/common/UserDetailModal';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-type UserRole = 'Admin' | 'HorseOwner' |'Owner'| 'Jockey' | 'RaceReferee' |'Referee'| 'Doctor' | 'Spectator';
+type UserRole = 'Admin' | 'Owner' | 'Jockey' | 'Referee' | 'Doctor' | 'Spectator';
 type UserStatus = 'Active' | 'Suspended' | 'Pending' | 'Rejected';
-
-interface SystemUser {
-  id: string;
-  username: string;
-  email: string;
-  role: UserRole;
-  status: UserStatus;
-  joinedDate: string;
-}
-
-interface ApiUser {
-  userId: number;
-  username: string;
-  email: string;
-  role: string;
-  status: string;
-  createdAt: string;
-}
-
-const ROLE_LABELS: Record<UserRole, string> = {
-  Admin: 'Admin',
-  Owner: 'Owner',
-  HorseOwner: 'Owner',
-  Jockey: 'Jockey',
-  Referee: 'Referee',
-  RaceReferee: 'Referee',
-  Doctor: 'Doctor',
-  Spectator: 'Spectator',
-};
-
-// Map role → approve endpoint
-const APPROVE_ENDPOINT: Partial<Record<UserRole, string>> = {
-  Jockey: '/admin/jockeys',
-  Referee: '/admin/referees',   
-  RaceReferee: '/admin/referees',
-  Doctor: '/admin/doctors',
-};
-
+interface SystemUser { id: string; username: string; email: string; role: UserRole; status: UserStatus; joinedDate: string; }
+interface ApiUser { userId: number; username: string; email: string; role: UserRole; status: UserStatus; createdAt: string; }
+interface CreateUserForm { username: string; fullName: string; email: string; password: string; role: UserRole; phoneNumber: string; dateOfBirth: string; identityNumber: string; experienceYears: string; selfDeclaredWeight: string; certificationLevel: string; medicalLicenseNumber: string; }
+const EMPTY_FORM: CreateUserForm = { username: '', fullName: '', email: '', password: '', role: 'Spectator', phoneNumber: '', dateOfBirth: '', identityNumber: '', experienceYears: '', selfDeclaredWeight: '', certificationLevel: '', medicalLicenseNumber: '' };
+const ROLE_LABELS: Record<UserRole, string> = { Admin: 'Quản trị viên', Owner: 'Chủ ngựa', Jockey: 'Nài ngựa', Referee: 'Trọng tài', Doctor: 'Bác sĩ', Spectator: 'Khán giả' };
 const PAGE_SIZE = 8;
+const isIdentityRole = (role: UserRole) => ['Owner', 'Jockey', 'Referee', 'Doctor'].includes(role);
+const friendlyError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : '';
+  if (/forbidden|403/i.test(message)) return 'Bạn không có quyền thực hiện thao tác này.';
+  if (/not found|404/i.test(message)) return 'Không tìm thấy tài khoản. Danh sách đã được làm mới.';
+  if (/already active|already suspended|409/i.test(message)) return 'Trạng thái tài khoản đã thay đổi. Vui lòng tải lại danh sách.';
+  return message || 'Không thể thực hiện thao tác. Vui lòng thử lại.';
+};
+const APPROVAL_ENDPOINTS: Partial<Record<UserRole, string>> = { Jockey: 'jockeys', Referee: 'referees', Doctor: 'doctors' };
 
 const UserManagement = () => {
-  const [users, setUsers] = useState<SystemUser[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
-  const [statusFilter, setStatusFilter] = useState<UserStatus | 'all'>('all');
-  const [currentPage, setCurrentPage] = useState(1);
-
-  const [pendingAction, setPendingAction] = useState<{
-    user: SystemUser;
-    action: 'suspend' | 'activate' | 'approve' | 'reject';
-  } | null>(null);
-
-  // ─── Fetch users từ API ───────────────────────────────────────────────────
-  const fetchUsers = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await apiFetch<{ success: boolean; data: ApiUser[] }>('/admin/users');
-      if (res.success && res.data) {
-        const mapped: SystemUser[] = res.data.map((u) => ({
-          id: String(u.userId),
-          username: u.username,
-          email: u.email,
-          role: u.role as UserRole,
-          status: u.status as UserStatus,
-          joinedDate: new Date(u.createdAt).toLocaleDateString('vi-VN'),
-        }));
-        setUsers(mapped);
-      }
-    } catch (err) {
-      console.error('Failed to fetch users:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
-
-  // ─── Filter + search ──────────────────────────────────────────────────────
-  const filteredUsers = useMemo(() => {
-    return users.filter((u) => {
-      const matchSearch =
-        searchQuery.trim() === '' ||
-        u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        u.email.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchRole = roleFilter === 'all' || u.role === roleFilter;
-      const matchStatus = statusFilter === 'all' || u.status === statusFilter;
-      return matchSearch && matchRole && matchStatus;
-    });
-  }, [users, searchQuery, roleFilter, statusFilter]);
-
-  // ─── Pagination ───────────────────────────────────────────────────────────
-  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
-  const pagedUsers = filteredUsers.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
-  );
-  const resetToFirstPage = () => setCurrentPage(1);
-
-  // ─── Confirm action ───────────────────────────────────────────────────────
-const handleConfirmAction = async () => {
-  if (!pendingAction) return;
-  const { user, action } = pendingAction;
-
-  try {
-    if (action === 'approve' || action === 'reject') {
-      const endpoint = APPROVE_ENDPOINT[user.role];
-      if (!endpoint) return;
-      await apiFetch(`${endpoint}/${user.id}/approve`, { method: 'PATCH' });
-    } else {
-      // suspend và activate đều gọi /suspend — BE tự toggle
-      await apiFetch(`/admin/users/${user.id}/suspend`, { method: 'PATCH' });
-    }
-    await fetchUsers();
-    setDetailUser(null);
-  } catch (err) {
-    console.error('Action failed:', err);
-  } finally {
-    setPendingAction(null);
-  }
+  const [users, setUsers] = useState<SystemUser[]>([]); const [loading, setLoading] = useState(true); const [searchQuery, setSearchQuery] = useState(''); const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all'); const [statusFilter, setStatusFilter] = useState<UserStatus | 'all'>('all'); const [currentPage, setCurrentPage] = useState(1); const [detailUser, setDetailUser] = useState<SystemUser | null>(null);
+  const [pendingAction, setPendingAction] = useState<{ user: SystemUser; action: 'suspend' | 'activate' | 'approve' | 'reject' } | null>(null); const [actionBusy, setActionBusy] = useState(false); const [showCreate, setShowCreate] = useState(false); const [form, setForm] = useState<CreateUserForm>(EMPTY_FORM); const [creating, setCreating] = useState(false); const [error, setError] = useState(''); const [message, setMessage] = useState('');
+  const fetchUsers = useCallback(async () => { setLoading(true); try { const response = await apiFetch<{ success: boolean; data: ApiUser[] }>('/admin/users'); if (!response.success) throw new Error('Không tải được danh sách người dùng.'); setUsers((response.data ?? []).map((user) => ({ id: String(user.userId), username: user.username, email: user.email, role: user.role, status: user.status, joinedDate: new Date(user.createdAt).toLocaleDateString('vi-VN') }))); } catch (requestError) { setError(friendlyError(requestError)); } finally { setLoading(false); } }, []);
+  useEffect(() => { void fetchUsers(); }, [fetchUsers]);
+  const filteredUsers = useMemo(() => users.filter((user) => (searchQuery.trim() === '' || user.username.toLowerCase().includes(searchQuery.toLowerCase()) || user.email.toLowerCase().includes(searchQuery.toLowerCase())) && (roleFilter === 'all' || user.role === roleFilter) && (statusFilter === 'all' || user.status === statusFilter)), [users, searchQuery, roleFilter, statusFilter]);
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE)); const pagedUsers = filteredUsers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const setFilter = (callback: () => void) => { callback(); setCurrentPage(1); };
+  const handleConfirmAction = async () => { if (!pendingAction || actionBusy) return; const { user, action } = pendingAction; setActionBusy(true); setError(''); setMessage(''); try { if (action === 'activate') await apiFetch(`/admin/users/${user.id}/activate`, { method: 'PATCH' }); else if (action === 'suspend') await apiFetch(`/admin/users/${user.id}/suspend`, { method: 'PATCH' }); else { const endpoint = APPROVAL_ENDPOINTS[user.role]; if (!endpoint) throw new Error('Không hỗ trợ phê duyệt cho vai trò này.'); await apiFetch(`/admin/${endpoint}/${user.id}/${action}`, { method: 'PATCH' }); } setMessage(action === 'activate' ? 'Đã kích hoạt tài khoản.' : action === 'suspend' ? 'Đã tạm ngưng tài khoản.' : action === 'approve' ? 'Đã phê duyệt tài khoản.' : 'Đã từ chối tài khoản.'); await fetchUsers(); setDetailUser(null); setPendingAction(null); } catch (requestError) { setError(friendlyError(requestError)); } finally { setActionBusy(false); } };
+  const handleCreate = async (event: React.FormEvent) => { event.preventDefault(); setError(''); setMessage(''); if (!form.username.trim() || !form.fullName.trim() || !/^\S+@\S+\.\S+$/.test(form.email) || form.password.length < 6) { setError('Vui lòng nhập tên đăng nhập, họ tên, email hợp lệ và mật khẩu từ 6 ký tự.'); return; } if (isIdentityRole(form.role) && (!form.phoneNumber.trim() || !form.dateOfBirth || !/^\d{12}$/.test(form.identityNumber))) { setError('Vai trò đã chọn yêu cầu số điện thoại, ngày sinh và CCCD gồm 12 chữ số.'); return; } setCreating(true); try { await apiFetch('/admin/users', { method: 'POST', body: JSON.stringify({ username: form.username.trim(), fullName: form.fullName.trim(), email: form.email.trim(), password: form.password, role: form.role, phoneNumber: form.phoneNumber || undefined, dateOfBirth: form.dateOfBirth || undefined, identityNumber: form.identityNumber || undefined, experienceYears: form.experienceYears ? Number(form.experienceYears) : undefined, selfDeclaredWeight: form.selfDeclaredWeight ? Number(form.selfDeclaredWeight) : undefined, certificationLevel: form.certificationLevel || undefined, medicalLicenseNumber: form.medicalLicenseNumber || undefined }) }); setShowCreate(false); setForm(EMPTY_FORM); setMessage('Đã tạo tài khoản mới. Mật khẩu không được hiển thị lại.'); await fetchUsers(); } catch (requestError) { setError(friendlyError(requestError)); } finally { setCreating(false); } };
+  const columns: DataTableColumn<SystemUser>[] = [{ key: 'username', header: 'Tên đăng nhập', render: (row) => <span className={styles.usernameCell}>{row.username}</span> }, { key: 'email', header: 'Email', render: (row) => <span className={styles.emailCell}>{row.email}</span> }, { key: 'role', header: 'Vai trò', render: (row) => <span className={styles.roleBadge}>{ROLE_LABELS[row.role]}</span> }, { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status as StatusType} /> }, { key: 'joinedDate', header: 'Ngày tham gia', render: (row) => row.joinedDate }, { key: 'action', header: 'Thao tác', width: '290px', render: (row) => <div className={styles.actionCell}>{row.status === 'Pending' && ['Jockey', 'Referee', 'Doctor'].includes(row.role) && <button type="button" className={styles.approveBtn} disabled={actionBusy} onClick={() => setPendingAction({ user: row, action: 'approve' })}>Phê duyệt</button>}{row.status === 'Active' && <button type="button" className={styles.suspendBtn} disabled={actionBusy} onClick={() => setPendingAction({ user: row, action: 'suspend' })}>Tạm ngưng</button>}{row.status === 'Suspended' && <button type="button" className={styles.activateBtn} disabled={actionBusy} onClick={() => setPendingAction({ user: row, action: 'activate' })}>Kích hoạt</button>}<button type="button" className={styles.detailBtn} onClick={() => setDetailUser(row)}>Xem chi tiết</button></div> }];
+  return <div className={styles.container}><div className={styles.header}><div><h1 className={styles.heading}>Quản lý người dùng</h1><p className={styles.subtitle}>Quản lý trạng thái tài khoản và tạo tài khoản theo quyền quản trị.</p></div><button type="button" className={styles.createBtn} onClick={() => { setError(''); setMessage(''); setShowCreate(true); }}><FiPlus size={16} /> Tạo tài khoản</button><div className={styles.filters}><div className={styles.searchWrap}><FiSearch className={styles.searchIcon} size={15} /><input className={styles.searchInput} placeholder="Tìm theo tên đăng nhập hoặc email" value={searchQuery} onChange={(event) => setFilter(() => setSearchQuery(event.target.value))} /></div><select className={styles.filterSelect} value={roleFilter} onChange={(event) => setFilter(() => setRoleFilter(event.target.value as UserRole | 'all'))}><option value="all">Tất cả vai trò</option>{(Object.keys(ROLE_LABELS) as UserRole[]).map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}</select><select className={styles.filterSelect} value={statusFilter} onChange={(event) => setFilter(() => setStatusFilter(event.target.value as UserStatus | 'all'))}><option value="all">Tất cả trạng thái</option><option value="Active">Đang hoạt động</option><option value="Suspended">Tạm ngưng</option><option value="Pending">Chờ phê duyệt</option><option value="Rejected">Đã từ chối</option></select></div></div>{error && <div className={styles.error} role="alert">{error}</div>}{message && <div className={styles.success}>{message}</div>}{loading ? <p className={styles.loadingText}>Đang tải danh sách người dùng...</p> : <DataTable columns={columns} data={pagedUsers} rowKey={(row) => row.id} emptyMessage="Không tìm thấy người dùng phù hợp." />}<div className={styles.pagination}><span className={styles.pageInfo}>Trang {currentPage}/{totalPages} — {filteredUsers.length} người dùng</span><div className={styles.pageBtns}><button type="button" className={styles.pageBtn} disabled={currentPage === 1} onClick={() => setCurrentPage((page) => page - 1)}><FiChevronLeft size={16} /> Trước</button><button type="button" className={styles.pageBtn} disabled={currentPage >= totalPages} onClick={() => setCurrentPage((page) => page + 1)}>Sau <FiChevronRight size={16} /></button></div></div>{pendingAction && <ConfirmDialog title={pendingAction.action === 'activate' ? 'Kích hoạt tài khoản' : pendingAction.action === 'suspend' ? 'Tạm ngưng tài khoản' : pendingAction.action === 'approve' ? 'Phê duyệt tài khoản' : 'Từ chối tài khoản'} message={`Bạn có chắc muốn thực hiện thao tác này với tài khoản "${pendingAction.user.username}"?`} confirmLabel={actionBusy ? 'Đang xử lý...' : 'Xác nhận'} variant={pendingAction.action === 'suspend' || pendingAction.action === 'reject' ? 'danger' : 'default'} onConfirm={() => void handleConfirmAction()} onCancel={() => !actionBusy && setPendingAction(null)} />}{detailUser && <UserDetailModal userId={detailUser.id} role={detailUser.role} basicInfo={{ username: detailUser.username, email: detailUser.email, role: ROLE_LABELS[detailUser.role], status: detailUser.status, joinedDate: detailUser.joinedDate }} showActions={detailUser.status === 'Pending' && ['Jockey', 'Referee', 'Doctor'].includes(detailUser.role)} onApprove={() => setPendingAction({ user: detailUser, action: 'approve' })} onReject={() => setPendingAction({ user: detailUser, action: 'reject' })} onClose={() => setDetailUser(null)} />}{showCreate && <div className={styles.modalOverlay} onMouseDown={() => !creating && setShowCreate(false)}><form className={styles.createModal} onSubmit={handleCreate} onMouseDown={(event) => event.stopPropagation()}><h2>Tạo tài khoản</h2><p>Chỉ các trường được backend hỗ trợ được gửi đi.</p><div className={styles.formGrid}><label>Tên đăng nhập<input value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} maxLength={50} required /></label><label>Họ và tên<input value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} maxLength={100} required /></label><label>Email<input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} maxLength={100} required /></label><label>Mật khẩu<input type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} minLength={6} autoComplete="new-password" required /></label><label>Vai trò<select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value as UserRole })}>{(Object.keys(ROLE_LABELS) as UserRole[]).map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}</select></label>{isIdentityRole(form.role) && <><label>Số điện thoại<input value={form.phoneNumber} onChange={(event) => setForm({ ...form, phoneNumber: event.target.value })} /></label><label>Ngày sinh<input type="date" value={form.dateOfBirth} onChange={(event) => setForm({ ...form, dateOfBirth: event.target.value })} /></label><label>CCCD<input inputMode="numeric" value={form.identityNumber} onChange={(event) => setForm({ ...form, identityNumber: event.target.value.replace(/\D/g, '').slice(0, 12) })} /></label></>}{form.role === 'Jockey' && <><label>Kinh nghiệm (năm)<input type="number" min="0" value={form.experienceYears} onChange={(event) => setForm({ ...form, experienceYears: event.target.value })} /></label><label>Cân nặng khai báo (kg)<input type="number" min="0" step="0.1" value={form.selfDeclaredWeight} onChange={(event) => setForm({ ...form, selfDeclaredWeight: event.target.value })} /></label></>}{form.role === 'Referee' && <label>Trình độ chứng nhận<input value={form.certificationLevel} onChange={(event) => setForm({ ...form, certificationLevel: event.target.value })} /></label>}{form.role === 'Doctor' && <label>Số giấy phép hành nghề<input value={form.medicalLicenseNumber} onChange={(event) => setForm({ ...form, medicalLicenseNumber: event.target.value })} /></label>}</div><div className={styles.modalActions}><button type="button" onClick={() => setShowCreate(false)} disabled={creating}>Hủy</button><button type="submit" className={styles.createBtn} disabled={creating}>{creating ? 'Đang tạo...' : 'Tạo tài khoản'}</button></div></form></div>}</div>;
 };
-
-  // ─── Columns ──────────────────────────────────────────────────────────────
-  const columns: DataTableColumn<SystemUser>[] = [
-    {
-      key: 'username',
-      header: 'Username',
-      render: (row) => <span className={styles.usernameCell}>{row.username}</span>,
-    },
-    {
-      key: 'email',
-      header: 'Email',
-      render: (row) => <span className={styles.emailCell}>{row.email}</span>,
-    },
-    {
-      key: 'role',
-      header: 'Role',
-      render: (row) => <span className={styles.roleBadge}>{ROLE_LABELS[row.role] ?? row.role}</span>,
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (row) => <StatusBadge status={row.status as StatusType} />,
-    },
-    {
-      key: 'joinedDate',
-      header: 'Ngày tham gia',
-      render: (row) => row.joinedDate,
-    },
-    {
-      key: 'action',
-      header: '',
-      width: '240px',
-      render: (row) => (
-        <div className={styles.actionCell}>
-          {row.status === 'Pending' && APPROVE_ENDPOINT[row.role] && (
-            <button
-              type="button"
-              className={styles.approveBtn}
-              onClick={() => setPendingAction({ user: row, action: 'approve' })}
-            >
-              Approve
-            </button>
-          )}
-          {row.status === 'Active' && (
-            <button
-              type="button"
-              className={styles.suspendBtn}
-              onClick={() => setPendingAction({ user: row, action: 'suspend' })}
-            >
-              Suspend
-            </button>
-          )}
-          {row.status === 'Suspended' && (
-            <button
-              type="button"
-              className={styles.activateBtn}
-              onClick={() => setPendingAction({ user: row, action: 'activate' })}
-            >
-              Activate
-            </button>
-          )}
-<button type="button" className={styles.detailBtn} onClick={() => setDetailUser(row)}>
-  Xem chi tiết
-</button>
-        </div>
-      ),
-    },
-  ];
-
-  const [detailUser, setDetailUser] = useState<SystemUser | null>(null);
-
-  return (
-    <div className={styles.container}>
-      {/* ═══ HEADER ═══════════════════════════════════════════ */}
-      <div className={styles.header}>
-        <h1 className={styles.heading}>User Management</h1>
-        <div className={styles.filters}>
-          <div className={styles.searchWrap}>
-            <FiSearch className={styles.searchIcon} size={15} />
-            <input
-              type="text"
-              className={styles.searchInput}
-              placeholder="Tìm theo username/email..."
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); resetToFirstPage(); }}
-            />
-          </div>
-          <select
-            className={styles.filterSelect}
-            value={roleFilter}
-            onChange={(e) => { setRoleFilter(e.target.value as UserRole | 'all'); resetToFirstPage(); }}
-          >
-            <option value="all">Tất cả Role</option>
-            <option value="Admin">Admin</option>
-            <option value="HorseOwner">Owner</option>
-            <option value="Jockey">Jockey</option>
-            <option value="RaceReferee">Referee</option>
-            <option value="Doctor">Doctor</option>
-            <option value="Spectator">Spectator</option>
-          </select>
-          <select
-            className={styles.filterSelect}
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value as UserStatus | 'all'); resetToFirstPage(); }}
-          >
-            <option value="all">Tất cả Status</option>
-            <option value="Active">Active</option>
-            <option value="Suspended">Suspended</option>
-            <option value="Pending">Pending</option>
-            <option value="Rejected">Rejected</option>
-          </select>
-        </div>
-      </div>
-
-      {/* ═══ TABLE ════════════════════════════════════════════ */}
-      {loading ? (
-        <p className={styles.loadingText}>Đang tải danh sách người dùng...</p>
-      ) : (
-        <DataTable
-          columns={columns}
-          data={pagedUsers}
-          rowKey={(row) => row.id}
-          emptyMessage="Không tìm thấy người dùng phù hợp."
-        />
-      )}
-
-      {/* ═══ PAGINATION ═══════════════════════════════════════ */}
-      <div className={styles.pagination}>
-        <span className={styles.pageInfo}>
-          Trang {currentPage}/{totalPages} — {filteredUsers.length} người dùng
-        </span>
-        <div className={styles.pageBtns}>
-          <button
-            type="button"
-            className={styles.pageBtn}
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-          >
-            <FiChevronLeft size={16} /> Previous
-          </button>
-          <button
-            type="button"
-            className={styles.pageBtn}
-            disabled={currentPage === totalPages}
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-          >
-            Next <FiChevronRight size={16} />
-          </button>
-        </div>
-      </div>
-
-      {/* ═══ CONFIRM DIALOG ═══════════════════════════════════ */}
-      {pendingAction && (
-        <ConfirmDialog
-          title={
-            pendingAction.action === 'approve' ? 'Phê duyệt tài khoản' :
-            pendingAction.action === 'reject' ? 'Từ chối tài khoản' :
-            pendingAction.action === 'suspend' ? 'Suspend tài khoản' : 'Activate tài khoản'
-          }
-          message={`Bạn có chắc muốn ${
-            pendingAction.action === 'approve' ? 'phê duyệt' :
-            pendingAction.action === 'reject' ? 'từ chối' :
-            pendingAction.action === 'suspend' ? 'Suspend' : 'Activate'
-          } tài khoản "${pendingAction.user.username}"?`}
-          variant={pendingAction.action === 'suspend' ? 'danger' : 'default'}
-          confirmLabel={
-            pendingAction.action === 'approve' ? 'Approve' :
-            pendingAction.action === 'reject' ? 'Reject' :
-            pendingAction.action === 'suspend' ? 'Suspend' : 'Activate'
-          }
-          onConfirm={handleConfirmAction}
-          onCancel={() => setPendingAction(null)}
-        />
-      )}
-{detailUser && (
-  <UserDetailModal
-    userId={detailUser.id}
-    role={detailUser.role}
-    basicInfo={{
-      username: detailUser.username,
-      email: detailUser.email,
-      role: ROLE_LABELS[detailUser.role] ?? detailUser.role,
-      status: detailUser.status,
-      joinedDate: detailUser.joinedDate,
-    }}
-    showActions={detailUser.status === 'Pending' && !!APPROVE_ENDPOINT[detailUser.role]}
-    onApprove={() => setPendingAction({ user: detailUser, action: 'approve' })}
-    onReject={() => setPendingAction({ user: detailUser, action: 'reject' })}
-    onClose={() => setDetailUser(null)}
-  />
-)}
-    </div>
-  );
-};
-
-
 
 export default UserManagement;

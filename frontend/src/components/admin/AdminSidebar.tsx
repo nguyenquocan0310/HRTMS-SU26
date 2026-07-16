@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import {
   FiGrid, FiShield, FiUsers, FiList, FiPlusCircle,
   FiFlag, FiCreditCard, FiTrendingUp, FiChevronLeft,
-  FiMonitor, FiBell, FiUser, FiAward,
+  FiMonitor, FiBell, FiUser, FiAward, FiFileText, FiClock,
 } from 'react-icons/fi';
 import styles from './AdminSidebar.module.scss';
 
@@ -26,6 +26,8 @@ const OPERATIONS_ITEMS: NavItem[] = [
 
   // Thêm ngay dưới Entry Fees
   { label: 'Quỹ & chi thưởng', path: '/admin/purse-payouts', icon: <FiAward size={18} /> },
+  { label: 'Báo cáo', path: '/admin/reports', icon: <FiFileText size={18} /> },
+  { label: 'Nhật ký hoạt động', path: '/admin/audit-log-viewer', icon: <FiClock size={18} /> },
 ];
 
 const SHARED_ITEMS: NavItem[] = [

@@ -71,7 +71,13 @@ let errorBody: ApiErrorResponse | null = null;
       }
     }
 
-    throw new Error(errorBody?.title ?? `API error: ${response.status}`);
+    const fallbackMessage: Record<number, string> = {
+      403: 'Bạn không có quyền thực hiện thao tác này.',
+      404: 'Không tìm thấy dữ liệu cần xử lý.',
+      409: 'Dữ liệu đã thay đổi hoặc đang có xung đột. Vui lòng tải lại và thử lại.',
+      422: 'Dữ liệu chưa đáp ứng điều kiện để thực hiện thao tác.',
+    };
+    throw new Error(errorBody?.title ?? fallbackMessage[response.status] ?? 'Không thể kết nối với hệ thống. Vui lòng thử lại.');
   }
 
   // Một số API trả về 204 No Content

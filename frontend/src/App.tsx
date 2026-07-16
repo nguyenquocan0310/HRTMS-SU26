@@ -17,6 +17,8 @@ import MyAccount from './pages/admin/MyAccount'
 import AssignOfficials from './pages/admin/AssignOfficials'
 import PursePayouts from './pages/admin/PursePayouts';
 import TicketCodeManagement from './pages/admin/TicketCodeManagement';
+import Reports from './pages/admin/Reports';
+import AuditLog from './pages/admin/AuditLog';
 
 
 // ── Import các trang Owner ──
@@ -26,7 +28,6 @@ import OwnerLayout from './pages/owner/OwnerLayout'
 import OwnerProfile from './pages/owner/OwnerProfile'
 import RegisterHorse from './pages/owner/RegisterHorse'
 import HorseDetail from './pages/owner/HorseDetail'
-import ScheduleConfirm from './pages/owner/ScheduleConfirm'
 import RaceEntries from './pages/owner/RaceEntries'
 import JockeyInvite from './pages/owner/JockeyInvite'
 import TournamentList from './pages/owner/TournamentList'
@@ -79,9 +80,8 @@ interface ProtectedRouteProps {
 }
 
 function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
-  if (import.meta.env.DEV) return <>{children}</>
-
   const { isAuthenticated, user } = useAuthStore()
+  if (import.meta.env.DEV) return <>{children}</>
   if (!isAuthenticated) return <Navigate to="/login" replace />
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
     return <Navigate to="/unauthorized" replace />
@@ -89,6 +89,7 @@ function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
   return <>{children}</>
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function getRoleHomePath(role: Role): string {
   switch (role) {
     case 'Admin': return '/admin'
@@ -99,14 +100,6 @@ export function getRoleHomePath(role: Role): string {
     case 'Referee': return '/referee'
     case 'Doctor': return '/doctor'
     case 'Spectator': return '/spectator'
-    case 'Admin':       return '/admin'
-    case 'HorseOwner':
-    case 'Owner':  return '/owner'
-    case 'Jockey':      return '/jockey'
-    case 'RaceReferee': 
-    case 'Referee':     return '/referee'    
-    case 'Doctor':      return '/doctor'
-    case 'Spectator':   return '/spectator'
   }
 }
 
@@ -227,6 +220,9 @@ export default function App() {
           <Route path="tournament-hub" element={<TournamentHub />} />
           <Route path="leaderboard" element={<Leaderboard />} />
           <Route path="live-race" element={<LiveRaceView />} />
+          <Route path="notifications" element={<NotificationCenter />} />
+          <Route path="reports" element={<Reports />} />
+          <Route path="audit-log-viewer" element={<AuditLog />} />
           <Route path="my-account" element={<MyAccount />} />
           <Route path="assign-officials" element={<AssignOfficials />} />
         </Route>

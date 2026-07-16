@@ -43,6 +43,71 @@ export interface EarningsHistoryItem {
   payoutCount: number;
 }
 
+export interface RacePurseSummary {
+  raceId: number;
+  raceNumber: number;
+  raceName: string;
+  roundName: string;
+  tournamentName: string;
+  allocatedFund: number;
+  paidAmount: number;
+  pendingAmount: number;
+  remainingAmount: number;
+  payoutStatus: string;
+  resultStatus: string;
+  hasDiscrepancy: boolean;
+  discrepancyAmount: number | null;
+  payouts: PursePayoutItem[];
+}
+
+export interface RoundPurseSummaryItem {
+  roundId: number;
+  roundName: string;
+  roundStatus: string;
+  allocatedFund: number;
+  paidAmount: number;
+  pendingAmount: number;
+  remainingAmount: number;
+  paidRaceCount: number;
+  totalRaceCount: number;
+  hasDiscrepancy: boolean;
+}
+
+export interface TournamentPurseSummary {
+  tournamentId: number;
+  tournamentName: string;
+  tournamentStatus: string;
+  totalFund: number;
+  paidAmount: number;
+  pendingAmount: number;
+  remainingAmount: number;
+  paidRaceCount: number;
+  totalRaceCount: number;
+  completedRoundCount: number;
+  totalRoundCount: number;
+  hasDiscrepancy: boolean;
+  rounds: RoundPurseSummaryItem[];
+}
+
+const unwrap = <T>(res: ApiResponse<T>, fallback: string): T => {
+  if (!res.success || res.data == null) {
+    throw new Error(res.message || fallback);
+  }
+  return res.data;
+};
+
+export const getTournamentPurseSummary = async (tournamentId: number): Promise<TournamentPurseSummary> =>
+  unwrap(
+    await apiFetch<ApiResponse<TournamentPurseSummary>>(`/tournament/${tournamentId}/purse-summary`),
+    'Không tải được tổng hợp quỹ thưởng của giải đấu.'
+  );
+
+export const getRacePurseSummary = async (raceId: number): Promise<RacePurseSummary> =>
+  unwrap(
+    await apiFetch<ApiResponse<RacePurseSummary>>(`/races/${raceId}/purse-summary`),
+    'Không tải được tổng hợp quỹ thưởng của cuộc đua.'
+  );
+
 /**
  * GET /api/races/{raceId}/payouts
  * Role: Admin

@@ -20,6 +20,13 @@
   font-weight: 800;
 }
 
+.subtitle { margin: .35rem 0 0; color: #64748b; font-size: .86rem; }
+.createBtn { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; align-self: flex-start; padding: .62rem .85rem; border: 1px solid #2563eb; border-radius: 6px; background: #2563eb; color: #fff; font-size: .82rem; font-weight: 700; cursor: pointer; }
+.createBtn:disabled, .actionCell button:disabled { opacity: .55; cursor: not-allowed; }
+.error, .success { padding: .8rem 1rem; font-size: .85rem; }
+.error { color: #b91c1c; border: 1px solid #fecaca; background: #fef2f2; }
+.success { color: #166534; border: 1px solid #bbf7d0; background: #f0fdf4; }
+
 .filters {
   display: flex;
   flex-wrap: wrap;
@@ -353,6 +360,17 @@
   text-align: center;
 }
 
+.modalOverlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 1rem; background: rgba(15, 23, 42, .48); }
+.createModal { width: min(760px, 100%); max-height: calc(100vh - 2rem); overflow-y: auto; padding: 1.25rem; border-radius: 10px; background: #fff; box-shadow: 0 20px 45px rgba(15, 23, 42, .25); }
+.createModal h2, .createModal p { margin: 0; }
+.createModal h2 { color: #111827; font-size: 1.1rem; }
+.createModal p { margin-top: .35rem; color: #6b7280; font-size: .82rem; }
+.formGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; margin-top: 1rem; }
+.formGrid label { display: flex; flex-direction: column; gap: .35rem; color: #374151; font-size: .8rem; font-weight: 600; }
+.formGrid input, .formGrid select { padding: .6rem .65rem; border: 1px solid #d1d5db; border-radius: 5px; color: #111827; background: #fff; }
+.modalActions { display: flex; justify-content: flex-end; gap: .65rem; margin-top: 1.1rem; }
+.modalActions > button:not(.createBtn) { padding: .62rem .85rem; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: #374151; cursor: pointer; }
+
 /* ─── Responsive ───────────────────────────────────────────────────────── */
 
 @media (max-width: 768px) {
@@ -379,4 +397,6 @@
     flex: 1;
     justify-content: center;
   }
+
+  .formGrid { grid-template-columns: 1fr; }
 }

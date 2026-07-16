@@ -142,7 +142,7 @@ const AdminDashboard = () => {
             <p className={styles.activitySubtext}>Latest audit events from the backend audit log.</p>
           </div>
           <Link to="/admin/audit-log-viewer" className={styles.viewAllLink}>
-            Full audit route pending
+            Xem toàn bộ nhật ký
           </Link>
         </div>
         <ul className={styles.activityList}>
