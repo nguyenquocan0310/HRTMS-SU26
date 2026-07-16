@@ -36,12 +36,10 @@ const StepReview = ({ formData, onGoToStep }: Props) => {
     items.push({ label: 'License Certificate', value: formData.jockeyVerification.licenseCertificate || '—', step: 4 });
     items.push({ label: 'Experience Years', value: formData.jockeyVerification.experienceYears !== '' ? String(formData.jockeyVerification.experienceYears) : '—', step: 4 });
     items.push({ label: 'Self Declared Weight', value: formData.jockeyVerification.selfDeclaredWeight !== '' ? `${formData.jockeyVerification.selfDeclaredWeight} kg` : '—', step: 4 });
-    items.push({ label: 'Family Declaration', value: formData.jockeyVerification.familyDeclaration || '—', step: 4 });
   }
 
   if (formData.role === RegRole.Referee) {
     items.push({ label: 'Certification Level', value: formData.refereeVerification.certificationLevel || '—', step: 4 });
-    items.push({ label: 'Family Declaration', value: formData.refereeVerification.familyDeclaration || '—', step: 4 });
   }
 
   if (formData.role === RegRole.Doctor) {

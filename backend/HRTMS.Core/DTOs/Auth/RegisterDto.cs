@@ -1,4 +1,3 @@
-using HRTMS.Core.DTOs.FamilyDeclaration;
 using Microsoft.AspNetCore.Http;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -57,10 +56,4 @@ public class RegisterDto
     /// Gửi kèm dưới dạng multipart/form-data.
     /// </summary>
     public IFormFile? CertificateFile { get; set; }
-
-    // ── FamilyRelationshipDeclarations ──────────────────────────────────────
-    // Bắt buộc khai ngay lúc đăng ký với cả 4 role: Owner/Jockey/Referee/Doctor
-    // (AuthService.RolesRequireFrdAtRegister). Gửi mảng rỗng nếu không có
-    // người thân nào trong ngành. Admin/Spectator không thuộc diện này.
-    public List<FamilyDeclarationItemDto>? FamilyDeclarations { get; set; }
 }

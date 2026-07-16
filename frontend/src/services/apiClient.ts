@@ -8,7 +8,7 @@ export interface ApiErrorResponse {
   message?: string;
   data?: null;
   // ASP.NET tự động trả format này khi lỗi validate ở tầng DataAnnotations
-  // (vd MinLength, Required trên FamilyDeclarationItemDto), khác với format
+  // (vd MinLength, Required trên các DTO), khác với format
   // {success,message} tùy chỉnh của tầng business logic.
   title?: string;
   errors?: Record<string, string[]>;

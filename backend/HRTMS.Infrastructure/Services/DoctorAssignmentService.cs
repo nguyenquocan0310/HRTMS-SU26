@@ -93,60 +93,6 @@ public class DoctorAssignmentService : IDoctorAssignmentService
             throw new InvalidOperationException("DOCTOR_DOUBLE_BOOKED");
         }
 
-        // Lay danh sach Owner/Jockey co trong Race
-        var participantUserIdsInRace = await (
-            from raceEntry in _context.RaceEntries
-            join pairing in _context.Pairings
-                on raceEntry.PairingId equals pairing.PairingId
-            join horse in _context.Horses
-                on pairing.HorseId equals horse.HorseId
-            where raceEntry.RaceId == raceId
-                  && raceEntry.Status != "Cancelled"
-            select new
-            {
-                OwnerId = horse.OwnerId,
-                JockeyId = pairing.JockeyId
-            }
-        )
-        .ToListAsync();
-
-        var relatedUserIdsInRace = participantUserIdsInRace
-            .SelectMany(x => new[] { x.OwnerId, x.JockeyId })
-            .Distinct()
-            .ToList();
-
-        var directFamilyRelations = new[]
-        {
-    "Spouse",
-    "Parent",
-    "Child",
-    "Sibling"
-};
-
-        // Kiem tra COI 2 chieu:
-        // 1. Doctor khai bao Owner/Jockey la nguoi than
-        // 2. Owner/Jockey khai bao Doctor la nguoi than
-        var hasConflictOfInterest = await _context.FamilyRelationshipDeclarations
-            .AnyAsync(f =>
-                f.RelatedUserId.HasValue &&
-                directFamilyRelations.Contains(f.RelationType) &&
-                (
-                    (
-                        f.DeclarantUserId == dto.DoctorId &&
-                        relatedUserIdsInRace.Contains(f.RelatedUserId.Value)
-                    )
-                    ||
-                    (
-                        relatedUserIdsInRace.Contains(f.DeclarantUserId) &&
-                        f.RelatedUserId.Value == dto.DoctorId
-                    )
-                ));
-
-        if (hasConflictOfInterest)
-        {
-            throw new InvalidOperationException("DOCTOR_CONFLICT_OF_INTEREST");
-        }
-
         var now = DateTime.UtcNow;
 
         var assignment = new DoctorAssignment
@@ -154,9 +100,7 @@ public class DoctorAssignmentService : IDoctorAssignmentService
             RaceId = raceId,
             DoctorId = dto.DoctorId,
             AssignedAt = now,
-            CertifiedAt = now,
-            CoiCheckStatus = "Passed",
-            CoiCheckedAt = now
+            CertifiedAt = now
         };
 
         _context.DoctorAssignments.Add(assignment);

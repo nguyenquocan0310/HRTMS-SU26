@@ -7,6 +7,29 @@
 
 ---
 
+## 📌 ERRATA / ADDENDUM — Quyết định thay đổi scope (cập nhật sau ngày ban hành gốc)
+
+> **Ngày quyết định:** (điền ngày cả nhóm chốt)
+> **Quyết định:** Cả nhóm đồng thuận **loại bỏ hoàn toàn** tính năng **Family Relationship Declaration / Conflict of Interest (COI) Check / Jockey Independence Check** khỏi phạm vi Phase 1.
+>
+> **Lý do:** Đối chiếu thực tế các môn thể thao tương tự (bóng đá, v.v.), ràng buộc "không cho phép quan hệ gia đình giữa các bên tham gia" không phải thông lệ phổ biến — trường hợp thực tế gần nhất chỉ là quy định trọng tài không được điều hành trận đấu có đội tuyển quốc gia mình. Ngoài ra, audit kỹ thuật trước đó cho thấy cơ chế resolve định danh (`MatchConfidence`) chưa từng hoạt động đúng, khiến kiểm tra COI mang tính hình thức.
+>
+> **Phạm vi bị ảnh hưởng (đã xóa khỏi code, schema, và cần coi là lỗi thời trong tài liệu bên dưới):**
+> - Bảng `FamilyRelationshipDeclarations` và toàn bộ Entity/DTO/Service/Controller liên quan (`FamilyDeclarationService`, `IdentityResolveService`, `IndependenceCheckService`)
+> - Cột `IndependenceCheckStatus/CheckedByRefereeId/CheckedAt/ViolationReason` trên `RaceEntries`
+> - Cột `CoiCheckStatus/CoiCheckedAt/CoiViolationReason` trên `RefereeAssignments` và `DoctorAssignments`
+> - Business rule: **BR-06, BR-25, BR-32 (phần khai báo gia đình), BR-40 (phần "khai báo gia đình" trong chính sách xóa an toàn), BR-47, BR-61, BR-62**
+> - Use case/UI liên quan: mục "Pha 4: Official Assignment & COI Clearance" (COI check vẫn giữ phần double-booking/Lead Referee, chỉ bỏ phần đối chiếu quan hệ gia đình), UI-S25/S27/S30 (tab khai báo gia đình), bước B2 đăng ký (khai báo gia đình cho Jockey/Referee), trang khai báo COI trong Profile (Jockey/Doctor/Referee)
+> - ERD: bỏ bảng `FamilyRelationshipDeclarations` và các FK liên quan
+>
+> **Các phần khác của luồng nghiệp vụ (Pre-race weigh-in, xác minh danh tính ngựa, khám lâm sàng Fit/Unfit, phân công Referee/Doctor theo lịch trùng, đúng 1 Lead Referee/race) vẫn giữ nguyên — chỉ riêng phần đối chiếu quan hệ gia đình bị loại bỏ.**
+>
+> Các bảng/sơ đồ/mô tả use case bên dưới **chưa được rewrite toàn bộ** để phản ánh thay đổi này (tài liệu gốc rất dài, ~40 vị trí rải rác); mọi chỗ nhắc tới "Family Relationship Declaration", "COI Check", "Independence Check", BR-06/25/47/61/62 nên được hiểu là **đã lỗi thời / không còn áp dụng**.
+
+---
+
+
+
 
 ---
 

@@ -27,20 +27,10 @@ const StepFinalize = ({ role, formData }: Props) => {
   const validateBeforeSubmit = (): string | null => {
     if (!role) return 'Vui lòng chọn vai trò.';
 
-    if (role === RegRole.Owner) {
-      const v = formData.ownerVerification;
-      if (v.familyDeclarations.length === 0 && v.noFamilyDeclarationNote.trim().length === 0) {
-        return 'Vui lòng khai báo người thân trong ngành, hoặc nhập "Không có người thân làm trong ngành này" để xác nhận.';
-      }
-    }
-
     if (role === RegRole.Jockey) {
       const v = formData.jockeyVerification;
       if (!v.certificateFile) {
         return 'Vui lòng upload file chứng chỉ/bằng cấp.';
-      }
-      if (v.familyDeclarations.length === 0 && v.noFamilyDeclarationNote.trim().length === 0) {
-        return 'Vui lòng khai báo người thân trong ngành, hoặc nhập "Không có người thân làm trong ngành này" để xác nhận.';
       }
     }
 
@@ -49,18 +39,12 @@ const StepFinalize = ({ role, formData }: Props) => {
       if (!v.certificateFile) {
         return 'Vui lòng upload file chứng chỉ/bằng cấp.';
       }
-      if (v.familyDeclarations.length === 0 && v.noFamilyDeclarationNote.trim().length === 0) {
-        return 'Vui lòng khai báo người thân trong ngành, hoặc nhập "Không có người thân làm trong ngành này" để xác nhận.';
-      }
     }
 
     if (role === RegRole.Doctor) {
       const v = formData.doctorVerification;
       if (!v.certificateFile) {
         return 'Vui lòng upload file chứng chỉ/bằng cấp.';
-      }
-      if (v.familyDeclarations.length === 0 && v.noFamilyDeclarationNote.trim().length === 0) {
-        return 'Vui lòng khai báo người thân trong ngành, hoặc nhập "Không có người thân làm trong ngành này" để xác nhận.';
       }
     }
 

@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { RegRole } from '../../../types/role.types';
-import { type RegisterFormData, type FamilyDeclarationItem } from '../../../types/auth.types';
+import { type RegisterFormData } from '../../../types/auth.types';
 import styles from './StepVerification.module.scss';
 
 interface Props {
@@ -9,151 +9,8 @@ interface Props {
   onChange: (partial: Partial<RegisterFormData>) => void;
 }
 
-const emptyDeclaration: FamilyDeclarationItem = {
-  relatedPersonName: '',
-  relationType: '',
-  relatedIdentityNumber: '',
-  industryRole: '',
-  notes: '',
-};
-
 const StepVerification = ({ role, formData, onChange }: Props) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // ─── Khối khai báo gia đình dùng chung cho cả 4 role ───────────────────────
-  const renderFamilyDeclarationBlock  = <
-    K extends 'ownerVerification' | 'jockeyVerification' | 'refereeVerification' | 'doctorVerification',
-  >(
-    key: K,
-    verification: { hasNoFamilyInIndustry: boolean; familyDeclarations: FamilyDeclarationItem[] }
-  ) => {
-    const updateVerification = (partial: Record<string, unknown>) => {
-      onChange({ [key]: { ...verification, ...partial } } as Partial<RegisterFormData>);
-    };
-
-    return (
-      <div className={styles.coiBox}>
-        <h4 className={styles.coiTitle}>Family / Conflict of Interest Declaration</h4>
-        <p className={styles.coiDesc}>
-          Khai báo quan hệ gia đình với các thành viên khác trong ngành. Nếu không có, tick vào ô bên dưới.
-        </p>
-
-<div className={styles.field}>
-          <label className={styles.label}>
-            Nếu không có người thân trong ngành, nhập xác nhận bên dưới
-          </label>
-          <input
-            type="text"
-            className={styles.input}
-            placeholder='Nhập: "Không có người thân làm trong ngành này"'
-            value={verification.noFamilyDeclarationNote}
-            onChange={(e) => updateVerification({ noFamilyDeclarationNote: e.target.value })}
-          />
-        </div>
-
-        {verification.noFamilyDeclarationNote.trim().length === 0 && (
-          <>
-            {verification.familyDeclarations.map((decl, idx) => (
-              <div key={idx} className={styles.coiItem}>
-                <div className={styles.field}>
-                  <label className={styles.label}>Họ tên người liên quan</label>
-                  <input
-                    type="text"
-                    className={styles.input}
-                    value={decl.relatedPersonName}
-                    onChange={(e) => {
-                      const updated = [...verification.familyDeclarations];
-                      updated[idx] = { ...updated[idx], relatedPersonName: e.target.value };
-                      updateVerification({ familyDeclarations: updated });
-                    }}
-                  />
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>Quan hệ</label>
-                  <input
-                    type="text"
-                    className={styles.input}
-                    placeholder="Ví dụ: Parent, Sibling, Spouse"
-                    value={decl.relationType}
-                    onChange={(e) => {
-                      const updated = [...verification.familyDeclarations];
-                      updated[idx] = { ...updated[idx], relationType: e.target.value };
-                      updateVerification({ familyDeclarations: updated });
-                    }}
-                  />
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>CCCD người liên quan</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    className={styles.input}
-                    placeholder="Nhập đúng 12 số CCCD"
-                    maxLength={12}
-                    value={decl.relatedIdentityNumber}
-                    onChange={(e) => {
-                      const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 12);
-                      const updated = [...verification.familyDeclarations];
-                      updated[idx] = { ...updated[idx], relatedIdentityNumber: digitsOnly };
-                      updateVerification({ familyDeclarations: updated });
-                    }}
-                  />
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>Vai trò trong ngành</label>
-                  <input
-                    type="text"
-                    className={styles.input}
-                    placeholder="Ví dụ: Owner, Jockey, Referee, Doctor"
-                    value={decl.industryRole}
-                    onChange={(e) => {
-                      const updated = [...verification.familyDeclarations];
-                      updated[idx] = { ...updated[idx], industryRole: e.target.value };
-                      updateVerification({ familyDeclarations: updated });
-                    }}
-                  />
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label}>Ghi chú</label>
-                  <input
-                    type="text"
-                    className={styles.input}
-                    value={decl.notes}
-                    onChange={(e) => {
-                      const updated = [...verification.familyDeclarations];
-                      updated[idx] = { ...updated[idx], notes: e.target.value };
-                      updateVerification({ familyDeclarations: updated });
-                    }}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className={styles.removeBtn}
-                  onClick={() => {
-                    const updated = verification.familyDeclarations.filter((_, i) => i !== idx);
-                    updateVerification({ familyDeclarations: updated });
-                  }}
-                >
-                  Xóa khai báo này
-                </button>
-              </div>
-            ))}
-
-            <button
-              type="button"
-              className={styles.addBtn}
-              onClick={() => {
-                const updated = [...verification.familyDeclarations, { ...emptyDeclaration }];
-                updateVerification({ familyDeclarations: updated });
-              }}
-            >
-              + Thêm khai báo
-            </button>
-          </>
-        )}
-      </div>
-    );
-  };
 
   // ─── Ô upload file chứng chỉ dùng chung cho Jockey/Referee/Doctor ──────────
   const renderCertificateUpload = (
@@ -267,8 +124,6 @@ const StepVerification = ({ role, formData, onChange }: Props) => {
               }
             />
           </div>
-
-          {renderFamilyDeclarationBlock('ownerVerification', formData.ownerVerification)}
         </div>
       </div>
     );
@@ -365,8 +220,6 @@ const StepVerification = ({ role, formData, onChange }: Props) => {
               }
             />
           </div>
-
-          {renderFamilyDeclarationBlock('jockeyVerification', formData.jockeyVerification)}
         </div>
       </div>
     );
@@ -428,8 +281,6 @@ const StepVerification = ({ role, formData, onChange }: Props) => {
           </div>
 
           {renderCertificateUpload('refereeVerification', formData.refereeVerification.certificateFile)}
-
-          {renderFamilyDeclarationBlock('refereeVerification', formData.refereeVerification)}
         </div>
       </div>
     );
@@ -491,8 +342,6 @@ const StepVerification = ({ role, formData, onChange }: Props) => {
           </div>
 
           {renderCertificateUpload('doctorVerification', formData.doctorVerification.certificateFile)}
-
-          {renderFamilyDeclarationBlock('doctorVerification', formData.doctorVerification)}
         </div>
       </div>
     );

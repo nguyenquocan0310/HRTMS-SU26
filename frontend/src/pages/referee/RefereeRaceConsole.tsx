@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
-  checkJockeyIndependence,
   confirmStartingList,
   createRaceViolation,
   finishRace,
@@ -36,7 +35,7 @@ function statusBadge(status: string | null | undefined) {
   const cls =
     normalized === 'Passed' || normalized === 'Clear' || normalized === 'Đạt'
       ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
-      : normalized === 'Warning' || normalized === 'Conflict' || normalized === 'Cảnh báo COI'
+      : normalized === 'Warning' || normalized === 'Conflict'
         ? 'border-amber-200 bg-amber-50 text-amber-700'
         : normalized === 'Disqualified'
           ? 'border-red-100 bg-red-50 text-red-700'
@@ -47,12 +46,6 @@ function statusBadge(status: string | null | undefined) {
       {normalized}
     </span>
   );
-}
-
-function independenceLabel(entry: RefereeRaceEntry) {
-  if (entry.hasIndependenceWarning) return 'Cảnh báo COI';
-  if (entry.independenceCheckStatus) return entry.independenceCheckStatus;
-  return 'Chưa kiểm tra';
 }
 
 function ResultTable({ title, items }: { title: string; items: StartingListEntry[] }) {
@@ -185,38 +178,6 @@ export default function RefereeRaceConsole() {
     const intervalId = window.setInterval(() => refreshLiveData(false), 4000);
     return () => window.clearInterval(intervalId);
   }, [raceId, liveStatus?.status]);
-
-  const checkedCount = useMemo(
-    () => entries.filter((item) => item.independenceCheckStatus || item.hasIndependenceWarning).length,
-    [entries]
-  );
-
-  const handleIndependenceCheck = async (entry: RefereeRaceEntry) => {
-    const key = `check-${entry.raceEntryId}`;
-    try {
-      setSavingKey(key);
-      const result = await checkJockeyIndependence(entry.raceEntryId);
-      setEntries((prev) =>
-        prev.map((item) =>
-          item.raceEntryId === entry.raceEntryId
-            ? {
-                ...item,
-                independenceCheckStatus: result.independenceCheckStatus,
-                independenceViolationReason: result.violationReason,
-                hasIndependenceWarning: result.hasWarning,
-                raceEntryStatus: result.raceEntryStatus,
-                status: result.raceEntryStatus ?? item.status,
-              }
-            : item
-        )
-      );
-      showToast(result.message || 'Đã kiểm tra độc lập Jockey.');
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Không thể kiểm tra độc lập.');
-    } finally {
-      setSavingKey(null);
-    }
-  };
 
   const handleConfirmStartingList = async () => {
     if (!raceId) return;
@@ -358,16 +319,6 @@ export default function RefereeRaceConsole() {
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Entries</p>
           <p className="mt-2 text-2xl font-bold text-gray-900">{entries.length}</p>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Đã independence check</p>
-          <p className="mt-2 text-2xl font-bold text-gray-900">{checkedCount}</p>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Cảnh báo COI</p>
-          <p className="mt-2 text-2xl font-bold text-amber-600">
-            {entries.filter((item) => item.hasIndependenceWarning).length}
-          </p>
         </div>
       </div>
 
@@ -642,13 +593,11 @@ export default function RefereeRaceConsole() {
                   <th className="px-5 py-3 font-semibold">Owner</th>
                   <th className="px-5 py-3 font-semibold">Entry status</th>
                   <th className="px-5 py-3 font-semibold">Doctor checks</th>
-                  <th className="px-5 py-3 font-semibold">Independence</th>
                   <th className="px-5 py-3 text-right font-semibold">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {entries.map((entry) => {
-                  const key = `check-${entry.raceEntryId}`;
                   return (
                     <tr key={entry.raceEntryId} className="hover:bg-gray-50/50">
                       <td className="px-5 py-4 font-mono text-xs font-bold text-gray-500">
@@ -666,23 +615,6 @@ export default function RefereeRaceConsole() {
                           <p>Khám: {entry.clinicalStatus || 'Chưa khám'}</p>
                           <p>Cân trước đua: {entry.preRaceJockeyWeight ?? 'Chưa cân'}</p>
                         </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="space-y-1.5">
-                          {statusBadge(independenceLabel(entry))}
-                          {entry.independenceViolationReason && (
-                            <p className="max-w-[240px] text-xs text-amber-700">{entry.independenceViolationReason}</p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-right">
-                        <button
-                          onClick={() => handleIndependenceCheck(entry)}
-                          disabled={savingKey === key}
-                          className="rounded-md bg-gray-900 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          {savingKey === key ? 'Đang kiểm tra...' : 'Kiểm tra độc lập'}
-                        </button>
                       </td>
                     </tr>
                   );

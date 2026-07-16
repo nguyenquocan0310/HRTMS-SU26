@@ -15,9 +15,6 @@ public static class ApplicationServiceExtensions
         services.AddScoped<JwtService>();
         services.AddScoped<IFileStorageService, FileStorageService>();
         services.AddScoped<IAuthService, AuthService>();
-        services.AddScoped<IFamilyDeclarationValidator, FamilyDeclarationValidator>();
-        services.AddScoped<IFamilyDeclarationService, FamilyDeclarationService>();
-        services.AddScoped<IIdentityResolveService, IdentityResolveService>();
         services.AddScoped<IAuditLogService, AuditLogService>();
         services.AddScoped<ITournamentServices, TournamentSevice>();
         services.AddScoped<ITournamentParticipantService, TournamentParticipantService>();
@@ -43,7 +40,6 @@ public static class ApplicationServiceExtensions
         services.AddScoped<IPredictionService, PredictionService>();
         services.AddScoped<IReconciliationService, ReconciliationService>();
         services.AddScoped<IWalletService, WalletService>();
-        services.AddScoped<IIndependenceCheckService, IndependenceCheckService>();
         services.AddScoped<IEmergencyDisqualificationService, EmergencyDisqualificationService>();
         services.AddScoped<IStartingListService, StartingListService>();
         services.AddScoped<IReportService, ReportService>();

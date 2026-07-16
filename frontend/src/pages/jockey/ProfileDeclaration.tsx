@@ -4,35 +4,13 @@ import {
   getMyAccountProfile,
   updateMyBasicInfo,
 } from '../../services/accountService'
-import {
-  createFamilyDeclaration,
-  deleteFamilyDeclaration,
-  getFamilyDeclarations,
-  updateFamilyDeclaration,
-  type FamilyDeclaration,
-  type FamilyDeclarationPayload,
-} from '../../services/familyDeclarationService'
 import { getMyProfile, updateMyProfile } from '../../services/jockeyService'
 import type { UpdateProfilePayload } from '../../services/jockeyService'
 import type { JockeyProfile } from '../../types/jockey.types'
 import type { JockeyRoleProfile, UserProfile } from '../../types/account.types'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const IDENTITY_PATTERN = /^\d{12}$/
 
-const relationOptions = [
-  { value: 'Parent', label: 'Cha/Mẹ' },
-  { value: 'Spouse', label: 'Vợ/Chồng' },
-  { value: 'Child', label: 'Con' },
-  { value: 'Sibling', label: 'Anh/Chị/Em' },
-]
-const industryRoleOptions = [
-  { value: '', label: 'Không xác định' },
-  { value: 'Owner', label: 'Chủ ngựa' },
-  { value: 'Jockey', label: 'Kỵ sĩ' },
-  { value: 'Referee', label: 'Trọng tài' },
-  { value: 'Doctor', label: 'Bác sĩ' },
-]
 const healthStatusOptions = [
   { value: 'Good', label: 'Tốt' },
   { value: 'Fair', label: 'Trung bình' },
@@ -40,14 +18,6 @@ const healthStatusOptions = [
 ]
 
 type JockeyAccountProfile = UserProfile<JockeyRoleProfile>
-
-const emptyCoiForm = {
-  relatedPersonName: '',
-  relatedIdentityNumber: '',
-  relationType: '',
-  industryRole: '',
-  notes: '',
-}
 
 const errorMessage = (error: unknown, fallback: string) =>
   error instanceof Error && error.message ? error.message : fallback
@@ -200,103 +170,6 @@ export default function ProfileDeclaration() {
     }
   }
 
-  const [declarations, setDeclarations] = useState<FamilyDeclaration[]>([])
-  const [coiForm, setCoiForm] = useState(emptyCoiForm)
-  const [editingDeclarationId, setEditingDeclarationId] = useState<number | null>(null)
-  const [deleteDeclarationId, setDeleteDeclarationId] = useState<number | null>(null)
-  const [coiLoading, setCoiLoading] = useState(true)
-  const [coiSaving, setCoiSaving] = useState(false)
-  const [coiError, setCoiError] = useState('')
-  const [coiSuccess, setCoiSuccess] = useState('')
-
-  const loadDeclarations = useCallback(async () => {
-    setCoiLoading(true)
-    setCoiError('')
-    try {
-      setDeclarations(await getFamilyDeclarations())
-    } catch (error) {
-      setCoiError(errorMessage(error, 'Không tải được danh sách khai báo COI.'))
-    } finally {
-      setCoiLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    const id = window.setTimeout(() => { void loadDeclarations() }, 0)
-    return () => window.clearTimeout(id)
-  }, [loadDeclarations])
-
-  const resetCoiForm = () => {
-    setCoiForm(emptyCoiForm)
-    setEditingDeclarationId(null)
-  }
-
-  const handleEditDeclaration = (item: FamilyDeclaration) => {
-    setEditingDeclarationId(item.declarationId)
-    setCoiForm({
-      relatedPersonName: item.relatedPersonName,
-      relatedIdentityNumber: '',
-      relationType: item.relationType,
-      industryRole: item.industryRole || '',
-      notes: item.notes || '',
-    })
-    setCoiError('')
-    setCoiSuccess('')
-  }
-
-  const handleCoiSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    setCoiError('')
-    setCoiSuccess('')
-    const personName = coiForm.relatedPersonName.trim()
-    if (!personName) return setCoiError('Vui lòng nhập họ tên người thân.')
-    if (!IDENTITY_PATTERN.test(coiForm.relatedIdentityNumber.trim())) {
-      return setCoiError('CCCD phải gồm đúng 12 chữ số.')
-    }
-    if (!coiForm.relationType) return setCoiError('Vui lòng chọn mối quan hệ.')
-
-    const payload: FamilyDeclarationPayload = {
-      relatedPersonName: personName,
-      relatedUserId: null,
-      relatedIdentityNumber: coiForm.relatedIdentityNumber.trim(),
-      relationType: coiForm.relationType,
-      industryRole: coiForm.industryRole || null,
-      notes: coiForm.notes.trim(),
-    }
-    setCoiSaving(true)
-    try {
-      if (editingDeclarationId) {
-        await updateFamilyDeclaration(editingDeclarationId, payload)
-        setCoiSuccess('Cập nhật khai báo COI thành công.')
-      } else {
-        await createFamilyDeclaration(payload)
-        setCoiSuccess('Tạo khai báo COI thành công.')
-      }
-      resetCoiForm()
-      await loadDeclarations()
-    } catch (error) {
-      setCoiError(errorMessage(error, 'Không thể lưu khai báo COI.'))
-    } finally {
-      setCoiSaving(false)
-    }
-  }
-
-  const handleDeleteDeclaration = async () => {
-    if (!deleteDeclarationId) return
-    setCoiSaving(true)
-    setCoiError('')
-    try {
-      await deleteFamilyDeclaration(deleteDeclarationId)
-      setDeleteDeclarationId(null)
-      setCoiSuccess('Xóa khai báo COI thành công.')
-      await loadDeclarations()
-    } catch (error) {
-      setCoiError(errorMessage(error, 'Không thể xóa khai báo COI.'))
-    } finally {
-      setCoiSaving(false)
-    }
-  }
-
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -332,7 +205,7 @@ export default function ProfileDeclaration() {
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Hồ sơ &amp; Khai báo</h1>
-        <p className="mt-1 text-sm text-gray-500">Quản lý tài khoản, hồ sơ chuyên môn, khai báo COI và bảo mật.</p>
+        <p className="mt-1 text-sm text-gray-500">Quản lý tài khoản, hồ sơ chuyên môn và bảo mật.</p>
       </div>
 
       <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -394,28 +267,6 @@ export default function ProfileDeclaration() {
       </section>
 
       <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-bold text-gray-900">Khai báo COI</h2>
-        <p className="mt-1 text-sm text-gray-500">Khai báo quan hệ gia đình để hệ thống kiểm tra xung đột lợi ích.</p>
-        <form onSubmit={handleCoiSubmit} className="mt-6 space-y-5" noValidate>
-          <div className="grid gap-5 sm:grid-cols-2">
-            <label className="text-sm font-semibold text-gray-700">Họ tên người thân<input value={coiForm.relatedPersonName} onChange={(e) => setCoiForm((p) => ({ ...p, relatedPersonName: e.target.value }))} disabled={coiSaving} className={inputClass} /></label>
-            <label className="text-sm font-semibold text-gray-700">CCCD người thân<input inputMode="numeric" maxLength={12} value={coiForm.relatedIdentityNumber} onChange={(e) => setCoiForm((p) => ({ ...p, relatedIdentityNumber: e.target.value.replace(/\D/g, '') }))} disabled={coiSaving} className={inputClass} /><span className="mt-1 block text-xs font-normal text-gray-500">CCCD phải nhập lại khi cập nhật và chỉ dùng để đối chiếu.</span></label>
-            <label className="text-sm font-semibold text-gray-700">Mối quan hệ<select value={coiForm.relationType} onChange={(e) => setCoiForm((p) => ({ ...p, relationType: e.target.value }))} disabled={coiSaving} className={inputClass}><option value="">Chọn mối quan hệ</option>{relationOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-            <label className="text-sm font-semibold text-gray-700">Vai trò trong ngành<select value={coiForm.industryRole} onChange={(e) => setCoiForm((p) => ({ ...p, industryRole: e.target.value }))} disabled={coiSaving} className={inputClass}>{industryRoleOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-          </div>
-          <label className="block text-sm font-semibold text-gray-700">Ghi chú<textarea rows={2} value={coiForm.notes} onChange={(e) => setCoiForm((p) => ({ ...p, notes: e.target.value }))} disabled={coiSaving} className={inputClass} /></label>
-          {coiSuccess && <Feedback type="success">{coiSuccess}</Feedback>}
-          {coiError && <Feedback type="error">{coiError}</Feedback>}
-          <div className="flex justify-end gap-3">{editingDeclarationId && <button type="button" onClick={resetCoiForm} disabled={coiSaving} className="rounded-lg border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-700">Hủy sửa</button>}<button type="submit" disabled={coiSaving} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{coiSaving ? 'Đang lưu...' : editingDeclarationId ? 'Cập nhật khai báo' : 'Thêm khai báo'}</button></div>
-        </form>
-        <div className="mt-6 overflow-x-auto rounded-lg border border-gray-200">
-          {coiLoading ? <div className="p-6 text-center text-sm text-gray-500">Đang tải khai báo...</div> : declarations.length === 0 ? <div className="p-6 text-center text-sm text-gray-500">Chưa có khai báo COI.</div> : (
-            <table className="w-full min-w-[720px] text-sm"><thead className="bg-gray-50 text-left text-gray-600"><tr><th className="px-4 py-3">Họ tên</th><th className="px-4 py-3">Quan hệ</th><th className="px-4 py-3">Vai trò</th><th className="px-4 py-3">Ngày khai báo</th><th className="px-4 py-3 text-right">Hành động</th></tr></thead><tbody className="divide-y divide-gray-100">{declarations.map((item) => <tr key={item.declarationId}><td className="px-4 py-3 font-medium text-gray-900">{item.relatedPersonName}</td><td className="px-4 py-3 text-gray-600">{relationOptions.find((option) => option.value === item.relationType)?.label || item.relationType}</td><td className="px-4 py-3 text-gray-600">{industryRoleOptions.find((option) => option.value === item.industryRole)?.label || item.industryRole || 'Không xác định'}</td><td className="px-4 py-3 text-gray-600">{new Date(item.declaredAt).toLocaleDateString('vi-VN')}</td><td className="px-4 py-3 text-right"><button type="button" onClick={() => handleEditDeclaration(item)} className="mr-3 font-semibold text-blue-600">Sửa</button><button type="button" onClick={() => setDeleteDeclarationId(item.declarationId)} className="font-semibold text-red-600">Xóa</button></td></tr>)}</tbody></table>
-          )}
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-bold text-gray-900">Bảo mật</h2>
         <p className="mt-1 text-sm text-gray-500">Đổi mật khẩu đăng nhập mà không làm gián đoạn phiên hiện tại.</p>
         <form onSubmit={handlePasswordSubmit} className="mt-6 space-y-5" noValidate>
@@ -429,10 +280,6 @@ export default function ProfileDeclaration() {
           <div className="flex justify-end"><button type="submit" disabled={passwordSaving} className="rounded-lg bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{passwordSaving ? 'Đang đổi mật khẩu...' : 'Đổi mật khẩu'}</button></div>
         </form>
       </section>
-
-      {deleteDeclarationId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl"><h2 className="text-lg font-bold text-gray-900">Xác nhận xóa khai báo</h2><p className="mt-2 text-sm text-gray-600">Thao tác này không thể hoàn tác.</p><div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setDeleteDeclarationId(null)} disabled={coiSaving} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700">Hủy</button><button type="button" onClick={() => void handleDeleteDeclaration()} disabled={coiSaving} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{coiSaving ? 'Đang xóa...' : 'Xóa'}</button></div></div></div>
-      )}
     </div>
   )
 }

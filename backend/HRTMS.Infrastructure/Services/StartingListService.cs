@@ -109,7 +109,6 @@ public class StartingListService : IStartingListService
                 PreRaceJockeyWeight = entry.PreRaceJockeyWeight,
                 HorseIdentityCheckStatus = entry.HorseIdentityCheckStatus,
                 ClinicalStatus = entry.ClinicalStatus,
-                IndependenceCheckStatus = entry.IndependenceCheckStatus,
                 RejectionReason = rejectionReason
             };
 
@@ -194,11 +193,6 @@ public class StartingListService : IStartingListService
         if (entry.ClinicalStatus != "Fit")
         {
             return "Horse clinical status is not Fit.";
-        }
-
-        if (entry.IndependenceCheckStatus != "Passed")
-        {
-            return "Jockey independence check has not passed.";
         }
 
         return null;

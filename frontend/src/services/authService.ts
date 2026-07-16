@@ -103,14 +103,6 @@ const mapApiRoleToRole = (apiRole: string): Role => {
   return mapping[apiRole] ?? 'Spectator';
 };
 
-interface FamilyDeclarationPayload {
-  relatedPersonName: string;
-  relationType: string;
-  relatedIdentityNumber: string;
-  industryRole?: string;
-  notes?: string;
-}
-
 /**
  * Đăng ký giờ dùng multipart/form-data (BE yêu cầu, xem api-contract-certificate-upload.md)
  * vì có thể kèm file certificateFile (Jockey/Referee/Doctor). KHÔNG còn gửi JSON thuần.
@@ -143,25 +135,6 @@ export const register = async (payload: RegisterPayload): Promise<RegisterResult
   const certificateFile = v.certificateFile as File | null | undefined;
   if (certificateFile) {
     formData.append('certificateFile', certificateFile);
-  }
-
-  // familyDeclarations gửi dạng mảng theo chỉ số như api-contract yêu cầu.
-  // Nếu người dùng tick "không có người thân trong ngành" thì familyDeclarations
-  // rỗng — không gửi field này lên, BE hiểu là không khai báo.
-  const familyDeclarations = v.familyDeclarations as FamilyDeclarationPayload[] | undefined;
-
-  if (familyDeclarations && familyDeclarations.length > 0) {
-    familyDeclarations.forEach((decl, idx) => {
-      formData.append(`familyDeclarations[${idx}].relatedPersonName`, decl.relatedPersonName);
-      formData.append(`familyDeclarations[${idx}].relationType`, decl.relationType);
-      formData.append(`familyDeclarations[${idx}].relatedIdentityNumber`, decl.relatedIdentityNumber);
-      if (decl.industryRole) {
-        formData.append(`familyDeclarations[${idx}].industryRole`, decl.industryRole);
-      }
-      if (decl.notes) {
-        formData.append(`familyDeclarations[${idx}].notes`, decl.notes);
-      }
-    });
   }
 
   const res = await apiFetch<ApiResponse<unknown>>('/auth/register', {
