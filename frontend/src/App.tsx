@@ -16,6 +16,7 @@ import NotificationCenter from './pages/admin/NotificationCenter'
 import MyAccount from './pages/admin/MyAccount'
 import AssignOfficials from './pages/admin/AssignOfficials'
 import PursePayouts from './pages/admin/PursePayouts';
+import TicketCodeManagement from './pages/admin/TicketCodeManagement';
 
 
 // ── Import các trang Owner ──
@@ -218,6 +219,10 @@ export default function App() {
           <Route
   path="purse-payouts"
   element={<PursePayouts />}
+/>
+<Route
+  path="ticket-codes"
+  element={<TicketCodeManagement />}
 />
           <Route path="tournament-hub" element={<TournamentHub />} />
           <Route path="leaderboard" element={<Leaderboard />} />
