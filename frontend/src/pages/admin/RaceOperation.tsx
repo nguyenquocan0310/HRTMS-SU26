@@ -148,7 +148,7 @@ const RaceOperations = () => {
     const options: RaceOption[] = tournament.rounds.flatMap((round) =>
       round.races.map((race) => ({
         id: race.raceId,
-        label: `Race #${race.raceNumber} · ${formatDateTime(
+        label: `${round.name} · Race #${race.raceNumber} · ${formatDateTime(
           race.scheduledTime
         )}`,
         isDrawn: race.isPostPositionDrawn,
@@ -286,6 +286,9 @@ const RaceOperations = () => {
 
   const selectedRaceIsOfficial =
     selectedRaceStatus === 'official';
+
+  const canAllocateToSelectedRace =
+    selectedRaceStatus === 'upcoming' && !isDrawn;
 
   const handleDeclareOfficial = async (raceId: number) => {
     const confirmed = window.confirm(
@@ -571,10 +574,16 @@ const RaceOperations = () => {
           </div>
 
           <p className={styles.tableSubtext}>
-            Chỉ pairing đủ điều kiện cho race đang chọn.
+            {canAllocateToSelectedRace
+              ? 'Chỉ pairing đủ điều kiện cho race đang chọn.'
+              : 'Race đang chọn không còn nhận allocate pairing.'}
           </p>
 
-          {loadingPairings ? (
+          {!canAllocateToSelectedRace ? (
+            <p className={styles.emptyCell}>
+              Chọn race Upcoming chưa bốc thăm để allocate pairing.
+            </p>
+          ) : loadingPairings ? (
             <p className={styles.emptyCell}>Đang tải...</p>
           ) : unallocatedPairings.length === 0 ? (
             <p className={styles.emptyCell}>
@@ -615,7 +624,8 @@ const RaceOperations = () => {
                     }
                     disabled={
                       allocatingId === pairing.pairingId ||
-                      !selectedRaceId
+                      !selectedRaceId ||
+                      !canAllocateToSelectedRace
                     }
                   >
                     {allocatingId === pairing.pairingId

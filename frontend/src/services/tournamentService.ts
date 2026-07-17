@@ -20,6 +20,7 @@ export interface RaceResponse {
   trackTypeOverride: string | null;
   raceDistanceOverride: number | null;
   status: string;
+  isPostPositionDrawn: boolean;
   confirmationCutoffHours: number;
   protestDeadlineMinutes: number;
 }

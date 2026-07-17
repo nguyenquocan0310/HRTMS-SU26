@@ -579,6 +579,7 @@ public class PairingService : IPairingService
             ?? throw new KeyNotFoundException("TARGET_RACE_NOT_FOUND");
 
         var targetTournamentId = targetRace.Round.TournamentId;
+        var targetRoundId = targetRace.RoundId;
         if (tournamentId.HasValue && tournamentId.Value != targetTournamentId)
         {
             throw new ArgumentException("TARGET_RACE_TOURNAMENT_MISMATCH");
@@ -597,16 +598,26 @@ public class PairingService : IPairingService
             .AsNoTracking()
             .Where(p => p.TournamentId == targetTournamentId && p.Status == effectiveStatus);
 
-        // Chi giu pairing CHUA co RaceEntry active (Pending/Confirmed) trong race CHUA ket thuc.
-        // Race da Official/Cancelled khong con "chiem cho" — pairing phai xuat hien lai
-        // de Admin allocate vao round ke tiep (multi-round).
+        // Candidate picker chỉ có ý nghĩa khi race đích còn nhận allocation. Race đã
+        // draw/không còn Upcoming sẽ bị AllocateAsync chặn; không trả candidate để UI
+        // không hiển thị một pairing vừa có trong race vừa ở danh sách chưa allocate.
         if (unallocatedOnly)
         {
-            query = query.Where(p =>
-                !p.RaceEntries.Any(re =>
-                    (re.Status == "Pending" || re.Status == "Confirmed") &&
-                    re.Race.Status != "Official" &&
-                    re.Race.Status != "Cancelled"));
+            if (targetRace.Status != "Upcoming" || targetRace.IsPostPositionDrawn)
+            {
+                query = query.Where(_ => false);
+            }
+            else
+            {
+                // Một pairing chỉ được thi một lần trong MỘT round. Không dùng trạng
+                // thái của race để quyết định ở đây: entry của race Official vẫn là
+                // lịch sử hợp lệ của round đó, nhưng entry ở round trước phải không
+                // cản pairing được allocate vào round tiếp theo.
+                query = query.Where(p =>
+                    !p.RaceEntries.Any(re =>
+                        re.Race.RoundId == targetRoundId &&
+                        re.Status != "Cancelled"));
+            }
         }
 
         // Round dau: pairing Confirmed chua allocate. Round sau: round truoc phai
@@ -654,9 +665,8 @@ public class PairingService : IPairingService
                         .Select(re => re.AdvancementStatus)
                         .FirstOrDefault(),
                 IsAllocated = p.RaceEntries.Any(re =>
-                    (re.Status == "Pending" || re.Status == "Confirmed") &&
-                    re.Race.Status != "Official" &&
-                    re.Race.Status != "Cancelled"),
+                    re.Race.RoundId == targetRoundId &&
+                    re.Status != "Cancelled"),
                 CreatedAt = p.CreatedAt
             })
             .ToListAsync();
