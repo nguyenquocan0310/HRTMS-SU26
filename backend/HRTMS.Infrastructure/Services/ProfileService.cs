@@ -185,24 +185,29 @@ public class ProfileService : IProfileService
             "Jockey" => await _context.JockeyProfiles
                 .AsNoTracking()
                 .Where(j => j.JockeyId == userId)
-                .Select(j => new {
-                    j.LicenseCertificate,
-                    j.ExperienceYears,
-                    j.SelfDeclaredWeight,
-                    j.BloodType,
-                    j.HealthStatus,
-                    j.Status,
-                    Certificate = certificate
-                })
+                .Join(_context.Users.AsNoTracking(),
+                    j => j.JockeyId, u => u.UserId,
+                    (j, u) => new {
+                        j.LicenseCertificate,
+                        j.ExperienceYears,
+                        j.SelfDeclaredWeight,
+                        j.BloodType,
+                        j.HealthStatus,
+                        j.Status,
+                        u.PhoneNumber,
+                        u.DateOfBirth,
+                        Certificate = certificate
+                    })
                 .FirstOrDefaultAsync(),
 
-            // Schema v2: PhoneNumber + IdentityNumber đã chuyển sang Users.
+            // Schema v2: PhoneNumber + DateOfBirth + IdentityNumber đã chuyển sang Users.
             // Profile Owner chỉ còn OwnerId — trả về từ Users context.
             "Owner" => await _context.Users
                 .AsNoTracking()
                 .Where(u => u.UserId == userId)
                 .Select(u => new {
                     u.PhoneNumber,
+                    u.DateOfBirth,
                     // IdentityNumber KHÔNG trả ra API (encrypted, restricted)
                     HasIdentity = u.IdentityHash != null
                 })
@@ -211,21 +216,29 @@ public class ProfileService : IProfileService
             "Referee" => await _context.RefereeProfiles
                 .AsNoTracking()
                 .Where(r => r.RefereeId == userId)
-                .Select(r => new {
-                    r.CertificationLevel,
-                    r.Status,
-                    Certificate = certificate
-                })
+                .Join(_context.Users.AsNoTracking(),
+                    r => r.RefereeId, u => u.UserId,
+                    (r, u) => new {
+                        r.CertificationLevel,
+                        r.Status,
+                        u.PhoneNumber,
+                        u.DateOfBirth,
+                        Certificate = certificate
+                    })
                 .FirstOrDefaultAsync(),
 
             "Doctor" => await _context.DoctorProfiles
                 .AsNoTracking()
                 .Where(d => d.DoctorId == userId)
-                .Select(d => new {
-                    d.MedicalLicenseNumber,
-                    d.Status,
-                    Certificate = certificate
-                })
+                .Join(_context.Users.AsNoTracking(),
+                    d => d.DoctorId, u => u.UserId,
+                    (d, u) => new {
+                        d.MedicalLicenseNumber,
+                        d.Status,
+                        u.PhoneNumber,
+                        u.DateOfBirth,
+                        Certificate = certificate
+                    })
                 .FirstOrDefaultAsync(),
 
             "Spectator" => await _context.Wallets
