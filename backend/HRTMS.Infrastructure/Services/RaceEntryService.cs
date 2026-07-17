@@ -73,6 +73,16 @@ public class RaceEntryService : IRaceEntryService
         if (pairing.Status != "Confirmed")
             throw new InvalidOperationException("PAIRING_NOT_CONFIRMED");
 
+        // Một pairing chỉ có một RaceEntry còn hiệu lực trong mỗi round. Guard này
+        // phải tồn tại ở API (không chỉ ở candidate picker) để chặn gọi trực tiếp
+        // đưa cùng pairing vào race khác của cùng vòng.
+        var alreadyAllocatedInRound = await _context.RaceEntries.AnyAsync(e =>
+            e.PairingId == pairing.PairingId &&
+            e.Race.RoundId == race.RoundId &&
+            e.Status != "Cancelled");
+        if (alreadyAllocatedInRound)
+            throw new InvalidOperationException("PAIRING_ALREADY_ALLOCATED_IN_ROUND");
+
         // Progression: round dau allocate tu do tu confirmed pairings; tu round 2 tro di
         // chi pairing da Qualified/AlsoEligible o round TRUOC (round truoc phai Completed).
         var previousRound = await _context.Rounds

@@ -164,6 +164,7 @@ namespace HRTMS.Infrastructure.Services
                         TrackTypeOverride = race.TrackTypeOverride,
                         RaceDistanceOverride = race.RaceDistanceOverride,
                         Status = race.Status,
+                        IsPostPositionDrawn = race.IsPostPositionDrawn,
                         ConfirmationCutoffHours = race.ConfirmationCutoffHours,
                         ProtestDeadlineMinutes = race.ProtestDeadlineMinutes,
                     }).ToList(),
@@ -969,6 +970,7 @@ namespace HRTMS.Infrastructure.Services
                 TrackTypeOverride = race.TrackTypeOverride,
                 RaceDistanceOverride = race.RaceDistanceOverride,
                 Status = race.Status,
+                IsPostPositionDrawn = race.IsPostPositionDrawn,
                 ConfirmationCutoffHours = race.ConfirmationCutoffHours,
                 ProtestDeadlineMinutes = race.ProtestDeadlineMinutes,
             };
@@ -1066,6 +1068,7 @@ namespace HRTMS.Infrastructure.Services
                 TrackTypeOverride = race.TrackTypeOverride,
                 RaceDistanceOverride = race.RaceDistanceOverride,
                 Status = race.Status,
+                IsPostPositionDrawn = race.IsPostPositionDrawn,
                 ConfirmationCutoffHours = race.ConfirmationCutoffHours,
                 ProtestDeadlineMinutes = race.ProtestDeadlineMinutes,
             };
