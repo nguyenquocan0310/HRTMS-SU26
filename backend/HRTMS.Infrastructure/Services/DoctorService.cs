@@ -109,6 +109,8 @@ public class DoctorService : IDoctorService
         Email = doctor.Doctor.Email,
         MedicalLicenseNumber = doctor.MedicalLicenseNumber,
         Status = doctor.Status,
+        PhoneNumber = doctor.Doctor.PhoneNumber,
+        DateOfBirth = doctor.Doctor.DateOfBirth,
         CreatedAt = doctor.CreatedAt
     };
 }
