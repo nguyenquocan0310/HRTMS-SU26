@@ -18,6 +18,7 @@ import PursePayouts from './pages/admin/PursePayouts';
 import TicketCodeManagement from './pages/admin/TicketCodeManagement';
 import Reports from './pages/admin/Reports';
 import AuditLog from './pages/admin/AuditLog';
+import NotificationCenter from './pages/admin/NotificationCenter';
 
 
 // ── Import các trang Owner ──
