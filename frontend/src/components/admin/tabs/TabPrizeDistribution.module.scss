@@ -209,3 +209,24 @@
     text-align: left;
   }
 }
+
+.rowError {
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+
+.inputError {
+  border-color: #dc2626 !important;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(220, 38, 38, 0.08);
+}
+
+.fieldError {
+  grid-column: 1 / -1;
+
+  color: #dc2626;
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
