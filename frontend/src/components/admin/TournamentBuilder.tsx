@@ -581,6 +581,7 @@ render: (row) => {
             totalPurse={typeof draft.basicInfo.purseAmount === 'number' ? draft.basicInfo.purseAmount : 0}
             onChange={(prizeDistribution) => setDraft((prev) => ({ ...prev, prizeDistribution }))}
             readOnly={isReadOnly}
+            showAllErrors={showAllErrors}
           />
         )}
 
