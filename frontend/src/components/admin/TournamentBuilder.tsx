@@ -593,6 +593,7 @@ render: (row) => {
             tournamentEndDate={draft.basicInfo.endDate}
             onChange={(rounds) => setDraft((prev) => ({ ...prev, rounds }))}
             readOnly={isReadOnly}
+            showAllErrors={showAllErrors}
           />
         )}
 
