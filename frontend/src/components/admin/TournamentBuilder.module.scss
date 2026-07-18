@@ -567,3 +567,107 @@
     padding: 1rem;
   }
 }
+
+/* ===============================
+   Validation Summary
+================================= */
+
+.validationSummary {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+
+  padding: 1rem 1.2rem;
+
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+
+  background: #fef2f2;
+
+  color: #b91c1c;
+
+  font-size: 0.9rem;
+  line-height: 1.6;
+
+  animation: fadeIn 0.2s ease;
+
+  strong {
+    display: block;
+    margin-bottom: 0.6rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+  }
+
+  ul {
+    margin: 0;
+    padding-left: 1.4rem;
+  }
+
+  li {
+    margin-bottom: 0.3rem;
+  }
+
+  li:last-child {
+    margin-bottom: 0;
+  }
+}
+
+/* ===============================
+   Error Message
+================================= */
+
+.errorText {
+  margin-top: 4px;
+
+  color: #dc2626;
+
+  font-size: 0.75rem;
+
+  line-height: 1.4;
+}
+
+/* ===============================
+   Input Error
+================================= */
+
+.inputError {
+  border-color: #dc2626 !important;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(220, 38, 38, 0.08) !important;
+}
+
+/* ===============================
+   Error Banner
+================================= */
+
+.errorBanner {
+  margin-top: 12px;
+
+  padding: 10px 14px;
+
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+
+  background: #fef2f2;
+
+  color: #b91c1c;
+
+  font-size: 0.82rem;
+}
+
+/* ===============================
+   Fade Animation
+================================= */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
