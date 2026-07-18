@@ -69,6 +69,7 @@ import SpectatorLiveRace from './pages/spectator/SpectatorLiveRace'
 import SpectatorLeaderboard from './pages/spectator/SpectatorLeaderboard'
 import SpectatorProfile from './pages/spectator/SpectatorProfile'
 import RaceOperations from './pages/admin/RaceOperation'
+import RaceList from './pages/admin/RaceList'
 import EntryFees from './pages/admin/EntryFees'
 
 // ── Placeholder Admin ──
@@ -208,6 +209,7 @@ export default function App() {
           <Route path="tournament-builder" element={<TournamentBuilder />} />
           <Route path="tournament-builder/:id" element={<TournamentBuilder />} />
           <Route path="race-operations" element={<RaceOperations />} />
+          <Route path="race-list" element={<RaceList />} />
           <Route path="entry-fees" element={<EntryFees />} />
           <Route
   path="purse-payouts"
