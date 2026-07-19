@@ -7,7 +7,7 @@ public partial class TicketRewardCode
 {
     public int TicketRewardCodeId { get; set; }
 
-    public byte[] CodeHash { get; set; } = null!;
+    public string Code { get; set; } = null!;
 
     public int PointAmount { get; set; }
 
