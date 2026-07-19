@@ -48,6 +48,8 @@ const RaceList = () => {
   const [declaring, setDeclaring] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
   const [actionError, setActionError] = useState('');
+  const [justOfficialIds, setJustOfficialIds] = useState<Set<number>>(new Set());
+
 
   useEffect(() => {
     getTournaments()
@@ -105,7 +107,7 @@ const RaceList = () => {
     }
   };
 
-  const handleDeclareOfficial = async () => {
+const handleDeclareOfficial = async () => {
     if (!selectedRace) return;
     const confirmed = window.confirm('Bạn có chắc muốn chuyển Race này sang trạng thái Official không?');
     if (!confirmed) return;
@@ -115,8 +117,10 @@ const RaceList = () => {
     try {
       await declareRaceOfficial(selectedRace.raceId, { confirmedByAdmin: true });
       setActionMsg('Race đã được chuyển sang trạng thái Official.');
-      closeDetail();
-      if (selectedTournamentId) reloadRaces(selectedTournamentId);
+      setJustOfficialIds((prev) => new Set(prev).add(selectedRace.raceId));
+      // Không gọi reloadRaces ở đây — race vừa Official sẽ bị GET /races/unofficial
+      // lọc mất; giữ nguyên danh sách hiện tại để vẫn thấy được, chỉ cập nhật badge.
+      setLiveStatus((prev) => (prev ? { ...prev, status: 'Official' } : prev));
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Không thể chuyển Race thành Official.');
     } finally {
@@ -224,7 +228,9 @@ const RaceList = () => {
                   {formatDateTime(selectedRace.scheduledTime)}
                 </div>
                 <div style={{ marginTop: '0.45rem' }}>
-                  <span className={`${styles.badge} ${styles.pending}`}>Unofficial</span>
+                  <span className={`${styles.badge} ${justOfficialIds.has(selectedRace.raceId) ? styles.confirmed : styles.pending}`}>
+                    {justOfficialIds.has(selectedRace.raceId) ? 'Official' : 'Unofficial'}
+                  </span>
                 </div>
               </div>
               <button type="button" className={styles.detailBtn} onClick={handleViewDetail}>
@@ -326,16 +332,18 @@ const RaceList = () => {
                   )}
                 </section>
 
-                <div className={styles.detailActions}>
-                  <button
-                    type="button"
-                    className={styles.declareOfficialBtn}
-                    onClick={handleDeclareOfficial}
-                    disabled={declaring}
-                  >
-                    {declaring ? 'Đang xử lý...' : 'Official'}
-                  </button>
-                </div>
+                {!justOfficialIds.has(selectedRace.raceId) && (
+                  <div className={styles.detailActions}>
+                    <button
+                      type="button"
+                      className={styles.declareOfficialBtn}
+                      onClick={handleDeclareOfficial}
+                      disabled={declaring}
+                    >
+                      {declaring ? 'Đang xử lý...' : 'Official'}
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </aside>
