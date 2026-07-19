@@ -396,11 +396,6 @@ const TicketCodeManagement = () => {
               </strong>
             </div>
           </div>
-
-          <div className={styles.infoBox}>
-            API sẽ tạo toàn bộ mã trong một request và trả
-            về danh sách codes.
-          </div>
         </aside>
       </div>
 

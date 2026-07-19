@@ -230,6 +230,12 @@ const RaceOperations = () => {
 
   const isDrawn = selectedRace?.isDrawn ?? false;
 
+  const selectedRaceStatus =
+    selectedRace?.status?.trim().toLowerCase() ?? '';
+
+  const canAllocateToSelectedRace =
+    selectedRaceStatus === 'upcoming' && !isDrawn;
+
   return (
     <div className={styles.container}>
       <div className={styles.pageHeader}>
