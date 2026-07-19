@@ -6,6 +6,7 @@ import {
   type UnofficialRace, type LiveRaceStatus, type LiveRaceEntry,
 } from '../../services/raceOperationService';
 import { getProtestsByRace } from '../../services/protestService';
+import { getUserBasicInfo } from '../../services/approvalService';
 import styles from './RaceList.module.scss';
 
 type ProtestItem = Awaited<ReturnType<typeof getProtestsByRace>>[number];
@@ -49,6 +50,8 @@ const RaceList = () => {
   const [actionMsg, setActionMsg] = useState('');
   const [actionError, setActionError] = useState('');
   const [justOfficialIds, setJustOfficialIds] = useState<Set<number>>(new Set());
+  const [protestSubmitterNames, setProtestSubmitterNames] = useState<Record<number, string>>({});
+
 
 
   useEffect(() => {
@@ -86,6 +89,7 @@ const RaceList = () => {
     setDetailError('');
     setLiveStatus(null);
     setProtests([]);
+    setProtestSubmitterNames({});
   };
 
   const handleViewDetail = async () => {
@@ -100,6 +104,20 @@ const RaceList = () => {
       ]);
       setLiveStatus(status);
       setProtests(protestList);
+
+      // Tra cứu tên người gửi cho từng userId khác nhau xuất hiện trong danh sách protest.
+      const uniqueUserIds = Array.from(
+        new Set(protestList.map((p) => (p as unknown as { submittedByUserId: number }).submittedByUserId))
+      ).filter((id) => typeof id === 'number' && !Number.isNaN(id));
+
+      const nameEntries = await Promise.all(
+        uniqueUserIds.map(async (userId) => {
+          const info = await getUserBasicInfo(userId);
+          return [userId, info?.fullName ?? `User #${userId}`] as const;
+        })
+      );
+
+      setProtestSubmitterNames(Object.fromEntries(nameEntries));
     } catch (e) {
       setDetailError(e instanceof Error ? e.message : 'Không tải được kết quả sơ bộ.');
     } finally {
@@ -324,7 +342,7 @@ const handleDeclareOfficial = async () => {
                           </div>
                           <p>{readProtestValue(protest, ['description', 'reason', 'content', 'notes'])}</p>
                           <small>
-                            Người gửi: {readProtestValue(protest, ['submittedByName', 'protesterName', 'createdByName', 'userName'])}
+                            Người gửi: {protestSubmitterNames[(protest as unknown as { submittedByUserId: number }).submittedByUserId] ?? '—'}
                           </small>
                         </div>
                       ))}
