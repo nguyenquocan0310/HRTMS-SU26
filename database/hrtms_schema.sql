@@ -1,25 +1,90 @@
 -- =============================================================================
+-- HRTMS_schema_snapshot.sql — SNAPSHOT THAM KHẢO CHO DATABASE HRTMS
+-- =============================================================================
+-- FILE TÁI TẠO SCHEMA: chạy file này = XÓA SẠCH toàn bộ bảng (kể cả dữ liệu,
+-- kể cả bảng Hangfire) trong database HRTMS rồi tạo mới schema từ đầu.
+-- Snapshot không chứa DROP/CREATE/ALTER DATABASE. HRTMS là database dùng chung;
+-- mọi thay đổi schema thực tế phải đi qua source schema/patch ngoài thư mục demo.
+--
+-- Nguồn gộp (CHỈ ĐỌC, không sửa nguồn):
+--   • Schema gốc : D:\study\SUMMER2026\SWP391\HRTMS-SU26\database\hrtms_schema.sql
+--                  (26 bảng, Version 2.0, cập nhật 2026-06-27)
+--   • Patches    : D:\study\SUMMER2026\SWP391\HRTMS-SU26\database\patches\
+--
+-- Danh sách patch đã gộp — ÁP DỤNG THEO ĐÚNG THỨ TỰ SỐ FILE:
+--   001_horse_stable_decoupling  : tách Horses khỏi giải, thêm HorseTournamentEntries,
+--                                  đổi FK Pairings -> enrollment. (Có INSERT backfill —
+--                                  no-op trên DB mới rỗng.)
+--   002_tournament_progression   : Tournaments.AdvancementRule/AdvancementCount +
+--                                  RaceEntries.AdvancementStatus/Rank/Reason + index.
+--   003_upload_file_table        : bảng Certificates; gỡ UNIQUE trên cột license text.
+--   004_live_race_simulation     : Races.ActualStartTime (Module H live race).
+--   005_row_version_concurrency  : Races.RowVersion + RaceEntries.RowVersion (ROWVERSION).
+--   006_system_user_seed         : role 'System' + seed user hệ thống `system`
+--                                  (⚠️ patch chứa SEED — user `system` được tạo tự động,
+--                                  PasswordHash='LOGIN_DISABLED', không đăng nhập được).
+--   007_remove_coi_check.sql     : đã fold vào bản cuối; không tạo bảng/field/index
+--                                  đã bị loại bỏ trong schema demo.
+--   008_ticket_code_plaintext.sql: đã fold — TicketRewardCodes dùng Code VARCHAR(20)
+--                                  plaintext + UQ_TicketRewardCodes_Code (bỏ CodeHash).
+--
+-- Thời điểm cập nhật : 2026-07-16
+-- Cách tạo           : schema gốc + patch 001→008 theo thứ tự; thay đổi xóa của
+--                      patch 007 (bỏ COI) và 008 (008_ticket_code_plaintext.sql —
+--                      TicketRewardCodes.Code plaintext thay CodeHash) được fold
+--                      trực tiếp vào DDL cuối.
+--
+-- ĐIỂM CẦN KIỂM TRA THỦ CÔNG (chi tiết: schema/schema-merge-report.md):
+--   1. Patch 006 thay CHK_Users_Role + CHK_Users_ProfessionalIdentity bằng DROP/ADD
+--      — bản cuối là bản của patch 006 (có role 'System').
+--   2. Patch 001 DROP cột/FK/INDEX của schema gốc rồi tạo bảng mới — hợp lệ vì mọi
+--      patch đều idempotent (IF EXISTS / IF NOT EXISTS).
+--   3. Patch 001 (backfill) và 006 (system user) chứa INSERT — seed nằm trong patch.
+--   4. Không có bảng/cột/constraint/index trùng tên giữa các patch.
+-- =============================================================================
+
+-- #############################################################################
+-- ## PHẦN A — SCHEMA GỐC (snapshot tham khảo, target HRTMS)
+-- #############################################################################
+-- =============================================================================
 -- HRTMS - Horse Racing Tournament Management System
 -- DB Schema: SQL Server 2022 - 3NF - Phase 1 Final
 -- Project: SU26SWP03 | Version: 2.0 | Updated: 2026-06-27
--- 27 tables - PK/FK/CHECK/DEFAULT/UNIQUE/INDEX
+-- 26 bảng nền; 28 bảng sau khi hợp nhất patches - PK/FK/CHECK/DEFAULT/UNIQUE/INDEX
 -- =============================================================================
 
-USE master;
-GO
+-- Không có database lifecycle trong snapshot. Runner demo không thực thi file này.
 
-IF DB_ID('HRTMS') IS NOT NULL
+-- =============================================================================
+-- CHỐT AN TOÀN KHI LỠ BẤM EXECUTE TRONG SSMS:
+--   • Sai database đích, hoặc schema đã tồn tại (bảng Users có sẵn)
+--     -> báo lỗi + BẬT NOEXEC: mọi batch phía dưới chỉ được parse, KHÔNG thực thi
+--        (không còn loạt lỗi Msg 2714 "already an object named ...").
+--   • Chỉ khi database HRTMS hoàn toàn trống schema, file mới thực sự chạy.
+-- =============================================================================
+IF DB_NAME() <> N'HRTMS'
 BEGIN
-    ALTER DATABASE HRTMS SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
-    DROP DATABASE HRTMS;
+    RAISERROR(N'DỪNG: snapshot chỉ dành cho database HRTMS. Phần dưới bị bỏ qua (NOEXEC).', 16, 1);
+    SET NOEXEC ON;
 END
 GO
+-- =============================================================================
+-- XÓA SẠCH SCHEMA CŨ (chủ đích): chạy file này nghĩa là tạo mới schema HRTMS.
+-- Drop toàn bộ FOREIGN KEY rồi drop toàn bộ bảng user (gồm cả Hangfire — BE sẽ
+-- tự tạo lại khi khởi động). Không đụng tới cấp DATABASE (không drop/tạo lại DB).
+-- ⚠️ Mọi dữ liệu hiện có trong HRTMS sẽ mất — chỉ chạy khi thật sự muốn làm lại.
+-- =============================================================================
+DECLARE @sql NVARCHAR(MAX) = N'';
+SELECT @sql += N'ALTER TABLE ' + QUOTENAME(SCHEMA_NAME(t.schema_id)) + N'.' + QUOTENAME(t.name)
+             + N' DROP CONSTRAINT ' + QUOTENAME(fk.name) + N';'
+FROM sys.foreign_keys fk JOIN sys.tables t ON t.object_id = fk.parent_object_id;
+EXEC sp_executesql @sql;
 
-CREATE DATABASE HRTMS
-    COLLATE Vietnamese_CI_AS;
-GO
-
-USE HRTMS;
+SET @sql = N'';
+SELECT @sql += N'DROP TABLE ' + QUOTENAME(SCHEMA_NAME(schema_id)) + N'.' + QUOTENAME(name) + N';'
+FROM sys.tables;
+EXEC sp_executesql @sql;
+PRINT N'Đã xóa toàn bộ bảng cũ trong HRTMS — bắt đầu tạo schema mới.';
 GO
 
 SET ANSI_NULLS ON;
@@ -495,7 +560,7 @@ GO
 
 CREATE TABLE TicketRewardCodes (
     TicketRewardCodeId   INT            IDENTITY(1,1) NOT NULL,
-    Code                 VARCHAR(20)    NOT NULL,
+    Code                 VARCHAR(20)    NOT NULL,   -- patch 008: plaintext thay CodeHash
     PointAmount          INT            NOT NULL,
     [Status]             VARCHAR(20)    NOT NULL DEFAULT 'Active',
     ExpiresAt            DATETIME2      NOT NULL,
@@ -700,7 +765,6 @@ CREATE UNIQUE INDEX UQ_Pairings_ActiveHorseTournament
 CREATE INDEX IX_RaceEntries_Race ON RaceEntries (RaceId);
 CREATE INDEX IX_RaceEntries_Pairing ON RaceEntries (PairingId);
 CREATE INDEX IX_RaceEntries_Status ON RaceEntries ([Status]);
-
 CREATE INDEX IX_TicketRewardCodes_Status ON TicketRewardCodes ([Status], ExpiresAt);
 CREATE INDEX IX_TicketRewardCodes_RedeemedBy ON TicketRewardCodes (RedeemedBySpectatorId) WHERE RedeemedBySpectatorId IS NOT NULL;
 CREATE INDEX IX_VPT_Wallet ON VirtualPointsTransactions (WalletId);
@@ -717,7 +781,7 @@ GO
 
 -- =============================================================================
 -- SUMMARY
--- 26 tables - SQL Server 2022 - 3NF
+-- 26 base tables - SQL Server 2022 - 3NF
 -- Users, JockeyProfiles, OwnerProfiles, RefereeProfiles, DoctorProfiles,
 -- SpectatorProfiles,
 -- Tournaments, TournamentParticipants, PrizeDistributions, Rounds, Races,
@@ -730,3 +794,503 @@ GO
 --   trg_RaceReports_Immutable  - chan UPDATE/DELETE bien ban da khoa (IsLocked=1)  [REQ-F-PRT.7]
 --   trg_AuditLogs_AppendOnly   - chan moi UPDATE/DELETE tren AuditLogs (append-only) [REQ-F-SEC.6]
 -- =============================================================================
+
+
+-- #############################################################################
+-- ## PATCH 001_horse_stable_decoupling (nguyên văn)
+-- #############################################################################
+-- Target snapshot: HRTMS (không đổi database context).
+GO
+
+/* =============================================================================
+   Patch 001 — Module C: Tách "Kho ngựa" (Horse Stable) khỏi Giải đấu
+   -----------------------------------------------------------------------------
+   Mục tiêu:
+     • Horses trở thành hồ sơ vĩnh viễn của Owner (bỏ TournamentId).
+     • Thêm bảng HorseTournamentEntries = 1 enrollment / (Horse, Tournament),
+       mang screening + AdminApproval THEO TỪNG GIẢI (duyệt lại mỗi giải).
+     • Pairings đổi composite-FK (TournamentId, HorseId) → trỏ vào enrollment.
+
+   Ghi chú phạm vi:
+     • CHỈ bỏ Horses.TournamentId. GIỮ NGUYÊN 4 cột ScreeningStatus /
+       ScreeningReason / AdminApprovalStatus / RejectionReason trên Horses
+       (baseline profile-level) để các module khác (Pairing/RaceEntry) vẫn
+       biên dịch & chạy mà không phải sửa.
+
+   Idempotent: chạy lại nhiều lần đều an toàn (dùng IF EXISTS / IF NOT EXISTS).
+   Target: SQL Server (T-SQL).
+   ============================================================================= */
+
+SET XACT_ABORT ON;
+GO
+
+/* ---------------------------------------------------------------------------
+   1) Gỡ các ràng buộc/khóa neo trên Horses(TournamentId, HorseId)
+      (phải gỡ FK của Pairings trước vì nó tham chiếu UQ của Horses)
+   --------------------------------------------------------------------------- */
+IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_Pairings_HorseTournament')
+    ALTER TABLE Pairings DROP CONSTRAINT FK_Pairings_HorseTournament;
+GO
+
+IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_Horses_OwnerRoster')
+    ALTER TABLE Horses DROP CONSTRAINT FK_Horses_OwnerRoster;
+GO
+
+IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_Horses_Tournament')
+    ALTER TABLE Horses DROP CONSTRAINT FK_Horses_Tournament;
+GO
+
+IF EXISTS (SELECT 1 FROM sys.key_constraints WHERE name = 'UQ_Horses_TournamentHorse')
+    ALTER TABLE Horses DROP CONSTRAINT UQ_Horses_TournamentHorse;
+GO
+
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Horses_Tournament' AND object_id = OBJECT_ID('Horses'))
+    DROP INDEX IX_Horses_Tournament ON Horses;
+GO
+
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Horses_TournamentApproval' AND object_id = OBJECT_ID('Horses'))
+    DROP INDEX IX_Horses_TournamentApproval ON Horses;
+GO
+
+/* ---------------------------------------------------------------------------
+   2) Bỏ cột Horses.TournamentId (root cause: ép đăng ký lại mỗi giải)
+   --------------------------------------------------------------------------- */
+IF EXISTS (SELECT 1 FROM sys.columns WHERE Name = 'TournamentId' AND Object_ID = OBJECT_ID('Horses'))
+    ALTER TABLE Horses DROP COLUMN TournamentId;
+GO
+
+/* ---------------------------------------------------------------------------
+   3) Bảng enrollment mới: HorseTournamentEntries
+      1 dòng / (Horse, Tournament); mang screening + AdminApproval theo giải.
+      OwnerId denormalized (= Horse.OwnerId) để neo composite-FK roster-check.
+   --------------------------------------------------------------------------- */
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'HorseTournamentEntries')
+BEGIN
+    CREATE TABLE HorseTournamentEntries (
+        EnrollmentId        INT             IDENTITY(1,1) NOT NULL,
+        HorseId             INT             NOT NULL,
+        TournamentId        INT             NOT NULL,
+        OwnerId             INT             NOT NULL,            -- = Horse.OwnerId (neo roster-FK)
+        [Status]            VARCHAR(20)     NOT NULL DEFAULT 'Enrolled',
+        ScreeningStatus     VARCHAR(20)     NOT NULL DEFAULT 'NotScreened',
+        ScreeningReason     NVARCHAR(500)   NULL,
+        AdminApprovalStatus VARCHAR(20)     NOT NULL DEFAULT 'Pending',
+        RejectionReason     NVARCHAR(500)   NULL,
+        CreatedAt           DATETIME2       NOT NULL DEFAULT GETUTCDATE(),
+        UpdatedAt           DATETIME2       NOT NULL DEFAULT GETUTCDATE(),
+
+        CONSTRAINT PK_HTE PRIMARY KEY (EnrollmentId),
+        CONSTRAINT FK_HTE_Horse FOREIGN KEY (HorseId) REFERENCES Horses(HorseId),
+        CONSTRAINT FK_HTE_Tournament FOREIGN KEY (TournamentId) REFERENCES Tournaments(TournamentId) ON DELETE CASCADE,
+        CONSTRAINT FK_HTE_OwnerRoster FOREIGN KEY (TournamentId, OwnerId)
+            REFERENCES TournamentParticipants(TournamentId, UserId),
+        CONSTRAINT UQ_HTE_HorseTournament UNIQUE (HorseId, TournamentId),   -- 1 enrollment / giải
+        CONSTRAINT UQ_HTE_TournamentHorse UNIQUE (TournamentId, HorseId),   -- neo cho Pairings FK
+        CONSTRAINT CHK_HTE_Status CHECK ([Status] IN ('Enrolled','Withdrawn')),
+        CONSTRAINT CHK_HTE_Screening CHECK (ScreeningStatus IN ('NotScreened','AutoEligible','ManualReview','AutoRejected')),
+        CONSTRAINT CHK_HTE_Approval CHECK (AdminApprovalStatus IN ('Pending','Approved','Rejected'))
+    );
+
+    CREATE INDEX IX_HTE_Horse ON HorseTournamentEntries (HorseId);
+    CREATE INDEX IX_HTE_TournamentApproval ON HorseTournamentEntries (TournamentId, AdminApprovalStatus);
+END
+GO
+
+/* ---------------------------------------------------------------------------
+   3b) Backfill enrollment từ dữ liệu Pairings hiện có
+       → mỗi (TournamentId, HorseId) đang được dùng trong Pairings phải có
+         enrollment tương ứng, nếu không bước (4) add FK sẽ FAIL (Msg 547).
+       Pre-existing pairing = ngựa đã hợp lệ trong giải → set Approved/AutoEligible.
+       Idempotent: chỉ chèn dòng còn thiếu (NOT EXISTS).
+   --------------------------------------------------------------------------- */
+INSERT INTO HorseTournamentEntries
+    (HorseId, TournamentId, OwnerId, [Status], ScreeningStatus, AdminApprovalStatus, CreatedAt, UpdatedAt)
+SELECT DISTINCT p.HorseId, p.TournamentId, h.OwnerId, 'Enrolled', 'AutoEligible', 'Approved',
+       GETUTCDATE(), GETUTCDATE()
+FROM Pairings p
+JOIN Horses h ON h.HorseId = p.HorseId
+WHERE NOT EXISTS (
+    SELECT 1 FROM HorseTournamentEntries e
+    WHERE e.HorseId = p.HorseId AND e.TournamentId = p.TournamentId
+);
+GO
+
+/* ---------------------------------------------------------------------------
+   4) Pairings: composite-FK (TournamentId, HorseId) trỏ vào enrollment
+      → đảm bảo ngựa của pairing đã enroll vào đúng giải (DB-level guarantee).
+   --------------------------------------------------------------------------- */
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_Pairings_HorseTournament')
+    ALTER TABLE Pairings
+        ADD CONSTRAINT FK_Pairings_HorseTournament
+        FOREIGN KEY (TournamentId, HorseId)
+        REFERENCES HorseTournamentEntries(TournamentId, HorseId);
+GO
+
+
+-- #############################################################################
+-- ## PATCH 002_tournament_progression (nguyên văn)
+-- #############################################################################
+-- Target snapshot: HRTMS (không đổi database context).
+GO
+
+/* =============================================================================
+   Patch 002 — Module B/E: Tournament/Round/Race Progression
+   -----------------------------------------------------------------------------
+   Mục tiêu:
+     • Tournaments.AdvancementRule  — rule chọn ngựa đi tiếp, cấu hình per giải:
+         'TopPerRace'    (MVP/default): mỗi race lấy Top N theo FinishPosition.
+         'EarningsBased' : xếp theo EarningsAwarded (purse thực kiếm được) —
+                           hệ thống KHÔNG có điểm số, chỉ có tiền thưởng.
+         'Hybrid'        : Top N mỗi race trước, slot còn lại theo earnings.
+     • Tournaments.AdvancementCount — N của TopPerRace (default 5, khớp cấu trúc
+       PrizeDistributions Top1–Top5).
+     • RaceEntries.AdvancementStatus — kết quả progression sau khi race Official:
+         'Qualified'    : đủ điều kiện allocate vào round kế tiếp.
+         'AlsoEligible' : dự bị — dead heat tại ranh qualify hoặc overflow;
+                          Admin quyết định khi allocate (draw/manual).
+         'Eliminated'   : bị loại, KHÔNG được allocate round sau.
+         NULL           : chưa tính (race chưa Official / entry Cancelled /
+                          round chung kết không có advancement).
+     • RaceEntries.AdvancementRank   — thứ hạng dùng để xét đi tiếp (MVP =
+       FinishPosition trong race).
+     • RaceEntries.AdvancementReason — lý do/evidence (dead heat, disqualified,
+       admin draw...) phục vụ audit.
+
+   Idempotent: chạy lại nhiều lần đều an toàn.
+   Target: SQL Server (T-SQL).
+   ============================================================================= */
+
+SET XACT_ABORT ON;
+GO
+
+/* ---------------------------------------------------------------------------
+   1) Tournaments: AdvancementRule + AdvancementCount
+   --------------------------------------------------------------------------- */
+IF COL_LENGTH('Tournaments', 'AdvancementRule') IS NULL
+    ALTER TABLE Tournaments ADD AdvancementRule VARCHAR(20) NOT NULL
+        CONSTRAINT DF_Tournaments_AdvRule DEFAULT 'TopPerRace';
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CHK_Tournaments_AdvRule')
+    ALTER TABLE Tournaments ADD CONSTRAINT CHK_Tournaments_AdvRule
+        CHECK (AdvancementRule IN ('TopPerRace','EarningsBased','Hybrid'));
+GO
+
+IF COL_LENGTH('Tournaments', 'AdvancementCount') IS NULL
+    ALTER TABLE Tournaments ADD AdvancementCount INT NOT NULL
+        CONSTRAINT DF_Tournaments_AdvCount DEFAULT 5;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CHK_Tournaments_AdvCount')
+    ALTER TABLE Tournaments ADD CONSTRAINT CHK_Tournaments_AdvCount
+        CHECK (AdvancementCount > 0);
+GO
+
+/* ---------------------------------------------------------------------------
+   2) RaceEntries: AdvancementStatus / AdvancementRank / AdvancementReason
+   --------------------------------------------------------------------------- */
+IF COL_LENGTH('RaceEntries', 'AdvancementStatus') IS NULL
+    ALTER TABLE RaceEntries ADD AdvancementStatus VARCHAR(20) NULL;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CHK_RaceEntries_AdvStatus')
+    ALTER TABLE RaceEntries ADD CONSTRAINT CHK_RaceEntries_AdvStatus
+        CHECK (AdvancementStatus IS NULL OR AdvancementStatus IN ('Qualified','AlsoEligible','Eliminated'));
+GO
+
+IF COL_LENGTH('RaceEntries', 'AdvancementRank') IS NULL
+    ALTER TABLE RaceEntries ADD AdvancementRank INT NULL;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CHK_RaceEntries_AdvRank')
+    ALTER TABLE RaceEntries ADD CONSTRAINT CHK_RaceEntries_AdvRank
+        CHECK (AdvancementRank IS NULL OR AdvancementRank > 0);
+GO
+
+IF COL_LENGTH('RaceEntries', 'AdvancementReason') IS NULL
+    ALTER TABLE RaceEntries ADD AdvancementReason NVARCHAR(255) NULL;
+GO
+
+/* ---------------------------------------------------------------------------
+   3) Index phục vụ picker/guard: lọc entry theo AdvancementStatus
+   --------------------------------------------------------------------------- */
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_RaceEntries_AdvStatus')
+    CREATE INDEX IX_RaceEntries_AdvStatus ON RaceEntries (AdvancementStatus)
+        WHERE AdvancementStatus IS NOT NULL;
+GO
+
+
+-- #############################################################################
+-- ## PATCH 003_upload_file_table (nguyên văn)
+-- #############################################################################
+-- Target snapshot: HRTMS (không đổi database context).
+GO
+
+/* =============================================================================
+   Patch 003 — Module ACC: Upload file chứng chỉ thay cho nhập tên chứng chỉ
+   -----------------------------------------------------------------------------
+   Mục tiêu:
+     • Thêm bảng Certificates để lưu file chứng chỉ/bằng cấp do người dùng
+       upload khi đăng ký các role cần thẩm định chuyên môn:
+         - Jockey  : thay cho việc chỉ gõ tên "LicenseCertificate"
+         - Referee : minh chứng cho "CertificationLevel"
+         - Doctor  : minh chứng cho "MedicalLicenseNumber"
+     • Mỗi User giữ đúng 1 bản ghi Certificate hiện hành (UNIQUE UserId).
+       Nếu user bị Admin reject và upload lại, file cũ sẽ được ghi đè
+       (xử lý ở tầng ứng dụng — service kiểm tra tồn tại rồi Update thay vì Insert).
+     • Admin xem chứng chỉ qua endpoint GET /api/certificates/{id}/download
+       (yêu cầu Authorize, không public trực tiếp file trên static hosting).
+     • Cột LicenseCertificate/CertificationLevel/MedicalLicenseNumber trong
+       các bảng *Profiles VẪN GIỮ NGUYÊN (lưu tên file gốc do người dùng upload,
+       để tương thích ngược với các API/report hiện có) — chứng chỉ file thật
+       sự nằm ở bảng Certificates.
+
+   Idempotent: chạy lại nhiều lần đều an toàn.
+   Target: SQL Server (T-SQL).
+   ============================================================================= */
+
+SET XACT_ABORT ON;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'Certificates')
+BEGIN
+    CREATE TABLE Certificates (
+        CertificateId   INT IDENTITY(1,1) NOT NULL,
+        UserId          INT NOT NULL,
+        CertificateType VARCHAR(20) NOT NULL,
+        FileName        NVARCHAR(255) NOT NULL,
+        FilePath        VARCHAR(500) NOT NULL,
+        ContentType     VARCHAR(100) NOT NULL,
+        FileSizeBytes   BIGINT NOT NULL,
+        UploadedAt      DATETIME2 NOT NULL CONSTRAINT DF_Certificates_UploadedAt DEFAULT (getutcdate()),
+
+        CONSTRAINT PK_Certificates PRIMARY KEY (CertificateId),
+        CONSTRAINT FK_Certificates_Users FOREIGN KEY (UserId)
+            REFERENCES Users (UserId) ON DELETE CASCADE,
+        CONSTRAINT CHK_Certificates_Type
+            CHECK (CertificateType IN ('Jockey','Referee','Doctor'))
+    );
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UQ_Certificates_UserId')
+    CREATE UNIQUE INDEX UQ_Certificates_UserId ON Certificates (UserId);
+GO
+
+/* ---------------------------------------------------------------------------
+   Gỡ unique constraint cũ trên cột text chứng chỉ (LicenseCertificate /
+   MedicalLicenseNumber): giờ các cột này chỉ lưu TÊN FILE GỐC do người dùng
+   upload (không còn là số/tên chứng chỉ duy nhất do người dùng tự gõ),
+   nên không còn ý nghĩa để ràng buộc UNIQUE. Định danh chứng chỉ thật sự
+   nằm ở bảng Certificates (UNIQUE theo UserId).
+
+   Lưu ý: 2 index này thực chất được sinh ra bởi UNIQUE CONSTRAINT (không phải
+   CREATE UNIQUE INDEX thường), nên phải DROP CONSTRAINT chứ không DROP INDEX
+   trực tiếp (SQL Server báo lỗi Msg 3723 nếu cố DROP INDEX).
+   --------------------------------------------------------------------------- */
+IF EXISTS (
+    SELECT 1 FROM sys.key_constraints
+    WHERE name = 'UQ_JockeyProfiles_License' AND parent_object_id = OBJECT_ID('JockeyProfiles')
+)
+    ALTER TABLE JockeyProfiles DROP CONSTRAINT UQ_JockeyProfiles_License;
+GO
+
+IF EXISTS (
+    SELECT 1 FROM sys.key_constraints
+    WHERE name = 'UQ_DoctorProfiles_License' AND parent_object_id = OBJECT_ID('DoctorProfiles')
+)
+    ALTER TABLE DoctorProfiles DROP CONSTRAINT UQ_DoctorProfiles_License;
+GO
+
+/* Fallback: nếu ở môi trường nào đó 2 index này lại được tạo dưới dạng index
+   thường (không phải constraint), DROP INDEX vẫn chạy được ở đây vì điều kiện
+   IF EXISTS ở trên sẽ false và không đụng tới; xử lý case còn lại bằng cách
+   kiểm tra tồn tại độc lập trong sys.indexes rồi drop qua index, bọc trong
+   TRY/CATCH để không chặn cả patch nếu gặp lại lỗi 3723 ở môi trường khác. */
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UQ_JockeyProfiles_License')
+BEGIN
+    BEGIN TRY
+        DROP INDEX UQ_JockeyProfiles_License ON JockeyProfiles;
+    END TRY
+    BEGIN CATCH
+        PRINT 'Bỏ qua: UQ_JockeyProfiles_License đã được xử lý ở bước DROP CONSTRAINT phía trên hoặc không thể drop trực tiếp.';
+    END CATCH
+END
+GO
+
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UQ_DoctorProfiles_License')
+BEGIN
+    BEGIN TRY
+        DROP INDEX UQ_DoctorProfiles_License ON DoctorProfiles;
+    END TRY
+    BEGIN CATCH
+        PRINT 'Bỏ qua: UQ_DoctorProfiles_License đã được xử lý ở bước DROP CONSTRAINT phía trên hoặc không thể drop trực tiếp.';
+    END CATCH
+END
+GO
+
+-- #############################################################################
+-- ## PATCH 004_live_race_simulation (nguyên văn)
+-- #############################################################################
+-- Target snapshot: HRTMS (không đổi database context).
+GO
+
+/* =============================================================================
+   Patch 004 — Module H mở rộng: Live Race Simulation (UI-S07)
+   -----------------------------------------------------------------------------
+   Mục tiêu:
+     • Thêm cột Races.ActualStartTime — thời điểm Referee thực sự bấm "Start Race"
+       (khác ScheduledTime là giờ dự kiến). FE dùng cột này để biết khi nào bắt
+       đầu chạy animation random-walk (client-side, 100ms/tick).
+     • Không thêm bảng mới: Violation trong lúc Live vẫn dùng lại bảng
+       RaceReports/Violations sẵn có — Referee ghi nhận vi phạm trong lúc Live sẽ
+       tạo (hoặc tái sử dụng) 1 RaceReport chưa khóa (IsLocked = 0) cho race đó.
+
+   Idempotent: chạy lại nhiều lần đều an toàn.
+   Target: SQL Server (T-SQL).
+   ============================================================================= */
+
+SET XACT_ABORT ON;
+GO
+
+IF NOT EXISTS (
+    SELECT 1 FROM sys.columns
+    WHERE object_id = OBJECT_ID('Races') AND name = 'ActualStartTime'
+)
+    ALTER TABLE Races ADD ActualStartTime DATETIME2 NULL;
+GO
+
+
+-- #############################################################################
+-- ## PATCH 005_row_version_concurrency (nguyên văn)
+-- #############################################################################
+-- Target snapshot: HRTMS (không đổi database context).
+GO
+
+/* =============================================================================
+   Patch 005 — Module E: Optimistic concurrency cho Races / RaceEntries
+   -----------------------------------------------------------------------------
+   Mục tiêu:
+     • Races.RowVersion       — ROWVERSION, concurrency token do SQL Server sinh.
+     • RaceEntries.RowVersion — ROWVERSION, concurrency token do SQL Server sinh.
+
+   Lý do:
+     Nhiều actor ghi đồng thời cùng 1 row (Doctor sửa weight trong lúc Referee
+     confirm starting list; 2 Admin cùng thao tác 1 entry) hiện là last-write-wins
+     âm thầm. EF Core map cột này bằng IsRowVersion() (HRTMSDbContext) — request
+     ghi đè dữ liệu đã đổi sẽ nhận DbUpdateConcurrencyException → API trả
+     409 CONCURRENCY_CONFLICT (ExceptionMiddleware).
+
+   Ghi chú:
+     • Các path dùng ExecuteUpdateAsync (withdraw, trừ ví...) bypass change
+       tracker — không đi qua RowVersion, đã tự bảo vệ bằng UPDATE có điều kiện.
+     • ROWVERSION do DB quản lý hoàn toàn: không cần backfill, không cần default.
+
+   Idempotent: chạy lại nhiều lần đều an toàn.
+   Target: SQL Server (T-SQL).
+   ============================================================================= */
+
+SET XACT_ABORT ON;
+GO
+
+/* ---------------------------------------------------------------------------
+   1) Races.RowVersion
+   --------------------------------------------------------------------------- */
+IF COL_LENGTH('Races', 'RowVersion') IS NULL
+    ALTER TABLE Races ADD RowVersion ROWVERSION NOT NULL;
+GO
+
+/* ---------------------------------------------------------------------------
+   2) RaceEntries.RowVersion
+   --------------------------------------------------------------------------- */
+IF COL_LENGTH('RaceEntries', 'RowVersion') IS NULL
+    ALTER TABLE RaceEntries ADD RowVersion ROWVERSION NOT NULL;
+GO
+
+PRINT 'Patch 005 applied: Races.RowVersion + RaceEntries.RowVersion (optimistic concurrency).';
+GO
+
+
+-- #############################################################################
+-- ## PATCH 006_system_user_seed (nguyên văn)
+-- #############################################################################
+-- Target snapshot: HRTMS (không đổi database context).
+GO
+
+/* =============================================================================
+   Patch 006 — Module E/Q: System user chuẩn cho job tự động
+   -----------------------------------------------------------------------------
+   Mục tiêu:
+     • Mở rộng CHK_Users_Role: thêm role 'System'.
+     • Mở rộng CHK_Users_ProfessionalIdentity: miễn trừ 'System' (như Admin/
+       Spectator — không yêu cầu Phone/DOB/Identity).
+     • Seed 1 user hệ thống cố định (Username = 'system') làm actor cho các job
+       tự động (AutoCancelOverdueAsync) — AuditLog.ActorId là FK NOT NULL tới
+       Users nên job cần user thật, không được "mượn" tài khoản Admin.
+
+   Bảo mật:
+     • PasswordHash = 'LOGIN_DISABLED' — KHÔNG phải BCrypt hash hợp lệ, không thể
+       verify thành công. AuthService còn chặn cứng Role = 'System' trước bước
+       verify mật khẩu (defense in depth).
+
+   Idempotent: chạy lại nhiều lần đều an toàn (check tồn tại trước khi đổi/insert).
+   Target: SQL Server (T-SQL).
+   ============================================================================= */
+
+SET XACT_ABORT ON;
+GO
+
+/* ---------------------------------------------------------------------------
+   1) CHK_Users_Role: thêm 'System' vào danh sách role hợp lệ
+   --------------------------------------------------------------------------- */
+IF EXISTS (SELECT 1 FROM sys.check_constraints
+           WHERE name = 'CHK_Users_Role'
+             AND definition NOT LIKE '%System%')
+BEGIN
+    ALTER TABLE Users DROP CONSTRAINT CHK_Users_Role;
+    ALTER TABLE Users ADD CONSTRAINT CHK_Users_Role
+        CHECK ([Role] IN ('Admin','Owner','Jockey','Referee','Doctor','Spectator','System'));
+END
+GO
+
+/* ---------------------------------------------------------------------------
+   2) CHK_Users_ProfessionalIdentity: miễn trừ 'System' khỏi yêu cầu định danh
+   --------------------------------------------------------------------------- */
+IF EXISTS (SELECT 1 FROM sys.check_constraints
+           WHERE name = 'CHK_Users_ProfessionalIdentity'
+             AND definition NOT LIKE '%System%')
+BEGIN
+    ALTER TABLE Users DROP CONSTRAINT CHK_Users_ProfessionalIdentity;
+    ALTER TABLE Users ADD CONSTRAINT CHK_Users_ProfessionalIdentity CHECK (
+        [Role] IN ('Admin','Spectator','System')
+        OR (PhoneNumber IS NOT NULL AND DateOfBirth IS NOT NULL AND IdentityNumberEncrypted IS NOT NULL AND IdentityHash IS NOT NULL)
+    );
+END
+GO
+
+/* ---------------------------------------------------------------------------
+   3) Seed system user (idempotent theo Username UNIQUE)
+   --------------------------------------------------------------------------- */
+IF NOT EXISTS (SELECT 1 FROM Users WHERE Username = 'system')
+BEGIN
+    INSERT INTO Users (Username, FullName, Email, NormalizedEmail, PasswordHash, [Role], [Status])
+    VALUES (
+        'system',
+        N'HRTMS System',
+        'system@hrtms.local',
+        'SYSTEM@HRTMS.LOCAL',
+        'LOGIN_DISABLED',          -- không phải BCrypt hash — không thể đăng nhập
+        'System',
+        'Active'
+    );
+END
+GO
+
+PRINT 'Patch 006 applied: role System + seed system user (actor cho job tự động).';
+GO
+
+PRINT N'HOÀN TẤT: schema HRTMS được tạo mới (schema gốc + patch 001-008).';
+GO
+
+SET NOEXEC OFF;
+GO
