@@ -303,3 +303,139 @@
     background: #dbeafe;
   }
 }
+
+.purseSummary {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2rem;
+
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+
+  > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  strong {
+    color: #111827;
+    font-size: 0.9rem;
+  }
+}
+
+.purseLabel {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.purseExceeded {
+  color: #dc2626 !important;
+}
+
+.roundFieldWrap {
+  display: flex;
+  min-width: 170px;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.roundFieldLabel {
+  color: #64748b;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.inputError {
+  border-color: #dc2626 !important;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(220, 38, 38, 0.08) !important;
+}
+
+.raceErrorText {
+  display: block;
+
+  margin-top: 0.2rem;
+
+  color: #dc2626;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.errorBanner {
+  margin-bottom: 0.75rem;
+  padding: 0.75rem 0.9rem;
+
+  border: 1px solid #fecaca;
+  border-radius: 7px;
+  background: #fef2f2;
+
+  color: #b91c1c;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.raceField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+
+  label {
+    color: #475569;
+    font-size: 0.72rem;
+    font-weight: 600;
+  }
+
+  input,
+  select {
+    width: 100%;
+    min-height: 38px;
+    padding: 0.5rem 0.65rem;
+
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    outline: none;
+    background: #ffffff;
+
+    color: #111827;
+    font-size: 0.82rem;
+
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
+
+    &:focus {
+      border-color: #2563eb;
+
+      box-shadow:
+        0 0 0 3px
+        rgba(37, 99, 235, 0.1);
+    }
+
+    &:disabled {
+      background: #f1f5f9;
+      color: #94a3b8;
+      cursor: not-allowed;
+    }
+  }
+}
+
+@media (max-width: 900px) {
+  .purseSummary {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .roundFieldWrap {
+    width: 100%;
+  }
+}

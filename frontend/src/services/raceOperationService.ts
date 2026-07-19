@@ -256,3 +256,59 @@ export const getRacePayouts = async (
 
   return res.data.payouts ?? [];
 };
+
+
+// ─── Race List (Unofficial) — dùng cho trang riêng, KHÔNG dùng ở Race Operations ─
+export interface UnofficialRace {
+  raceId: number;
+  tournamentId: number;
+  tournamentName: string;
+  roundName: string;
+  raceNumber: number;
+  scheduledTime: string;
+  hasRaceReport: boolean;
+  isRaceReportLocked: boolean;
+  hasPendingProtests: boolean;
+  prizeDistributionsConfigured: boolean;
+  rankingIntegrityValid: boolean;
+  postRaceWeighInComplete: boolean;
+  protestWindowClosed: boolean;
+  protestDeadlineAt: string | null;
+  canDeclareOfficial: boolean;
+}
+
+export const getUnofficialRaces = (
+  tournamentId?: number
+): Promise<UnofficialRace[]> =>
+  apiFetch<ApiResponse<UnofficialRace[]>>(
+    tournamentId ? `/races/unofficial?tournamentId=${tournamentId}` : '/races/unofficial'
+  ).then((res) => res.data ?? []);
+
+// ─── Live Race Status — nguồn "Kết quả sơ bộ" trước khi Official ───────────
+export interface LiveRaceEntry {
+  raceEntryId: number;
+  postPosition: number | null;
+  status: string;
+  isWithdrawn: boolean;
+  horseId: number;
+  horseName: string;
+  jockeyId: number;
+  jockeyName: string;
+  finishPosition: number | null;
+  finishTime: number | null;
+}
+
+export interface LiveRaceStatus {
+  raceId: number;
+  status: string;
+  scheduledTime: string;
+  actualStartTime: string | null;
+  raceDurationSeconds: number;
+  entries: LiveRaceEntry[];
+}
+
+export const getLiveRaceStatus = (raceId: number): Promise<LiveRaceStatus> =>
+  apiFetch<ApiResponse<LiveRaceStatus>>(`/races/${raceId}/live-status`).then((res) => {
+    if (!res.data) throw new Error(res.message || 'Không tải được kết quả sơ bộ.');
+    return res.data;
+  });
