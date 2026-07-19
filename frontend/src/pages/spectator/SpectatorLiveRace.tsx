@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import LiveRaceAnimation from '../../components/spectator/LiveRaceAnimation'
+import HorseRaceStage from '../../features/live-race/HorseRaceStage'
 import { getTournaments } from '../../services/tournamentService'
 import {
   getRaceLiveStatus,
@@ -10,9 +12,11 @@ import {
 
 const statusLabel: Record<string, string> = {
   upcoming: 'Sắp diễn ra',
+  'pre-race': 'Chờ xuất phát',
   live: 'Đang diễn ra',
-  unofficial: 'Kết quả tạm thời',
+  unofficial: 'Kết quả sơ bộ',
   official: 'Kết quả chính thức',
+  completed: 'Đã hoàn tất',
   cancelled: 'Đã hủy',
 }
 
@@ -25,6 +29,8 @@ interface LiveRaceOption {
   roundName: string
 }
 
+type RaceLoadMode = 'initial' | 'manual' | 'poll'
+
 export default function SpectatorLiveRace() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -34,23 +40,48 @@ export default function SpectatorLiveRace() {
   const [violations, setViolations] = useState<RaceViolation[]>([])
   const [raceOptions, setRaceOptions] = useState<LiveRaceOption[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
+  const mountedRef = useRef(false)
+  const currentRaceIdRef = useRef<number | null>(validRaceId ? raceId : null)
+  const activeRequestRef = useRef<{ raceId: number; token: symbol } | null>(null)
 
-  const load = useCallback(async (showLoading = false) => {
+  const load = useCallback(async (mode: RaceLoadMode = 'poll') => {
     if (!validRaceId) return
+    if (activeRequestRef.current?.raceId === raceId) return
+
+    const token = Symbol(`race-${raceId}-${mode}`)
+    activeRequestRef.current = { raceId, token }
     try {
-      if (showLoading) setLoading(true)
-      setError('')
-      const [raceResult, violationResult] = await Promise.all([
+      if (mode === 'initial') setLoading(true)
+      if (mode === 'manual') setRefreshing(true)
+      if (mode !== 'poll') setError('')
+
+      const [raceResult, violationResult] = await Promise.allSettled([
         getRaceLiveStatus(raceId),
         getRaceViolations(raceId),
       ])
-      setRace(raceResult)
-      setViolations(violationResult)
+
+      if (!mountedRef.current || currentRaceIdRef.current !== raceId) return
+
+      if (violationResult.status === 'fulfilled') setViolations(violationResult.value)
+      if (raceResult.status === 'rejected') throw raceResult.reason
+      setRace(raceResult.value)
+      setError('')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không tải được cuộc đua.')
+      if (
+        mode !== 'poll'
+        && mountedRef.current
+        && currentRaceIdRef.current === raceId
+      ) {
+        setError(err instanceof Error ? err.message : 'Không tải được cuộc đua.')
+      }
     } finally {
-      setLoading(false)
+      if (activeRequestRef.current?.token === token) activeRequestRef.current = null
+      if (mountedRef.current && currentRaceIdRef.current === raceId) {
+        if (mode === 'initial') setLoading(false)
+        if (mode === 'manual') setRefreshing(false)
+      }
     }
   }, [raceId, validRaceId])
 
@@ -80,14 +111,26 @@ export default function SpectatorLiveRace() {
   }, [])
 
   useEffect(() => {
-    void Promise.resolve().then(() => validRaceId ? load(true) : loadRaceOptions())
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      currentRaceIdRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    currentRaceIdRef.current = validRaceId ? raceId : null
+  }, [raceId, validRaceId])
+
+  useEffect(() => {
+    void Promise.resolve().then(() => validRaceId ? load('initial') : loadRaceOptions())
   }, [load, loadRaceOptions, validRaceId])
 
   useEffect(() => {
-    if (!validRaceId || race?.status.toLowerCase() !== 'live') return
-    const timer = window.setInterval(() => void load(false), 4000)
+    if (!validRaceId) return
+    const timer = window.setInterval(() => void load('poll'), 4000)
     return () => window.clearInterval(timer)
-  }, [load, race?.status, validRaceId])
+  }, [load, validRaceId])
 
   const normalizedStatus = race?.status.toLowerCase() ?? ''
   const sortedRaceOptions = useMemo(
@@ -99,10 +142,10 @@ export default function SpectatorLiveRace() {
     <div className="space-y-6 pb-12">
       <header className="flex flex-col gap-3 border-b border-gray-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div><h1 className="text-3xl font-extrabold text-gray-900">Theo dõi cuộc đua</h1><p className="mt-1 text-sm text-gray-500">Trạng thái và kết quả được cập nhật từ hệ thống.</p></div>
-        <button type="button" onClick={() => validRaceId ? void load(true) : void loadRaceOptions()} disabled={loading} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 disabled:opacity-50">Làm mới</button>
+        <button type="button" onClick={() => validRaceId ? void load('manual') : void loadRaceOptions()} disabled={loading || refreshing} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 disabled:opacity-50">{refreshing ? 'Đang làm mới...' : 'Làm mới'}</button>
       </header>
 
-      {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><p>{error}</p><button type="button" onClick={() => validRaceId ? void load(true) : void loadRaceOptions()} className="mt-3 rounded-lg border border-red-200 bg-white px-4 py-2 font-bold text-red-700">Thử lại</button></div>}
+      {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><p>{error}</p><button type="button" onClick={() => validRaceId ? void load('manual') : void loadRaceOptions()} className="mt-3 rounded-lg border border-red-200 bg-white px-4 py-2 font-bold text-red-700">Thử lại</button></div>}
       {loading ? (
         <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center text-sm text-gray-500">Đang tải cuộc đua...</div>
       ) : !validRaceId ? (
@@ -122,6 +165,10 @@ export default function SpectatorLiveRace() {
             <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase text-gray-400">Race #{race.raceId}</p><h2 className="mt-1 text-2xl font-black text-gray-900">{statusLabel[normalizedStatus] ?? race.status}</h2></div><span className={`rounded-full border px-3 py-1 text-xs font-bold ${normalizedStatus === 'live' ? 'border-red-200 bg-red-50 text-red-700' : normalizedStatus === 'official' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>{statusLabel[normalizedStatus] ?? race.status}</span></div>
             <p className="mt-3 text-sm text-gray-500">Bắt đầu: {race.actualStartTime ? new Date(race.actualStartTime).toLocaleString('vi-VN') : 'Chưa bắt đầu'} {race.raceDurationSeconds != null && `· Thời lượng ${race.raceDurationSeconds} giây`}</p>
           </section>
+
+          {race.entries.length > 0 && (
+            <HorseRaceStage key={race.raceId} race={race} fallback={<LiveRaceAnimation race={race} />} />
+          )}
 
           <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
             <div className="border-b border-gray-100 px-5 py-4"><h2 className="font-bold text-gray-900">Danh sách thi đấu</h2></div>

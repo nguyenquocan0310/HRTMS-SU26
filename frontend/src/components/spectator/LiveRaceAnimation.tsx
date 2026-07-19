@@ -41,8 +41,10 @@ export default function LiveRaceAnimation({ race }: LiveRaceAnimationProps) {
   const status = race.status.toLowerCase()
   const isLive = status === 'live'
   const hasBackendResult = ['unofficial', 'official', 'completed'].includes(status)
-  const rankingLabel = hasBackendResult
-    ? 'Kết quả từ hệ thống'
+  const rankingLabel = status === 'unofficial'
+    ? 'Kết quả sơ bộ'
+    : status === 'official' || status === 'completed'
+      ? 'Kết quả chính thức'
     : isLive
       ? 'Diễn biến mô phỏng'
       : status === 'cancelled'
@@ -92,6 +94,9 @@ export default function LiveRaceAnimation({ race }: LiveRaceAnimationProps) {
                 )}
               </>
             )}
+            {status === 'pre-race' && (
+              <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-blue-700">Chờ trọng tài cho xuất phát</span>
+            )}
             {isLive && (
               <>
                 <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-red-700">Đã chạy {formatClock(elapsedSeconds)}</span>
@@ -103,6 +108,12 @@ export default function LiveRaceAnimation({ race }: LiveRaceAnimationProps) {
 
         {isLive && !hasTimingData && (
           <div className="border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800">Đang chờ thời điểm bắt đầu và thời lượng cuộc đua từ hệ thống.</div>
+        )}
+        {status === 'cancelled' && (
+          <div className="border-b border-red-200 bg-red-50 px-5 py-3 text-sm font-semibold text-red-700">Cuộc đua đã bị hủy. Animation đã dừng.</div>
+        )}
+        {status === 'unofficial' && (
+          <div className="border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-800">Kết quả sơ bộ do trọng tài xác nhận, đang chờ công bố chính thức.</div>
         )}
 
         <div className="overflow-x-auto p-4">
@@ -129,7 +140,7 @@ export default function LiveRaceAnimation({ race }: LiveRaceAnimationProps) {
                     </div>
                     <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-white/80" />
                     <div
-                      className="pointer-events-none absolute left-[4%] top-1/2 w-[90%] transition-transform duration-200 ease-linear"
+                      className="pointer-events-none absolute left-[4%] top-1/2 w-[90%] transition-transform duration-200 ease-linear motion-reduce:transition-none"
                       style={{ transform: `translate(${progress * 100}%, -50%)` }}
                     >
                       <div
