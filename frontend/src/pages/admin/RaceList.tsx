@@ -6,6 +6,7 @@ import {
   type UnofficialRace, type LiveRaceStatus, type LiveRaceEntry,
 } from '../../services/raceOperationService';
 import { getProtestsByRace } from '../../services/protestService';
+import { getUserBasicInfo } from '../../services/approvalService';
 import styles from './RaceList.module.scss';
 
 type ProtestItem = Awaited<ReturnType<typeof getProtestsByRace>>[number];
@@ -48,6 +49,10 @@ const RaceList = () => {
   const [declaring, setDeclaring] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
   const [actionError, setActionError] = useState('');
+  const [justOfficialIds, setJustOfficialIds] = useState<Set<number>>(new Set());
+  const [protestSubmitterNames, setProtestSubmitterNames] = useState<Record<number, string>>({});
+
+
 
   useEffect(() => {
     getTournaments()
@@ -84,6 +89,7 @@ const RaceList = () => {
     setDetailError('');
     setLiveStatus(null);
     setProtests([]);
+    setProtestSubmitterNames({});
   };
 
   const handleViewDetail = async () => {
@@ -98,6 +104,20 @@ const RaceList = () => {
       ]);
       setLiveStatus(status);
       setProtests(protestList);
+
+      // Tra cứu tên người gửi cho từng userId khác nhau xuất hiện trong danh sách protest.
+      const uniqueUserIds = Array.from(
+        new Set(protestList.map((p) => (p as unknown as { submittedByUserId: number }).submittedByUserId))
+      ).filter((id) => typeof id === 'number' && !Number.isNaN(id));
+
+      const nameEntries = await Promise.all(
+        uniqueUserIds.map(async (userId) => {
+          const info = await getUserBasicInfo(userId);
+          return [userId, info?.fullName ?? `User #${userId}`] as const;
+        })
+      );
+
+      setProtestSubmitterNames(Object.fromEntries(nameEntries));
     } catch (e) {
       setDetailError(e instanceof Error ? e.message : 'Không tải được kết quả sơ bộ.');
     } finally {
@@ -105,7 +125,7 @@ const RaceList = () => {
     }
   };
 
-  const handleDeclareOfficial = async () => {
+const handleDeclareOfficial = async () => {
     if (!selectedRace) return;
     const confirmed = window.confirm('Bạn có chắc muốn chuyển Race này sang trạng thái Official không?');
     if (!confirmed) return;
@@ -115,8 +135,10 @@ const RaceList = () => {
     try {
       await declareRaceOfficial(selectedRace.raceId, { confirmedByAdmin: true });
       setActionMsg('Race đã được chuyển sang trạng thái Official.');
-      closeDetail();
-      if (selectedTournamentId) reloadRaces(selectedTournamentId);
+      setJustOfficialIds((prev) => new Set(prev).add(selectedRace.raceId));
+      // Không gọi reloadRaces ở đây — race vừa Official sẽ bị GET /races/unofficial
+      // lọc mất; giữ nguyên danh sách hiện tại để vẫn thấy được, chỉ cập nhật badge.
+      setLiveStatus((prev) => (prev ? { ...prev, status: 'Official' } : prev));
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Không thể chuyển Race thành Official.');
     } finally {
@@ -224,7 +246,9 @@ const RaceList = () => {
                   {formatDateTime(selectedRace.scheduledTime)}
                 </div>
                 <div style={{ marginTop: '0.45rem' }}>
-                  <span className={`${styles.badge} ${styles.pending}`}>Unofficial</span>
+                  <span className={`${styles.badge} ${justOfficialIds.has(selectedRace.raceId) ? styles.confirmed : styles.pending}`}>
+                    {justOfficialIds.has(selectedRace.raceId) ? 'Official' : 'Unofficial'}
+                  </span>
                 </div>
               </div>
               <button type="button" className={styles.detailBtn} onClick={handleViewDetail}>
@@ -318,7 +342,7 @@ const RaceList = () => {
                           </div>
                           <p>{readProtestValue(protest, ['description', 'reason', 'content', 'notes'])}</p>
                           <small>
-                            Người gửi: {readProtestValue(protest, ['submittedByName', 'protesterName', 'createdByName', 'userName'])}
+                            Người gửi: {protestSubmitterNames[(protest as unknown as { submittedByUserId: number }).submittedByUserId] ?? '—'}
                           </small>
                         </div>
                       ))}
@@ -326,16 +350,18 @@ const RaceList = () => {
                   )}
                 </section>
 
-                <div className={styles.detailActions}>
-                  <button
-                    type="button"
-                    className={styles.declareOfficialBtn}
-                    onClick={handleDeclareOfficial}
-                    disabled={declaring}
-                  >
-                    {declaring ? 'Đang xử lý...' : 'Official'}
-                  </button>
-                </div>
+                {!justOfficialIds.has(selectedRace.raceId) && (
+                  <div className={styles.detailActions}>
+                    <button
+                      type="button"
+                      className={styles.declareOfficialBtn}
+                      onClick={handleDeclareOfficial}
+                      disabled={declaring}
+                    >
+                      {declaring ? 'Đang xử lý...' : 'Official'}
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </aside>

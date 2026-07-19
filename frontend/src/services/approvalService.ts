@@ -314,3 +314,22 @@ export const getActiveUsersByRole = async (
   return res.data ?? [];
 };
 
+// Tra cứu tên user theo ID — dùng để hiển thị "Người gửi" ở protest, vì
+// ProtestDto chỉ trả submittedByUserId (số), không có tên kèm theo.
+export interface UserBasicInfo {
+  userId: number;
+  fullName: string;
+}
+
+export const getUserBasicInfo = async (userId: number): Promise<UserBasicInfo | null> => {
+  try {
+    const res = await apiFetch<{ success: boolean; data: { userId: number; fullName: string } }>(
+      `/admin/users/${userId}`
+    );
+    if (!res.success || !res.data) return null;
+    return { userId: res.data.userId, fullName: res.data.fullName };
+  } catch {
+    return null;
+  }
+};
+
