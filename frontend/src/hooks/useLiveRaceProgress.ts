@@ -13,13 +13,18 @@ const stableOffset = (raceEntryId: number) => {
   return seed * 2 - 1
 }
 
+const resultProgress = (finishPosition: number | null) => {
+  if (finishPosition == null) return 0.9
+  return clamp(1 - (finishPosition - 1) * 0.012, 0.9, 1)
+}
+
 export function useLiveRaceProgress(race: RaceLiveStatus | null) {
   const [now, setNow] = useState(() => Date.now())
   const status = race?.status.toLowerCase() ?? ''
 
   useEffect(() => {
     if (status !== 'live' && status !== 'upcoming') return
-    const timer = window.setInterval(() => setNow(Date.now()), status === 'live' ? 150 : 1000)
+    const timer = window.setInterval(() => setNow(Date.now()), status === 'live' ? 100 : 1000)
     return () => window.clearInterval(timer)
   }, [status, race?.raceId])
 
@@ -43,7 +48,7 @@ export function useLiveRaceProgress(race: RaceLiveStatus | null) {
       continue
     }
     if (isResultStatus) {
-      progressByEntry[entry.raceEntryId] = entry.finishPosition != null ? 1 : 0.975
+      progressByEntry[entry.raceEntryId] = resultProgress(entry.finishPosition)
       continue
     }
     if (status !== 'live' || !hasTimingData) {
