@@ -22,10 +22,7 @@ public class AdminTicketCodeController : ControllerBase
     private int CurrentAdminId =>
         int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-    /// <summary>
-    /// Admin tạo batch mã vé thưởng (BR-63). Raw code chỉ trả về một lần trong response này —
-    /// DB chỉ lưu SHA-256 hash, không có endpoint nào lấy lại raw code sau đó.
-    /// </summary>
+    /// <summary>Admin tạo batch mã vé thưởng (BR-63). Trả về danh sách mã vừa sinh.</summary>
     [HttpPost]
     public async Task<IActionResult> CreateBatch([FromBody] CreateTicketCodesDto dto)
     {
@@ -33,6 +30,20 @@ public class AdminTicketCodeController : ControllerBase
 
         var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
         var result = await _walletService.CreateTicketCodesAsync(CurrentAdminId, dto, ip);
+        return result.Success ? Ok(result) : BadRequest(result);
+    }
+
+    /// <summary>
+    /// Admin xem danh sách mã vé thưởng đã tạo (phân trang + lọc trạng thái).
+    /// status: Active | Redeemed | Expired (bỏ trống = tất cả).
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> GetCodes(
+        [FromQuery] string? status,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        var result = await _walletService.GetTicketCodesAsync(status, page, pageSize);
         return result.Success ? Ok(result) : BadRequest(result);
     }
 }

@@ -680,9 +680,9 @@ public partial class HRTMSDbContext : DbContext
 
             entity.HasIndex(e => new { e.Status, e.ExpiresAt }, "IX_TicketRewardCodes_Status");
 
-            entity.HasIndex(e => e.CodeHash, "UQ_TicketRewardCodes_CodeHash").IsUnique();
+            entity.HasIndex(e => e.Code, "UQ_TicketRewardCodes_Code").IsUnique();
 
-            entity.Property(e => e.CodeHash).HasMaxLength(32);
+            entity.Property(e => e.Code).HasMaxLength(20).IsUnicode(false);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
             entity.Property(e => e.Status)
                 .HasMaxLength(20)

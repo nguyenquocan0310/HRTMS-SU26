@@ -13,9 +13,16 @@ public interface IWalletService
         int spectatorId, RedeemTicketCodeDto dto, string? ipAddress);
 
     /// <summary>
-    /// Admin tạo batch mã vé thưởng: sinh raw code an toàn, lưu SHA-256 hash, trả raw code
-    /// đúng một lần. Toàn bộ batch trong một transaction — lỗi bất kỳ code nào → rollback cả batch.
+    /// Admin tạo batch mã vé thưởng: sinh raw code an toàn, lưu plaintext, trả về danh sách code.
+    /// Toàn bộ batch trong một transaction — lỗi bất kỳ code nào → rollback cả batch.
     /// </summary>
     Task<ApiResponse<CreateTicketCodesResponseDto>> CreateTicketCodesAsync(
         int adminId, CreateTicketCodesDto dto, string? ipAddress);
+
+    /// <summary>
+    /// Admin xem danh sách mã vé thưởng đã tạo (có phân trang + lọc theo trạng thái).
+    /// status: Active | Redeemed | Expired | null (tất cả).
+    /// </summary>
+    Task<ApiResponse<TicketCodeListResponseDto>> GetTicketCodesAsync(
+        string? status, int page, int pageSize);
 }
