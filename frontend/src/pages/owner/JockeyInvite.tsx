@@ -386,7 +386,12 @@ export default function JockeyInvite() {
                     return (
                       <tr key={jId} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3 font-medium text-gray-800">{j.fullName || 'N/A'}</td>
-                        <td className="px-4 py-3 text-gray-600">{j.licenseCertificate || 'N/A'}</td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center gap-1 rounded border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+                            <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                            Đã xác thực
+                          </span>
+                        </td>
                         <td className="px-4 py-3 text-gray-600">{j.experienceYears || 0} năm</td>
                         <td className="px-4 py-3">
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded border ${
@@ -658,7 +663,7 @@ export default function JockeyInvite() {
                     {availableJockeys.map((j) => {
                       const idVal = String(j.jockeyId || j.jockeyID || j.id || '');
                       const nameVal = j.fullName || j.name || j.jockeyName || 'Jockey không tên';
-                      const licVal = j.licenseCertificate || j.licenseNumber ? ` (GPLX: ${j.licenseCertificate || j.licenseNumber})` : '';
+                      const licVal = ' (Chứng chỉ: Đã xác thực)';
                       const expVal = j.experienceYears ? ` - ${j.experienceYears} năm KN` : '';
                       return (
                         <option key={idVal} value={idVal}>
