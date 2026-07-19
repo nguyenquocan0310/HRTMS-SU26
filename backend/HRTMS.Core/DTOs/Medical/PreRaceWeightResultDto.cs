@@ -24,5 +24,9 @@ public class PreRaceWeightResultDto
 
     public bool IsWeightWarning { get; set; }
 
+    public bool IsEmergencyDisqualified { get; set; }
+
+    public string RaceEntryStatus { get; set; } = null!;
+
     public string Message { get; set; } = null!;
 }
