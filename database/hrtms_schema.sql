@@ -250,7 +250,7 @@ CREATE TABLE Races (
     IsPostPositionDrawn      BIT            NOT NULL DEFAULT 0,
     IsPredictionGateClosed   BIT            NOT NULL DEFAULT 0,
     ConfirmationCutoffHours  INT            NOT NULL DEFAULT 24,
-    ProtestDeadlineMinutes   INT            NOT NULL DEFAULT 120,
+    ProtestDeadlineMinutes   INT            NOT NULL DEFAULT 10,
     CreatedAt                DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
     UpdatedAt                DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
 
@@ -427,6 +427,7 @@ CREATE TABLE RaceReports (
     IsLocked       BIT            NOT NULL DEFAULT 0,
     SubmittedAt    DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
     LockedAt       DATETIME2      NULL,
+    ProtestWindowClosedAt DATETIME2 NULL,
 
     CONSTRAINT PK_RaceReports PRIMARY KEY (RaceReportId),
     CONSTRAINT FK_RaceReports_Race FOREIGN KEY (RaceId) REFERENCES Races(RaceId) ON DELETE NO ACTION,
@@ -636,7 +637,8 @@ BEGIN
             Notes         = i.Notes,
             IsLocked      = i.IsLocked,
             SubmittedAt   = i.SubmittedAt,
-            LockedAt      = i.LockedAt
+            LockedAt      = i.LockedAt,
+            ProtestWindowClosedAt = i.ProtestWindowClosedAt
         FROM RaceReports rr
         INNER JOIN inserted i ON rr.RaceReportId = i.RaceReportId;
     END

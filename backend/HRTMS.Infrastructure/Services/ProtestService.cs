@@ -193,6 +193,29 @@ public class ProtestService : IProtestService
             throw new InvalidOperationException("RACE_REPORT_LOCKED");
     }
 
+    private const int MinCloseWindowMinutes = 5;
+
+    public async Task CloseWindowEarlyAsync(int raceId, int refereeId)
+    {
+        var race = await _context.Races
+            .Include(r => r.RaceReport)
+            .FirstOrDefaultAsync(r => r.RaceId == raceId)
+            ?? throw new KeyNotFoundException("RACE_NOT_FOUND");
+
+        await EnsureRefereeAssignedAsync(raceId, refereeId);
+        EnsureRaceReportOpen(race);
+
+        if (race.RaceReport!.ProtestWindowClosedAt != null)
+            throw new InvalidOperationException("PROTEST_WINDOW_ALREADY_CLOSED");
+
+        var now = DateTime.UtcNow;
+        if (now < race.RaceReport.SubmittedAt.AddMinutes(MinCloseWindowMinutes))
+            throw new InvalidOperationException("MIN_WINDOW_NOT_ELAPSED");
+
+        race.RaceReport.ProtestWindowClosedAt = now;
+        await _context.SaveChangesAsync();
+    }
+
     private async Task EnsureRefereeAssignedAsync(int raceId, int refereeId)
     {
         var assigned = await _context.RefereeAssignments

@@ -21,9 +21,12 @@ namespace HRTMS.Infrastructure.Services
             return race.RaceReport.SubmittedAt.AddMinutes(race.ProtestDeadlineMinutes);
         }
 
-        /// <summary>True nếu cửa sổ khiếu nại đã đóng (hết hạn nộp Protest mới).</summary>
+        /// <summary>True nếu cửa sổ khiếu nại đã đóng (hết hạn nộp Protest mới),
+        /// do hết thời gian HOẶC do Referee chủ động đóng sớm (tối thiểu 5 phút).</summary>
         public static bool IsClosed(Race race, DateTime now)
         {
+            if (race.RaceReport?.ProtestWindowClosedAt != null)
+                return true;
             var deadline = GetDeadline(race);
             return deadline.HasValue && now > deadline.Value;
         }

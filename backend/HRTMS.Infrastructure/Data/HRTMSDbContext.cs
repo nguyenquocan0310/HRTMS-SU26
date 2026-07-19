@@ -487,7 +487,7 @@ public partial class HRTMSDbContext : DbContext
 
             entity.Property(e => e.ConfirmationCutoffHours).HasDefaultValue(24);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
-            entity.Property(e => e.ProtestDeadlineMinutes).HasDefaultValue(120);
+            entity.Property(e => e.ProtestDeadlineMinutes).HasDefaultValue(10);
             entity.Property(e => e.PurseAmount).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.Status)
                 .HasMaxLength(20)
