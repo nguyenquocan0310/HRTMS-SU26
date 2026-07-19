@@ -64,10 +64,10 @@ export default function PredictionPage() {
       setLoading(true)
       setError('')
       const tournaments = await getTournaments()
-      const upcomingRaces = tournaments.flatMap((tournament) =>
+      const predictionRaces = tournaments.flatMap((tournament) =>
         tournament.rounds.flatMap((round) =>
           round.races
-            .filter((race) => race.status.toLowerCase() === 'upcoming')
+            .filter((race) => race.status.toLowerCase() === 'pre-race')
             .map((race) => ({
               raceId: race.raceId,
               raceNumber: race.raceNumber,
@@ -79,7 +79,7 @@ export default function PredictionPage() {
         )
       )
       const options = await Promise.all(
-        upcomingRaces.map(async (race) => {
+        predictionRaces.map(async (race) => {
           try {
             return { ...race, gate: await getPredictionGateStatus(race.raceId), gateError: false }
           } catch {
@@ -114,7 +114,7 @@ export default function PredictionPage() {
     gate?.canPredict &&
     gate.isPostPositionDrawn &&
     !gate.isPredictionGateClosed &&
-    gate.raceStatus.toLowerCase() === 'upcoming'
+    gate.raceStatus.toLowerCase() === 'pre-race'
   )
   const validPoints = Number.isInteger(pointsPlaced) && pointsPlaced > 0 && pointsPlaced <= balance
   const canSubmit = canPredict && selectedEntryId != null && validPoints && !submitting
@@ -155,7 +155,7 @@ export default function PredictionPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-xl font-bold text-gray-900">Chọn cuộc đua</h2>
-              <p className="mt-1 text-sm text-gray-500">Chỉ các race Upcoming đủ điều kiện mới có thể mở form dự đoán.</p>
+              <p className="mt-1 text-sm text-gray-500">Chỉ race đã được Referee chốt danh sách xuất phát mới có thể mở form dự đoán.</p>
             </div>
             <button type="button" onClick={loadRaceOptions} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50">
               Làm mới danh sách
@@ -165,7 +165,7 @@ export default function PredictionPage() {
           {raceOptions.length === 0 ? (
             <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center">
               <p className="font-semibold text-gray-700">Hiện chưa có cuộc đua nào đang mở cho dự đoán.</p>
-              <p className="mt-1 text-sm text-gray-400">Hãy quay lại sau khi Admin bốc thăm và mở cổng dự đoán.</p>
+              <p className="mt-1 text-sm text-gray-400">Hãy quay lại sau khi Referee chốt danh sách xuất phát.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -174,12 +174,12 @@ export default function PredictionPage() {
                   race.gate?.canPredict &&
                   race.gate.isPostPositionDrawn &&
                   !race.gate.isPredictionGateClosed &&
-                  race.gate.raceStatus.toLowerCase() === 'upcoming'
+                  race.gate.raceStatus.toLowerCase() === 'pre-race'
                 )
                 const gateLabel = race.gateError
                   ? 'Không tải được trạng thái cổng'
-                  : !race.gate?.isPostPositionDrawn
-                    ? 'Chưa bốc thăm'
+                  : !race.gate
+                    ? 'Đang kiểm tra...'
                     : race.gate.isPredictionGateClosed || !race.gate.canPredict
                       ? 'Đã đóng'
                       : 'Đang mở'
@@ -225,9 +225,9 @@ export default function PredictionPage() {
 
           {!canPredict && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              {!gate.isPostPositionDrawn
-                ? 'Không thể dự đoán: cuộc đua chưa được bốc thăm vị trí xuất phát.'
-                : `Không thể dự đoán: race đang ở trạng thái ${gate.raceStatus} hoặc cổng dự đoán đã đóng.`}
+              {gate.raceStatus.toLowerCase() !== 'pre-race'
+                ? 'Không thể dự đoán: Referee chưa chốt danh sách xuất phát.'
+                : 'Không thể dự đoán: cổng dự đoán đã đóng.'}
             </div>
           )}
 

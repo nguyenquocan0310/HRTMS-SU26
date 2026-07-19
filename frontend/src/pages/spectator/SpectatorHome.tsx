@@ -30,14 +30,14 @@ export default function SpectatorHome() {
           getMyPredictions(),
         ])
 
-        const upcomingRaceIds = tournamentList.flatMap((tournament) =>
+        const predictionRaceIds = tournamentList.flatMap((tournament) =>
           tournament.rounds.flatMap((round) =>
             round.races
-              .filter((race) => race.status.toLowerCase() === 'upcoming')
+              .filter((race) => ['upcoming', 'pre-race'].includes(race.status.toLowerCase()))
               .map((race) => race.raceId)
           )
         )
-        const gateResults = await Promise.all(upcomingRaceIds.map(async (raceId) => {
+        const gateResults = await Promise.all(predictionRaceIds.map(async (raceId) => {
           try {
             return { raceId, gate: await getPredictionGateStatus(raceId), failed: false }
           } catch {
@@ -102,15 +102,15 @@ export default function SpectatorHome() {
         ) : (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {races.map((race) => {
-              const isUpcoming = race.status.toLowerCase() === 'upcoming'
+              const isPredictionPhase = race.status.toLowerCase() === 'pre-race'
               const gate = predictionGates[race.raceId]
               const gateFailed = gateErrors[race.raceId]
-              const canPredict = isUpcoming
+              const canPredict = isPredictionPhase
                 && gate?.canPredict === true
                 && gate.isPostPositionDrawn === true
                 && gate.isPredictionGateClosed === false
-                && gate.raceStatus.toLowerCase() === 'upcoming'
-              const predictionLabel = !isUpcoming
+                && gate.raceStatus.toLowerCase() === 'pre-race'
+              const predictionLabel = !['upcoming', 'pre-race'].includes(race.status.toLowerCase())
                 ? 'Không khả dụng'
                 : gateFailed
                   ? 'Không tải được cổng'
@@ -118,6 +118,8 @@ export default function SpectatorHome() {
                     ? 'Đang kiểm tra...'
                     : !gate.isPostPositionDrawn
                       ? 'Chưa bốc thăm'
+                      : !isPredictionPhase
+                        ? 'Chưa chốt danh sách'
                       : gate.isPredictionGateClosed || !gate.canPredict
                         ? 'Cổng đã đóng'
                         : 'Dự đoán'
