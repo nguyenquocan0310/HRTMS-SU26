@@ -107,6 +107,17 @@ public class MedicalCheckService : IMedicalCheckService
 
         await _context.SaveChangesAsync();
 
+        // Lech qua threshold khong duoc phep pass
+        // Emergency DQ nhu HorseIdentity/Clinical, chu khong chi tra ve warning.
+        if (isWeightWarning)
+        {
+            await _emergencyDisqualificationService.DisqualifyAsync(
+                doctorId,
+                raceEntry.RaceEntryId,
+                $"Pre-race weight difference ({weightDifference}kg) exceeds threshold ({thresholdKg}kg).",
+                "MED.2_PRE_RACE_WEIGHT_CHECK");
+        }
+
         return new PreRaceWeightResultDto
         {
             RaceEntryId = raceEntry.RaceEntryId,
@@ -120,8 +131,10 @@ public class MedicalCheckService : IMedicalCheckService
             WeightDifference = weightDifference,
             ThresholdKg = thresholdKg,
             IsWeightWarning = isWeightWarning,
+            IsEmergencyDisqualified = isWeightWarning,
+            RaceEntryStatus = raceEntry.Status,
             Message = isWeightWarning
-                ? "Pre-race weight exceeds the configured threshold."
+                ? "Pre-race weight exceeds the configured threshold. Race entry has been disqualified."
                 : "Pre-race weight recorded successfully."
         };
     }
@@ -163,6 +176,17 @@ public class MedicalCheckService : IMedicalCheckService
         raceEntry.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
+        // Giong pre-race: lech qua threshold phai DQ that su, khong duoc
+        // chi flag roi cho pass.
+        if (flagged)
+        {
+            await _emergencyDisqualificationService.DisqualifyAsync(
+                doctorId,
+                raceEntry.RaceEntryId,
+                $"Cân nặng sau đua chênh lệch ({difference}kg) vượt quá ngưỡng ({thresholdKg}kg).",
+                "MED.6_POST_RACE_WEIGHT_CHECK");
+        }
+
         return new PostRaceWeightResultDto
         {
             RaceEntryId = raceEntry.RaceEntryId,
@@ -173,9 +197,11 @@ public class MedicalCheckService : IMedicalCheckService
             WeightDifference = difference,
             ThresholdKg = thresholdKg,
             IsWeightFlagged = flagged,
+            IsEmergencyDisqualified = flagged,
+            RaceEntryStatus = raceEntry.Status,
             Message = flagged
-                ? "Post-race weight difference exceeds the configured threshold."
-                : "Post-race weight recorded successfully."
+                ? "Cân nặng sau đua vượt quá ngưỡng cho phép. Entry đua đã bị loại."
+                : "Cân nặng sau đua được ghi nhận thành công."
         };
     }
 
