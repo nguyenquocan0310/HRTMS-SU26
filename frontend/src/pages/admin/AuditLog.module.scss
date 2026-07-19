@@ -1,1 +1,129 @@
-.container { display: flex; flex-direction: column; gap: 1.25rem; }.header { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }.header h1, .header p { margin: 0; }.header h1 { color: #111827; font-size: 1.65rem; }.header p { margin-top: .35rem; color: #6b7280; font-size: .86rem; }button { display: inline-flex; align-items: center; gap: .35rem; padding: .6rem .75rem; border: 1px solid #d1d5db; background: #fff; color: #374151; cursor: pointer; font-weight: 600; }button:disabled { opacity: .5; cursor: not-allowed; }.filters { display: flex; align-items: end; gap: .75rem; flex-wrap: wrap; }.filters label { display: flex; flex-direction: column; gap: .35rem; color: #374151; font-size: .8rem; font-weight: 700; }.filters input { padding: .55rem; border: 1px solid #d1d5db; }.error { padding: .85rem 1rem; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; }.card { border: 1px solid #e5e7eb; background: #fff; }.empty { padding: 2rem; color: #6b7280; text-align: center; }.tableWrap { overflow-x: auto; }table { width: 100%; border-collapse: collapse; font-size: .82rem; }th, td { padding: .7rem; border-bottom: 1px solid #e5e7eb; text-align: left; vertical-align: top; }th { color: #4b5563; background: #f9fafb; white-space: nowrap; }td:last-child { display: flex; flex-direction: column; gap: .3rem; max-width: 280px; }.pagination { display: flex; align-items: center; justify-content: space-between; gap: .75rem; color: #6b7280; font-size: .84rem; }.pagination div { display: flex; gap: .5rem; }
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.header h1,
+.header p {
+  margin: 0;
+}
+
+.header h1 {
+  color: #111827;
+  font-size: 1.65rem;
+}
+
+.header p {
+  margin-top: .35rem;
+  color: #6b7280;
+  font-size: .86rem;
+}
+
+.container button {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .6rem .75rem;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.container button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.filters {
+  display: flex;
+  align-items: end;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+
+.filters label {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  color: #374151;
+  font-size: .8rem;
+  font-weight: 700;
+}
+
+.filters input {
+  padding: .55rem;
+  border: 1px solid #d1d5db;
+}
+
+.error {
+  padding: .85rem 1rem;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.card {
+  border: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+.empty {
+  padding: 2rem;
+  color: #6b7280;
+  text-align: center;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.tableWrap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .82rem;
+}
+
+.tableWrap th,
+.tableWrap td {
+  padding: .7rem;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  vertical-align: top;
+}
+
+.tableWrap th {
+  color: #4b5563;
+  background: #f9fafb;
+  white-space: nowrap;
+}
+
+.tableWrap td:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+  max-width: 280px;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  color: #6b7280;
+  font-size: .84rem;
+}
+
+.pagination div {
+  display: flex;
+  gap: .5rem;
+}
