@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FiCopy,
   FiDownload,
@@ -8,10 +8,27 @@ import {
 
 import {
   createTicketCodes,
+  getTicketCodes,
   type CreateTicketCodesResult,
+  type TicketCodeListItem,
+  type TicketCodeStatus,
 } from '../../services/ticketCodeService';
 
 import styles from './TicketCodeManagement.module.scss';
+
+const PAGE_SIZE = 20;
+
+const statusLabels: Record<TicketCodeStatus, string> = {
+  Active: 'Còn hiệu lực',
+  Redeemed: 'Đã dùng',
+  Expired: 'Hết hạn',
+};
+
+const badgeClass: Record<TicketCodeStatus, string> = {
+  Active: styles.badgeActive,
+  Redeemed: styles.badgeRedeemed,
+  Expired: styles.badgeExpired,
+};
 
 const toLocalDateTimeValue = (date: Date) => {
   const offset = date.getTimezoneOffset();
@@ -42,6 +59,50 @@ const TicketCodeManagement = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+
+  // Danh sách mã đã tạo (xem lại từ DB).
+  const [listItems, setListItems] = useState<TicketCodeListItem[]>([]);
+  const [listTotal, setListTotal] = useState(0);
+  const [listPage, setListPage] = useState(1);
+  const [listStatus, setListStatus] =
+    useState<TicketCodeStatus | ''>('');
+  const [listLoading, setListLoading] = useState(false);
+  const [listError, setListError] = useState('');
+
+  const loadList = useCallback(
+    async (page: number, status: TicketCodeStatus | '') => {
+      setListLoading(true);
+      setListError('');
+      try {
+        const data = await getTicketCodes({
+          status,
+          page,
+          pageSize: PAGE_SIZE,
+        });
+        setListItems(data.items);
+        setListTotal(data.total);
+        setListPage(data.page);
+      } catch (err) {
+        setListError(
+          err instanceof Error
+            ? err.message
+            : 'Không thể tải danh sách mã.'
+        );
+      } finally {
+        setListLoading(false);
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    loadList(1, listStatus);
+  }, [loadList, listStatus]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(listTotal / PAGE_SIZE)
+  );
 
   const validate = (): string | null => {
     if (
@@ -101,6 +162,8 @@ const TicketCodeManagement = () => {
       setMessage(
         `Đã tạo thành công ${data.count} mã ticket.`
       );
+      // Nạp lại danh sách để thấy mã vừa tạo.
+      loadList(1, listStatus);
     } catch (err) {
       setError(
         err instanceof Error
@@ -408,6 +471,158 @@ const TicketCodeManagement = () => {
           </div>
         </section>
       )}
+
+      <section className={styles.resultCard}>
+        <div className={styles.resultHeader}>
+          <div>
+            <h2 className={styles.cardTitle}>
+              Mã đã tạo
+            </h2>
+
+            <p className={styles.cardDesc}>
+              {listTotal} mã · trang {listPage}/{totalPages}
+            </p>
+          </div>
+
+          <div className={styles.filterRow}>
+            <select
+              className={styles.filterSelect}
+              value={listStatus}
+              onChange={(event) =>
+                setListStatus(
+                  event.target.value as TicketCodeStatus | ''
+                )
+              }
+            >
+              <option value="">Tất cả trạng thái</option>
+              <option value="Active">Còn hiệu lực</option>
+              <option value="Redeemed">Đã dùng</option>
+              <option value="Expired">Hết hạn</option>
+            </select>
+
+            <button
+              type="button"
+              className={styles.secondaryBtn}
+              onClick={() => loadList(listPage, listStatus)}
+              disabled={listLoading}
+            >
+              <FiRefreshCw size={15} />
+              Tải lại
+            </button>
+          </div>
+        </div>
+
+        {listError && (
+          <div className={styles.errorBox}>{listError}</div>
+        )}
+
+        {listLoading ? (
+          <div className={styles.emptyState}>
+            Đang tải danh sách mã...
+          </div>
+        ) : listItems.length === 0 ? (
+          <div className={styles.emptyState}>
+            Chưa có mã nào.
+          </div>
+        ) : (
+          <>
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>Mã</th>
+                    <th>Thưởng</th>
+                    <th>Trạng thái</th>
+                    <th>Hết hạn</th>
+                    <th>Người dùng</th>
+                    <th>Ngày dùng</th>
+                    <th></th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {listItems.map((item) => (
+                    <tr key={item.id}>
+                      <td>
+                        <code className={styles.codeText}>
+                          {item.code}
+                        </code>
+                      </td>
+                      <td>{item.pointAmount}</td>
+                      <td>
+                        <span
+                          className={`${styles.badge} ${
+                            badgeClass[item.status]
+                          }`}
+                        >
+                          {statusLabels[item.status]}
+                        </span>
+                      </td>
+                      <td>
+                        {new Date(
+                          item.expiresAt
+                        ).toLocaleString('vi-VN')}
+                      </td>
+                      <td>
+                        {item.redeemedBySpectatorName ?? '—'}
+                      </td>
+                      <td>
+                        {item.redeemedAt
+                          ? new Date(
+                              item.redeemedAt
+                            ).toLocaleString('vi-VN')
+                          : '—'}
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className={styles.copyBtn}
+                          onClick={() =>
+                            handleCopyOne(item.code)
+                          }
+                          aria-label={`Sao chép ${item.code}`}
+                        >
+                          <FiCopy size={15} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className={styles.pagination}>
+              <button
+                type="button"
+                className={styles.pageBtn}
+                onClick={() =>
+                  loadList(listPage - 1, listStatus)
+                }
+                disabled={listLoading || listPage <= 1}
+              >
+                Trước
+              </button>
+
+              <span>
+                {listPage}/{totalPages}
+              </span>
+
+              <button
+                type="button"
+                className={styles.pageBtn}
+                onClick={() =>
+                  loadList(listPage + 1, listStatus)
+                }
+                disabled={
+                  listLoading || listPage >= totalPages
+                }
+              >
+                Sau
+              </button>
+            </div>
+          </>
+        )}
+      </section>
     </div>
   );
 };

@@ -48,3 +48,48 @@ export const createTicketCodes = async (
 
   return res.data;
 };
+
+export type TicketCodeStatus = 'Active' | 'Redeemed' | 'Expired';
+
+export interface TicketCodeListItem {
+  id: number;
+  code: string;
+  pointAmount: number;
+  status: TicketCodeStatus;
+  expiresAt: string;
+  createdAt: string;
+  redeemedBySpectatorName: string | null;
+  redeemedAt: string | null;
+}
+
+export interface TicketCodeListResult {
+  items: TicketCodeListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/**
+ * GET /api/admin/ticket-codes?status=&page=&pageSize=
+ * Role: Admin
+ */
+export const getTicketCodes = async (params: {
+  status?: TicketCodeStatus | '';
+  page?: number;
+  pageSize?: number;
+}): Promise<TicketCodeListResult> => {
+  const query = new URLSearchParams();
+  if (params.status) query.set('status', params.status);
+  query.set('page', String(params.page ?? 1));
+  query.set('pageSize', String(params.pageSize ?? 20));
+
+  const res = await apiFetch<ApiResponse<TicketCodeListResult>>(
+    `/admin/ticket-codes?${query.toString()}`
+  );
+
+  if (!res.success || !res.data) {
+    throw new Error(res.message || 'Không thể tải danh sách mã.');
+  }
+
+  return res.data;
+};
