@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using System.Text;
 using HRTMS.Core.Common;
 using HRTMS.Core.DTOs.Wallet;
 using HRTMS.Core.Entities;
@@ -46,15 +45,15 @@ public class WalletService : IWalletService
             return ApiResponse<RedeemTicketCodeResponseDto>.Fail(
                 "Bạn cần bổ sung số điện thoại và số CCCD trong hồ sơ trước khi đổi mã vé thưởng.");
 
-        var codeHash = HashCode(dto.Code);
+        var rawCode = dto.Code.Trim();
         var now = DateTime.UtcNow;
 
         await using var transaction = await _context.Database.BeginTransactionAsync();
         try
         {
-            // Tra cứu code theo hash (không tin tưởng mã thô).
+            // Tra cứu code theo giá trị mã (lưu plaintext để admin xem lại được).
             var code = await _context.TicketRewardCodes
-                .FirstOrDefaultAsync(c => c.CodeHash == codeHash);
+                .FirstOrDefaultAsync(c => c.Code == rawCode);
 
             if (code == null)
                 return ApiResponse<RedeemTicketCodeResponseDto>.Fail("Mã vé thưởng không tồn tại.");
@@ -162,7 +161,7 @@ public class WalletService : IWalletService
             {
                 _context.TicketRewardCodes.Add(new TicketRewardCode
                 {
-                    CodeHash = HashCode(raw),   // chỉ lưu hash, không lưu raw code
+                    Code = raw,   // lưu plaintext để admin xem/tra lại sau
                     PointAmount = dto.RewardAmount,
                     Status = StatusActive,
                     ExpiresAt = dto.ExpiresAt,
@@ -170,7 +169,7 @@ public class WalletService : IWalletService
                 });
             }
 
-            // UNIQUE(CodeHash) chặn trùng với code đã tồn tại; vi phạm → DbUpdateException → rollback cả batch.
+            // UNIQUE(Code) chặn trùng với code đã tồn tại; vi phạm → DbUpdateException → rollback cả batch.
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
         }
@@ -209,6 +208,52 @@ public class WalletService : IWalletService
         return $"TKT-{new string(chars)}";
     }
 
-    private static byte[] HashCode(string rawCode)
-        => SHA256.HashData(Encoding.UTF8.GetBytes(rawCode.Trim()));
+    public async Task<ApiResponse<TicketCodeListResponseDto>> GetTicketCodesAsync(
+        string? status, int page, int pageSize)
+    {
+        if (page < 1) page = 1;
+        if (pageSize < 1 || pageSize > 100) pageSize = 20;
+
+        var now = DateTime.UtcNow;
+        var query = _context.TicketRewardCodes.AsNoTracking();
+
+        // Lọc theo trạng thái. "Expired" là trạng thái suy ra lúc chạy (Active + đã quá hạn),
+        // DB không tự đổi Status khi hết hạn — xem check hết hạn trong RedeemTicketCodeAsync.
+        query = status switch
+        {
+            StatusRedeemed => query.Where(c => c.Status == StatusRedeemed),
+            "Expired" => query.Where(c => c.Status == StatusActive && c.ExpiresAt <= now),
+            StatusActive => query.Where(c => c.Status == StatusActive && c.ExpiresAt > now),
+            _ => query
+        };
+
+        var total = await query.CountAsync();
+
+        var items = await query
+            .OrderByDescending(c => c.TicketRewardCodeId)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(c => new TicketCodeListItemDto
+            {
+                Id = c.TicketRewardCodeId,
+                Code = c.Code,
+                PointAmount = c.PointAmount,
+                Status = c.Status == StatusActive && c.ExpiresAt <= now ? "Expired" : c.Status,
+                ExpiresAt = c.ExpiresAt,
+                CreatedAt = c.CreatedAt,
+                RedeemedBySpectatorName = c.RedeemedBySpectator != null
+                    ? c.RedeemedBySpectator.Spectator.FullName
+                    : null,
+                RedeemedAt = c.RedeemedAt
+            })
+            .ToListAsync();
+
+        return ApiResponse<TicketCodeListResponseDto>.Ok(new TicketCodeListResponseDto
+        {
+            Items = items,
+            Total = total,
+            Page = page,
+            PageSize = pageSize
+        });
+    }
 }

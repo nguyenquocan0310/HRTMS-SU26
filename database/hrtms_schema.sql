@@ -495,7 +495,7 @@ GO
 
 CREATE TABLE TicketRewardCodes (
     TicketRewardCodeId   INT            IDENTITY(1,1) NOT NULL,
-    CodeHash             VARBINARY(32)   NOT NULL,
+    Code                 VARCHAR(20)    NOT NULL,
     PointAmount          INT            NOT NULL,
     [Status]             VARCHAR(20)    NOT NULL DEFAULT 'Active',
     ExpiresAt            DATETIME2      NOT NULL,
@@ -504,7 +504,7 @@ CREATE TABLE TicketRewardCodes (
     CreatedAt            DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
 
     CONSTRAINT PK_TicketRewardCodes PRIMARY KEY (TicketRewardCodeId),
-    CONSTRAINT UQ_TicketRewardCodes_CodeHash UNIQUE (CodeHash),
+    CONSTRAINT UQ_TicketRewardCodes_Code UNIQUE (Code),
     CONSTRAINT FK_TicketRewardCodes_RedeemedBy FOREIGN KEY (RedeemedBySpectatorId) REFERENCES SpectatorProfiles(SpectatorId),
     CONSTRAINT CHK_TicketRewardCodes_PointAmount CHECK (PointAmount > 0),
     CONSTRAINT CHK_TicketRewardCodes_Status CHECK ([Status] IN ('Active','Redeemed','Expired','Disabled'))

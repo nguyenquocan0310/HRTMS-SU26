@@ -1,336 +1,496 @@
-﻿/*
-  HRTMS seed data
-  - Common password for all seeded accounts: password
-  - BCrypt hash below is for the plain text password "password".
-  - IDs use the 9000 range to avoid clashing with normal development data.
-*/
+/* =============================================================================
+   HRTMS seed.sql — SEED HỢP NHẤT CHO DEMO "GIẢI ĐUA NGỰA MÙA HÈ 2026"
+   -----------------------------------------------------------------------------
+   Gộp từ bộ demo (2026-07-19): 01_base_accounts.sql + 02_create_tournament.sql
+   + hai tài khoản chính + mã ticket demo.
 
-SET ANSI_NULLS ON;
-SET QUOTED_IDENTIFIER ON;
-SET ANSI_PADDING ON;
-SET ANSI_WARNINGS ON;
-SET CONCAT_NULL_YIELDS_NULL ON;
-SET ARITHABORT ON;
-SET NUMERIC_ROUNDABORT OFF;
+   Tạo:
+     • Admin        : summer26_admin / summer26.admin@hrtms.localhost.com
+     • 2 TÀI KHOẢN CHÍNH (thao tác demo, nhận mail thật):
+         Owner  : nguyenan_owner  / nguyenan159246+owner@gmail.com
+         Jockey : nguyenan_jockey / nguyenan159246+jockey@gmail.com
+     • 37 cặp Owner/Jockey hỗ trợ (summer26_owner01..37 / summer26_jockey01..37)
+     • 2 Referee, 2 Doctor, 1 Spectator (kèm ví 1000 điểm)
+     • Tournament GIẢI ĐUA NGỰA MÙA HÈ 2026: 3 round, race 4/2/1, 01–30/09/2026,
+       MaxHorses=10, TopPerRace, AdvancementCount=2
+     • GIẢI GIAO HỮU THÁNG 9-2026 (song song 05–25/09/2026, Open Registration,
+       2 pairing friendly26_* Confirmed) — demo vận hành nhiều giải cùng lúc
+     • GIẢI ĐUA NGỰA MÙA XUÂN 2026 (01–31/03/2026, Completed) — lịch sử đầy đủ:
+       2 round / 3 race Official, 8 pairing spring26_*, kết quả, biên bản khóa,
+       payout đã trả, thông báo — xem lại như một giải thật
+     • 5 mã TicketRewardCodes (plaintext theo patch 008)
 
+   Mật khẩu mọi tài khoản seed: password  (hash BCrypt bên dưới).
+   Idempotent: NOT EXISTS — chạy lại an toàn, không tạo trùng.
+   ⚠️ Chỉ chạy trên database HRTMS (guard bên dưới). KHÔNG chạy trên production.
+   ============================================================================= */
+
+SET ANSI_NULLS ON; SET QUOTED_IDENTIFIER ON; SET ANSI_PADDING ON; SET ANSI_WARNINGS ON;
+SET CONCAT_NULL_YIELDS_NULL ON; SET ARITHABORT ON; SET NUMERIC_ROUNDABORT OFF;
 SET NOCOUNT ON;
+SET XACT_ABORT ON;
+
+IF DB_NAME() <> N'HRTMS'
+    THROW 51000, N'DỪNG: database đích phải là HRTMS.', 1;
 
 DECLARE @Now DATETIME2 = SYSUTCDATETIME();
-DECLARE @PasswordHash NVARCHAR(255) = N'$2a$12$h5ACuyerc5Y4nYStAGnYlOJVNBMkbMzRfnHCMGQZuk0LApe0xrO5y';
+DECLARE @PasswordHash VARCHAR(255) = '$2a$12$h5ACuyerc5Y4nYStAGnYlOJVNBMkbMzRfnHCMGQZuk0LApe0xrO5y'; -- "password"
 
 BEGIN TRY
     BEGIN TRANSACTION;
 
-    IF NOT EXISTS (SELECT 1 FROM dbo.Users WHERE UserId IN (9001, 9002, 9003, 9004, 9005, 9006))
-    BEGIN
-        SET IDENTITY_INSERT dbo.Users ON;
+    /* ------------------------------------------------------------------ ADMIN */
+    IF NOT EXISTS (SELECT 1 FROM Users WHERE Username='summer26_admin')
+        INSERT Users (Username,FullName,Email,NormalizedEmail,PasswordHash,[Role],[Status],CreatedAt,UpdatedAt)
+        VALUES ('summer26_admin',N'Quản trị Mùa Hè 2026','summer26.admin@hrtms.localhost.com',
+                'SUMMER26.ADMIN@HRTMS.LOCALHOST.COM',@PasswordHash,'Admin','Active',@Now,@Now);
 
-        INSERT INTO dbo.Users
-            (UserId, Username, FullName, Email, NormalizedEmail, PhoneNumber, NormalizedPhone,
-             DateOfBirth, IdentityNumberEncrypted, IdentityHash, PasswordHash, Role, Status,
-             FailedLoginAttempts, LockoutEnd, CreatedAt, UpdatedAt)
+    /* -------------------------------------------- 2 TÀI KHOẢN CHÍNH (demo thật)
+       Username KHÔNG theo pattern summer26_owner%/summer26_jockey% để các seed
+       hỗ trợ (pairing nền, allocation bulk) không đụng vào cặp chính. */
+    IF NOT EXISTS (SELECT 1 FROM Users WHERE Email='nguyenan159246+owner@gmail.com')
+        INSERT Users (Username,FullName,Email,NormalizedEmail,PhoneNumber,NormalizedPhone,DateOfBirth,
+                      IdentityNumberEncrypted,IdentityHash,PasswordHash,[Role],[Status],CreatedAt,UpdatedAt)
+        VALUES ('nguyenan_owner',N'Nguyễn Quốc An (Chủ ngựa)','nguyenan159246+owner@gmail.com',
+                'NGUYENAN159246+OWNER@GMAIL.COM','0911113224','0911113224','1990-01-01',
+                CONVERT(VARBINARY(512),'079090113224'),HASHBYTES('SHA2_256','079090113224'),
+                @PasswordHash,'Owner','Active',@Now,@Now);
+
+    IF NOT EXISTS (SELECT 1 FROM Users WHERE Email='nguyenan159246+jockey@gmail.com')
+        INSERT Users (Username,FullName,Email,NormalizedEmail,PhoneNumber,NormalizedPhone,DateOfBirth,
+                      IdentityNumberEncrypted,IdentityHash,PasswordHash,[Role],[Status],CreatedAt,UpdatedAt)
+        VALUES ('nguyenan_jockey',N'Nguyễn Quốc An (Nài ngựa)','nguyenan159246+jockey@gmail.com',
+                'NGUYENAN159246+JOCKEY@GMAIL.COM','0911159246','0911159246','1999-01-01',
+                CONVERT(VARBINARY(512),'001099159246'),HASHBYTES('SHA2_256','001099159246'),
+                @PasswordHash,'Jockey','Active',@Now,@Now);
+
+    INSERT OwnerProfiles (OwnerId,CreatedAt,UpdatedAt)
+    SELECT UserId,@Now,@Now FROM Users u WHERE u.Username='nguyenan_owner'
+      AND NOT EXISTS (SELECT 1 FROM OwnerProfiles p WHERE p.OwnerId=u.UserId);
+
+    INSERT JockeyProfiles (JockeyId,LicenseCertificate,ExperienceYears,SelfDeclaredWeight,BloodType,HealthStatus,[Status],CreatedAt,UpdatedAt)
+    SELECT UserId,'nguyenan_jockey.pdf',6,53.50,'O+','Good','Active',@Now,@Now FROM Users u
+    WHERE u.Username='nguyenan_jockey'
+      AND NOT EXISTS (SELECT 1 FROM JockeyProfiles p WHERE p.JockeyId=u.UserId);
+
+    /* ------------------------------------- 37 CẶP OWNER/JOCKEY HỖ TRỢ + STAFF */
+    DECLARE @Support TABLE (N INT PRIMARY KEY, OwnerName NVARCHAR(100), JockeyName NVARCHAR(100));
+    INSERT @Support VALUES
+    (1,N'Nguyễn Nhật Hạ',N'Lê Anh Khoa'),
+    (2,N'Trần Minh Bảo',N'Phạm Quốc Anh'),(3,N'Lê Ngọc Châu',N'Võ Thành Bách'),
+    (4,N'Phạm Thu Dung',N'Nguyễn Minh Cường'),(5,N'Vũ Hoàng Đức',N'Trần Hải Đăng'),
+    (6,N'Đặng Ngọc Hà',N'Lê Trọng Giang'),(7,N'Bùi Thành Hưng',N'Phạm Khánh Hòa'),
+    (8,N'Đỗ Mai Lan',N'Vũ Đức Long'),(9,N'Hoàng Văn Nam',N'Đặng Nhật Minh'),
+    (10,N'Ngô Thảo Phương',N'Bùi Quốc Phúc'),(11,N'Dương Hải Sơn',N'Đỗ Thành Tâm'),
+    (12,N'Đinh Ngọc Trang',N'Hoàng Anh Tú'),(13,N'Tạ Quang Vinh',N'Ngô Quang Việt'),
+    (14,N'Nguyễn Bảo Yến',N'Dương Minh Xuân'),(15,N'Trần Gia Hân',N'Đinh Tuấn Kiệt'),
+    (16,N'Lê Đức Khang',N'Tạ Hoàng Lâm'),(17,N'Phạm Thanh Mai',N'Nguyễn Công Nam'),
+    (18,N'Vũ Quỳnh Nga',N'Trần Đức Phong'),(19,N'Đặng Hữu Phúc',N'Lê Minh Quân'),
+    (20,N'Bùi Kim Oanh',N'Phạm Tuấn Sơn'),(21,N'Đỗ Xuân Quang',N'Vũ Gia Thịnh'),
+    (22,N'Hoàng Minh Tâm',N'Đặng Quốc Toàn'),(23,N'Ngô Hải Yến',N'Bùi Thanh Vũ'),
+    (24,N'Dương Quốc Bảo',N'Đỗ Anh Dũng'),(25,N'Đinh Thu Giang',N'Hoàng Minh Hiếu'),
+    (26,N'Tạ Minh Khôi',N'Ngô Quang Huy'),(27,N'Nguyễn Phương Linh',N'Dương Đức Mạnh'),
+    (28,N'Trần Hoài An',N'Đinh Thanh Nhân'),(29,N'Lê Khánh Chi',N'Tạ Quốc Thắng'),
+    (30,N'Phạm Quốc Duy',N'Nguyễn Văn Trí'),(31,N'Vũ Thanh Hương',N'Trần Minh Vương'),
+    (32,N'Đặng Đình Khánh',N'Lê Quốc Cường'),(33,N'Bùi Ngọc Liên',N'Phạm Hải Dương'),
+    (34,N'Đỗ Trọng Nghĩa',N'Vũ Minh Hoàng'),(35,N'Hoàng Thu Thủy',N'Đặng Gia Huy'),
+    (36,N'Ngô Tuấn Vũ',N'Bùi Hoàng Long'),(37,N'Dương Bảo Trâm',N'Đỗ Quốc Minh');
+
+    DECLARE @Accounts TABLE (Username VARCHAR(50),FullName NVARCHAR(100),Email VARCHAR(100),[Role] VARCHAR(20),Phone VARCHAR(20),Dob DATE,IdentityNo VARCHAR(20));
+    INSERT @Accounts VALUES
+    ('summer26_referee01',N'Trọng tài Phan Văn Kiên','summer26.referee01@hrtms.localhost.com','Referee','0926000001','1978-03-15','001078260001'),
+    ('summer26_referee02',N'Trọng tài Lương Đức Mạnh','summer26.referee02@hrtms.localhost.com','Referee','0926000002','1980-04-16','001080260002'),
+    ('summer26_doctor01',N'Bác sĩ Nguyễn Thùy Linh','summer26.doctor01@hrtms.localhost.com','Doctor','0936000001','1984-05-17','001084260001'),
+    ('summer26_doctor02',N'Bác sĩ Trần Quốc Thái','summer26.doctor02@hrtms.localhost.com','Doctor','0936000002','1982-06-18','001082260002');
+
+    INSERT @Accounts
+    SELECT CONCAT('summer26_owner',RIGHT('00'+CAST(N AS VARCHAR(2)),2)),OwnerName,
+           CONCAT('summer26.owner',RIGHT('00'+CAST(N AS VARCHAR(2)),2),'@hrtms.localhost.com'),'Owner',
+           CONCAT('0907',RIGHT('000000'+CAST(N AS VARCHAR(6)),6)),'1988-01-01',CONCAT('001088',RIGHT('000000'+CAST(N AS VARCHAR(6)),6))
+    FROM @Support
+    UNION ALL
+    SELECT CONCAT('summer26_jockey',RIGHT('00'+CAST(N AS VARCHAR(2)),2)),JockeyName,
+           CONCAT('summer26.jockey',RIGHT('00'+CAST(N AS VARCHAR(2)),2),'@hrtms.localhost.com'),'Jockey',
+           CONCAT('0917',RIGHT('000000'+CAST(N AS VARCHAR(6)),6)),'1997-01-01',CONCAT('079097',RIGHT('000000'+CAST(N AS VARCHAR(6)),6))
+    FROM @Support;
+
+    INSERT Users (Username,FullName,Email,NormalizedEmail,PhoneNumber,NormalizedPhone,DateOfBirth,IdentityNumberEncrypted,IdentityHash,PasswordHash,[Role],[Status],CreatedAt,UpdatedAt)
+    SELECT a.Username,a.FullName,a.Email,UPPER(a.Email),a.Phone,a.Phone,a.Dob,
+           CONVERT(VARBINARY(512),a.IdentityNo),HASHBYTES('SHA2_256',a.IdentityNo),
+           @PasswordHash,a.[Role],'Active',@Now,@Now
+    FROM @Accounts a
+    WHERE NOT EXISTS (SELECT 1 FROM Users u WHERE u.Username=a.Username OR u.Email=a.Email);
+
+    INSERT OwnerProfiles (OwnerId,CreatedAt,UpdatedAt)
+    SELECT UserId,@Now,@Now FROM Users u
+    WHERE u.Username LIKE 'summer26_owner%'
+      AND NOT EXISTS (SELECT 1 FROM OwnerProfiles p WHERE p.OwnerId=u.UserId);
+
+    INSERT JockeyProfiles (JockeyId,LicenseCertificate,ExperienceYears,SelfDeclaredWeight,BloodType,HealthStatus,[Status],CreatedAt,UpdatedAt)
+    SELECT UserId,CONCAT(Username,'.pdf'),6,54.00,'O+','Good','Active',@Now,@Now FROM Users u
+    WHERE u.Username LIKE 'summer26_jockey%'
+      AND NOT EXISTS (SELECT 1 FROM JockeyProfiles p WHERE p.JockeyId=u.UserId);
+
+    INSERT RefereeProfiles (RefereeId,CertificationLevel,[Status],CreatedAt,UpdatedAt)
+    SELECT UserId,N'Cấp quốc gia','Active',@Now,@Now FROM Users u
+    WHERE u.Username LIKE 'summer26_referee%' AND NOT EXISTS (SELECT 1 FROM RefereeProfiles p WHERE p.RefereeId=u.UserId);
+
+    INSERT DoctorProfiles (DoctorId,MedicalLicenseNumber,[Status],CreatedAt,UpdatedAt)
+    SELECT UserId,CONCAT(Username,'.pdf'),'Active',@Now,@Now FROM Users u
+    WHERE u.Username LIKE 'summer26_doctor%' AND NOT EXISTS (SELECT 1 FROM DoctorProfiles p WHERE p.DoctorId=u.UserId);
+
+    INSERT Certificates (UserId,CertificateType,FileName,FilePath,ContentType,FileSizeBytes,UploadedAt)
+    SELECT u.UserId,u.[Role],CONCAT(u.Username,'.pdf'),CONCAT('/demo-certificates/',u.Username,'.pdf'),'application/pdf',2048,@Now
+    FROM Users u
+    WHERE (u.Username LIKE 'summer26_jockey%' OR u.Username LIKE 'summer26_referee%'
+           OR u.Username LIKE 'summer26_doctor%' OR u.Username='nguyenan_jockey')
+      AND NOT EXISTS (SELECT 1 FROM Certificates c WHERE c.UserId=u.UserId);
+
+    /* ---------------------------------------------- SPECTATOR + VÍ (demo mã vé) */
+    IF NOT EXISTS (SELECT 1 FROM Users WHERE Username='summer26_spectator01')
+        INSERT Users (Username,FullName,Email,NormalizedEmail,PasswordHash,[Role],[Status],CreatedAt,UpdatedAt)
+        VALUES ('summer26_spectator01',N'Khán giả Đỗ Anh Minh','summer26.spectator01@hrtms.localhost.com',
+                'SUMMER26.SPECTATOR01@HRTMS.LOCALHOST.COM',@PasswordHash,'Spectator','Active',@Now,@Now);
+
+    INSERT SpectatorProfiles (SpectatorId,CreatedAt)
+    SELECT UserId,@Now FROM Users u WHERE u.Username='summer26_spectator01'
+      AND NOT EXISTS (SELECT 1 FROM SpectatorProfiles s WHERE s.SpectatorId=u.UserId);
+
+    INSERT Wallets (SpectatorId,Balance,UpdatedAt)
+    SELECT UserId,1000,@Now FROM Users u WHERE u.Username='summer26_spectator01'
+      AND NOT EXISTS (SELECT 1 FROM Wallets w WHERE w.SpectatorId=u.UserId);
+
+    /* --------------------------------------------------------- TOURNAMENT 4/2/1 */
+    DECLARE @AdminId INT=(SELECT UserId FROM Users WHERE Username='summer26_admin');
+
+    IF NOT EXISTS (SELECT 1 FROM Tournaments WHERE [Name]=N'GIẢI ĐUA NGỰA MÙA HÈ 2026')
+    INSERT Tournaments ([Name],[Description],StartDate,EndDate,MaxHorses,AllowedBreed,TrackType,RaceDistance,RaceCategory,
+     MinJockeyExperienceYears,PurseAmount,EntryFeeAmount,PreRaceWeightThresholdKg,PostRaceWeightDiffThresholdKg,[Status],
+     AdvancementRule,AdvancementCount,CreatedAt,UpdatedAt,CreatedBy)
+    VALUES (N'GIẢI ĐUA NGỰA MÙA HÈ 2026',N'Demo 38 pairing, 4 vòng loại, 2 bán kết, 1 chung kết.',
+     '2026-09-01T00:00:00','2026-09-30T23:59:59',10,'Thoroughbred','Turf',1600,'Open',3,
+     100000000,1000000,2.00,1.00,'Open Registration','TopPerRace',2,@Now,@Now,@AdminId);
+
+    DECLARE @TId INT=(SELECT TournamentId FROM Tournaments WHERE [Name]=N'GIẢI ĐUA NGỰA MÙA HÈ 2026');
+    IF EXISTS (SELECT 1 FROM Tournaments WHERE TournamentId=@TId AND (MaxHorses<>10 OR AdvancementRule<>'TopPerRace' OR AdvancementCount<>2))
+        THROW 51003,N'Cấu hình tournament hiện có không khớp MaxHorses=10, TopPerRace=2.',1;
+
+    INSERT PrizeDistributions (TournamentId,[Position],Percentage,CreatedAt,UpdatedAt)
+    SELECT @TId,v.Pos,v.Pct,@Now,@Now FROM (VALUES (1,50.00),(2,25.00),(3,15.00),(4,7.00),(5,3.00))v(Pos,Pct)
+    WHERE NOT EXISTS (SELECT 1 FROM PrizeDistributions p WHERE p.TournamentId=@TId AND p.[Position]=v.Pos);
+
+    INSERT Rounds (TournamentId,[Name],SequenceOrder,ScheduledDate,[Status],UpdatedAt)
+    SELECT @TId,v.Name,v.Seq,v.Dt,'Upcoming',@Now
+    FROM (VALUES (N'Vòng loại',1,CONVERT(DATETIME2,'2026-09-05T08:00:00')),
+                 (N'Bán kết',2,CONVERT(DATETIME2,'2026-09-15T08:00:00')),
+                 (N'Chung kết',3,CONVERT(DATETIME2,'2026-09-25T15:00:00')))v(Name,Seq,Dt)
+    WHERE NOT EXISTS (SELECT 1 FROM Rounds r WHERE r.TournamentId=@TId AND r.SequenceOrder=v.Seq);
+
+    DECLARE @Q INT=(SELECT RoundId FROM Rounds WHERE TournamentId=@TId AND SequenceOrder=1),
+            @S INT=(SELECT RoundId FROM Rounds WHERE TournamentId=@TId AND SequenceOrder=2),
+            @F INT=(SELECT RoundId FROM Rounds WHERE TournamentId=@TId AND SequenceOrder=3);
+    INSERT Races (RoundId,RaceNumber,ScheduledTime,PurseAmount,[Status],IsPostPositionDrawn,IsPredictionGateClosed,ConfirmationCutoffHours,ProtestDeadlineMinutes,CreatedAt,UpdatedAt)
+    SELECT v.RoundId,v.RaceNo,v.Dt,v.Purse,'Upcoming',0,0,24,120,@Now,@Now
+    FROM (VALUES (@Q,1,CONVERT(DATETIME2,'2026-09-05T09:00:00'),10000000),(@Q,2,CONVERT(DATETIME2,'2026-09-05T11:00:00'),10000000),
+                 (@Q,3,CONVERT(DATETIME2,'2026-09-06T09:00:00'),10000000),(@Q,4,CONVERT(DATETIME2,'2026-09-06T11:00:00'),10000000),
+                 (@S,1,CONVERT(DATETIME2,'2026-09-15T09:00:00'),15000000),(@S,2,CONVERT(DATETIME2,'2026-09-15T11:00:00'),15000000),
+                 (@F,1,CONVERT(DATETIME2,'2026-09-25T15:00:00'),30000000))v(RoundId,RaceNo,Dt,Purse)
+    WHERE NOT EXISTS (SELECT 1 FROM Races r WHERE r.RoundId=v.RoundId AND r.RaceNumber=v.RaceNo);
+
+    /* -------------------------------------- TICKET REWARD CODES (patch 008 — plaintext)
+       BR-63 / REQ-F-PRD.5: admin xem lại được qua GET /api/admin/ticket-codes.
+       TKT-DEMO00000005 để Expired làm case demo mã hết hạn. */
+    IF NOT EXISTS (SELECT 1 FROM TicketRewardCodes WHERE Code='TKT-DEMO00000001')
+        INSERT TicketRewardCodes (Code,PointAmount,[Status],ExpiresAt,CreatedAt)
         VALUES
-            (9001, N'admin.seed', N'Quan tri Vien HRTMS', N'admin.hrtms.vn@gmail.com', N'ADMIN.HRTMS.VN@GMAIL.COM',
-             N'0901234567', N'0901234567', '1990-01-01', 0x303031303930303030303031, HASHBYTES('SHA2_256', N'001090000001'), @PasswordHash,
-             N'Admin', N'Active', 0, NULL, @Now, @Now),
+            ('TKT-DEMO00000001',200,'Active', DATEADD(DAY,365,@Now),@Now),
+            ('TKT-DEMO00000002',200,'Active', DATEADD(DAY,365,@Now),@Now),
+            ('TKT-DEMO00000003',500,'Active', DATEADD(DAY,365,@Now),@Now),
+            ('TKT-DEMO00000004',500,'Active', DATEADD(DAY,365,@Now),@Now),
+            ('TKT-DEMO00000005',200,'Expired',DATEADD(DAY,-1,@Now),@Now);
 
-            (9002, N'owner.seed', N'Nguyen Van Chuong', N'nguyenvanchuong.owner@gmail.com', N'NGUYENVANCHUONG.OWNER@GMAIL.COM',
-             N'0912345678', N'0912345678', '1991-02-02', 0x303739303931303030303032, HASHBYTES('SHA2_256', N'079091000002'), @PasswordHash,
-             N'Owner', N'Active', 0, NULL, @Now, @Now),
 
-            (9003, N'jockey.seed', N'Tran Minh Khoa', N'tranminhkhoa.jockey@icloud.com', N'TRANMINHKHOA.JOCKEY@ICLOUD.COM',
-             N'0934567890', N'0934567890', '1998-03-03', 0x303031303938303030303033, HASHBYTES('SHA2_256', N'001098000003'), @PasswordHash,
-             N'Jockey', N'Active', 0, NULL, @Now, @Now),
+    /* =========================================================================
+       GIẢI PHỤ SONG SONG — "GIẢI GIAO HỮU THÁNG 9-2026"
+       Trùng thời gian với giải chính (05–25/09/2026) để minh họa vận hành
+       NHIỀU GIẢI CÙNG LÚC. 1 round + 2 race Upcoming, 2 pairing Confirmed sẵn
+       (dùng demo allocate đa giải và case lỗi PAIRING_TOURNAMENT_MISMATCH khi
+       lỡ chọn pairing của giải này allocate vào race giải chính).
+       Account riêng (friendly26_*) — không đụng 38 pairing của giải chính.
+       ========================================================================= */
+    DECLARE @FrAcc TABLE (N INT PRIMARY KEY, OwnerName NVARCHAR(100), JockeyName NVARCHAR(100), HorseName NVARCHAR(100), HorseColor NVARCHAR(50));
+    INSERT @FrAcc VALUES
+    (1,N'Cao Thái Bình',N'Mai Văn Lâm',N'Gió Biển',N'Xám khói'),
+    (2,N'Lý Thu Hằng',N'Chu Đức Toản',N'Sóng Thần',N'Nâu trầm');
 
-            (9004, N'referee.seed', N'Le Quang Huy', N'lequanghuy.referee@gmail.com', N'LEQUANGHUY.REFEREE@GMAIL.COM',
-             N'0967890123', N'0967890123', '1988-04-04', 0x303031303838303030303034, HASHBYTES('SHA2_256', N'001088000004'), @PasswordHash,
-             N'Referee', N'Active', 0, NULL, @Now, @Now),
+    INSERT Users (Username,FullName,Email,NormalizedEmail,PhoneNumber,NormalizedPhone,DateOfBirth,IdentityNumberEncrypted,IdentityHash,PasswordHash,[Role],[Status],CreatedAt,UpdatedAt)
+    SELECT v.Username,v.FullName,v.Email,UPPER(v.Email),v.Phone,v.Phone,v.Dob,
+           CONVERT(VARBINARY(512),v.IdNo),HASHBYTES('SHA2_256',v.IdNo),@PasswordHash,v.[Role],'Active',@Now,@Now
+    FROM (
+        SELECT CONCAT('friendly26_owner0',N) Username,OwnerName FullName,
+               CONCAT('friendly26.owner0',N,'@hrtms.localhost.com') Email,'Owner' [Role],
+               CONCAT('0947',RIGHT('000000'+CAST(N AS VARCHAR),6)) Phone,CAST('1986-02-02' AS DATE) Dob,CONCAT('001086',RIGHT('000000'+CAST(N AS VARCHAR),6)) IdNo
+        FROM @FrAcc
+        UNION ALL
+        SELECT CONCAT('friendly26_jockey0',N),JockeyName,CONCAT('friendly26.jockey0',N,'@hrtms.localhost.com'),'Jockey',
+               CONCAT('0957',RIGHT('000000'+CAST(N AS VARCHAR),6)),'1996-03-03',CONCAT('079096',RIGHT('000000'+CAST(N AS VARCHAR),6))
+        FROM @FrAcc
+    ) v
+    WHERE NOT EXISTS (SELECT 1 FROM Users u WHERE u.Username=v.Username OR u.Email=v.Email);
 
-            (9005, N'doctor.seed', N'Pham Thu Ha', N'phamthuha.doctor@icloud.com', N'PHAMTHUHA.DOCTOR@ICLOUD.COM',
-             N'0987654321', N'0987654321', '1985-05-05', 0x303031303835303030303035, HASHBYTES('SHA2_256', N'001085000005'), @PasswordHash,
-             N'Doctor', N'Active', 0, NULL, @Now, @Now),
+    INSERT OwnerProfiles (OwnerId,CreatedAt,UpdatedAt)
+    SELECT UserId,@Now,@Now FROM Users u WHERE u.Username LIKE 'friendly26_owner%'
+      AND NOT EXISTS (SELECT 1 FROM OwnerProfiles p WHERE p.OwnerId=u.UserId);
+    INSERT JockeyProfiles (JockeyId,LicenseCertificate,ExperienceYears,SelfDeclaredWeight,BloodType,HealthStatus,[Status],CreatedAt,UpdatedAt)
+    SELECT UserId,CONCAT(Username,'.pdf'),5,54.50,'A+','Good','Active',@Now,@Now FROM Users u
+    WHERE u.Username LIKE 'friendly26_jockey%'
+      AND NOT EXISTS (SELECT 1 FROM JockeyProfiles p WHERE p.JockeyId=u.UserId);
 
-            (9006, N'spectator.seed', N'Do Anh Minh', N'doanhminh.spectator@gmail.com', N'DOANHMINH.SPECTATOR@GMAIL.COM',
-             N'0978123456', N'0978123456', '2000-06-06', 0x303031303030303030303036, HASHBYTES('SHA2_256', N'001000000006'), @PasswordHash,
-             N'Spectator', N'Active', 0, NULL, @Now, @Now);
-
-        SET IDENTITY_INSERT dbo.Users OFF;
-    END
-
-    IF NOT EXISTS (SELECT 1 FROM dbo.OwnerProfiles WHERE OwnerId = 9002)
+    IF NOT EXISTS (SELECT 1 FROM Tournaments WHERE [Name]=N'GIẢI GIAO HỮU THÁNG 9-2026')
     BEGIN
-        INSERT INTO dbo.OwnerProfiles (OwnerId, CreatedAt, UpdatedAt)
-        VALUES (9002, @Now, @Now);
-    END
+        INSERT Tournaments ([Name],[Description],StartDate,EndDate,MaxHorses,AllowedBreed,TrackType,RaceDistance,RaceCategory,
+         MinJockeyExperienceYears,PurseAmount,EntryFeeAmount,PreRaceWeightThresholdKg,PostRaceWeightDiffThresholdKg,[Status],
+         AdvancementRule,AdvancementCount,CreatedAt,UpdatedAt,CreatedBy)
+        VALUES (N'GIẢI GIAO HỮU THÁNG 9-2026',N'Giải giao hữu chạy song song với Giải Mùa Hè 2026 — minh họa vận hành nhiều giải cùng lúc.',
+         '2026-09-05T00:00:00','2026-09-25T23:59:59',6,'Thoroughbred','Turf',1400,'Open',2,
+         30000000,500000,2.00,1.00,'Open Registration','TopPerRace',2,@Now,@Now,@AdminId);
 
-    IF NOT EXISTS (SELECT 1 FROM dbo.JockeyProfiles WHERE JockeyId = 9003)
+        DECLARE @FrTId INT = SCOPE_IDENTITY();
+
+        INSERT PrizeDistributions (TournamentId,[Position],Percentage,CreatedAt,UpdatedAt)
+        SELECT @FrTId,v.Pos,v.Pct,@Now,@Now FROM (VALUES (1,50.00),(2,30.00),(3,20.00))v(Pos,Pct);
+
+        INSERT Rounds (TournamentId,[Name],SequenceOrder,ScheduledDate,[Status],UpdatedAt)
+        VALUES (@FrTId,N'Vòng đấu chính',1,'2026-09-10T08:00:00','Upcoming',@Now);
+        DECLARE @FrRound INT = SCOPE_IDENTITY();
+
+        INSERT Races (RoundId,RaceNumber,ScheduledTime,PurseAmount,[Status],IsPostPositionDrawn,IsPredictionGateClosed,ConfirmationCutoffHours,ProtestDeadlineMinutes,CreatedAt,UpdatedAt)
+        VALUES (@FrRound,1,'2026-09-10T09:00:00',15000000,'Upcoming',0,0,24,120,@Now,@Now),
+               (@FrRound,2,'2026-09-10T15:00:00',15000000,'Upcoming',0,0,24,120,@Now,@Now);
+
+        INSERT TournamentParticipants (TournamentId,UserId,[Role],[Status],ScreeningStatus,RegisteredAt,ApprovedBy,ApprovedAt)
+        SELECT @FrTId,u.UserId,u.[Role],'Approved','AutoEligible',@Now,@AdminId,@Now
+        FROM Users u WHERE u.Username LIKE 'friendly26_%';
+
+        INSERT Horses (OwnerId,[Name],BirthYear,Gender,Color,Pedigree,Weight,IdentifyingMarks,Breed,VaccinationRecordRef,DopingTestDate,DopingTestResult,LegalConsentAccepted,[Status],ScreeningStatus,AdminApprovalStatus,CreatedAt,UpdatedAt)
+        SELECT u.UserId,a.HorseName,2021,'Male',a.HorseColor,N'Dòng giống thuần chủng đã xác minh',470.00,CONCAT(N'Dấu nhận dạng giao hữu số ',a.N),'Thoroughbred',
+               CONCAT('VAC-F26-',a.N),'2026-08-01','Clean',1,'Active','AutoEligible','Approved',@Now,@Now
+        FROM @FrAcc a JOIN Users u ON u.Username=CONCAT('friendly26_owner0',a.N)
+        WHERE NOT EXISTS (SELECT 1 FROM Horses x WHERE x.OwnerId=u.UserId AND x.[Name]=a.HorseName);
+
+        INSERT HorseTournamentEntries (HorseId,TournamentId,OwnerId,[Status],ScreeningStatus,AdminApprovalStatus,CreatedAt,UpdatedAt)
+        SELECT h.HorseId,@FrTId,h.OwnerId,'Enrolled','AutoEligible','Approved',@Now,@Now
+        FROM Horses h JOIN Users u ON u.UserId=h.OwnerId AND u.Username LIKE 'friendly26_owner%';
+
+        INSERT Pairings (TournamentId,HorseId,JockeyId,[Status],RequestMessage,ResponseReason,CreatedAt,UpdatedAt)
+        SELECT @FrTId,h.HorseId,j.UserId,'Confirmed',N'Ghép cặp giải giao hữu.',N'Chủ ngựa đã xác nhận.',@Now,@Now
+        FROM @FrAcc a
+        JOIN Users o ON o.Username=CONCAT('friendly26_owner0',a.N)
+        JOIN Horses h ON h.OwnerId=o.UserId AND h.[Name]=a.HorseName
+        JOIN Users j ON j.Username=CONCAT('friendly26_jockey0',a.N);
+    END;
+
+    /* =========================================================================
+       GIẢI ĐÃ KẾT THÚC — "GIẢI ĐUA NGỰA MÙA XUÂN 2026" (xem lại lịch sử)
+       01–31/03/2026, Status='Completed'. 2 round: Vòng loại (2 race) + Chung kết
+       (1 race) — tất cả Official. Đầy đủ: 8 owner/jockey/horse, roster, pairing,
+       entry (fee Paid, cân trước/sau, identity, clinical), kết quả về đích,
+       advancement, phân công trọng tài/bác sĩ, biên bản đã khóa, payout đã trả
+       (Owner 80% / Jockey 20% theo cơ cấu 50/30/20), thông báo lịch sử.
+       Mốc thời gian dùng tháng 2–3/2026 để lịch sử nhất quán.
+       ========================================================================= */
+    IF NOT EXISTS (SELECT 1 FROM Tournaments WHERE [Name]=N'GIẢI ĐUA NGỰA MÙA XUÂN 2026')
     BEGIN
-        INSERT INTO dbo.JockeyProfiles
-            (JockeyId, LicenseCertificate, ExperienceYears, SelfDeclaredWeight,
-             BloodType, HealthStatus, Status, RejectionReason, CreatedAt, UpdatedAt)
-        VALUES
-            (9003, N'LIC-JOCKEY-SEED-001', 6, 54.50, N'O+', N'Good', N'Active', NULL, @Now, @Now);
-    END
+        DECLARE @Sp TABLE (N INT PRIMARY KEY, OwnerName NVARCHAR(100), JockeyName NVARCHAR(100), HorseName NVARCHAR(100), HorseColor NVARCHAR(50));
+        INSERT @Sp VALUES
+        (1,N'Hồ Văn Tùng',N'Kiều Minh Đạt',N'Xuân Phong',N'Hạt dẻ'),
+        (2,N'La Thị Nhung',N'Ông Quốc Bảo',N'Mai Vàng',N'Vàng nâu'),
+        (3,N'Thái Đức Long',N'Ninh Hữu Tài',N'Đào Hồng',N'Nâu hồng'),
+        (4,N'Tiêu Ngọc Bích',N'Ứng Văn Sang',N'Lộc Xuân',N'Xám bạc'),
+        (5,N'Quách Hải Nam',N'Từ Minh Nhật',N'Én Nhỏ',N'Đen tuyền'),
+        (6,N'Ma Thị Cúc',N'Hà Quang Vinh',N'Nắng Mới',N'Nâu sáng'),
+        (7,N'Ưng Đình Phú',N'Cổ Thành Danh',N'Chồi Biếc',N'Xám xanh'),
+        (8,N'Giang Thu Thảo',N'Bạch Công Hậu',N'Mưa Xuân',N'Nâu đỏ');
 
-    IF NOT EXISTS (SELECT 1 FROM dbo.RefereeProfiles WHERE RefereeId = 9004)
-    BEGIN
-        INSERT INTO dbo.RefereeProfiles
-            (RefereeId, CertificationLevel, Status, RejectionReason, CreatedAt, UpdatedAt)
-        VALUES
-            (9004, N'National', N'Active', NULL, @Now, @Now);
-    END
+        DECLARE @T0 DATETIME2 = '2026-02-01T08:00:00'; -- mốc tạo dữ liệu lịch sử
 
-    IF NOT EXISTS (SELECT 1 FROM dbo.DoctorProfiles WHERE DoctorId = 9005)
-    BEGIN
-        INSERT INTO dbo.DoctorProfiles
-            (DoctorId, MedicalLicenseNumber, Status, RejectionReason, CreatedAt, UpdatedAt)
-        VALUES
-            (9005, N'MED-SEED-001', N'Active', NULL, @Now, @Now);
-    END
+        INSERT Users (Username,FullName,Email,NormalizedEmail,PhoneNumber,NormalizedPhone,DateOfBirth,IdentityNumberEncrypted,IdentityHash,PasswordHash,[Role],[Status],CreatedAt,UpdatedAt)
+        SELECT v.Username,v.FullName,v.Email,UPPER(v.Email),v.Phone,v.Phone,v.Dob,
+               CONVERT(VARBINARY(512),v.IdNo),HASHBYTES('SHA2_256',v.IdNo),@PasswordHash,v.[Role],'Active',@T0,@T0
+        FROM (
+            SELECT CONCAT('spring26_owner0',N) Username,OwnerName FullName,
+                   CONCAT('spring26.owner0',N,'@hrtms.localhost.com') Email,'Owner' [Role],
+                   CONCAT('0967',RIGHT('000000'+CAST(N AS VARCHAR),6)) Phone,CAST('1985-04-04' AS DATE) Dob,CONCAT('001085',RIGHT('000000'+CAST(N AS VARCHAR),6)) IdNo
+            FROM @Sp
+            UNION ALL
+            SELECT CONCAT('spring26_jockey0',N),JockeyName,CONCAT('spring26.jockey0',N,'@hrtms.localhost.com'),'Jockey',
+                   CONCAT('0977',RIGHT('000000'+CAST(N AS VARCHAR),6)),'1995-05-05',CONCAT('079095',RIGHT('000000'+CAST(N AS VARCHAR),6))
+            FROM @Sp
+        ) v
+        WHERE NOT EXISTS (SELECT 1 FROM Users u WHERE u.Username=v.Username OR u.Email=v.Email);
 
-    IF NOT EXISTS (SELECT 1 FROM dbo.SpectatorProfiles WHERE SpectatorId = 9006)
-    BEGIN
-        INSERT INTO dbo.SpectatorProfiles (SpectatorId, CreatedAt)
-        VALUES (9006, @Now);
-    END
+        INSERT OwnerProfiles (OwnerId,CreatedAt,UpdatedAt)
+        SELECT UserId,@T0,@T0 FROM Users u WHERE u.Username LIKE 'spring26_owner%'
+          AND NOT EXISTS (SELECT 1 FROM OwnerProfiles p WHERE p.OwnerId=u.UserId);
+        INSERT JockeyProfiles (JockeyId,LicenseCertificate,ExperienceYears,SelfDeclaredWeight,BloodType,HealthStatus,[Status],CreatedAt,UpdatedAt)
+        SELECT UserId,CONCAT(Username,'.pdf'),7,53.00,'B+','Good','Active',@T0,@T0 FROM Users u
+        WHERE u.Username LIKE 'spring26_jockey%'
+          AND NOT EXISTS (SELECT 1 FROM JockeyProfiles p WHERE p.JockeyId=u.UserId);
 
-    IF OBJECT_ID(N'dbo.Wallets', N'U') IS NOT NULL
-       AND NOT EXISTS (SELECT 1 FROM dbo.Wallets WHERE WalletId = 9006 OR SpectatorId = 9006)
-    BEGIN
-        SET IDENTITY_INSERT dbo.Wallets ON;
+        INSERT Tournaments ([Name],[Description],StartDate,EndDate,MaxHorses,AllowedBreed,TrackType,RaceDistance,RaceCategory,
+         MinJockeyExperienceYears,PurseAmount,EntryFeeAmount,PreRaceWeightThresholdKg,PostRaceWeightDiffThresholdKg,[Status],
+         AdvancementRule,AdvancementCount,CreatedAt,UpdatedAt,CreatedBy)
+        VALUES (N'GIẢI ĐUA NGỰA MÙA XUÂN 2026',N'Giải đã kết thúc — dữ liệu lịch sử đầy đủ để xem lại kết quả, tiền thưởng và biên bản.',
+         '2026-03-01T00:00:00','2026-03-31T23:59:59',6,'Thoroughbred','Turf',1400,'Open',2,
+         60000000,500000,2.00,1.00,'Completed','TopPerRace',2,@T0,'2026-03-25T12:00:00',@AdminId);
+        DECLARE @SpTId INT = SCOPE_IDENTITY();
 
-        INSERT INTO dbo.Wallets (WalletId, SpectatorId, Balance, UpdatedAt)
-        VALUES (9006, 9006, 1000, @Now);
+        INSERT PrizeDistributions (TournamentId,[Position],Percentage,CreatedAt,UpdatedAt)
+        SELECT @SpTId,v.Pos,v.Pct,@T0,@T0 FROM (VALUES (1,50.00),(2,30.00),(3,20.00))v(Pos,Pct);
 
-        SET IDENTITY_INSERT dbo.Wallets OFF;
-    END
+        INSERT Rounds (TournamentId,[Name],SequenceOrder,ScheduledDate,[Status],UpdatedAt)
+        VALUES (@SpTId,N'Vòng loại',1,'2026-03-08T08:00:00','Completed','2026-03-08T18:00:00'),
+               (@SpTId,N'Chung kết',2,'2026-03-22T15:00:00','Completed','2026-03-22T18:00:00');
+        DECLARE @SpQ INT=(SELECT RoundId FROM Rounds WHERE TournamentId=@SpTId AND SequenceOrder=1);
+        DECLARE @SpF INT=(SELECT RoundId FROM Rounds WHERE TournamentId=@SpTId AND SequenceOrder=2);
 
-    IF OBJECT_ID(N'dbo.VirtualPointsTransactions', N'U') IS NOT NULL
-       AND EXISTS (SELECT 1 FROM dbo.Wallets WHERE WalletId = 9006)
-       AND NOT EXISTS (SELECT 1 FROM dbo.VirtualPointsTransactions WHERE TransactionId = 9001)
-    BEGIN
-        SET IDENTITY_INSERT dbo.VirtualPointsTransactions ON;
+        INSERT Races (RoundId,RaceNumber,ScheduledTime,ActualStartTime,PurseAmount,[Status],IsPostPositionDrawn,IsPredictionGateClosed,ConfirmationCutoffHours,ProtestDeadlineMinutes,CreatedAt,UpdatedAt)
+        VALUES (@SpQ,1,'2026-03-08T09:00:00','2026-03-08T09:02:00',15000000,'Official',1,1,24,120,@T0,'2026-03-08T11:00:00'),
+               (@SpQ,2,'2026-03-08T15:00:00','2026-03-08T15:03:00',15000000,'Official',1,1,24,120,@T0,'2026-03-08T17:00:00'),
+               (@SpF,1,'2026-03-22T15:00:00','2026-03-22T15:01:00',30000000,'Official',1,1,24,120,@T0,'2026-03-22T17:00:00');
 
-        INSERT INTO dbo.VirtualPointsTransactions
-            (TransactionId, WalletId, Amount, Type, ReferenceType, ReferenceId, CreatedAt)
-        VALUES
-            (9001, 9006, 1000, N'SignUp Bonus', NULL, NULL, @Now);
+        INSERT TournamentParticipants (TournamentId,UserId,[Role],[Status],ScreeningStatus,RegisteredAt,ApprovedBy,ApprovedAt)
+        SELECT @SpTId,u.UserId,u.[Role],'Approved','AutoEligible',@T0,@AdminId,@T0
+        FROM Users u
+        WHERE u.Username LIKE 'spring26_%'
+           OR u.Username IN ('summer26_referee01','summer26_referee02','summer26_doctor01','summer26_doctor02');
 
-        SET IDENTITY_INSERT dbo.VirtualPointsTransactions OFF;
-    END
+        INSERT Horses (OwnerId,[Name],BirthYear,Gender,Color,Pedigree,Weight,IdentifyingMarks,Breed,VaccinationRecordRef,DopingTestDate,DopingTestResult,LegalConsentAccepted,[Status],ScreeningStatus,AdminApprovalStatus,CreatedAt,UpdatedAt)
+        SELECT u.UserId,a.HorseName,2020,'Male',a.HorseColor,N'Dòng giống thuần chủng đã xác minh',475.00,CONCAT(N'Dấu nhận dạng mùa xuân số ',a.N),'Thoroughbred',
+               CONCAT('VAC-SP26-',a.N),'2026-02-10','Clean',1,'Active','AutoEligible','Approved',@T0,@T0
+        FROM @Sp a JOIN Users u ON u.Username=CONCAT('spring26_owner0',a.N)
+        WHERE NOT EXISTS (SELECT 1 FROM Horses x WHERE x.OwnerId=u.UserId AND x.[Name]=a.HorseName);
 
-    IF NOT EXISTS (SELECT 1 FROM dbo.Tournaments WHERE TournamentId = 9001)
-    BEGIN
-        SET IDENTITY_INSERT dbo.Tournaments ON;
+        INSERT HorseTournamentEntries (HorseId,TournamentId,OwnerId,[Status],ScreeningStatus,AdminApprovalStatus,CreatedAt,UpdatedAt)
+        SELECT h.HorseId,@SpTId,h.OwnerId,'Enrolled','AutoEligible','Approved',@T0,@T0
+        FROM Horses h JOIN Users u ON u.UserId=h.OwnerId AND u.Username LIKE 'spring26_owner%';
 
-        INSERT INTO dbo.Tournaments
-            (TournamentId, Name, Description, StartDate, EndDate, MaxHorses, AllowedBreed,
-             TrackType, RaceDistance, RaceCategory, MinJockeyExperienceYears, PurseAmount,
-             EntryFeeAmount, PreRaceWeightThresholdKg, PostRaceWeightDiffThresholdKg,
-             Status, CreatedAt, UpdatedAt, CreatedBy)
-        VALUES
-            (9001, N'Cup Dua Ngua Quoc Gia Viet Nam 2026',
-             N'Giai dau mau duoc to chuc boi Lien doan Dua ngua Viet Nam tai Phu Tho.',
-             '2026-07-10T08:00:00', '2026-07-12T18:00:00',
-             12, N'Thoroughbred', N'Turf', 1600, N'Open', 2,
-             50000000.00, 500000.00, 2.00, 1.00,
-             N'Open Registration', @Now, @Now, 9001);
+        INSERT Pairings (TournamentId,HorseId,JockeyId,[Status],RequestMessage,ResponseReason,CreatedAt,UpdatedAt)
+        SELECT @SpTId,h.HorseId,j.UserId,'Confirmed',N'Ghép cặp Giải Mùa Xuân 2026.',N'Chủ ngựa đã xác nhận.',@T0,@T0
+        FROM @Sp a
+        JOIN Users o ON o.Username=CONCAT('spring26_owner0',a.N)
+        JOIN Horses h ON h.OwnerId=o.UserId AND h.[Name]=a.HorseName
+        JOIN Users j ON j.Username=CONCAT('spring26_jockey0',a.N);
 
-        SET IDENTITY_INSERT dbo.Tournaments OFF;
-    END
+        /* Phân công trọng tài/bác sĩ (dùng lại staff giải Mùa Hè — 1 người phục vụ nhiều giải) */
+        DECLARE @Ref1 INT=(SELECT UserId FROM Users WHERE Username='summer26_referee01');
+        DECLARE @Ref2 INT=(SELECT UserId FROM Users WHERE Username='summer26_referee02');
+        DECLARE @Doc1 INT=(SELECT UserId FROM Users WHERE Username='summer26_doctor01');
+        DECLARE @Doc2 INT=(SELECT UserId FROM Users WHERE Username='summer26_doctor02');
 
-    IF OBJECT_ID(N'dbo.PrizeDistributions', N'U') IS NOT NULL
-       AND NOT EXISTS (SELECT 1 FROM dbo.PrizeDistributions WHERE TournamentId = 9001)
-    BEGIN
-        INSERT INTO dbo.PrizeDistributions (TournamentId, Position, Percentage, CreatedAt, UpdatedAt)
-        VALUES
-            (9001, 1, 40.00, @Now, @Now),
-            (9001, 2, 25.00, @Now, @Now),
-            (9001, 3, 15.00, @Now, @Now),
-            (9001, 4, 12.00, @Now, @Now),
-            (9001, 5, 8.00, @Now, @Now);
-    END
+        INSERT RefereeAssignments (RaceId,RefereeId,[Role],AssignedAt)
+        SELECT r.RaceId,CASE WHEN r.RaceNumber=2 AND r.RoundId=@SpQ THEN @Ref2 ELSE @Ref1 END,'Lead Referee','2026-03-01T08:00:00'
+        FROM Races r WHERE r.RoundId IN (@SpQ,@SpF);
+        INSERT DoctorAssignments (RaceId,DoctorId,AssignedAt)
+        SELECT r.RaceId,CASE WHEN r.RaceNumber=2 AND r.RoundId=@SpQ THEN @Doc2 ELSE @Doc1 END,'2026-03-01T08:00:00'
+        FROM Races r WHERE r.RoundId IN (@SpQ,@SpF);
 
-    IF NOT EXISTS (SELECT 1 FROM dbo.Rounds WHERE RoundId IN (9001, 9002, 9003))
-    BEGIN
-        SET IDENTITY_INSERT dbo.Rounds ON;
+        /* Kịch bản kết quả:
+           Vòng loại race 1: cặp 1-4 về 1,2,3,4  → cặp 1,2 Qualified
+           Vòng loại race 2: cặp 5-8 về 1,2,3,4  → cặp 5,6 Qualified
+           Chung kết       : 5 (Nhất), 1 (Nhì), 6 (Ba), 2 (Tư) */
+        DECLARE @Plan TABLE (RoundId INT, RaceNo INT, PairIdx INT, Pos INT, Ft DECIMAL(8,3), Adv VARCHAR(20) NULL, AdvRank INT NULL);
+        INSERT @Plan VALUES
+        (@SpQ,1,1,1, 84.512,'Qualified',1),(@SpQ,1,2,2, 85.104,'Qualified',3),(@SpQ,1,3,3, 86.230,'Eliminated',NULL),(@SpQ,1,4,4, 87.415,'Eliminated',NULL),
+        (@SpQ,2,5,1, 84.207,'Qualified',2),(@SpQ,2,6,2, 85.663,'Qualified',4),(@SpQ,2,7,3, 86.884,'Eliminated',NULL),(@SpQ,2,8,4, 88.020,'Eliminated',NULL),
+        (@SpF,1,5,1, 83.905,NULL,NULL),(@SpF,1,1,2, 84.377,NULL,NULL),(@SpF,1,6,3, 85.128,NULL,NULL),(@SpF,1,2,4, 86.049,NULL,NULL);
 
-        INSERT INTO dbo.Rounds
-            (RoundId, TournamentId, Name, SequenceOrder, ScheduledDate, Status, UpdatedAt)
-        VALUES
-            (9001, 9001, N'Vong loai', 1, '2026-07-10', N'Upcoming', @Now),
-            (9002, 9001, N'Ban ket', 2, '2026-07-11', N'Upcoming', @Now),
-            (9003, 9001, N'Chung ket', 3, '2026-07-12', N'Upcoming', @Now);
+        INSERT RaceEntries (RaceId,PairingId,PostPosition,[Status],
+            PreRaceJockeyWeight,PreRaceWeightByDoctorId,
+            HorseIdentityCheckStatus,HorseIdentityCheckedByDoctorId,HorseIdentityCheckedAt,
+            ClinicalStatus,ClinicalCheckedByDoctorId,ClinicalCheckedAt,
+            PostRaceJockeyWeight,PostRaceWeightByDoctorId,
+            FinishPosition,FinishTime,AdvancementStatus,AdvancementRank,
+            EntryFeeStatus,EntryFeeConfirmedBy,EntryFeeConfirmedAt,IsWithdrawn,CreatedAt,UpdatedAt)
+        SELECT r.RaceId,pg.PairingId,pl.Pos,'Confirmed',
+            53.00 + pl.PairIdx*0.10, CASE WHEN pl.RaceNo=2 AND pl.RoundId=@SpQ THEN @Doc2 ELSE @Doc1 END,
+            'Matched', CASE WHEN pl.RaceNo=2 AND pl.RoundId=@SpQ THEN @Doc2 ELSE @Doc1 END, DATEADD(HOUR,-2,r.ScheduledTime),
+            'Fit', CASE WHEN pl.RaceNo=2 AND pl.RoundId=@SpQ THEN @Doc2 ELSE @Doc1 END, DATEADD(HOUR,-2,r.ScheduledTime),
+            53.20 + pl.PairIdx*0.10, CASE WHEN pl.RaceNo=2 AND pl.RoundId=@SpQ THEN @Doc2 ELSE @Doc1 END,
+            pl.Pos, pl.Ft, pl.Adv, pl.AdvRank,
+            'Paid', @AdminId, DATEADD(DAY,-3,r.ScheduledTime), 0, @T0, DATEADD(HOUR,2,r.ScheduledTime)
+        FROM @Plan pl
+        JOIN Races r ON r.RoundId=pl.RoundId AND r.RaceNumber=pl.RaceNo
+        JOIN @Sp a ON a.N=pl.PairIdx
+        JOIN Users o ON o.Username=CONCAT('spring26_owner0',a.N)
+        JOIN Horses h ON h.OwnerId=o.UserId AND h.[Name]=a.HorseName
+        JOIN Pairings pg ON pg.TournamentId=@SpTId AND pg.HorseId=h.HorseId;
 
-        SET IDENTITY_INSERT dbo.Rounds OFF;
-    END
+        /* Biên bản trận đua — đã khóa */
+        INSERT RaceReports (RaceId,LeadRefereeId,Notes,IsLocked,SubmittedAt,LockedAt)
+        SELECT r.RaceId,CASE WHEN r.RaceNumber=2 AND r.RoundId=@SpQ THEN @Ref2 ELSE @Ref1 END,
+               N'Trận đua diễn ra đúng lịch, không có khiếu nại.',1,
+               DATEADD(HOUR,1,r.ScheduledTime),DATEADD(HOUR,3,r.ScheduledTime)
+        FROM Races r WHERE r.RoundId IN (@SpQ,@SpF);
 
-    IF NOT EXISTS (SELECT 1 FROM dbo.Races WHERE RaceId IN (9001, 9002, 9003, 9004, 9005, 9006))
-    BEGIN
-        SET IDENTITY_INSERT dbo.Races ON;
+        /* Payout đã trả: mỗi race Top 3 theo 50/30/20; chia Owner 80% / Jockey 20% */
+        INSERT PursePayouts (RaceEntryId,RecipientUserId,[Role],CalculatedAmount,PayoutStatus,PaidAt,UpdatedByAdminId,UpdatedAt)
+        SELECT e.RaceEntryId,
+               CASE part.[Role] WHEN 'Owner' THEN h.OwnerId ELSE pg.JockeyId END,
+               part.[Role],
+               ROUND(r.PurseAmount * pd.Percentage/100.0 * CASE part.[Role] WHEN 'Owner' THEN 0.8 ELSE 0.2 END, 0),
+               'Paid', DATEADD(DAY,1,r.ScheduledTime), @AdminId, DATEADD(DAY,1,r.ScheduledTime)
+        FROM RaceEntries e
+        JOIN Races r ON r.RaceId=e.RaceId AND r.RoundId IN (@SpQ,@SpF)
+        JOIN PrizeDistributions pd ON pd.TournamentId=@SpTId AND pd.[Position]=e.FinishPosition
+        JOIN Pairings pg ON pg.PairingId=e.PairingId
+        JOIN Horses h ON h.HorseId=pg.HorseId
+        CROSS JOIN (VALUES ('Owner'),('Jockey')) part([Role])
+        WHERE e.FinishPosition<=3;
 
-        INSERT INTO dbo.Races
-            (RaceId, RoundId, RaceNumber, ScheduledTime, PurseAmount, TrackTypeOverride,
-             RaceDistanceOverride, Status, IsPostPositionDrawn, IsPredictionGateClosed,
-             ConfirmationCutoffHours, ProtestDeadlineMinutes, CreatedAt, UpdatedAt)
-        VALUES
-            (9001, 9001, 1, '2026-07-10T09:00:00',  8000000.00, NULL, NULL, N'Upcoming', 0, 0, 24, 30, @Now, @Now),
-            (9002, 9001, 2, '2026-07-10T14:00:00',  8000000.00, NULL, NULL, N'Upcoming', 0, 0, 24, 30, @Now, @Now),
-            (9003, 9002, 1, '2026-07-11T09:00:00', 12000000.00, NULL, 2000, N'Upcoming', 0, 0, 24, 30, @Now, @Now),
-            (9004, 9002, 2, '2026-07-11T14:00:00', 12000000.00, N'Dirt', 2000, N'Upcoming', 0, 0, 24, 30, @Now, @Now),
-            (9005, 9003, 1, '2026-07-12T10:00:00', 20000000.00, NULL, 2000, N'Upcoming', 0, 0, 24, 30, @Now, @Now),
-            (9006, 9003, 2, '2026-07-12T15:00:00', 30000000.00, NULL, 2000, N'Upcoming', 0, 0, 24, 30, @Now, @Now);
-
-        SET IDENTITY_INSERT dbo.Races OFF;
-    END
-
-    -- Roster: Owner + Jockey + Referee + Doctor đã Approved trong giải 9001
-    IF NOT EXISTS (SELECT 1 FROM dbo.TournamentParticipants WHERE ParticipantId IN (9401, 9402, 9403, 9404))
-    BEGIN
-        SET IDENTITY_INSERT dbo.TournamentParticipants ON;
-
-        INSERT INTO dbo.TournamentParticipants
-            (ParticipantId, TournamentId, UserId, [Role], [Status], ScreeningStatus,
-             ScreeningReason, RejectionReason, RegisteredAt, ApprovedBy, ApprovedAt)
-        VALUES
-            (9401, 9001, 9002, N'Owner',   N'Approved', N'AutoEligible', N'Owner active va dinh danh day du.', NULL, @Now, 9001, @Now),
-            (9402, 9001, 9003, N'Jockey',  N'Approved', N'AutoEligible', N'Jockey du kinh nghiem toi thieu.', NULL, @Now, 9001, @Now),
-            (9403, 9001, 9004, N'Referee', N'Approved', N'AutoEligible', N'Trong tai da active.', NULL, @Now, 9001, @Now),
-            (9404, 9001, 9005, N'Doctor',  N'Approved', N'AutoEligible', N'Bac si da active.', NULL, @Now, 9001, @Now);
-
-        SET IDENTITY_INSERT dbo.TournamentParticipants OFF;
-    END
-
-    -- Kho ngua (schema v3): ho so vinh vien cua Owner 9002, KHONG gan giai
-    IF NOT EXISTS (SELECT 1 FROM dbo.Horses WHERE HorseId IN (9501, 9502))
-    BEGIN
-        SET IDENTITY_INSERT dbo.Horses ON;
-
-        INSERT INTO dbo.Horses
-            (HorseId, OwnerId, [Name], BirthYear, Gender, Color, Pedigree, Weight,
-             IdentifyingMarks, Breed, VaccinationRecordRef, DopingTestDate, DopingTestResult,
-             LegalConsentAccepted, [Status], ScreeningStatus, ScreeningReason, AdminApprovalStatus,
-             RejectionReason, CreatedAt, UpdatedAt)
-        VALUES
-            (9501, 9002, N'Hong Linh', 2020, N'Male', N'Nau sam', N'Sire A x Dam A', 472.50,
-             N'Vet trang nho o tran', N'Thoroughbred', N'VAC-HL-2026', '2026-06-20', N'Clean',
-             1, N'Active', N'AutoEligible', NULL, N'Approved', NULL, @Now, @Now),
-            (9502, 9002, N'Bach Ma Son', 2019, N'Gelding', N'Xam', N'Sire B x Dam B', 468.00,
-             N'Chan sau trai co khoang trang', N'Thoroughbred', N'VAC-BMS-2026', '2026-06-20', N'Clean',
-             1, N'Active', N'AutoEligible', NULL, N'Approved', NULL, @Now, @Now);
-
-        SET IDENTITY_INSERT dbo.Horses OFF;
-    END
-
-    -- Enrollment (HorseTournamentEntries): day 2 con ngua vao giai 9001, screening theo giai
-    IF OBJECT_ID(N'dbo.HorseTournamentEntries', N'U') IS NOT NULL
-       AND NOT EXISTS (SELECT 1 FROM dbo.HorseTournamentEntries WHERE EnrollmentId IN (9551, 9552))
-    BEGIN
-        SET IDENTITY_INSERT dbo.HorseTournamentEntries ON;
-
-        INSERT INTO dbo.HorseTournamentEntries
-            (EnrollmentId, HorseId, TournamentId, OwnerId, [Status],
-             ScreeningStatus, ScreeningReason, AdminApprovalStatus, RejectionReason, CreatedAt, UpdatedAt)
-        VALUES
-            (9551, 9501, 9001, 9002, N'Enrolled', N'AutoEligible', N'Khop dieu kien giai.', N'Approved', NULL, @Now, @Now),
-            (9552, 9502, 9001, 9002, N'Enrolled', N'AutoEligible', N'Khop dieu kien giai.', N'Approved', NULL, @Now, @Now);
-
-        SET IDENTITY_INSERT dbo.HorseTournamentEntries OFF;
-    END
-
-    -- Pairings: ghep ngua da enroll voi Jockey 9003 trong giai 9001
-    IF NOT EXISTS (SELECT 1 FROM dbo.Pairings WHERE PairingId IN (9601, 9602))
-    BEGIN
-        SET IDENTITY_INSERT dbo.Pairings ON;
-
-        INSERT INTO dbo.Pairings
-            (PairingId, TournamentId, HorseId, JockeyId, [Status], RequestMessage, ResponseReason, CreatedAt, UpdatedAt)
-        VALUES
-            (9601, 9001, 9501, 9003, N'Accepted', N'Moi tham gia race vong loai.', N'Da nhan loi.', @Now, @Now),
-            (9602, 9001, 9502, 9003, N'Pending',  N'Moi du bi cho ban ket.', NULL, @Now, @Now);
-
-        SET IDENTITY_INSERT dbo.Pairings OFF;
-    END
-
-    -- RaceEntry mau: pairing 9601 da Confirmed + Paid trong Race 9001
-    IF NOT EXISTS (SELECT 1 FROM dbo.RaceEntries WHERE RaceEntryId = 9701)
-    BEGIN
-        SET IDENTITY_INSERT dbo.RaceEntries ON;
-
-        INSERT INTO dbo.RaceEntries
-            (RaceEntryId, RaceId, PairingId, PostPosition, [Status], PreRaceJockeyWeight,
-             PreRaceWeightByDoctorId, HorseIdentityCheckStatus, HorseIdentityCheckedByDoctorId,
-             HorseIdentityCheckedAt, ClinicalStatus, ClinicalCheckedByDoctorId, ClinicalCheckedAt,
-             EntryFeeStatus, EntryFeeConfirmedBy, EntryFeeConfirmedAt,
-             CreatedAt, UpdatedAt)
-        VALUES
-            (9701, 9001, 9601, 1, N'Confirmed', 53.60, 9005, N'Matched', 9005, @Now,
-             N'Fit', 9005, @Now, N'Paid', 9001, @Now, @Now, @Now);
-
-        SET IDENTITY_INSERT dbo.RaceEntries OFF;
-    END
-
-    /*
-      TicketRewardCodes demo (BR-63 / REQ-F-PRD.5).
-      - Raw code duoi day CHI dung cho demo/test thu cong — DB chi luu SHA-256 hash.
-      - Application KHONG BAO GIO log hay tra lai raw code sau khi tao.
-      - HASHBYTES dung literal VARCHAR (khong co tien to N) de bytes ASCII trung khop
-        voi UTF-8 bytes ma WalletService.HashCode dung khi redeem.
-      Raw codes demo:
-        TKT-DEMO00000001  (+200 diem, Active)
-        TKT-DEMO00000002  (+200 diem, Active)
-        TKT-DEMO00000003  (+500 diem, Active)
-        TKT-DEMO00000004  (+500 diem, Active)
-        TKT-DEMO00000005  (+200 diem, Expired — demo case ma het han)
-    */
-    IF NOT EXISTS (SELECT 1 FROM dbo.TicketRewardCodes
-                   WHERE CodeHash = HASHBYTES('SHA2_256', 'TKT-DEMO00000001'))
-    BEGIN
-        INSERT INTO dbo.TicketRewardCodes (CodeHash, PointAmount, [Status], ExpiresAt, CreatedAt)
-        VALUES
-            (HASHBYTES('SHA2_256', 'TKT-DEMO00000001'), 200, N'Active',  DATEADD(DAY, 365, @Now), @Now),
-            (HASHBYTES('SHA2_256', 'TKT-DEMO00000002'), 200, N'Active',  DATEADD(DAY, 365, @Now), @Now),
-            (HASHBYTES('SHA2_256', 'TKT-DEMO00000003'), 500, N'Active',  DATEADD(DAY, 365, @Now), @Now),
-            (HASHBYTES('SHA2_256', 'TKT-DEMO00000004'), 500, N'Active',  DATEADD(DAY, 365, @Now), @Now),
-            (HASHBYTES('SHA2_256', 'TKT-DEMO00000005'), 200, N'Expired', DATEADD(DAY, -1, @Now), @Now);
-    END
+        /* Thông báo lịch sử (in-app, đã đọc) cho 3 chủ ngựa đạt giải chung kết */
+        INSERT Notifications (RecipientId,Title,[Message],[Type],IsRead,RelatedEntityType,RelatedEntityId,SentAt,ReadAt)
+        SELECT h.OwnerId,
+               N'Kết quả chung kết Giải Mùa Xuân 2026',
+               CONCAT(N'Ngựa ',h.[Name],N' về hạng ',e.FinishPosition,N' tại chung kết. Tiền thưởng đã được chi trả.'),
+               'In-app',1,'Race',e.RaceId,'2026-03-22T18:00:00','2026-03-23T08:00:00'
+        FROM RaceEntries e
+        JOIN Races r ON r.RaceId=e.RaceId AND r.RoundId=@SpF
+        JOIN Pairings pg ON pg.PairingId=e.PairingId
+        JOIN Horses h ON h.HorseId=pg.HorseId
+        WHERE e.FinishPosition<=3;
+    END;
 
     COMMIT TRANSACTION;
 END TRY
 BEGIN CATCH
-    IF XACT_STATE() <> 0
-        ROLLBACK TRANSACTION;
-
-    IF OBJECTPROPERTY(OBJECT_ID(N'dbo.Users'), 'TableHasIdentity') = 1
-        BEGIN TRY SET IDENTITY_INSERT dbo.Users OFF; END TRY BEGIN CATCH PRINT N'Identity cleanup skipped for Users.'; END CATCH;
-    IF OBJECT_ID(N'dbo.Wallets', N'U') IS NOT NULL
-        BEGIN TRY SET IDENTITY_INSERT dbo.Wallets OFF; END TRY BEGIN CATCH PRINT N'Identity cleanup skipped for Wallets.'; END CATCH;
-    IF OBJECT_ID(N'dbo.VirtualPointsTransactions', N'U') IS NOT NULL
-        BEGIN TRY SET IDENTITY_INSERT dbo.VirtualPointsTransactions OFF; END TRY BEGIN CATCH PRINT N'Identity cleanup skipped for VirtualPointsTransactions.'; END CATCH;
-    IF OBJECTPROPERTY(OBJECT_ID(N'dbo.Tournaments'), 'TableHasIdentity') = 1
-        BEGIN TRY SET IDENTITY_INSERT dbo.Tournaments OFF; END TRY BEGIN CATCH PRINT N'Identity cleanup skipped for Tournaments.'; END CATCH;
-    IF OBJECTPROPERTY(OBJECT_ID(N'dbo.Rounds'), 'TableHasIdentity') = 1
-        BEGIN TRY SET IDENTITY_INSERT dbo.Rounds OFF; END TRY BEGIN CATCH PRINT N'Identity cleanup skipped for Rounds.'; END CATCH;
-    IF OBJECTPROPERTY(OBJECT_ID(N'dbo.Races'), 'TableHasIdentity') = 1
-        BEGIN TRY SET IDENTITY_INSERT dbo.Races OFF; END TRY BEGIN CATCH PRINT N'Identity cleanup skipped for Races.'; END CATCH;
-    IF OBJECTPROPERTY(OBJECT_ID(N'dbo.TournamentParticipants'), 'TableHasIdentity') = 1
-        BEGIN TRY SET IDENTITY_INSERT dbo.TournamentParticipants OFF; END TRY BEGIN CATCH PRINT N'Identity cleanup skipped for TournamentParticipants.'; END CATCH;
-    IF OBJECTPROPERTY(OBJECT_ID(N'dbo.Horses'), 'TableHasIdentity') = 1
-        BEGIN TRY SET IDENTITY_INSERT dbo.Horses OFF; END TRY BEGIN CATCH PRINT N'Identity cleanup skipped for Horses.'; END CATCH;
-    IF OBJECT_ID(N'dbo.HorseTournamentEntries', N'U') IS NOT NULL
-        BEGIN TRY SET IDENTITY_INSERT dbo.HorseTournamentEntries OFF; END TRY BEGIN CATCH PRINT N'Identity cleanup skipped for HorseTournamentEntries.'; END CATCH;
-    IF OBJECTPROPERTY(OBJECT_ID(N'dbo.Pairings'), 'TableHasIdentity') = 1
-        BEGIN TRY SET IDENTITY_INSERT dbo.Pairings OFF; END TRY BEGIN CATCH PRINT N'Identity cleanup skipped for Pairings.'; END CATCH;
-    IF OBJECTPROPERTY(OBJECT_ID(N'dbo.RaceEntries'), 'TableHasIdentity') = 1
-        BEGIN TRY SET IDENTITY_INSERT dbo.RaceEntries OFF; END TRY BEGIN CATCH PRINT N'Identity cleanup skipped for RaceEntries.'; END CATCH;
-
+    IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
     THROW;
 END CATCH;
 
+/* ------------------------------------------------------------------ KIỂM CHỨNG */
+SELECT [Role],COUNT(*) AS SoTaiKhoan
+FROM Users
+WHERE Username LIKE 'summer26_%' OR Username IN ('nguyenan_owner','nguyenan_jockey')
+GROUP BY [Role] ORDER BY [Role];
 
+SELECT t.TournamentId,t.[Name],t.[Status],t.StartDate,t.EndDate,t.MaxHorses,t.AdvancementRule,t.AdvancementCount,
+ (SELECT COUNT(*) FROM Rounds rd WHERE rd.TournamentId=t.TournamentId) SoRound,
+ (SELECT COUNT(*) FROM Races r JOIN Rounds rd ON rd.RoundId=r.RoundId WHERE rd.TournamentId=t.TournamentId) SoRace,
+ (SELECT COUNT(*) FROM Pairings p WHERE p.TournamentId=t.TournamentId) SoPairing
+FROM Tournaments t
+WHERE t.[Name] IN (N'GIẢI ĐUA NGỰA MÙA HÈ 2026',N'GIẢI GIAO HỮU THÁNG 9-2026',N'GIẢI ĐUA NGỰA MÙA XUÂN 2026')
+ORDER BY t.StartDate;
 
+-- Giải đã kết thúc: đối chiếu tổng payout mỗi race = PurseAmount
+SELECT rd.[Name] AS Vong,r.RaceNumber,r.PurseAmount,SUM(pp.CalculatedAmount) AS TongDaTra
+FROM PursePayouts pp
+JOIN RaceEntries e ON e.RaceEntryId=pp.RaceEntryId
+JOIN Races r ON r.RaceId=e.RaceId
+JOIN Rounds rd ON rd.RoundId=r.RoundId
+JOIN Tournaments t ON t.TournamentId=rd.TournamentId AND t.[Name]=N'GIẢI ĐUA NGỰA MÙA XUÂN 2026'
+GROUP BY rd.SequenceOrder,rd.[Name],r.RaceNumber,r.PurseAmount ORDER BY rd.SequenceOrder,r.RaceNumber;
 
+SELECT Code,PointAmount,[Status],ExpiresAt FROM TicketRewardCodes WHERE Code LIKE 'TKT-DEMO%' ORDER BY Code;
 
-
-
-
+SELECT N'Seed hợp nhất hoàn tất: Admin + 2 tài khoản chính + 37 cặp hỗ trợ + staff + tournament 4/2/1 + 5 mã ticket.' AS KetQua;
