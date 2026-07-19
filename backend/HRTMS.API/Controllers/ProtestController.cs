@@ -88,13 +88,52 @@ public class ProtestController : ControllerBase
             return StatusCode(StatusCodes.Status403Forbidden,
                 ApiResponse<ProtestRulingResultDto>.Fail("Referee is not assigned to this race."));
         }
+        catch (InvalidOperationException ex) when (ex.Message is "RACE_NOT_UNOFFICIAL" or "RACE_REPORT_LOCKED" or "PROTEST_ALREADY_RESOLVED")
+        {
+            return Conflict(ApiResponse<ProtestRulingResultDto>.Fail(MapRulingError(ex.Message)));
+        }
         catch (ArgumentException ex)
         {
             return BadRequest(ApiResponse<ProtestRulingResultDto>.Fail(MapRulingError(ex.Message)));
         }
-        catch (InvalidOperationException ex) when (ex.Message is "RACE_NOT_UNOFFICIAL" or "RACE_REPORT_LOCKED" or "PROTEST_ALREADY_RESOLVED")
+    }
+
+    // Referee can manually close the protest window early (min 5 minutes after
+    // the preliminary result was submitted) instead of waiting the full
+    // Race.ProtestDeadlineMinutes, so the race can move to Official sooner.
+    [HttpPost("races/{raceId:int}/close-window")]
+    [Authorize(Roles = "Referee")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> CloseWindow(int raceId)
+    {
+        if (!TryGetUserId(out var refereeId))
+            return Unauthorized(ApiResponse<object>.Fail("Invalid session."));
+
+        try
         {
-            return Conflict(ApiResponse<ProtestRulingResultDto>.Fail(MapRulingError(ex.Message)));
+            await _protestService.CloseWindowEarlyAsync(raceId, refereeId);
+            return Ok(ApiResponse<object>.Ok(null!, "Protest window closed."));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(ApiResponse<object>.Fail("Race was not found."));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden,
+                ApiResponse<object>.Fail("Referee is not assigned to this race."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message is "RACE_NOT_UNOFFICIAL" or "RACE_REPORT_LOCKED")
+        {
+            return Conflict(ApiResponse<object>.Fail("The race is not in a state where the protest window can be closed."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "MIN_WINDOW_NOT_ELAPSED")
+        {
+            return Conflict(ApiResponse<object>.Fail("The protest window can only be closed after at least 5 minutes."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "PROTEST_WINDOW_ALREADY_CLOSED")
+        {
+            return Conflict(ApiResponse<object>.Fail("The protest window is already closed."));
         }
     }
 

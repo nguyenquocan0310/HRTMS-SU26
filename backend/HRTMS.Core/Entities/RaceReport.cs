@@ -19,6 +19,8 @@ public partial class RaceReport
 
     public DateTime? LockedAt { get; set; }
 
+    public DateTime? ProtestWindowClosedAt { get; set; }
+
     public virtual RefereeProfile LeadReferee { get; set; } = null!;
 
     public virtual Race Race { get; set; } = null!;
