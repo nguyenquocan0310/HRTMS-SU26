@@ -14,6 +14,62 @@ public class StartingListService : IStartingListService
         _context = context;
     }
 
+    // Preview read-only danh sach xuat phat truoc khi Referee confirm.
+    public async Task<List<StartingListEntryDto>> GetRaceEntriesAsync(
+        int refereeId,
+        int raceId)
+    {
+        var referee = await _context.RefereeProfiles
+            .Include(r => r.Referee)
+            .FirstOrDefaultAsync(r => r.RefereeId == refereeId)
+            ?? throw new KeyNotFoundException("REFEREE_NOT_FOUND");
+
+        if (referee.Referee.Role != "Referee")
+            throw new InvalidOperationException("USER_NOT_REFEREE");
+
+        if (referee.Status != "Active")
+            throw new InvalidOperationException("REFEREE_NOT_ACTIVE");
+
+        var raceExists = await _context.Races.AnyAsync(r => r.RaceId == raceId);
+        if (!raceExists)
+            throw new KeyNotFoundException("RACE_NOT_FOUND");
+
+        var assigned = await _context.RefereeAssignments.AnyAsync(a =>
+            a.RaceId == raceId && a.RefereeId == refereeId);
+        if (!assigned)
+            throw new InvalidOperationException("REFEREE_NOT_ASSIGNED_TO_RACE");
+
+        var entries = await _context.RaceEntries
+            .AsNoTracking()
+            .Include(e => e.Pairing)
+                .ThenInclude(p => p.Horse)
+                    .ThenInclude(h => h.Owner)
+                        .ThenInclude(o => o.Owner)
+            .Include(e => e.Pairing)
+                .ThenInclude(p => p.Jockey)
+                    .ThenInclude(j => j.Jockey)
+            .Where(e => e.RaceId == raceId)
+            .OrderBy(e => e.PostPosition)
+            .ThenBy(e => e.RaceEntryId)
+            .ToListAsync();
+
+        return entries.Select(entry => new StartingListEntryDto
+        {
+            RaceEntryId = entry.RaceEntryId,
+            RaceId = entry.RaceId,
+            PairingId = entry.PairingId,
+            HorseName = entry.Pairing.Horse.Name,
+            JockeyName = entry.Pairing.Jockey.Jockey.FullName,
+            OwnerName = entry.Pairing.Horse.Owner.Owner.FullName,
+            PostPosition = entry.PostPosition,
+            Status = entry.Status,
+            PreRaceJockeyWeight = entry.PreRaceJockeyWeight,
+            HorseIdentityCheckStatus = entry.HorseIdentityCheckStatus,
+            ClinicalStatus = entry.ClinicalStatus,
+            RejectionReason = GetRejectionReason(entry)
+        }).ToList();
+    }
+
     public async Task<ConfirmStartingListResultDto> ConfirmStartingListAsync(
         int refereeId,
         int raceId)
@@ -137,15 +193,17 @@ public class StartingListService : IStartingListService
             throw new InvalidOperationException("NO_ELIGIBLE_STARTING_ENTRIES");
         }
 
-        // Danh sach xuat phat da duoc confirm chinh thuc -> KHOA lai bang cach chuyen
-        // Race sang "Pre-Race". Tu day 4 buoc check (weight/identity/clinical/independence)
-        // va Withdraw deu bi chan (guard != "Upcoming"), chi con Start Race di tiep.
+        // Danh sach xuat phat da duoc confirm chinh thuc -> khoa danh sach bang cach chuyen
+        // Race sang "Pre-Race" va mo cong du doan. Tu day 4 buoc check
+        // (weight/identity/clinical/independence) va Withdraw deu bi chan
+        // (guard != "Upcoming"), chi con Start Race di tiep.
         // Bọc transaction de update reject entries + doi status la nguyen tu.
         await using var tx = await _context.Database.BeginTransactionAsync();
         try
         {
             race.Status = "Pre-Race";
             race.IsPostPositionDrawn = true;
+            race.IsPredictionGateClosed = false;
             race.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();

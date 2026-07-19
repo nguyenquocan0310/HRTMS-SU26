@@ -50,6 +50,7 @@ export interface RefereeRaceEntry {
   pairingId: number | null;
   postPosition: number | null;
   status: string;
+  isWithdrawn: boolean;
   raceEntryStatus: string | null;
   horseName: string;
   jockeyName: string;
@@ -57,6 +58,7 @@ export interface RefereeRaceEntry {
   preRaceJockeyWeight: number | null;
   horseIdentityCheckStatus: string | null;
   clinicalStatus: string | null;
+  rejectionReason: string | null;
 }
 
 export interface StartingListEntry {
@@ -115,6 +117,7 @@ export interface RaceViolation {
   placeBehindEntryId?: number | null;
   description?: string | null;
   recordedAt?: string | null;
+  loggedAt?: string | null;
   refereeName?: string | null;
 }
 
@@ -126,10 +129,18 @@ export interface CreateViolationPayload {
   description: string;
 }
 
+export type UpdateViolationPayload = Omit<CreateViolationPayload, 'raceEntryId'>;
+
+export interface ViolationCodeOption {
+  code: string;
+  name: string;
+  description: string;
+}
+
 export interface FinishRaceResult {
   raceEntryId: number;
   finishPosition: number;
-  finishTime: number;
+  finishTime?: number;
 }
 
 export interface FinishRacePayload {
@@ -137,10 +148,20 @@ export interface FinishRacePayload {
   results: FinishRaceResult[];
 }
 
-const extractArray = (res: any): any[] => {
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value !== null && typeof value === 'object' ? value as Record<string, unknown> : {};
+const numberOrNull = (value: unknown): number | null => typeof value === 'number' && Number.isFinite(value) ? value : null;
+const numberOrUndefined = (value: unknown): number | undefined => typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+const stringOrNull = (value: unknown): string | null => typeof value === 'string' ? value : null;
+const stringOrUndefined = (value: unknown): string | undefined => typeof value === 'string' ? value : undefined;
+
+const extractArray = (res: unknown): unknown[] => {
   if (Array.isArray(res)) return res;
-  if (Array.isArray(res?.data)) return res.data;
-  if (Array.isArray(res?.data?.items)) return res.data.items;
+  const root = asRecord(res);
+  if (Array.isArray(root.data)) return root.data;
+  const data = asRecord(root.data);
+  if (Array.isArray(data.items)) return data.items;
+  if (Array.isArray(data.entries)) return data.entries;
   return [];
 };
 
@@ -155,46 +176,53 @@ const unwrapData = <T>(res: ApiResponse<T> | T): T => {
   return res as T;
 };
 
-const normalizeAssignment = (item: any): RefereeRaceAssignment | null => {
-  const raceId = Number(item?.raceId);
+const normalizeAssignment = (value: unknown): RefereeRaceAssignment | null => {
+  const item = asRecord(value);
+  const raceId = Number(item.raceId);
   if (!Number.isFinite(raceId)) return null;
 
   return {
     raceId,
-    raceNumber: item?.raceNumber ?? null,
-    scheduledTime: item?.scheduledTime ?? null,
-    raceStatus: item?.raceStatus ?? item?.status ?? null,
-    roundId: item?.roundId ?? null,
-    roundName: item?.roundName ?? null,
-    tournamentId: item?.tournamentId ?? null,
-    tournamentName: item?.tournamentName ?? null,
-    refereeId: item?.refereeId,
-    refereeName: item?.refereeName,
-    refereeEmail: item?.refereeEmail,
-    certificationLevel: item?.certificationLevel,
-    role: item?.role ?? item?.assignmentRole ?? null,
-    assignmentRole: item?.assignmentRole ?? item?.role ?? null,
-    assignedAt: item?.assignedAt ?? new Date().toISOString(),
+    raceNumber: numberOrNull(item.raceNumber),
+    scheduledTime: stringOrNull(item.scheduledTime),
+    raceStatus: stringOrNull(item.raceStatus ?? item.status),
+    roundId: numberOrNull(item.roundId),
+    roundName: stringOrNull(item.roundName),
+    tournamentId: numberOrNull(item.tournamentId),
+    tournamentName: stringOrNull(item.tournamentName),
+    refereeId: numberOrUndefined(item.refereeId),
+    refereeName: stringOrUndefined(item.refereeName),
+    refereeEmail: stringOrUndefined(item.refereeEmail),
+    certificationLevel: stringOrUndefined(item.certificationLevel),
+    role: stringOrUndefined(item.role ?? item.assignmentRole),
+    assignmentRole: stringOrNull(item.assignmentRole ?? item.role),
+    assignedAt: typeof item.assignedAt === 'string' ? item.assignedAt : '',
   };
 };
 
-const normalizeRaceEntry = (item: any): RefereeRaceEntry | null => {
-  const raceEntryId = Number(item?.raceEntryId ?? item?.id);
+const normalizeRaceEntry = (value: unknown): RefereeRaceEntry | null => {
+  const item = asRecord(value);
+  const horse = asRecord(item.horse);
+  const jockey = asRecord(item.jockey);
+  const owner = asRecord(item.owner);
+  const raceEntryId = Number(item.raceEntryId ?? item.id);
   if (!Number.isFinite(raceEntryId)) return null;
 
   return {
     raceEntryId,
-    raceId: item?.raceId ?? null,
-    pairingId: item?.pairingId ?? null,
-    postPosition: item?.postPosition ?? null,
-    status: item?.status ?? item?.raceEntryStatus ?? 'Unknown',
-    raceEntryStatus: item?.raceEntryStatus ?? item?.status ?? null,
-    horseName: item?.horse?.name ?? item?.horseName ?? 'Chưa có tên',
-    jockeyName: item?.jockey?.fullName ?? item?.jockeyName ?? 'Chưa có kỵ sĩ',
-    ownerName: item?.owner?.fullName ?? item?.ownerName ?? null,
-    preRaceJockeyWeight: item?.preRaceJockeyWeight ?? null,
-    horseIdentityCheckStatus: item?.horseIdentityCheckStatus ?? null,
-    clinicalStatus: item?.clinicalStatus ?? null,
+    raceId: numberOrNull(item.raceId),
+    pairingId: numberOrNull(item.pairingId),
+    postPosition: numberOrNull(item.postPosition),
+    status: stringOrNull(item.status ?? item.raceEntryStatus) ?? 'Unknown',
+    isWithdrawn: item.isWithdrawn === true,
+    raceEntryStatus: stringOrNull(item.raceEntryStatus ?? item.status),
+    horseName: String(horse.name ?? item.horseName ?? 'Chưa có tên'),
+    jockeyName: String(jockey.fullName ?? item.jockeyName ?? 'Chưa có kỵ sĩ'),
+    ownerName: owner.fullName != null ? String(owner.fullName) : item.ownerName != null ? String(item.ownerName) : null,
+    preRaceJockeyWeight: numberOrNull(item.preRaceJockeyWeight),
+    horseIdentityCheckStatus: stringOrNull(item.horseIdentityCheckStatus),
+    clinicalStatus: stringOrNull(item.clinicalStatus),
+    rejectionReason: stringOrNull(item.rejectionReason),
   };
 };
 
@@ -214,14 +242,14 @@ export const updateRefereeProfile = async (
 };
 
 export const getMyRefereeRaceAssignments = async (): Promise<RefereeRaceAssignment[]> => {
-  const res = await apiFetch<any>('/referees/race-assignments/my');
+  const res = await apiFetch<unknown>('/referees/race-assignments/my');
   return extractArray(res)
     .map(normalizeAssignment)
     .filter((item): item is RefereeRaceAssignment => item !== null);
 };
 
 export const getRefereeRaceEntries = async (raceId: number): Promise<RefereeRaceEntry[]> => {
-  const res = await apiFetch<any>(`/races/${raceId}/entries`);
+  const res = await apiFetch<unknown>(`/referee/race-entries/races/${raceId}/entries`);
   return extractArray(res)
     .map(normalizeRaceEntry)
     .filter((item): item is RefereeRaceEntry => item !== null);
@@ -250,6 +278,11 @@ export const getRaceViolations = async (raceId: number): Promise<RaceViolation[]
   return unwrapData(res);
 };
 
+export const getViolationCodes = async (): Promise<ViolationCodeOption[]> => {
+  const res = await apiFetch<ApiResponse<ViolationCodeOption[]> | ViolationCodeOption[]>('/violations/codes');
+  return unwrapData(res);
+};
+
 export const startRace = async (raceId: number): Promise<Partial<RaceLiveStatus>> => {
   const res = await apiFetch<ApiResponse<Partial<RaceLiveStatus>> | Partial<RaceLiveStatus>>(
     `/referees/races/${raceId}/start`,
@@ -267,6 +300,22 @@ export const createRaceViolation = async (
     { method: 'POST', body: JSON.stringify(payload) }
   );
   return unwrapData(res);
+};
+
+export const updateRaceViolation = async (
+  raceId: number,
+  violationId: number,
+  payload: UpdateViolationPayload
+): Promise<RaceViolation> => {
+  const res = await apiFetch<ApiResponse<RaceViolation> | RaceViolation>(
+    `/referees/races/${raceId}/violations/${violationId}`,
+    { method: 'PATCH', body: JSON.stringify(payload) }
+  );
+  return unwrapData(res);
+};
+
+export const deleteRaceViolation = async (raceId: number, violationId: number): Promise<void> => {
+  await apiFetch<void>(`/referees/races/${raceId}/violations/${violationId}`, { method: 'DELETE' });
 };
 
 export const finishRace = async (

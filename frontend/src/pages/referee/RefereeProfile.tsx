@@ -10,6 +10,7 @@ import {
   type RefereeProfile as RefereeProfessionalProfile,
 } from '../../services/refereeService'
 import type { RefereeRoleProfile, UserProfile } from '../../types/account.types'
+import CertificateViewer from '../../components/common/CertificateViewer'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const CERTIFICATION_MAX_LENGTH = 50
@@ -25,13 +26,6 @@ const formatDate = (value?: string) => {
   return Number.isNaN(date.getTime())
     ? value
     : new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
-}
-
-const formatFileSize = (bytes?: number) => {
-  if (bytes === undefined || bytes === null) return 'Chưa có thông tin'
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 const statusClass = (status: string) => {
@@ -201,11 +195,9 @@ export default function RefereeProfile() {
 
   const inputClass = 'mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100'
   const readOnlyClass = 'mt-2 min-h-10 rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-medium text-gray-700'
-  const certificate = account.profile?.certificate
-
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div><p className="text-xs font-semibold uppercase tracking-widest text-blue-600">Tài khoản trọng tài</p><h1 className="mt-2 text-3xl font-bold text-gray-900">Hồ sơ và bảo mật</h1><p className="mt-1 text-sm text-gray-500">Quản lý thông tin tài khoản, hồ sơ chuyên môn và mật khẩu đăng nhập.</p></div>
+      <div><p className="text-xs font-black uppercase tracking-[.16em] text-blue-700">Hồ sơ Referee</p><h1 className="mt-1 text-2xl font-black text-slate-950 sm:text-3xl">Hồ sơ và bảo mật</h1><p className="mt-2 text-sm text-slate-500">Quản lý thông tin tài khoản, hồ sơ chuyên môn và mật khẩu đăng nhập.</p></div>
 
       <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="border-b border-gray-100 pb-4"><h2 className="text-lg font-bold text-gray-900">Thông tin tài khoản</h2><p className="mt-1 text-sm text-gray-500">Username, role và trạng thái tài khoản là thông tin chỉ đọc.</p></div>
@@ -230,11 +222,7 @@ export default function RefereeProfile() {
         </form>
       </section>
 
-      <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <div className="border-b border-gray-100 pb-4"><h2 className="text-lg font-bold text-gray-900">Chứng chỉ</h2><p className="mt-1 text-sm text-gray-500">Metadata của tệp chứng chỉ hiện có (chỉ đọc).</p></div>
-        {certificate ? <div className="mt-5 grid gap-4 sm:grid-cols-2"><div><p className="text-sm font-semibold text-gray-700">Tên tệp</p><p className={readOnlyClass}>{certificate.fileName}</p></div><div><p className="text-sm font-semibold text-gray-700">Content type</p><p className={readOnlyClass}>{certificate.contentType || 'Không xác định'}</p></div><div><p className="text-sm font-semibold text-gray-700">Kích thước</p><p className={readOnlyClass}>{formatFileSize(certificate.fileSizeBytes)}</p></div><div><p className="text-sm font-semibold text-gray-700">Ngày tải lên</p><p className={readOnlyClass}>{formatDate(certificate.uploadedAt)}</p></div></div> : <p className="mt-5 rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">Chưa có metadata chứng chỉ.</p>}
-        <p className="mt-4 rounded-md border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">Chức năng cập nhật file chứng chỉ đang chờ Backend hỗ trợ.</p>
-      </section>
+      <CertificateViewer certificate={account.profile?.certificate} />
 
       <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="border-b border-gray-100 pb-4"><h2 className="text-lg font-bold text-gray-900">Bảo mật</h2><p className="mt-1 text-sm text-gray-500">Đổi mật khẩu đăng nhập mà không làm gián đoạn phiên hiện tại.</p></div>

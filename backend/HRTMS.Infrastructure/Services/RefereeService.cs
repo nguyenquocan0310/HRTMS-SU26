@@ -103,6 +103,8 @@ public class RefereeService : IRefereeService
         Email = referee.Referee.Email,
         CertificationLevel = referee.CertificationLevel,
         Status = referee.Status,
+        PhoneNumber = referee.Referee.PhoneNumber,
+        DateOfBirth = referee.Referee.DateOfBirth,
         CreatedAt = referee.CreatedAt
     };
 }

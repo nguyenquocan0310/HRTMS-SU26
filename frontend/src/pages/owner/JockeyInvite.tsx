@@ -524,7 +524,40 @@ export default function JockeyInvite() {
                             {new Date(invitation.invitedAt).toLocaleDateString('vi-VN')}
                           </td>
                           <td className="px-4 py-3">
-                            {invitation.status === 'Accepted' || canCancel ? (
+                            {invitation.status === 'Confirmed' ? (
+                              <button
+                                type="button"
+                                disabled
+                                className="inline-flex cursor-not-allowed items-center whitespace-nowrap rounded-full border border-gray-200 bg-gray-100 px-3.5 py-2 text-xs font-bold text-gray-500"
+                              >
+                                Xác nhận ghép cặp
+                              </button>
+                            ) : invitation.status === 'Cancelled' ? (
+                              <button
+                                type="button"
+                                disabled
+                                className="inline-flex cursor-not-allowed items-center whitespace-nowrap rounded-full border border-gray-200 bg-gray-100 px-3.5 py-2 text-xs font-bold text-gray-500"
+                              >
+                                Hủy lời mời
+                              </button>
+                            ) : invitation.status === 'Declined' ? (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <button
+                                  type="button"
+                                  disabled
+                                  className="inline-flex cursor-not-allowed items-center whitespace-nowrap rounded-full border border-gray-200 bg-gray-100 px-3.5 py-2 text-xs font-bold text-gray-500"
+                                >
+                                  Xác nhận ghép cặp
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled
+                                  className="inline-flex cursor-not-allowed items-center whitespace-nowrap rounded-full border border-gray-200 bg-gray-100 px-3.5 py-2 text-xs font-bold text-gray-500"
+                                >
+                                  Hủy lời mời
+                                </button>
+                              </div>
+                            ) : invitation.status === 'Accepted' || canCancel ? (
                               <div className="flex flex-wrap items-center gap-2">
                                 {invitation.status === 'Accepted' && (
                                   <button

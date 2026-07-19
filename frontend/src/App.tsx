@@ -12,13 +12,13 @@ import TournamentBuilder from './components/admin/TournamentBuilder'
 import TournamentHub from './pages/admin/TournamentHub'
 import Leaderboard from './pages/admin/Leaderboard'
 import LiveRaceView from './pages/admin/LiveRaceView'
-import NotificationCenter from './pages/admin/NotificationCenter'
 import MyAccount from './pages/admin/MyAccount'
 import AssignOfficials from './pages/admin/AssignOfficials'
 import PursePayouts from './pages/admin/PursePayouts';
 import TicketCodeManagement from './pages/admin/TicketCodeManagement';
 import Reports from './pages/admin/Reports';
 import AuditLog from './pages/admin/AuditLog';
+import NotificationCenter from './pages/admin/NotificationCenter';
 
 
 // ── Import các trang Owner ──
@@ -40,6 +40,7 @@ import MyRaces from './pages/jockey/MyRaces'
 import RaceHistory from './pages/jockey/RaceHistory'
 import ProfileDeclaration from './pages/jockey/ProfileDeclaration'
 import JockeyTournamentList from './pages/jockey/JockeyTournamentList'
+import JockeyDashboard from './pages/jockey/JockeyDashboard'
 
 // ── Import các trang shared ──
 import Protest from './pages/shared/Protest'
@@ -83,6 +84,7 @@ interface ProtectedRouteProps {
 function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
   const { isAuthenticated, user } = useAuthStore()
   if (import.meta.env.DEV) return <>{children}</>
+
   if (!isAuthenticated) return <Navigate to="/login" replace />
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
     return <Navigate to="/unauthorized" replace />
@@ -141,14 +143,14 @@ export default function App() {
             <JockeyLayout />
           </ProtectedRoute>
         }>
-          <Route index element={<div>Jockey Dashboard</div>} />
+          <Route index element={<JockeyDashboard />} />
           <Route path="invitations" element={<InvitationList />} />
           <Route path="races" element={<MyRaces />} />
           <Route path="history" element={<RaceHistory />} />
           <Route path="profile-declaration" element={<ProfileDeclaration />} />
           <Route path="tournaments" element={<JockeyTournamentList />} />
-          <Route path="protest" element={<Protest userRole="Jockey" />} />
-          <Route path="notifications" element={<SharedNotificationCenter />} />
+          <Route path="protest" element={<Protest userRole="Jockey" iconless />} />
+          <Route path="notifications" element={<SharedNotificationCenter iconless />} />
         </Route>
 
         {/* ── Cấu trúc Route của BÁC SĨ (Doctor) ── */}
@@ -161,7 +163,7 @@ export default function App() {
           <Route path="paddock" element={<PaddockConsole />} />
           <Route path="tournaments" element={<DoctorTournamentList />} />
           <Route path="profile" element={<DoctorProfile />} />
-          <Route path="notifications" element={<SharedNotificationCenter />} />
+          <Route path="notifications" element={<SharedNotificationCenter iconless />} />
         </Route>
 
         {/* ── Cấu trúc Route của TRỌNG TÀI (Referee) ── */}
@@ -174,7 +176,7 @@ export default function App() {
           <Route path="tournaments" element={<RefereeTournamentList />} />
           <Route path="race-console" element={<RefereeRaceConsole />} />
           <Route path="profile" element={<RefereeProfile />} />
-          <Route path="notifications" element={<SharedNotificationCenter />} />
+          <Route path="notifications" element={<SharedNotificationCenter iconless />} />
         </Route>
 
         {/* ── Cấu trúc Route của KHÁN GIẢ (Spectator) ── */}
@@ -189,7 +191,7 @@ export default function App() {
           <Route path="my-predictions" element={<MyPredictions />} />
           <Route path="live-race" element={<SpectatorLiveRace />} />
           <Route path="leaderboard" element={<SpectatorLeaderboard />} />
-          <Route path="notifications" element={<SharedNotificationCenter />} />
+          <Route path="notifications" element={<SharedNotificationCenter iconless />} />
           <Route path="profile" element={<SpectatorProfile />} />
         </Route>
 

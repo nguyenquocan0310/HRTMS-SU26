@@ -37,17 +37,16 @@ export interface JockeyCareerStats {
  * Represents a race invitation sent to a jockey
  */
 export interface RaceInvitation {
-  invitationID: string;
-  raceID?: string;
-  ownerID: string;
+  pairingId: number;
+  ownerId: number;
   ownerName: string;
+  horseId: number;
   horseName: string;
   breedCode: string;
-  raceScheduledTime?: string;
   status: 'Pending' | 'Accepted' | 'Confirmed' | 'Declined' | 'Cancelled';
   invitedAt: string;
-  respondedAt?: string;
-  requestMessage?: string;
+  respondedAt: string | null;
+  requestMessage: string | null;
 }
 
 export interface JockeyRaceEntry {
@@ -73,7 +72,7 @@ export interface JockeyRaceEntry {
   clinicalStatus: string | null;
   postRaceJockeyWeight: number | null;
   finishPosition: number | null;
-  finishTime: string | null;
+  finishTime: number | null;
   pointsAwarded: number | null;
   earningsAwarded: number | null;
   entryFeeStatus: string;

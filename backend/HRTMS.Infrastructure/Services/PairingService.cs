@@ -543,6 +543,7 @@ public class PairingService : IPairingService
     }
 
     public async Task<PagedResult<AdminPairingDto>> GetAdminPairingsAsync(
+        int targetRaceId,
         int? tournamentId,
         string? status,
         bool unallocatedOnly,
@@ -569,25 +570,71 @@ public class PairingService : IPairingService
             throw new ArgumentException("INVALID_PAIRING_STATUS");
         }
 
-        var query = _context.Pairings
+        // Allocation list phai biet Race dich. Khong duoc liet ke pairing chung
+        // ca tournament vi round sau chi nhan pairing da qualify o round truoc.
+        var targetRace = await _context.Races
             .AsNoTracking()
-            .Where(p => p.Status == effectiveStatus);
+            .Include(r => r.Round)
+            .FirstOrDefaultAsync(r => r.RaceId == targetRaceId)
+            ?? throw new KeyNotFoundException("TARGET_RACE_NOT_FOUND");
 
-        if (tournamentId.HasValue)
+        var targetTournamentId = targetRace.Round.TournamentId;
+        var targetRoundId = targetRace.RoundId;
+        if (tournamentId.HasValue && tournamentId.Value != targetTournamentId)
         {
-            query = query.Where(p => p.TournamentId == tournamentId.Value);
+            throw new ArgumentException("TARGET_RACE_TOURNAMENT_MISMATCH");
         }
 
-        // Chi giu pairing CHUA co RaceEntry active (Pending/Confirmed) trong race CHUA ket thuc.
-        // Race da Official/Cancelled khong con "chiem cho" — pairing phai xuat hien lai
-        // de Admin allocate vao round ke tiep (multi-round).
+        var previousRound = await _context.Rounds
+            .AsNoTracking()
+            .Where(r => r.TournamentId == targetTournamentId &&
+                        r.SequenceOrder < targetRace.Round.SequenceOrder)
+            .OrderByDescending(r => r.SequenceOrder)
+            .FirstOrDefaultAsync();
+
+        var previousRoundId = previousRound?.RoundId;
+
+        var query = _context.Pairings
+            .AsNoTracking()
+            .Where(p => p.TournamentId == targetTournamentId && p.Status == effectiveStatus);
+
+        // Candidate picker chỉ có ý nghĩa khi race đích còn nhận allocation. Race đã
+        // draw/không còn Upcoming sẽ bị AllocateAsync chặn; không trả candidate để UI
+        // không hiển thị một pairing vừa có trong race vừa ở danh sách chưa allocate.
         if (unallocatedOnly)
         {
-            query = query.Where(p =>
-                !p.RaceEntries.Any(re =>
-                    (re.Status == "Pending" || re.Status == "Confirmed") &&
-                    re.Race.Status != "Official" &&
-                    re.Race.Status != "Cancelled"));
+            if (targetRace.Status != "Upcoming" || targetRace.IsPostPositionDrawn)
+            {
+                query = query.Where(_ => false);
+            }
+            else
+            {
+                // Một pairing chỉ được thi một lần trong MỘT round. Không dùng trạng
+                // thái của race để quyết định ở đây: entry của race Official vẫn là
+                // lịch sử hợp lệ của round đó, nhưng entry ở round trước phải không
+                // cản pairing được allocate vào round tiếp theo.
+                query = query.Where(p =>
+                    !p.RaceEntries.Any(re =>
+                        re.Race.RoundId == targetRoundId &&
+                        re.Status != "Cancelled"));
+            }
+        }
+
+        // Round dau: pairing Confirmed chua allocate. Round sau: round truoc phai
+        // Completed va chi RaceEntry Qualified/AlsoEligible moi duoc hien thi.
+        if (previousRound != null)
+        {
+            if (previousRound.Status != "Completed")
+            {
+                query = query.Where(_ => false);
+            }
+            else
+            {
+                query = query.Where(p => p.RaceEntries.Any(re =>
+                    re.Race.RoundId == previousRound.RoundId &&
+                    (re.AdvancementStatus == "Qualified" ||
+                     re.AdvancementStatus == "AlsoEligible")));
+            }
         }
 
         var total = await query.CountAsync();
@@ -609,10 +656,17 @@ public class PairingService : IPairingService
                 OwnerId = p.Horse.OwnerId,
                 OwnerName = p.Horse.Owner.Owner.FullName,
                 Status = p.Status,
+                AdvancementStatus = previousRoundId == null
+                    ? null
+                    : p.RaceEntries
+                        .Where(re => re.Race.RoundId == previousRoundId &&
+                                     (re.AdvancementStatus == "Qualified" ||
+                                      re.AdvancementStatus == "AlsoEligible"))
+                        .Select(re => re.AdvancementStatus)
+                        .FirstOrDefault(),
                 IsAllocated = p.RaceEntries.Any(re =>
-                    (re.Status == "Pending" || re.Status == "Confirmed") &&
-                    re.Race.Status != "Official" &&
-                    re.Race.Status != "Cancelled"),
+                    re.Race.RoundId == targetRoundId &&
+                    re.Status != "Cancelled"),
                 CreatedAt = p.CreatedAt
             })
             .ToListAsync();

@@ -59,6 +59,7 @@ function TournamentCard({
   registeringId: number | null;
 }) {
   const isRegistered = participation != null;
+  const isOpen = tournament.status === 'Open Registration';
   const statusCls = participation
     ? STATUS_STYLE[participation.status] ?? 'border-gray-200 bg-gray-50 text-gray-700'
     : '';
@@ -66,7 +67,7 @@ function TournamentCard({
     TOURNAMENT_STATUS_STYLE[tournament.status] ?? 'bg-gray-50 text-gray-600 border-gray-200';
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-5 shadow-sm transition-colors hover:border-blue-200 hover:bg-blue-50/30">
+    <article className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-[#cfa73d]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate text-sm font-bold text-gray-900">{tournament.name}</h3>
@@ -105,16 +106,16 @@ function TournamentCard({
 
       <button
         onClick={() => onRegister(tournament.tournamentId)}
-        disabled={isRegistered || registeringId === tournament.tournamentId}
-        className="rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+        disabled={isRegistered || !isOpen || registeringId === tournament.tournamentId}
+        className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold shadow-sm transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
       >
         {registeringId === tournament.tournamentId
           ? 'Đang đăng ký...'
           : isRegistered
-            ? 'Đã đăng ký'
-            : 'Đăng ký tham gia'}
+            ? participation?.status === 'Approved' ? 'Đã được duyệt vào roster' : 'Đã đăng ký'
+            : !isOpen ? 'Đã đóng đăng ký' : 'Đăng ký tham gia'}
       </button>
-    </div>
+    </article>
   );
 }
 
@@ -139,7 +140,7 @@ export default function RefereeTournamentList() {
       setLoading(true);
       setError('');
       const [tournamentList] = await Promise.all([getTournaments(), loadParticipations()]);
-      setTournaments(tournamentList.filter((item) => item.status === 'Open Registration'));
+      setTournaments(tournamentList);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không thể tải danh sách giải.');
     } finally {
@@ -148,7 +149,8 @@ export default function RefereeTournamentList() {
   }, [loadParticipations]);
 
   useEffect(() => {
-    load();
+    const id = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(id);
   }, [load]);
 
   const filtered = useMemo(
@@ -164,9 +166,9 @@ export default function RefereeTournamentList() {
   const handleRegister = async (tournamentId: number) => {
     try {
       setRegisteringId(tournamentId);
-      await registerForTournament(tournamentId);
+      const result = await registerForTournament(tournamentId);
       await loadParticipations();
-      showToast('Đăng ký thành công, đang chờ Admin duyệt.');
+      showToast(result.status === 'Approved' ? 'Đăng ký đã được duyệt.' : 'Đăng ký thành công, đang chờ Admin duyệt.');
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Đăng ký thất bại.');
     } finally {
@@ -182,16 +184,17 @@ export default function RefereeTournamentList() {
         </div>
       )}
 
-      <div className="flex flex-col gap-3 border-b border-gray-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Đăng ký giải đấu</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="text-xs font-black uppercase tracking-[.16em] text-blue-700">Giải đấu và phân công</p>
+          <h1 className="mt-1 text-2xl font-black text-slate-950 sm:text-3xl">Giải đấu của tôi</h1>
+          <p className="mt-2 text-sm text-gray-500">
             Referee đăng ký giải để được Admin duyệt roster trước khi phân công vào race.
           </p>
         </div>
         {!loading && (
           <span className="self-start rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
-            {filtered.length} giải mở đăng ký
+            {tournaments.filter((item) => item.status === 'Open Registration').length} giải mở đăng ký
           </span>
         )}
       </div>
@@ -201,7 +204,7 @@ export default function RefereeTournamentList() {
         value={search}
         onChange={(event) => setSearch(event.target.value)}
         placeholder="Tìm kiếm giải đấu theo tên..."
-        className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 sm:max-w-sm"
+        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 sm:max-w-md"
       />
 
       {error ? (
@@ -215,9 +218,9 @@ export default function RefereeTournamentList() {
       ) : filtered.length === 0 ? (
         <div className="py-20 text-center">
           <p className="text-sm font-semibold text-gray-700">
-            {search ? 'Không tìm thấy giải phù hợp' : 'Hiện tại không có giải nào đang mở đăng ký'}
+            {search ? 'Không tìm thấy giải phù hợp' : 'Hiện tại chưa có giải đấu nào'}
           </p>
-          <p className="mt-1 text-xs text-gray-400">Quay lại sau khi Admin mở đăng ký cho giải mới.</p>
+          <p className="mt-1 text-xs text-gray-400">Danh sách sẽ cập nhật khi hệ thống có giải mới.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">

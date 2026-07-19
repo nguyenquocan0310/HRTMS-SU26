@@ -17,6 +17,13 @@ const formatCurrency = (value: number) =>
 const formatDate = (value: string | null) =>
   value ? new Intl.DateTimeFormat('vi-VN').format(new Date(value)) : '—';
 
+const formatRecipientRole = (role: string) => {
+  const normalized = role.toLowerCase();
+  if (normalized === 'owner') return 'Chủ ngựa';
+  if (normalized === 'jockey') return 'Nài ngựa';
+  return role;
+};
+
 const errorMessage = (error: unknown, fallback: string) =>
   error instanceof Error && error.message ? error.message : fallback;
 
@@ -42,6 +49,8 @@ const PayoutTable = ({ payouts, emptyText }: { payouts: OwnerPayout[]; emptyText
           <tr>
             <th className="px-5 py-3">Ngựa</th>
             <th className="px-5 py-3">Thứ hạng</th>
+            <th className="px-5 py-3">Người nhận</th>
+            <th className="px-5 py-3">Vai trò</th>
             <th className="px-5 py-3">Tiền thưởng</th>
             <th className="px-5 py-3">Trạng thái</th>
             <th className="px-5 py-3">Ngày thanh toán</th>
@@ -52,6 +61,8 @@ const PayoutTable = ({ payouts, emptyText }: { payouts: OwnerPayout[]; emptyText
             <tr key={payout.pursePayoutId}>
               <td className="px-5 py-4 font-semibold text-slate-900">{payout.horseName}</td>
               <td className="px-5 py-4 text-slate-700">{payout.finishPosition}</td>
+              <td className="px-5 py-4 text-slate-700">{payout.recipientName || '—'}</td>
+              <td className="px-5 py-4 text-slate-700">{formatRecipientRole(payout.role)}</td>
               <td className="px-5 py-4 font-bold text-slate-900">{formatCurrency(payout.calculatedAmount)}</td>
               <td className="px-5 py-4"><StatusBadge status={payout.payoutStatus} /></td>
               <td className="px-5 py-4 text-slate-600">{formatDate(payout.paidAt)}</td>
