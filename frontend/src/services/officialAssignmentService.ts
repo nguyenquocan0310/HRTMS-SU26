@@ -49,3 +49,29 @@ export const assignDoctor = (raceId: number, doctorId: number): Promise<DoctorAs
 
 export const removeDoctor = (raceId: number, doctorId: number): Promise<void> =>
   apiFetch(`/admin/races/${raceId}/doctors/${doctorId}`, { method: 'DELETE' });
+
+
+// Danh sách cán bộ đủ điều kiện phân công cho MỘT race cụ thể — đã lọc theo
+// TournamentParticipants Approved đúng giải + loại người đang bận race khác
+// cùng giờ. Đây là nguồn đúng cho modal Assign, thay cho getActiveUsersByRole
+// (chỉ lọc Active, không kiểm tra roster/tournament/trùng giờ).
+export interface AvailableOfficial {
+  userId: number;
+  username: string;
+  fullName: string;
+  email: string;
+  role: string;
+  profileStatus: string;
+  certificationLevel: string | null;
+  createdAt: string;
+}
+
+interface AvailableOfficialsResponse {
+  referees: AvailableOfficial[];
+  doctors: AvailableOfficial[];
+}
+
+export const getAvailableOfficials = (raceId: number): Promise<AvailableOfficialsResponse> =>
+  apiFetch<{ success: boolean; data: AvailableOfficialsResponse }>(
+    `/admin/races/${raceId}/available-officials`
+  ).then((res) => res.data ?? { referees: [], doctors: [] });
