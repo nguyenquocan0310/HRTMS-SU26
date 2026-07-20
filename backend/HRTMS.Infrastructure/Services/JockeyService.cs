@@ -12,11 +12,16 @@ public class JockeyService : IJockeyService
 {
     private readonly HRTMSDbContext _context;
     private readonly INotificationService _notificationService;
+    private readonly ITokenBlacklistService _tokenBlacklistService;
 
-    public JockeyService(HRTMSDbContext context, INotificationService notificationService)
+    public JockeyService(
+        HRTMSDbContext context,
+        INotificationService notificationService,
+        ITokenBlacklistService tokenBlacklistService)
     {
         _context = context;
         _notificationService = notificationService;
+        _tokenBlacklistService = tokenBlacklistService;
     }
 
     public async Task<JockeyProfileDto?> GetProfileAsync(int jockeyId)
@@ -88,6 +93,18 @@ public class JockeyService : IJockeyService
                 // pattern HRS.6 cua Horse: sua field nhay cam -> ve Pending).
                 jockey.Status = "Pending";
                 jockey.RejectionReason = null;
+
+                // BUGFIX: JockeyProfile.Status va Users.Status phai dong bo.
+                // Truoc day chi doi JockeyProfile.Status -> user van Users.Status
+                // = "Active" nen van dang nhap/dung he thong binh thuong du UI
+                // hien "Pending". Doi ca Users.Status de login/authorization thuc
+                // su bi chan cho toi khi Admin duyet lai (giong pattern ApproveJockey
+                // set ca profile.Status va user.Status = "Active").
+                if (jockey.Jockey != null)
+                {
+                    jockey.Jockey.Status = "Pending";
+                    jockey.Jockey.UpdatedAt = DateTime.UtcNow;
+                }
             }
         }
 
@@ -131,6 +148,15 @@ public class JockeyService : IJockeyService
 
         if (anyChanged)
         {
+            jockey.Status = "Pending";
+            jockey.RejectionReason = null;
+
+            if (jockey.Jockey != null)
+            {
+                jockey.Jockey.Status = "Pending";
+                jockey.Jockey.UpdatedAt = DateTime.UtcNow;
+            }
+
             _context.AuditLogs.Add(new AuditLog
             {
                 ActorId = jockeyId,
@@ -159,13 +185,16 @@ public class JockeyService : IJockeyService
 
         await _context.SaveChangesAsync();
 
-        if (licenseChanged)
+        if (anyChanged)
         {
+            await _tokenBlacklistService.BlacklistUserAsync(jockeyId);
+
             await _notificationService.SendAsync(
                 jockeyId,
                 "Hồ sơ Jockey đang chờ duyệt lại",
-                "Bạn vừa cập nhật License Certificate. Hồ sơ của bạn sẽ tạm chuyển về " +
-                "trạng thái chờ duyệt (Pending) cho tới khi Admin xác nhận lại chứng chỉ mới.",
+                "Bạn vừa cập nhật thông tin hồ sơ. Hồ sơ của bạn đã được chuyển về " +
+                "trạng thái chờ duyệt (Pending) cho tới khi Admin phê duyệt lại. " +
+                "Vui lòng đăng nhập lại sau khi hồ sơ được phê duyệt.",
                 type: "Both",
                 relatedEntityType: "JockeyProfiles",
                 relatedEntityId: jockeyId);
