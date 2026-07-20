@@ -423,8 +423,6 @@ CREATE TABLE RaceEntries (
     PostRaceWeightByDoctorId          INT             NULL,
     FinishPosition                    INT             NULL,
     FinishTime                        DECIMAL(8,3)    NULL,
-    FinishStatus                      VARCHAR(20)     NULL,
-    DnfReason                         NVARCHAR(255)   NULL,
     PointsAwarded                     INT             NULL,
     EarningsAwarded                   DECIMAL(18,2)   NULL,
     EntryFeeStatus                    VARCHAR(20)     NOT NULL DEFAULT 'Unpaid',
@@ -451,7 +449,6 @@ CREATE TABLE RaceEntries (
     CONSTRAINT CHK_RaceEntries_HorseIdentity CHECK (HorseIdentityCheckStatus IS NULL OR HorseIdentityCheckStatus IN ('Matched','Mismatch')),
     CONSTRAINT CHK_RaceEntries_Clinical CHECK (ClinicalStatus IS NULL OR ClinicalStatus IN ('Fit','Unfit')),
     CONSTRAINT CHK_RaceEntries_FinishPos CHECK (FinishPosition IS NULL OR FinishPosition > 0),
-    CONSTRAINT CHK_RaceEntries_FinishStatus CHECK (FinishStatus IS NULL OR FinishStatus IN ('Finished','DNF')),
     CONSTRAINT CHK_RaceEntries_FeeStatus CHECK (EntryFeeStatus IN ('Unpaid','Paid','Refund Pending','Refunded'))
 );
 GO
