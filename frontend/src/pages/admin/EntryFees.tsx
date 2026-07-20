@@ -7,12 +7,16 @@ interface FeeEntry {
   raceEntryId: number;
   raceId: number;
   horseName: string;
-  jockey?: {
-    fullName?: string;
-  };
+  jockeyName: string;
   status: string;
   entryFeeStatus: string;
   createdAt: string;
+}
+
+interface PendingFeeEntry extends Omit<FeeEntry, 'jockeyName'> {
+  jockey?: {
+    fullName?: string | null;
+  };
 }
 
 interface RejectModalState {
@@ -31,8 +35,13 @@ const EntryFees = () => {
   const loadEntries = () => {
     setLoading(true);
     setError('');
-    apiFetch<{ success: boolean; data: FeeEntry[] }>('/admin/entries/pending-fee')
-      .then((res) => setEntries(res.data ?? []))
+    apiFetch<{ success: boolean; data: PendingFeeEntry[] }>('/admin/entries/pending-fee')
+      .then((res) => setEntries(
+        (res.data ?? []).map((entry) => ({
+          ...entry,
+          jockeyName: entry.jockey?.fullName?.trim() ?? '',
+        }))
+      ))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   };
@@ -118,7 +127,7 @@ const EntryFees = () => {
                     <td className={styles.name}>
                       {entry.horseName} <span className={styles.muted}>#{entry.raceEntryId}</span>
                     </td>
-                    <td>{entry.jockey?.fullName ?? '—'}</td>
+                    <td>{entry.jockeyName}</td>
                     <td>
                       <span className={`${styles.badge} ${entry.status === 'Confirmed' ? styles.confirmed : styles.pending}`}>
                         {entry.status}
