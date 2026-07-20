@@ -10,13 +10,16 @@ public class MedicalCheckService : IMedicalCheckService
 {
     private readonly HRTMSDbContext _context;
     private readonly IEmergencyDisqualificationService _emergencyDisqualificationService;
+    private readonly IAuditLogService _auditLog;
 
     public MedicalCheckService(
         HRTMSDbContext context,
-        IEmergencyDisqualificationService emergencyDisqualificationService)
+        IEmergencyDisqualificationService emergencyDisqualificationService,
+        IAuditLogService auditLog)
     {
         _context = context;
         _emergencyDisqualificationService = emergencyDisqualificationService;
+        _auditLog = auditLog;
     }
     // Kiem tra doctor hop le
     private async Task<DoctorProfile> ValidateDoctorAsync(int doctorId)
@@ -107,7 +110,15 @@ public class MedicalCheckService : IMedicalCheckService
 
         await _context.SaveChangesAsync();
 
-        // Lech qua threshold khong duoc phep pass
+        await _auditLog.LogAsync(
+            actorId: doctorId,
+            action: "Record_Pre_Race_Weight",
+            entityName: "RaceEntry",
+            entityId: raceEntry.RaceEntryId.ToString(),
+            newValue: $"PreRaceJockeyWeight={dto.PreRaceJockeyWeight}, SelfDeclared={selfDeclaredWeight}, " +
+                      $"Difference={weightDifference}, ThresholdKg={thresholdKg}, IsWeightWarning={isWeightWarning}");
+
+        // Lech qua threshold khong duoc phep pass am tham - phai kich hoat
         // Emergency DQ nhu HorseIdentity/Clinical, chu khong chi tra ve warning.
         if (isWeightWarning)
         {
@@ -176,6 +187,14 @@ public class MedicalCheckService : IMedicalCheckService
         raceEntry.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
+        await _auditLog.LogAsync(
+            actorId: doctorId,
+            action: "Record_Post_Race_Weight",
+            entityName: "RaceEntry",
+            entityId: raceEntry.RaceEntryId.ToString(),
+            newValue: $"PostRaceJockeyWeight={dto.PostRaceJockeyWeight}, PreRaceJockeyWeight={raceEntry.PreRaceJockeyWeight.Value}, " +
+                      $"Difference={difference}, ThresholdKg={thresholdKg}, IsWeightFlagged={flagged}");
+
         // Giong pre-race: lech qua threshold phai DQ that su, khong duoc
         // chi flag roi cho pass.
         if (flagged)
@@ -200,8 +219,8 @@ public class MedicalCheckService : IMedicalCheckService
             IsEmergencyDisqualified = flagged,
             RaceEntryStatus = raceEntry.Status,
             Message = flagged
-                ? "Cân nặng sau đua vượt quá ngưỡng cho phép. Entry đua đã bị loại."
-                : "Cân nặng sau đua được ghi nhận thành công."
+                ? "Post-race weight difference exceeds the configured threshold. Race entry has been disqualified."
+                : "Post-race weight recorded successfully."
         };
     }
 
@@ -266,6 +285,13 @@ public class MedicalCheckService : IMedicalCheckService
         var isMismatch = dto.HorseIdentityCheckStatus == "Mismatch";
 
         await _context.SaveChangesAsync();
+
+        await _auditLog.LogAsync(
+            actorId: doctorId,
+            action: "Record_Horse_Identity_Check",
+            entityName: "RaceEntry",
+            entityId: raceEntry.RaceEntryId.ToString(),
+            newValue: $"HorseIdentityCheckStatus={dto.HorseIdentityCheckStatus}");
 
         if (isMismatch)
         {
@@ -372,6 +398,13 @@ public class MedicalCheckService : IMedicalCheckService
         // Ban hien tai xu ly DQ toi thieu: cap nhat RaceEntry thanh Disqualified
         // Phan ACID refund + notification + audit se lam o MED.7
         await _context.SaveChangesAsync();
+
+        await _auditLog.LogAsync(
+            actorId: doctorId,
+            action: "Record_Clinical_Check",
+            entityName: "RaceEntry",
+            entityId: raceEntry.RaceEntryId.ToString(),
+            newValue: $"ClinicalStatus={dto.ClinicalStatus}, UnfitReason={raceEntry.UnfitReason ?? "N/A"}");
 
         if (isUnfit)
         {

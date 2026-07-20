@@ -58,6 +58,9 @@ public class JockeyService : IJockeyService
 
         var oldLicense = jockey.LicenseCertificate;
         var oldStatus = jockey.Status;
+        var oldSelfDeclaredWeight = jockey.SelfDeclaredWeight;
+        var oldBloodType = jockey.BloodType;
+        var oldHealthStatus = jockey.HealthStatus;
         var licenseChanged = false;
 
         if (!string.IsNullOrWhiteSpace(dto.LicenseCertificate))
@@ -121,24 +124,34 @@ public class JockeyService : IJockeyService
 
         jockey.UpdatedAt = DateTime.UtcNow;
 
-        if (licenseChanged)
+        var anyChanged = licenseChanged ||
+            oldSelfDeclaredWeight != jockey.SelfDeclaredWeight ||
+            oldBloodType != jockey.BloodType ||
+            oldHealthStatus != jockey.HealthStatus;
+
+        if (anyChanged)
         {
             _context.AuditLogs.Add(new AuditLog
             {
                 ActorId = jockeyId,
-                Action = "Update_Jockey_License",
+                Action = licenseChanged ? "Update_Jockey_License" : "Update_Jockey_Profile",
                 EntityName = "JockeyProfiles",
                 EntityId = jockeyId.ToString(),
                 OldValue = JsonSerializer.Serialize(new
                 {
                     LicenseCertificate = oldLicense,
-                    Status = oldStatus
+                    Status = oldStatus,
+                    SelfDeclaredWeight = oldSelfDeclaredWeight,
+                    BloodType = oldBloodType,
+                    HealthStatus = oldHealthStatus
                 }),
                 NewValue = JsonSerializer.Serialize(new
                 {
-                    LicenseCertificate =
-                        jockey.LicenseCertificate,
-                    jockey.Status
+                    LicenseCertificate = jockey.LicenseCertificate,
+                    jockey.Status,
+                    jockey.SelfDeclaredWeight,
+                    jockey.BloodType,
+                    jockey.HealthStatus
                 }),
                 CreatedAt = DateTime.UtcNow
             });
