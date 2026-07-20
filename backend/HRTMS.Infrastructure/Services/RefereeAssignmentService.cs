@@ -10,15 +10,18 @@ namespace HRTMS.Infrastructure.Services;
 public class RefereeAssignmentService : IRefereeAssignmentService
 {
     private readonly HRTMSDbContext _context;
+    private readonly IAuditLogService _auditLog;
 
-    public RefereeAssignmentService(HRTMSDbContext context)
+    public RefereeAssignmentService(HRTMSDbContext context, IAuditLogService auditLog)
     {
         _context = context;
+        _auditLog = auditLog;
     }
 
     public async Task<RefereeAssignmentDto> AssignAsync(
         int raceId,
-        AssignRefereeDto dto)
+        AssignRefereeDto dto,
+        int adminUserId)
     {
         // Kiem tra Race co ton tai hay khong
         // Lay Race de kiem tra ton tai va thoi gian thi dau
@@ -119,6 +122,13 @@ public class RefereeAssignmentService : IRefereeAssignmentService
         _context.RefereeAssignments.Add(assignment);
         await _context.SaveChangesAsync();
 
+        await _auditLog.LogAsync(
+            actorId: adminUserId,
+            action: "Assign_Referee",
+            entityName: "RefereeAssignment",
+            entityId: $"{raceId}:{dto.RefereeId}",
+            newValue: $"RaceId={raceId}, RefereeId={dto.RefereeId}, Role={dto.Role}");
+
         return new RefereeAssignmentDto
         {
             RaceId = assignment.RaceId,
@@ -165,7 +175,8 @@ public class RefereeAssignmentService : IRefereeAssignmentService
 
     public async Task RemoveAsync(
         int raceId,
-        int refereeId)
+        int refereeId,
+        int adminUserId)
     {
         // Tim assignment can go khoi Race
         var assignment = await _context.RefereeAssignments
@@ -178,38 +189,47 @@ public class RefereeAssignmentService : IRefereeAssignmentService
             throw new KeyNotFoundException("REFEREE_ASSIGNMENT_NOT_FOUND");
         }
 
+        var oldRole = assignment.Role;
+
         _context.RefereeAssignments.Remove(assignment);
         await _context.SaveChangesAsync();
+
+        await _auditLog.LogAsync(
+            actorId: adminUserId,
+            action: "Remove_Referee",
+            entityName: "RefereeAssignment",
+            entityId: $"{raceId}:{refereeId}",
+            oldValue: $"RaceId={raceId}, RefereeId={refereeId}, Role={oldRole}");
     }
     public async Task<List<MyRaceAssignmentDto>> GetMyAssignmentsAsync(
     int refereeId)
-{
-    // Lay danh sach Race ma Referee duoc phan cong
-    var assignments = await _context.RefereeAssignments
-        .AsNoTracking()
-        .Include(a => a.Race)
-            .ThenInclude(r => r.Round)
-                .ThenInclude(round => round.Tournament)
-        .Where(a => a.RefereeId == refereeId)
-        .OrderBy(a => a.Race.ScheduledTime)
-        .Select(a => new MyRaceAssignmentDto
-        {
-            RaceId = a.RaceId,
-            RaceNumber = a.Race.RaceNumber,
-            ScheduledTime = a.Race.ScheduledTime,
-            RaceStatus = a.Race.Status,
-            RoundId = a.Race.RoundId,
-            RoundName = a.Race.Round.Name,
-            TournamentId = a.Race.Round.TournamentId,
-            TournamentName = a.Race.Round.Tournament.Name,
+    {
+        // Lay danh sach Race ma Referee duoc phan cong
+        var assignments = await _context.RefereeAssignments
+            .AsNoTracking()
+            .Include(a => a.Race)
+                .ThenInclude(r => r.Round)
+                    .ThenInclude(round => round.Tournament)
+            .Where(a => a.RefereeId == refereeId)
+            .OrderBy(a => a.Race.ScheduledTime)
+            .Select(a => new MyRaceAssignmentDto
+            {
+                RaceId = a.RaceId,
+                RaceNumber = a.Race.RaceNumber,
+                ScheduledTime = a.Race.ScheduledTime,
+                RaceStatus = a.Race.Status,
+                RoundId = a.Race.RoundId,
+                RoundName = a.Race.Round.Name,
+                TournamentId = a.Race.Round.TournamentId,
+                TournamentName = a.Race.Round.Tournament.Name,
 
-            // RefereeAssignment co Role
-            AssignmentRole = a.Role,
+                // RefereeAssignment co Role
+                AssignmentRole = a.Role,
 
-            AssignedAt = a.AssignedAt
-        })
-        .ToListAsync();
+                AssignedAt = a.AssignedAt
+            })
+            .ToListAsync();
 
-    return assignments;
-}
+        return assignments;
+    }
 }

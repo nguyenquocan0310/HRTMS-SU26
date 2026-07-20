@@ -8,7 +8,8 @@ public interface IRefereeAssignmentService
     // Admin gan Referee vao mot Race
     Task<RefereeAssignmentDto> AssignAsync(
         int raceId,
-        AssignRefereeDto dto);
+        AssignRefereeDto dto,
+        int adminUserId);
 
     // Lay danh sach Referee da duoc gan vao mot Race
     Task<List<RefereeAssignmentDto>> GetByRaceAsync(
@@ -17,7 +18,8 @@ public interface IRefereeAssignmentService
     // Admin go Referee khoi mot Race
     Task RemoveAsync(
         int raceId,
-        int refereeId);
+        int refereeId,
+        int adminUserId);
 
     // Referee xem cac Race minh duoc phan cong
     Task<List<MyRaceAssignmentDto>> GetMyAssignmentsAsync(

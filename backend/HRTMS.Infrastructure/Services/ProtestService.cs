@@ -11,11 +11,16 @@ public class ProtestService : IProtestService
     private const int MaxProtestsPerUserPerRace = 3;
     private readonly HRTMSDbContext _context;
     private readonly INotificationService _notificationService;
+    private readonly IAuditLogService _auditLog;
 
-    public ProtestService(HRTMSDbContext context, INotificationService notificationService)
+    public ProtestService(
+        HRTMSDbContext context,
+        INotificationService notificationService,
+        IAuditLogService auditLog)
     {
         _context = context;
         _notificationService = notificationService;
+        _auditLog = auditLog;
     }
 
     public async Task<ProtestDto> SubmitAsync(int submitterUserId, SubmitProtestDto dto)
@@ -70,6 +75,14 @@ public class ProtestService : IProtestService
         };
         _context.Protests.Add(protest);
         await _context.SaveChangesAsync();
+
+        await _auditLog.LogAsync(
+            actorId: submitterUserId,
+            action: "Submit_Protest",
+            entityName: "Protest",
+            entityId: protest.ProtestId.ToString(),
+            newValue: $"RaceId={protest.RaceId}, AccusedRaceEntryId={protest.AccusedRaceEntryId}, ViolationId={protest.ViolationId}, Status=Pending");
+
         return ToDto(protest);
     }
 
@@ -118,6 +131,16 @@ public class ProtestService : IProtestService
         foreach (var entry in race.RaceEntries)
             entry.UpdatedAt = now;
         await _context.SaveChangesAsync();
+
+        await _auditLog.LogAsync(
+            actorId: refereeId,
+            action: "Rule_Protest",
+            entityName: "Protest",
+            entityId: protest.ProtestId.ToString(),
+            oldValue: "Pending",
+            newValue: $"Status={protest.Status}, Penalty={protest.PenaltyApplied ?? "None"}, " +
+                      $"AccusedRaceEntryId={accusedEntry.RaceEntryId}, Notes={protest.RefereeDecision}");
+
         await transaction.CommitAsync();
 
         var recipients = new[]
@@ -214,6 +237,13 @@ public class ProtestService : IProtestService
 
         race.RaceReport.ProtestWindowClosedAt = now;
         await _context.SaveChangesAsync();
+
+        await _auditLog.LogAsync(
+            actorId: refereeId,
+            action: "Close_Protest_Window_Early",
+            entityName: "Race",
+            entityId: race.RaceId.ToString(),
+            newValue: $"ProtestWindowClosedAt={now:O}");
     }
 
     private async Task EnsureRefereeAssignedAsync(int raceId, int refereeId)
@@ -303,4 +333,4 @@ public class ProtestService : IProtestService
         SubmittedAt = protest.SubmittedAt,
         ResolvedAt = protest.ResolvedAt
     };
-}
+}   
