@@ -327,6 +327,8 @@ public class TournamentParticipantService : ITournamentParticipantService
         UserId = p.UserId,
         FullName = p.User != null ? p.User.FullName : string.Empty,
         Email = p.User != null ? p.User.Email : string.Empty,
+        PhoneNumber = p.User != null ? p.User.PhoneNumber : null,
+        DateOfBirth = p.User != null ? p.User.DateOfBirth : null,
         Role = p.Role,
         Status = p.Status,
         ScreeningStatus = p.ScreeningStatus,
