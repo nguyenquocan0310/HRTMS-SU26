@@ -123,6 +123,18 @@ public class EmergencyDisqualificationService : IEmergencyDisqualificationServic
                 notificationRecipients.Add(adminId);
             }
 
+            // Thông báo cho toàn bộ ban trọng tài đang được phân công vào race,
+            // để họ kịp cập nhật danh sách xuất phát sau khi entry bị loại khẩn cấp.
+            var refereeIds = await _context.RefereeAssignments
+                .Where(a => a.RaceId == raceEntry.RaceId)
+                .Select(a => a.RefereeId)
+                .ToListAsync();
+
+            foreach (var refereeId in refereeIds)
+            {
+                notificationRecipients.Add(refereeId);
+            }
+
             // Neu DB khong co Admin thi gui them cho actor de van co nguoi nhan thong bao
             if (!notificationRecipients.Contains(actorId))
             {
