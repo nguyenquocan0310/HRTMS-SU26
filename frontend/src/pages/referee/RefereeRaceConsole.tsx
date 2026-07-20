@@ -42,6 +42,42 @@ function ResultTable({ title, items }: { title: string; items: StartingListEntry
   return <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-100 px-5 py-4"><h3 className="font-bold text-slate-900">{title}</h3></div><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-5 py-3">Post</th><th className="px-5 py-3">Ngựa</th><th className="px-5 py-3">Kỵ sĩ</th><th className="px-5 py-3">Owner</th><th className="px-5 py-3">Trạng thái</th><th className="px-5 py-3">Lý do</th></tr></thead><tbody className="divide-y divide-slate-100">{items.map((item) => <tr key={item.raceEntryId}><td className="px-5 py-4 font-bold">{item.postPosition ?? '—'}</td><td className="px-5 py-4 font-bold text-slate-900">{item.horseName}</td><td className="px-5 py-4">{item.jockeyName}</td><td className="px-5 py-4">{item.ownerName || '—'}</td><td className="px-5 py-4"><StatusBadge status={item.status} /></td><td className="px-5 py-4 text-slate-500">{item.rejectionReason || '—'}</td></tr>)}</tbody></table></div></section>
 }
 
+function UnofficialResultsTable({ liveStatus }: { liveStatus: RaceLiveStatus }) {
+  const isOfficial = liveStatus.status === 'Official'
+  const items = [...liveStatus.entries].sort((a, b) => {
+    if (a.finishPosition == null) return b.finishPosition == null ? 0 : 1
+    if (b.finishPosition == null) return -1
+    return a.finishPosition - b.finishPosition
+  })
+
+  return (
+    <section className={`overflow-hidden rounded-xl border bg-white shadow-sm ${isOfficial ? 'border-emerald-200' : 'border-amber-200'}`}>
+      <div className={`border-b px-5 py-4 ${isOfficial ? 'border-emerald-100 bg-emerald-50' : 'border-amber-100 bg-amber-50'}`}>
+        <h2 className={`font-bold ${isOfficial ? 'text-emerald-950' : 'text-amber-950'}`}>{isOfficial ? 'Kết quả chính thức' : 'Kết quả sơ bộ'}</h2>
+        <p className={`mt-1 text-xs ${isOfficial ? 'text-emerald-800' : 'text-amber-800'}`}>{isOfficial ? 'Kết quả đã được Admin công bố Official.' : 'Dữ liệu thứ hạng đã được tải lại từ backend sau khi cuộc đua chuyển sang Unofficial.'}</p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+            <tr><th className="px-5 py-3">Hạng</th><th className="px-5 py-3">Post</th><th className="px-5 py-3">Ngựa / Kỵ sĩ</th><th className="px-5 py-3">Thời gian</th><th className="px-5 py-3">Trạng thái</th></tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {items.map((entry) => (
+              <tr key={entry.raceEntryId}>
+                <td className="px-5 py-4 text-lg font-black text-slate-950">{entry.finishPosition ?? '—'}</td>
+                <td className="px-5 py-4 font-bold text-slate-600">{entry.postPosition ?? '—'}</td>
+                <td className="px-5 py-4"><p className="font-bold text-slate-900">{entry.horseName}</p><p className="text-xs text-slate-500">{entry.jockeyName}</p></td>
+                <td className="px-5 py-4">{entry.finishTime != null ? `${entry.finishTime} giây` : '—'}</td>
+                <td className="px-5 py-4"><StatusBadge status={entry.status} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
 export default function RefereeRaceConsole() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -190,6 +226,7 @@ export default function RefereeRaceConsole() {
   if (loading) return <div className="space-y-5" aria-busy="true"><div className="h-24 animate-pulse rounded-xl bg-white" /><div className="h-80 animate-pulse rounded-xl border border-slate-200 bg-white" /></div>
 
   return <div className="space-y-6">
+    {liveStatus && ['Unofficial', 'Official'].includes(liveStatus.status) && <UnofficialResultsTable liveStatus={liveStatus} />}
     {message && <div role="status" className="fixed bottom-5 right-5 z-50 max-w-sm rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white shadow-xl">{message}</div>}
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-black uppercase tracking-[.16em] text-blue-700">Điều hành cuộc đua</p><h1 className="mt-1 text-2xl font-black text-slate-950 sm:text-3xl">Bàn điều hành Referee</h1><p className="mt-2 text-sm text-slate-500">Chỉ các cuộc đua được Admin phân công mới có thể mở và thao tác.</p></div>{raceId && <button type="button" onClick={() => navigate('/referee/race-console')} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700">Đổi cuộc đua</button>}</div>
 
