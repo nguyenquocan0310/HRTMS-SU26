@@ -36,6 +36,7 @@ namespace HRTMS.Infrastructure.Services
                 .Include(r => r.Round).ThenInclude(rd => rd.Tournament)
                 .Include(r => r.RaceReport)
                 .Include(r => r.RaceEntries)
+                    .ThenInclude(re => re.ViolationRaceEntries)
                 .Where(r => r.Status == "Unofficial");
 
             if (tournamentId.HasValue)
@@ -111,6 +112,7 @@ namespace HRTMS.Infrastructure.Services
                 .Include(r => r.RaceReport)
                 .Include(r => r.RaceEntries).ThenInclude(re => re.Pairing).ThenInclude(p => p.Horse)
                 .Include(r => r.RaceEntries).ThenInclude(re => re.Pairing).ThenInclude(p => p.Jockey)
+                .Include(r => r.RaceEntries).ThenInclude(re => re.ViolationRaceEntries)
                 .Include(r => r.Predictions)
                 .FirstOrDefaultAsync(r => r.RaceId == raceId)
                 ?? throw new KeyNotFoundException($"Không tìm thấy cuộc đua #{raceId}.");
@@ -255,6 +257,7 @@ namespace HRTMS.Infrastructure.Services
                 var finishers = race.RaceEntries
                     .Where(re => re.Status != "Cancelled" &&
                                  re.Status != "Disqualified" &&
+                                 !re.ViolationRaceEntries.Any(v => v.ViolationCode == "DNF-001" && v.Penalty == "Scratch") &&
                                  re.FinishPosition != null)
                     .ToList();
 
@@ -460,7 +463,7 @@ namespace HRTMS.Infrastructure.Services
         {
             foreach (var entry in entries)
             {
-                if (entry.Status == "Cancelled" || entry.Status == "Disqualified" || entry.FinishPosition == null)
+                if (entry.Status == "Cancelled" || entry.Status == "Disqualified" || entry.ViolationRaceEntries.Any(v => v.ViolationCode == "DNF-001" && v.Penalty == "Scratch") || entry.FinishPosition == null)
                     continue;
 
                 entry.PointsAwarded = entry.FinishPosition switch
@@ -487,7 +490,7 @@ namespace HRTMS.Infrastructure.Services
 
             // Nhóm theo FinishPosition để xử lý đồng hạng
             var finishersByPosition = race.RaceEntries
-                .Where(re => re.Status != "Cancelled" && re.Status != "Disqualified" && re.FinishPosition != null)
+                .Where(re => re.Status != "Cancelled" && re.Status != "Disqualified" && !re.ViolationRaceEntries.Any(v => v.ViolationCode == "DNF-001" && v.Penalty == "Scratch") && re.FinishPosition != null)
                 .GroupBy(re => re.FinishPosition!.Value)
                 .OrderBy(g => g.Key)
                 .ToList();
@@ -601,7 +604,7 @@ namespace HRTMS.Infrastructure.Services
         private static bool IsRankingIntegrityValid(IEnumerable<RaceEntry> entries)
         {
             var positions = entries
-                .Where(re => re.Status != "Cancelled" && re.Status != "Disqualified")
+                .Where(re => re.Status != "Cancelled" && re.Status != "Disqualified" && !re.ViolationRaceEntries.Any(v => v.ViolationCode == "DNF-001" && v.Penalty == "Scratch"))
                 .Select(re => re.FinishPosition)
                 .ToList();
 
@@ -628,7 +631,7 @@ namespace HRTMS.Infrastructure.Services
         private static bool IsPostRaceWeighInComplete(IEnumerable<RaceEntry> entries)
         {
             return entries
-                .Where(re => re.Status != "Cancelled" && re.Status != "Disqualified")
+                .Where(re => re.Status != "Cancelled" && re.Status != "Disqualified" && !re.ViolationRaceEntries.Any(v => v.ViolationCode == "DNF-001" && v.Penalty == "Scratch"))
                 .All(re => re.PostRaceJockeyWeight != null);
         }
     }

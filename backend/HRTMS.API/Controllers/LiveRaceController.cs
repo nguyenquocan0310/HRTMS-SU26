@@ -165,6 +165,37 @@ public class LiveRaceController : ControllerBase
         }
     }
 
+    [HttpPatch("api/referees/races/{raceId:int}/entries/{raceEntryId:int}/dnf")]
+    [Authorize(Roles = "Referee")]
+    [ProducesResponseType(typeof(ApiResponse<MarkDnfResultDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> MarkDnf(int raceId, int raceEntryId, [FromBody] MarkDnfDto dto)
+    {
+        if (!TryGetUserId(out var refereeId))
+            return Unauthorized(ApiResponse<MarkDnfResultDto>.Fail("Phiên đăng nhập không hợp lệ."));
+
+        try
+        {
+            var result = await _service.MarkDnfAsync(raceId, raceEntryId, refereeId, dto);
+            return Ok(ApiResponse<MarkDnfResultDto>.Ok(result, "Đã ghi nhận ngựa bỏ cuộc (DNF)."));
+        }
+        catch (ArgumentException ex) when (ex.Message == "DNF_REASON_REQUIRED")
+        {
+            return BadRequest(ApiResponse<MarkDnfResultDto>.Fail("Lý do DNF phải có ít nhất 10 ký tự."));
+        }
+        catch (KeyNotFoundException ex) when (ex.Message is "RACE_NOT_FOUND" or "RACE_ENTRY_NOT_FOUND" or "REFEREE_NOT_FOUND")
+        {
+            return NotFound(ApiResponse<MarkDnfResultDto>.Fail("Không tìm thấy race, race entry hoặc trọng tài."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "REFEREE_NOT_ASSIGNED_TO_RACE")
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<MarkDnfResultDto>.Fail("Bạn không được phân công cho cuộc đua này."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message is "RACE_NOT_LIVE" or "RACE_ENTRY_NOT_ELIGIBLE" or "RACE_ENTRY_ALREADY_DNF")
+        {
+            return Conflict(ApiResponse<MarkDnfResultDto>.Fail("Race entry không thể được ghi nhận DNF ở trạng thái hiện tại."));
+        }
+    }
+
     // Referee chốt sơ bộ FinishPosition (kết thúc màn Live), chuyển Live -> Unofficial.
     [HttpPatch("api/referees/races/{raceId:int}/violations/{violationId:int}")]
     [Authorize(Roles = "Referee")]

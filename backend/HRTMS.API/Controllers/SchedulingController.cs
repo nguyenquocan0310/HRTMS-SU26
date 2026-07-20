@@ -211,6 +211,11 @@ public class SchedulingController : ControllerBase
             return UnprocessableEntity(Err("RACE_NOT_UPCOMING",
                 "Cuộc đua đã bắt đầu hoặc kết thúc nên không thể rút đăng ký."));
         }
+        catch (InvalidOperationException ex) when (ex.Message == "LATE_WITHDRAW_REASON_REQUIRED")
+        {
+            return BadRequest(Err("LATE_WITHDRAW_REASON_REQUIRED",
+                "Rút lui sau Pre-Race phải nêu lý do ít nhất 10 ký tự."));
+        }
         catch (InvalidOperationException ex) when (ex.Message == "WITHDRAW_AFTER_CUTOFF")
         {
             return UnprocessableEntity(Err("WITHDRAW_AFTER_CUTOFF",
