@@ -21,6 +21,8 @@ namespace HRTMS.Core.Interfaces.Services
         // Referee ghi nhận vi phạm trong lúc race đang Live (Module H).
         Task<ViolationDto> RecordViolationAsync(int raceId, int refereeId, CreateViolationDto dto);
 
+        Task<MarkDnfResultDto> MarkDnfAsync(int raceId, int raceEntryId, int refereeId, MarkDnfDto dto);
+
         Task<IReadOnlyList<ViolationCodeOptionDto>> GetViolationCodesAsync();
 
         Task<ViolationDto> UpdateViolationAsync(int raceId, int violationId, int refereeId, UpdateViolationDto dto);

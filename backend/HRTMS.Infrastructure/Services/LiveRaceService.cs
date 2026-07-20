@@ -26,10 +26,12 @@ public class LiveRaceService : ILiveRaceService
     private const string StatusUnofficial = "Unofficial";
 
     private readonly HRTMSDbContext _context;
+    private readonly INotificationService _notificationService;
 
-    public LiveRaceService(HRTMSDbContext context)
+    public LiveRaceService(HRTMSDbContext context, INotificationService notificationService)
     {
         _context = context;
+        _notificationService = notificationService;
     }
 
     // =====================================================================
@@ -233,6 +235,70 @@ public class LiveRaceService : ILiveRaceService
         };
     }
 
+    // Referee xác nhận ngựa bỏ cuộc trong lúc race đang Live. DNF khác DQ/withdraw:
+    // entry đã xuất phát, không được xếp hạng nhưng prediction được settle là Lost.
+    public async Task<MarkDnfResultDto> MarkDnfAsync(int raceId, int raceEntryId, int refereeId, MarkDnfDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Reason) || dto.Reason.Trim().Length < 10)
+            throw new ArgumentException("DNF_REASON_REQUIRED");
+
+        var race = await _context.Races.FirstOrDefaultAsync(r => r.RaceId == raceId)
+            ?? throw new KeyNotFoundException("RACE_NOT_FOUND");
+        await EnsureRefereeAssignedAsync(raceId, refereeId);
+
+        if (race.Status != StatusLive)
+            throw new InvalidOperationException("RACE_NOT_LIVE");
+
+        var entry = await _context.RaceEntries
+            .Include(e => e.Pairing).ThenInclude(p => p.Horse)
+            .FirstOrDefaultAsync(e => e.RaceEntryId == raceEntryId && e.RaceId == raceId)
+            ?? throw new KeyNotFoundException("RACE_ENTRY_NOT_FOUND");
+
+        if (entry.Status is "Cancelled" or "Disqualified" || entry.IsWithdrawn)
+            throw new InvalidOperationException("RACE_ENTRY_NOT_ELIGIBLE");
+        var alreadyDnf = await _context.Violations
+            .AnyAsync(v => v.RaceReport.RaceId == raceId && v.RaceEntryId == raceEntryId &&
+                           v.ViolationCode == "DNF-001" && v.Penalty == "Scratch");
+        if (alreadyDnf)
+            throw new InvalidOperationException("RACE_ENTRY_ALREADY_DNF");
+
+        var now = DateTime.UtcNow;
+        var report = await _context.RaceReports.FirstOrDefaultAsync(r => r.RaceId == raceId);
+        if (report == null)
+        {
+            report = new RaceReport { RaceId = raceId, LeadRefereeId = refereeId, IsLocked = false, SubmittedAt = now };
+            _context.RaceReports.Add(report);
+            await _context.SaveChangesAsync();
+        }
+        else if (report.IsLocked)
+            throw new InvalidOperationException("RACE_REPORT_LOCKED");
+
+        _context.Violations.Add(new Violation
+        {
+            RaceReportId = report.RaceReportId,
+            RaceEntryId = raceEntryId,
+            ViolationCode = "DNF-001",
+            Penalty = "Scratch",
+            Description = dto.Reason.Trim(),
+            LoggedAt = now
+        });
+        await _context.SaveChangesAsync();
+
+        var recipients = new HashSet<int> { entry.Pairing.Horse.OwnerId, entry.Pairing.JockeyId };
+        var adminIds = await _context.Users.Where(u => u.Role == "Admin" && u.Status == "Active").Select(u => u.UserId).ToListAsync();
+        var refereeIds = await _context.RefereeAssignments.Where(a => a.RaceId == raceId).Select(a => a.RefereeId).ToListAsync();
+        var doctorIds = await _context.DoctorAssignments.Where(a => a.RaceId == raceId).Select(a => a.DoctorId).ToListAsync();
+        recipients.UnionWith(adminIds);
+        recipients.UnionWith(refereeIds);
+        recipients.UnionWith(doctorIds);
+        await _notificationService.SendBulkAsync(recipients,
+            "Khẩn: Ngựa bỏ cuộc (DNF)",
+            $"Race entry #{raceEntryId} ở cuộc đua #{raceId} đã bỏ cuộc. Lý do: {dto.Reason.Trim()}",
+            type: "Both", relatedEntityType: "RaceEntry", relatedEntityId: raceEntryId);
+
+        return new MarkDnfResultDto { RaceEntryId = raceEntryId, RaceId = raceId, DnfReason = dto.Reason.Trim() };
+    }
+
     // =====================================================================
     // GET violations — poll riêng (3-5s), tách khỏi tick animation 100ms
     // =====================================================================
@@ -335,8 +401,14 @@ public class LiveRaceService : ILiveRaceService
         // Disqualified đã bị loại khỏi cuộc đua — không cần FinishPosition lẫn
         // cân sau đua, khớp với quy tắc DeclareOfficialAsync (IsRankingIntegrityValid /
         // IsPostRaceWeighInComplete) vốn cũng loại trừ Disqualified.
+        var dnfEntryIds = await _context.Violations
+            .Where(v => v.RaceReport.RaceId == raceId && v.ViolationCode == "DNF-001" && v.Penalty == "Scratch")
+            .Select(v => v.RaceEntryId)
+            .ToListAsync();
+
         var eligibleEntryIds = race.RaceEntries
             .Where(e => e.Status != "Cancelled" && e.Status != "Disqualified" && !e.IsWithdrawn)
+            .Where(e => !dnfEntryIds.Contains(e.RaceEntryId))
             .Select(e => e.RaceEntryId)
             .ToHashSet();
 

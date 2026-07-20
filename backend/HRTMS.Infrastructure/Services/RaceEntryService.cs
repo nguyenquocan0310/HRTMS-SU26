@@ -407,14 +407,17 @@ public class RaceEntryService : IRaceEntryService
 
         // Race phai con Upcoming (moi actor) — khong duoc pha du lieu race
         // Live/Unofficial/Official (ket qua, payout, leaderboard tham chieu entry).
-        if (entry.Race.Status != "Upcoming")
+        var isLateWithdrawal = entry.Race.Status == "Pre-Race";
+        if (entry.Race.Status != "Upcoming" && !isLateWithdrawal)
             throw new InvalidOperationException("RACE_NOT_UPCOMING");
 
         // Owner tu rut chi truoc Confirmation Cut-off; sau cut-off chi Admin/system
         // (isSystem = true) duoc huy de dieu phoi khan cap.
         var withdrawCutoff = entry.Race.ScheduledTime.AddHours(-entry.Race.ConfirmationCutoffHours);
-        if (!isSystem && DateTime.UtcNow > withdrawCutoff)
+        if (!isLateWithdrawal && !isSystem && DateTime.UtcNow > withdrawCutoff)
             throw new InvalidOperationException("WITHDRAW_AFTER_CUTOFF");
+        if (isLateWithdrawal && (string.IsNullOrWhiteSpace(dto.Reason) || dto.Reason.Trim().Length < 10))
+            throw new InvalidOperationException("LATE_WITHDRAW_REASON_REQUIRED");
 
         var reason = string.IsNullOrWhiteSpace(dto.Reason)
             ? (isSystem ? "Tự động hủy: quá hạn xác nhận tham gia" : "Chủ ngựa tự rút lui")
@@ -435,7 +438,7 @@ public class RaceEntryService : IRaceEntryService
                             (e.Status == "Pending" || e.Status == "Confirmed"))
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(e => e.Status, "Cancelled")
-                    .SetProperty(e => e.PostPosition, (int?)null) // giai phong cong -> Vacant
+                    .SetProperty(e => e.PostPosition, e => isLateWithdrawal ? e.PostPosition : null)
                     .SetProperty(e => e.IsWithdrawn, true)
                     .SetProperty(e => e.WithdrawalReason, reason)
                     .SetProperty(e => e.UpdatedAt, now));
@@ -508,6 +511,22 @@ public class RaceEntryService : IRaceEntryService
                 type: "Both",
                 relatedEntityType: "RaceEntry",
                 relatedEntityId: raceEntryId);
+
+            if (isLateWithdrawal)
+            {
+                var refereeIds = await _context.RefereeAssignments
+                    .Where(a => a.RaceId == entry.RaceId)
+                    .Select(a => a.RefereeId)
+                    .ToListAsync();
+                var doctorIds = await _context.DoctorAssignments
+                    .Where(a => a.RaceId == entry.RaceId)
+                    .Select(a => a.DoctorId)
+                    .ToListAsync();
+                await _notification.SendBulkAsync(refereeIds.Concat(doctorIds),
+                    "Khẩn: Rút lui sau Pre-Race",
+                    $"Race entry #{raceEntryId} đã rút sau khi hoàn tất kiểm tra trước đua. Lý do: {reason}.",
+                    type: "Both", relatedEntityType: "RaceEntry", relatedEntityId: raceEntryId);
+            }
 
             await _audit.LogAsync(actorId,
                 isSystem ? "Tự động hủy đăng ký đua (quá hạn xác nhận)" : "Rút khỏi cuộc đua",
