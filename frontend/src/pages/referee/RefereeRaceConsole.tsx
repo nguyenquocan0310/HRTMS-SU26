@@ -54,7 +54,7 @@ function UnofficialResultsTable({ liveStatus }: { liveStatus: RaceLiveStatus }) 
     <section className={`overflow-hidden rounded-xl border bg-white shadow-sm ${isOfficial ? 'border-emerald-200' : 'border-amber-200'}`}>
       <div className={`border-b px-5 py-4 ${isOfficial ? 'border-emerald-100 bg-emerald-50' : 'border-amber-100 bg-amber-50'}`}>
         <h2 className={`font-bold ${isOfficial ? 'text-emerald-950' : 'text-amber-950'}`}>{isOfficial ? 'Kết quả chính thức' : 'Kết quả sơ bộ'}</h2>
-        <p className={`mt-1 text-xs ${isOfficial ? 'text-emerald-800' : 'text-amber-800'}`}>{isOfficial ? 'Kết quả đã được Admin công bố Official.' : 'Dữ liệu thứ hạng đã được tải lại từ backend sau khi cuộc đua chuyển sang Unofficial.'}</p>
+        {isOfficial && <p className="mt-1 text-xs text-emerald-800">Kết quả đã được Admin công bố Official.</p>}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">

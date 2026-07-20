@@ -32,10 +32,16 @@ export default function InvitationList() {
   useEffect(() => { const id = window.setTimeout(() => void loadInvitations(), 0); return () => window.clearTimeout(id) }, [loadInvitations])
 
   const handleAccept = async (pairingId: number) => {
+    const invitation = invitations.find((item) => item.pairingId === pairingId)
+    if (!invitation || invitation.status !== 'Pending') return
+
     setActionLoadingId(pairingId); setError(''); setSuccess('')
     try {
       await acceptPairing(pairingId)
-      await loadInvitations()
+      setInvitations((current) => current.map((item) => item.pairingId === pairingId
+        ? { ...item, status: 'Accepted', respondedAt: new Date().toISOString() }
+        : item
+      ))
       setSuccess('Đã chấp nhận lời mời. Chủ ngựa sẽ thực hiện bước xác nhận tiếp theo.')
     } catch (actionError) {
       setError(getErrorMessage(actionError, 'Chấp nhận lời mời thất bại.'))

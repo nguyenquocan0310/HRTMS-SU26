@@ -40,20 +40,6 @@ const mergeEntryPatch = (entry: DoctorRaceEntry, patch: Partial<DoctorRaceEntry>
   raceEntryStatus: patch.raceEntryStatus ?? patch.status ?? entry.raceEntryStatus,
 })
 
-function EntryStatusBadge({ entry }: { entry: DoctorRaceEntry }) {
-  const status = entry.raceEntryStatus ?? entry.status
-  const isDisqualified = status === 'Disqualified' || entry.isEmergencyDisqualified
-  const cls = isDisqualified
-    ? 'bg-red-50 text-red-700 border-red-100'
-    : 'bg-emerald-50 text-emerald-700 border-emerald-100'
-
-  return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${cls}`}>
-      {status}
-    </span>
-  )
-}
-
 function WeighInResultBadge({ entry }: { entry: DoctorRaceEntry }) {
   const status = entry.raceEntryStatus ?? entry.status
   if (status === 'Disqualified' || entry.isEmergencyDisqualified) {
@@ -83,6 +69,35 @@ function WeighInResultBadge({ entry }: { entry: DoctorRaceEntry }) {
   return (
     <span className="inline-flex rounded-full border border-gray-100 bg-gray-50 px-2 py-0.5 text-xs font-semibold text-gray-500">
       Chưa cân
+    </span>
+  )
+}
+
+function WeighOutResultBadge({ entry }: { entry: DoctorRaceEntry }) {
+  const status = entry.raceEntryStatus ?? entry.status
+  if (status === 'Disqualified' || entry.isEmergencyDisqualified) {
+    return (
+      <span className="inline-flex rounded-full border border-red-100 bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">
+        Không áp dụng · Đã loại
+      </span>
+    )
+  }
+
+  if (entry.postRaceJockeyWeight == null) {
+    return (
+      <span className="inline-flex rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-semibold text-gray-600">
+        Chưa ghi nhận
+      </span>
+    )
+  }
+
+  return (
+    <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${
+      entry.postRaceWeightFlagged
+        ? 'border-amber-200 bg-amber-50 text-amber-700'
+        : 'border-emerald-100 bg-emerald-50 text-emerald-700'
+    }`}>
+      {entry.postRaceWeightFlagged ? 'Cảnh báo vượt ngưỡng' : 'Đã ghi nhận'}
     </span>
   )
 }
@@ -292,6 +307,8 @@ export default function PaddockConsole() {
         weightDifference: res.weightDifference ?? entry.weightDifference,
         thresholdKg: res.thresholdKg ?? entry.thresholdKg,
         isWeightWarning: Boolean(res.isWeightWarning),
+        isEmergencyDisqualified: Boolean(res.isEmergencyDisqualified),
+        raceEntryStatus: res.raceEntryStatus ?? entry.raceEntryStatus,
         message: res.message,
       })
       showToast(res.message ?? `Đã xác nhận Weigh-In cho ${entry.jockeyName}.`)
@@ -303,6 +320,11 @@ export default function PaddockConsole() {
   }
 
   const handleHorseIdentityConfirm = async (entry: DoctorRaceEntry) => {
+    if (!isEntryEligible(entry)) {
+      showToast('Race entry này đã bị loại nên không thể lưu xác nhận danh tính.')
+      return
+    }
+
     const horseIdentityCheckStatus = identityInputs[entry.raceEntryId] ?? 'Matched'
     if (
       horseIdentityCheckStatus === 'Mismatch' &&
@@ -331,6 +353,11 @@ export default function PaddockConsole() {
   }
 
   const handleClinicalConfirm = async (entry: DoctorRaceEntry) => {
+    if (!isEntryEligible(entry)) {
+      showToast('Race entry này đã bị loại nên không thể lưu kết quả khám lâm sàng.')
+      return
+    }
+
     const clinicalStatus = clinicalInputs[entry.raceEntryId] ?? 'Fit'
     const unfitReason = unfitReasons[entry.raceEntryId]?.trim() ?? ''
 
@@ -564,7 +591,7 @@ export default function PaddockConsole() {
                       const eligible = isEntryEligible(entry)
 
                       return (
-                        <tr key={entry.raceEntryId} className="transition-colors hover:bg-gray-50/20">
+                        <tr key={entry.raceEntryId} className={`transition-colors ${eligible ? 'hover:bg-gray-50/20' : 'bg-gray-50/60'}`}>
                           <td className="px-4 py-4 font-mono text-xs font-bold text-gray-500">
                             {entry.postPosition ?? '-'}
                           </td>
@@ -688,7 +715,7 @@ export default function PaddockConsole() {
                                     [entry.raceEntryId]: event.target.value as IdentityStatus,
                                   }))
                                 }
-                                className="rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-semibold focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                className="rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-semibold focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-40"
                               >
                                 <option value="Matched">Matched</option>
                                 <option value="Mismatch">Mismatch</option>
@@ -710,7 +737,7 @@ export default function PaddockConsole() {
                                   [entry.raceEntryId]: event.target.value as ClinicalStatus,
                                 }))
                               }
-                              className={`rounded-lg border px-3 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 ${
+                              className={`rounded-lg border px-3 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-40 ${
                                 clinicalStatus === 'Unfit'
                                   ? 'border-red-200 bg-red-50 text-red-700 focus:ring-red-500/20'
                                   : 'border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-500/20'
@@ -842,17 +869,7 @@ export default function PaddockConsole() {
                           {difference == null ? 'Chưa có' : `${difference > 0 ? '+' : ''}${difference.toFixed(1)} kg`}
                         </td>
                         <td className="px-4 py-4">
-                          {entry.postRaceJockeyWeight == null ? (
-                            <EntryStatusBadge entry={entry} />
-                          ) : (
-                            <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${
-                              entry.postRaceWeightFlagged
-                                ? 'border-amber-200 bg-amber-50 text-amber-700'
-                                : 'border-emerald-100 bg-emerald-50 text-emerald-700'
-                            }`}>
-                              {entry.postRaceWeightFlagged ? 'Backend đánh dấu cảnh báo' : 'Đã ghi nhận'}
-                            </span>
-                          )}
+                          <WeighOutResultBadge entry={entry} />
                         </td>
                         <td className="px-4 py-4 text-right">
                           <button

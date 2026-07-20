@@ -163,7 +163,7 @@ export default function SpectatorLiveRace() {
         <>
           <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase text-gray-400">Race #{race.raceId}</p><h2 className="mt-1 text-2xl font-black text-gray-900">{statusLabel[normalizedStatus] ?? race.status}</h2></div><span className={`rounded-full border px-3 py-1 text-xs font-bold ${normalizedStatus === 'live' ? 'border-red-200 bg-red-50 text-red-700' : normalizedStatus === 'official' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>{statusLabel[normalizedStatus] ?? race.status}</span></div>
-            <p className="mt-3 text-sm text-gray-500">Bắt đầu: {race.actualStartTime ? new Date(race.actualStartTime).toLocaleString('vi-VN') : 'Chưa bắt đầu'} {race.raceDurationSeconds != null && `· Thời lượng ${race.raceDurationSeconds} giây`}</p>
+            <p className="mt-3 text-sm text-gray-500">Bắt đầu: {race.actualStartTime ? new Date(race.actualStartTime).toLocaleString('vi-VN') : 'Chưa bắt đầu'}</p>
           </section>
 
           {race.entries.length > 0 && (

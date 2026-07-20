@@ -17,6 +17,8 @@ const statusConfig: Record<RaceInvitation['status'], { label: string; cls: strin
 
 export default function InvitationCard({ invitation, actionLoading = false, onAccept, onDecline }: InvitationCardProps) {
   const config = statusConfig[invitation.status]
+  const canRespond = invitation.status === 'Pending'
+  const hasResponded = invitation.status === 'Accepted' || invitation.status === 'Confirmed'
   return (
     <article className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-[#cfa73d]">
       <div className="flex items-start justify-between gap-3">
@@ -29,7 +31,7 @@ export default function InvitationCard({ invitation, actionLoading = false, onAc
         {invitation.respondedAt && <div className="flex justify-between gap-4"><dt className="text-slate-500">Phản hồi lúc</dt><dd className="text-right font-semibold text-slate-700">{new Date(invitation.respondedAt).toLocaleString('vi-VN')}</dd></div>}
         {invitation.requestMessage && <div><dt className="text-slate-500">Lời nhắn</dt><dd className="mt-1 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 leading-6 text-slate-700">{invitation.requestMessage}</dd></div>}
       </dl>
-      {invitation.status === 'Pending' && <div className="mt-auto grid grid-cols-2 gap-2 pt-5"><button type="button" onClick={() => onAccept(invitation.pairingId)} disabled={actionLoading} className="rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-bold disabled:cursor-wait disabled:opacity-60">{actionLoading ? 'Đang xử lý...' : 'Chấp nhận'}</button><button type="button" onClick={() => onDecline(invitation.pairingId)} disabled={actionLoading} className="rounded-lg border border-red-200 bg-white px-3 py-2.5 text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-60">Từ chối</button></div>}
+      {(canRespond || hasResponded) && <div className="mt-auto grid grid-cols-2 gap-2 pt-5"><button type="button" onClick={() => onAccept(invitation.pairingId)} disabled={actionLoading || !canRespond} className="rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-bold disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:opacity-70">{actionLoading ? 'Đang xử lý...' : 'Chấp nhận'}</button><button type="button" onClick={() => onDecline(invitation.pairingId)} disabled={actionLoading || !canRespond} className="rounded-lg border border-red-200 bg-white px-3 py-2.5 text-sm font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-70">Từ chối</button></div>}
     </article>
   )
 }

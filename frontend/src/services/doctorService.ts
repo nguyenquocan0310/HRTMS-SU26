@@ -67,6 +67,8 @@ export interface PreRaceWeightResponse {
   weightDifference?: number | null;
   thresholdKg?: number | null;
   isWeightWarning?: boolean;
+  isEmergencyDisqualified?: boolean;
+  raceEntryStatus?: string | null;
   message?: string;
 }
 
