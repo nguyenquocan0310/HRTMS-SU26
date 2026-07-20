@@ -37,9 +37,9 @@ public class ProtestController : ControllerBase
             return CreatedAtAction(nameof(GetByRace), new { raceId = protest.RaceId },
                 ApiResponse<ProtestDto>.Ok(protest, "Protest submitted."));
         }
-        catch (KeyNotFoundException ex) when (ex.Message is "RACE_NOT_FOUND" or "ACCUSED_ENTRY_NOT_IN_RACE" or "VIOLATION_NOT_IN_RACE")
+        catch (KeyNotFoundException ex) when (ex.Message is "RACE_NOT_FOUND" or "ACCUSED_ENTRY_NOT_IN_RACE" or "VIOLATION_NOT_IN_RACE" or "SUBMITTER_NOT_FOUND")
         {
-            return NotFound(ApiResponse<ProtestDto>.Fail("Race, accused entry, or violation was not found."));
+            return NotFound(ApiResponse<ProtestDto>.Fail("Submitter account was not found."));
         }
         catch (UnauthorizedAccessException)
         {
