@@ -10,6 +10,9 @@ import { getUserBasicInfo } from '../../services/approvalService';
 import styles from './RaceList.module.scss';
 
 type ProtestItem = Awaited<ReturnType<typeof getProtestsByRace>>[number];
+type RaceListItem = Pick<UnofficialRace,
+  'raceId' | 'tournamentId' | 'tournamentName' | 'roundName' | 'raceNumber' | 'scheduledTime'
+> & { displayStatus: 'Unofficial' | 'Official' };
 
 const formatDateTime = (iso: string) => {
   const d = new Date(iso);
@@ -32,11 +35,26 @@ const readProtestValue = (protest: ProtestItem, keys: string[]): string => {
   return '—';
 };
 
+const getOfficialRaces = (tournament: TournamentResponse | undefined): RaceListItem[] =>
+  tournament?.rounds.flatMap((round) =>
+    round.races
+      .filter((race) => race.status === 'Official')
+      .map((race) => ({
+        raceId: race.raceId,
+        tournamentId: tournament.tournamentId,
+        tournamentName: tournament.name,
+        roundName: round.name,
+        raceNumber: race.raceNumber,
+        scheduledTime: race.scheduledTime,
+        displayStatus: 'Official',
+      }))
+  ) ?? [];
+
 const RaceList = () => {
   const [tournaments, setTournaments] = useState<TournamentResponse[]>([]);
   const [selectedTournamentId, setSelectedTournamentId] = useState<number | null>(null);
 
-  const [races, setRaces] = useState<UnofficialRace[]>([]);
+  const [races, setRaces] = useState<RaceListItem[]>([]);
   const [selectedRaceId, setSelectedRaceId] = useState<number | null>(null);
   const [loadingRaces, setLoadingRaces] = useState(false);
 
@@ -49,7 +67,6 @@ const RaceList = () => {
   const [declaring, setDeclaring] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
   const [actionError, setActionError] = useState('');
-  const [justOfficialIds, setJustOfficialIds] = useState<Set<number>>(new Set());
   const [protestSubmitterNames, setProtestSubmitterNames] = useState<Record<number, string>>({});
 
 
@@ -66,7 +83,20 @@ const RaceList = () => {
   const reloadRaces = (tournamentId: number) => {
     setLoadingRaces(true);
     getUnofficialRaces(tournamentId)
-      .then((list) => {
+      .then((unofficialRaces) => {
+        const raceById = new Map<number, RaceListItem>();
+        unofficialRaces.forEach((race) => raceById.set(race.raceId, {
+          raceId: race.raceId,
+          tournamentId: race.tournamentId,
+          tournamentName: race.tournamentName,
+          roundName: race.roundName,
+          raceNumber: race.raceNumber,
+          scheduledTime: race.scheduledTime,
+          displayStatus: 'Unofficial',
+        }));
+        getOfficialRaces(tournaments.find((t) => t.tournamentId === tournamentId))
+          .forEach((race) => raceById.set(race.raceId, race));
+        const list = Array.from(raceById.values());
         setRaces(list);
         setSelectedRaceId((current) =>
           current && list.some((r) => r.raceId === current) ? current : (list[0]?.raceId ?? null)
@@ -83,6 +113,7 @@ const RaceList = () => {
   }, [selectedTournamentId]);
 
   const selectedRace = races.find((r) => r.raceId === selectedRaceId) ?? null;
+  const selectedRaceIsOfficial = selectedRace?.displayStatus === 'Official';
 
   const closeDetail = () => {
     setDetailOpen(false);
@@ -135,7 +166,20 @@ const handleDeclareOfficial = async () => {
     try {
       await declareRaceOfficial(selectedRace.raceId, { confirmedByAdmin: true });
       setActionMsg('Race đã được chuyển sang trạng thái Official.');
-      setJustOfficialIds((prev) => new Set(prev).add(selectedRace.raceId));
+      setRaces((prev) => prev.map((race) =>
+        race.raceId === selectedRace.raceId ? { ...race, displayStatus: 'Official' } : race
+      ));
+      setTournaments((prev) => prev.map((tournament) =>
+        tournament.tournamentId !== selectedRace.tournamentId ? tournament : {
+          ...tournament,
+          rounds: tournament.rounds.map((round) => ({
+            ...round,
+            races: round.races.map((race) =>
+              race.raceId === selectedRace.raceId ? { ...race, status: 'Official' } : race
+            ),
+          })),
+        }
+      ));
       // Không gọi reloadRaces ở đây — race vừa Official sẽ bị GET /races/unofficial
       // lọc mất; giữ nguyên danh sách hiện tại để vẫn thấy được, chỉ cập nhật badge.
       setLiveStatus((prev) => (prev ? { ...prev, status: 'Official' } : prev));
@@ -246,8 +290,8 @@ const handleDeclareOfficial = async () => {
                   {formatDateTime(selectedRace.scheduledTime)}
                 </div>
                 <div style={{ marginTop: '0.45rem' }}>
-                  <span className={`${styles.badge} ${justOfficialIds.has(selectedRace.raceId) ? styles.confirmed : styles.pending}`}>
-                    {justOfficialIds.has(selectedRace.raceId) ? 'Official' : 'Unofficial'}
+                  <span className={`${styles.badge} ${selectedRaceIsOfficial ? styles.confirmed : styles.pending}`}>
+                    {selectedRace.displayStatus}
                   </span>
                 </div>
               </div>
@@ -277,8 +321,8 @@ const handleDeclareOfficial = async () => {
 
             <div className={styles.detailStatusRow}>
               <span>Trạng thái Race</span>
-              <span className={`${styles.badge} ${styles.pending}`}>
-                {liveStatus?.status ?? 'Unofficial'}
+              <span className={`${styles.badge} ${selectedRaceIsOfficial ? styles.confirmed : styles.pending}`}>
+                {liveStatus?.status ?? selectedRace.displayStatus}
               </span>
             </div>
 
@@ -350,7 +394,7 @@ const handleDeclareOfficial = async () => {
                   )}
                 </section>
 
-                {!justOfficialIds.has(selectedRace.raceId) && (
+                {!selectedRaceIsOfficial && (
                   <div className={styles.detailActions}>
                     <button
                       type="button"
