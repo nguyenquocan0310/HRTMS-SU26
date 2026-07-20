@@ -179,7 +179,7 @@ public class RaceEntryService : IRaceEntryService
             throw new InvalidOperationException("DUPLICATE_IN_RACE");
         }
 
-        await _audit.LogAsync(adminId, "ALLOCATE_RACE_ENTRY", "RaceEntry",
+        await _audit.LogAsync(adminId, "Xếp ngựa vào cuộc đua", "RaceEntry",
             entry.RaceEntryId.ToString(), null,
             $"RaceId={raceId};PairingId={dto.PairingId}");
 
@@ -253,7 +253,7 @@ public class RaceEntryService : IRaceEntryService
             throw new InvalidOperationException("DRAW_CONFLICT");
         }
 
-        await _audit.LogAsync(adminId, "DRAW_POST_POSITIONS", "Race",
+        await _audit.LogAsync(adminId, "Bốc thăm vị trí xuất phát", "Race",
             raceId.ToString(), null, $"Entries={entries.Count}");
 
         // Bao Owner cong xuat phat cua tung ngua (sau khi da commit boc tham).
@@ -370,7 +370,7 @@ public class RaceEntryService : IRaceEntryService
         entry.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        await _audit.LogAsync(ownerId, "CONFIRM_RACE_ENTRY", "RaceEntry",
+        await _audit.LogAsync(ownerId, "Xác nhận tham gia cuộc đua", "RaceEntry",
             entry.RaceEntryId.ToString(), "Pending", "Confirmed");
 
         return MapToResponse(entry, entry.Pairing);
@@ -417,7 +417,7 @@ public class RaceEntryService : IRaceEntryService
             throw new InvalidOperationException("WITHDRAW_AFTER_CUTOFF");
 
         var reason = string.IsNullOrWhiteSpace(dto.Reason)
-            ? (isSystem ? "Auto-cancelled: confirmation cut-off passed" : "Withdrawn by owner")
+            ? (isSystem ? "Tự động hủy: quá hạn xác nhận tham gia" : "Chủ ngựa tự rút lui")
             : dto.Reason!;
 
         var now = DateTime.UtcNow;
@@ -510,7 +510,7 @@ public class RaceEntryService : IRaceEntryService
                 relatedEntityId: raceEntryId);
 
             await _audit.LogAsync(actorId,
-                isSystem ? "AUTO_CANCEL_RACE_ENTRY" : "WITHDRAW_RACE_ENTRY",
+                isSystem ? "Tự động hủy đăng ký đua (quá hạn xác nhận)" : "Rút khỏi cuộc đua",
                 "RaceEntry", raceEntryId.ToString(),
                 entry.Status, $"Cancelled;Refunded={refunded};Reason={reason}");
 
@@ -627,7 +627,7 @@ public class RaceEntryService : IRaceEntryService
         foreach (var id in overdueIds)
         {
             await WithdrawAsync(systemActorId, id,
-                new WithdrawEntryDto { Reason = "Auto-cancelled: confirmation cut-off passed" },
+                new WithdrawEntryDto { Reason = "Tự động hủy: quá hạn xác nhận tham gia" },
                 isSystem: true);
             count++;
         }
@@ -717,7 +717,7 @@ public class RaceEntryService : IRaceEntryService
             race.UpdatedAt = now;
             await _context.SaveChangesAsync();
 
-            await _audit.LogAsync(adminId, "Cancel_Race", "Race", raceId.ToString(),
+            await _audit.LogAsync(adminId, "Hủy cuộc đua", "Race", raceId.ToString(),
                 oldStatus, $"Cancelled;Entries={cancelledEntries};Refunded={refunded};Reason={cancelReason}");
 
             if (tx != null) await tx.CommitAsync();

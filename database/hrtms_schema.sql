@@ -643,7 +643,7 @@ GO
 CREATE TABLE AuditLogs (
     AuditLogId  INT            IDENTITY(1,1) NOT NULL,
     ActorId     INT            NOT NULL,
-    [Action]    VARCHAR(50)    NOT NULL,
+    [Action]    NVARCHAR(100)  NOT NULL,
     EntityName  VARCHAR(50)    NOT NULL,
     EntityId    VARCHAR(50)    NOT NULL,
     OldValue    NVARCHAR(MAX)  NULL,

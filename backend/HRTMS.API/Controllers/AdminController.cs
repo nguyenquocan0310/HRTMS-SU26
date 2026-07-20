@@ -88,7 +88,7 @@ public class AdminController : ControllerBase
 
         await _auditLogService.LogAsync(
             actorId: CurrentAdminId,
-            action: "Suspend_User",
+            action: "Tạm ngưng tài khoản",
             entityName: "User",
             entityId: user.UserId.ToString(),
             oldValue: oldStatus,
@@ -129,7 +129,7 @@ public class AdminController : ControllerBase
 
         await _auditLogService.LogAsync(
             actorId: CurrentAdminId,
-            action: "Activate_User",
+            action: "Kích hoạt tài khoản",
             entityName: "User",
             entityId: user.UserId.ToString(),
             oldValue: oldStatus,
@@ -175,7 +175,7 @@ public class AdminController : ControllerBase
 
         await _auditLogService.LogAsync(
             actorId: CurrentAdminId,
-            action: "Approve_Referee",
+            action: "Duyệt hồ sơ trọng tài",
             entityName: "RefereeProfile",
             entityId: profile.RefereeId.ToString(),
             oldValue: $"RefereeProfile.Status={oldProfileStatus}, User.Status={oldUserStatus}",
@@ -224,7 +224,7 @@ public class AdminController : ControllerBase
 
         await _auditLogService.LogAsync(
             actorId: CurrentAdminId,
-            action: "Reject_Referee",
+            action: "Từ chối hồ sơ trọng tài",
             entityName: "RefereeProfile",
             entityId: profile.RefereeId.ToString(),
             oldValue: $"RefereeProfile.Status={oldProfileStatus}, User.Status={oldUserStatus}",
@@ -270,7 +270,7 @@ public class AdminController : ControllerBase
 
         await _auditLogService.LogAsync(
             actorId: CurrentAdminId,
-            action: "Approve_Doctor",
+            action: "Duyệt hồ sơ bác sĩ",
             entityName: "DoctorProfile",
             entityId: profile.DoctorId.ToString(),
             oldValue: $"DoctorProfile.Status={oldProfileStatus}, User.Status={oldUserStatus}",
@@ -319,7 +319,7 @@ public class AdminController : ControllerBase
 
         await _auditLogService.LogAsync(
             actorId: CurrentAdminId,
-            action: "Reject_Doctor",
+            action: "Từ chối hồ sơ bác sĩ",
             entityName: "DoctorProfile",
             entityId: profile.DoctorId.ToString(),
             oldValue: $"DoctorProfile.Status={oldProfileStatus}, User.Status={oldUserStatus}",
@@ -394,7 +394,7 @@ public class AdminController : ControllerBase
 
         await _auditLogService.LogAsync(
             actorId: CurrentAdminId,
-            action: "Approve_Jockey",
+            action: "Duyệt hồ sơ nài ngựa",
             entityName: "JockeyProfile",
             entityId: profile.JockeyId.ToString(),
             oldValue: $"JockeyProfile.Status={oldProfileStatus}, User.Status={oldUserStatus}",
@@ -443,7 +443,7 @@ public class AdminController : ControllerBase
 
         await _auditLogService.LogAsync(
             actorId: CurrentAdminId,
-            action: "Reject_Jockey",
+            action: "Từ chối hồ sơ nài ngựa",
             entityName: "JockeyProfile",
             entityId: profile.JockeyId.ToString(),
             oldValue: $"JockeyProfile.Status={oldProfileStatus}, User.Status={oldUserStatus}",

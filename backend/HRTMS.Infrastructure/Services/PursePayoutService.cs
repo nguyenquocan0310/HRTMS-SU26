@@ -91,7 +91,7 @@ namespace HRTMS.Infrastructure.Services
             // LogAsync tự SaveChangesAsync → lưu payout + audit trong 1 SaveChanges (1 transaction)
             await _auditLog.LogAsync(
                 actorId: adminUserId,
-                action: "Update_Payout_Status",
+                action: "Cập nhật trạng thái chi trả thưởng",
                 entityName: "PursePayout",
                 entityId: payout.PursePayoutId.ToString(),
                 oldValue: oldStatus,

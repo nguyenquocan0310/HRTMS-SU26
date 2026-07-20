@@ -79,7 +79,7 @@ public class ProfileService : IProfileService
 
         await _auditLog.LogAsync(
             actorId: userId,
-            action: "Update_Profile",
+            action: "Cập nhật hồ sơ cá nhân",
             entityName: "Users",
             entityId: userId.ToString(),
             oldValue: $"FullName={oldFullName}, Email={oldEmail}",
@@ -138,7 +138,7 @@ public class ProfileService : IProfileService
 
         await _auditLog.LogAsync(
             actorId: userId,
-            action: "Change_Password",
+            action: "Đổi mật khẩu",
             entityName: "Users",
             entityId: userId.ToString(),
             ipAddress: ipAddress

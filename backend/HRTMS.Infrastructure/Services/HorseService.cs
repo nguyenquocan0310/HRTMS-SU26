@@ -100,7 +100,7 @@ public class HorseService : IHorseService
 
         if (horse.AdminApprovalStatus == "Rejected")
         {
-            await _auditLog.LogAsync(ownerId, "AutoReject_Horse", "Horse",
+            await _auditLog.LogAsync(ownerId, "Tự động từ chối hồ sơ ngựa (không đạt sàng lọc)", "Horse",
                 horse.HorseId.ToString(), "NotScreened", $"AutoRejected: {horse.ScreeningReason}");
             await _notification.SendAsync(
                 horse.OwnerId,
@@ -189,7 +189,7 @@ public class HorseService : IHorseService
         switch (category)
         {
             case "AutoRejected":
-                await _auditLog.LogAsync(ownerId, "AutoReject_Enrollment", "HorseTournamentEntry",
+                await _auditLog.LogAsync(ownerId, "Tự động từ chối đăng ký ngựa vào giải", "HorseTournamentEntry",
                     entry.EnrollmentId.ToString(), "NotScreened", $"AutoRejected: {entry.ScreeningReason}");
                 await _notification.SendAsync(
                     horse.OwnerId,
@@ -201,7 +201,7 @@ public class HorseService : IHorseService
                     $"Ngựa không đủ điều kiện dự giải. Lý do: {entry.ScreeningReason}");
 
             case "AutoEligible":
-                await _auditLog.LogAsync(ownerId, "AutoApprove_Enrollment", "HorseTournamentEntry",
+                await _auditLog.LogAsync(ownerId, "Tự động duyệt ngựa đủ điều kiện vào giải", "HorseTournamentEntry",
                     entry.EnrollmentId.ToString(), "NotScreened", "Approved (AutoEligible)");
                 await _notification.SendAsync(
                     horse.OwnerId,
@@ -274,7 +274,7 @@ public class HorseService : IHorseService
         entry.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        await _auditLog.LogAsync(ownerId, "Withdraw_Enrollment", "HorseTournamentEntry",
+        await _auditLog.LogAsync(ownerId, "Rút ngựa khỏi giải", "HorseTournamentEntry",
             enrollmentId.ToString(), "Enrolled", "Withdrawn", null);
 
         await _notification.SendAsync(
@@ -555,7 +555,7 @@ public class HorseService : IHorseService
 
         await _auditLog.LogAsync(
             actorId: adminId,
-            action: "Approve_Enrollment",
+            action: "Duyệt đăng ký ngựa vào giải",
             entityName: "HorseTournamentEntry",
             entityId: enrollmentId.ToString(),
             oldValue: "Pending",
@@ -625,7 +625,7 @@ public class HorseService : IHorseService
 
             await _auditLog.LogAsync(
                 actorId: adminId,
-                action: "Reject_Enrollment",
+                action: "Từ chối đăng ký ngựa vào giải",
                 entityName: "HorseTournamentEntry",
                 entityId: enrollmentId.ToString(),
                 oldValue: oldStatus,
@@ -874,7 +874,7 @@ public class HorseService : IHorseService
         entry.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        await _auditLog.LogAsync(adminId, "Update_Entry_Fee_Status", "RaceEntry",
+        await _auditLog.LogAsync(adminId, "Cập nhật trạng thái lệ phí", "RaceEntry",
             raceEntryId.ToString(), oldFeeStatus, "Paid", null);
 
         // Bao Owner: le phi da duoc xac nhan (email + in-app).
@@ -901,7 +901,7 @@ public class HorseService : IHorseService
         entry.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        await _auditLog.LogAsync(adminId, "Complete_Refund", "RaceEntry",
+        await _auditLog.LogAsync(adminId, "Hoàn phí tham gia", "RaceEntry",
             raceEntryId.ToString(), "Refund Pending", "Refunded", null);
 
         await _notification.SendAsync(
@@ -948,7 +948,7 @@ public class HorseService : IHorseService
         entry.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        await _auditLog.LogAsync(adminId, "Approve_RaceEntry", "RaceEntry",
+        await _auditLog.LogAsync(adminId, "Duyệt lượt đăng ký đua", "RaceEntry",
             raceEntryId.ToString(), "Pending", "Confirmed", null);
 
         await _notification.SendAsync(
@@ -991,7 +991,7 @@ public class HorseService : IHorseService
         if (result.AlreadyWithdrawn)
             return ApiResponse<string>.Fail("Lượt đăng ký này đã bị hủy trước đó.");
 
-        await _auditLog.LogAsync(adminId, "Reject_RaceEntry", "RaceEntry",
+        await _auditLog.LogAsync(adminId, "Từ chối lượt đăng ký đua", "RaceEntry",
             raceEntryId.ToString(), oldStatus, $"Cancelled: {reason}", null);
 
         await _notification.SendAsync(

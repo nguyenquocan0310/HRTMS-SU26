@@ -106,7 +106,7 @@ public class TournamentParticipantService : ITournamentParticipantService
                 relatedEntityId: participant.ParticipantId);
         }
 
-        await _auditLog.LogAsync(userId, "Register_TournamentParticipant", "TournamentParticipant",
+        await _auditLog.LogAsync(userId, "Đăng ký nhân sự điều hành giải", "TournamentParticipant",
             participant.ParticipantId.ToString(), null,
             $"Tournament={tournamentId}, Role={role}, Screening={participant.ScreeningStatus}, Status={participant.Status}");
 
@@ -164,7 +164,7 @@ public class TournamentParticipantService : ITournamentParticipantService
         participant.RejectionReason = null;
         await _context.SaveChangesAsync();
 
-        await _auditLog.LogAsync(adminId, "Approve_TournamentParticipant", "TournamentParticipant",
+        await _auditLog.LogAsync(adminId, "Duyệt nhân sự điều hành giải", "TournamentParticipant",
             participantId.ToString(), oldStatus, "Approved");
 
         await _notification.SendAsync(
@@ -197,7 +197,7 @@ public class TournamentParticipantService : ITournamentParticipantService
         participant.ApprovedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        await _auditLog.LogAsync(adminId, "Reject_TournamentParticipant", "TournamentParticipant",
+        await _auditLog.LogAsync(adminId, "Từ chối nhân sự điều hành giải", "TournamentParticipant",
             participantId.ToString(), oldStatus, $"Rejected: {reason.Trim()}");
 
         await _notification.SendAsync(
