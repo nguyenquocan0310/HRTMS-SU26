@@ -7,7 +7,9 @@ interface FeeEntry {
   raceEntryId: number;
   raceId: number;
   horseName: string;
-  jockeyName: string;
+  jockey?: {
+    fullName?: string;
+  };
   status: string;
   entryFeeStatus: string;
   createdAt: string;
@@ -116,7 +118,7 @@ const EntryFees = () => {
                     <td className={styles.name}>
                       {entry.horseName} <span className={styles.muted}>#{entry.raceEntryId}</span>
                     </td>
-                    <td>{entry.jockeyName}</td>
+                    <td>{entry.jockey?.fullName ?? '—'}</td>
                     <td>
                       <span className={`${styles.badge} ${entry.status === 'Confirmed' ? styles.confirmed : styles.pending}`}>
                         {entry.status}
