@@ -15,9 +15,10 @@
        MaxHorses=10, TopPerRace, AdvancementCount=5; tổng purse 500.000.000
        (Vòng loại 50tr×4 + Bán kết 75tr×2 + Chung kết 150tr)
      • GIẢI GIAO HỮU THÁNG 9-2026 (song song 05–25/09/2026, Open Registration,
-       1 round / 1 race, MaxHorses=10, 2 pairing friendly26_* Confirmed)
+       1 round / 1 race, MaxHorses=10, 0 pairing ban đầu — account/ngựa/roster
+       friendly26_* sẵn sàng để ghép cặp bằng UI hoặc seed2)
        — demo vận hành nhiều giải cùng lúc + demo nhanh MỘT race duy nhất
-       (bổ sung 8 pairing cho đủ 10 bằng `src\demo\seed2`)
+       (bổ sung 9 pairing hỗ trợ cho đủ 10 bằng `src\demo\seed2`)
      • GIẢI ĐUA NGỰA MÙA XUÂN 2026 (01–31/03/2026, Completed) — lịch sử đầy đủ:
        2 round / 3 race Official, 8 pairing spring26_*, kết quả, biên bản khóa,
        payout đã trả, thông báo — xem lại như một giải thật
@@ -222,14 +223,14 @@ BEGIN TRY
     /* =========================================================================
        GIẢI PHỤ SONG SONG — "GIẢI GIAO HỮU THÁNG 9-2026"
        Trùng thời gian với giải chính (05–25/09/2026) để minh họa vận hành
-       NHIỀU GIẢI CÙNG LÚC. 1 round + 1 race Upcoming, MaxHorses=10, 2 pairing
-       Confirmed sẵn (dùng demo allocate đa giải và case lỗi
-       PAIRING_TOURNAMENT_MISMATCH khi lỡ chọn pairing của giải này allocate
-       vào race giải chính).
+       NHIỀU GIẢI CÙNG LÚC. 1 round + 1 race Upcoming, MaxHorses=10.
+       **0 PAIRING BAN ĐẦU** — chỉ dựng account/ngựa/roster `friendly26_*` ở
+       trạng thái sẵn sàng ghép cặp; việc ghép cặp do UI (cặp chính) và seed2
+       (9 cặp hỗ trợ) đảm nhiệm.
        Account riêng (friendly26_*) — không đụng 38 pairing của giải chính.
        Chỉ 1 race ⇒ dùng làm kịch bản demo NGẮN: chạy trọn vòng đời một cuộc
-       đua mà không phải đi hết 7 race của giải chính. Bổ sung 8 pairing cho
-       đủ 10 bằng `src\demo\seed2\01_friendly_pairings_and_fee.sql`.
+       đua mà không phải đi hết 7 race của giải chính. Bổ sung 9 pairing cho
+       đủ 10 bằng `src\demo\seed2\01_friendly_support_pairings.sql`.
        ========================================================================= */
     DECLARE @FrAcc TABLE (N INT PRIMARY KEY, OwnerName NVARCHAR(100), JockeyName NVARCHAR(100), HorseName NVARCHAR(100), HorseColor NVARCHAR(50));
     INSERT @FrAcc VALUES
@@ -296,12 +297,10 @@ BEGIN TRY
         SELECT h.HorseId,@FrTId,h.OwnerId,'Enrolled','AutoEligible','Approved',@Now,@Now
         FROM Horses h JOIN Users u ON u.UserId=h.OwnerId AND u.Username LIKE 'friendly26_owner%';
 
-        INSERT Pairings (TournamentId,HorseId,JockeyId,[Status],RequestMessage,ResponseReason,CreatedAt,UpdatedAt)
-        SELECT @FrTId,h.HorseId,j.UserId,'Confirmed',N'Ghép cặp giải giao hữu.',N'Chủ ngựa đã xác nhận.',@Now,@Now
-        FROM @FrAcc a
-        JOIN Users o ON o.Username=CONCAT('friendly26_owner0',a.N)
-        JOIN Horses h ON h.OwnerId=o.UserId AND h.[Name]=a.HorseName
-        JOIN Users j ON j.Username=CONCAT('friendly26_jockey0',a.N);
+        -- KHÔNG seed Pairing cho giải giao hữu: giải bắt đầu với 0 pairing.
+        -- Ngựa/nài/roster đã sẵn sàng để GHÉP CẶP bằng UI hoặc bằng seed2.
+        -- Pairing chính do 2 tài khoản nguyenan159246+* tạo qua UI; 9 cặp hỗ trợ
+        -- do `src\demo\seed2\01_friendly_support_pairings.sql` tạo.
     END;
 
     /* Nâng cấp DB đã seed bản cũ (MaxHorses=6, 2 race) sang cấu hình 1 race.
@@ -317,8 +316,14 @@ BEGIN TRY
                               WHERE rd.TournamentId=@FrTIdFix AND r.RaceNumber=2);
         IF @FrRace2 IS NOT NULL
         BEGIN
+            -- Chỉ xóa khi race 2 hoàn toàn TRỐNG. Kiểm đủ MỌI bảng con có FK tới
+            -- Races (RaceEntries, Predictions, RaceReports, Protests) — có bất kỳ
+            -- dữ liệu thật nào thì DỪNG, không tự xóa.
             IF EXISTS (SELECT 1 FROM RaceEntries WHERE RaceId=@FrRace2)
-                THROW 51004,N'Giải giao hữu cần còn 1 race nhưng race 2 đã có RaceEntry — xử lý tay trước khi seed lại.',1;
+            OR EXISTS (SELECT 1 FROM Predictions WHERE RaceId=@FrRace2)
+            OR EXISTS (SELECT 1 FROM RaceReports WHERE RaceId=@FrRace2)
+            OR EXISTS (SELECT 1 FROM Protests    WHERE RaceId=@FrRace2)
+                THROW 51004,N'Giải giao hữu cần còn 1 race nhưng race 2 đã có dữ liệu (entry/prediction/biên bản/khiếu nại) — xử lý tay trước khi seed lại.',1;
             DELETE FROM RefereeAssignments WHERE RaceId=@FrRace2;
             DELETE FROM DoctorAssignments  WHERE RaceId=@FrRace2;
             DELETE FROM Races WHERE RaceId=@FrRace2;
@@ -327,6 +332,16 @@ BEGIN TRY
         UPDATE r SET PurseAmount=30000000,UpdatedAt=@Now
         FROM Races r JOIN Rounds rd ON rd.RoundId=r.RoundId
         WHERE rd.TournamentId=@FrTIdFix AND r.RaceNumber=1 AND r.PurseAmount<30000000;
+
+        -- Giải giao hữu phải bắt đầu với 0 pairing. DB seed bản cũ có 2 pairing
+        -- friendly26_* → gỡ, nhưng CHỈ khi chưa được allocate vào race nào.
+        IF EXISTS (SELECT 1 FROM Pairings p WHERE p.TournamentId=@FrTIdFix)
+        BEGIN
+            IF EXISTS (SELECT 1 FROM RaceEntries e JOIN Pairings p ON p.PairingId=e.PairingId
+                       WHERE p.TournamentId=@FrTIdFix)
+                THROW 51005,N'Giải giao hữu cần 0 pairing ban đầu nhưng đã có pairing được allocate vào race — xử lý tay trước khi seed lại.',1;
+            DELETE FROM Pairings WHERE TournamentId=@FrTIdFix;
+        END;
     END;
 
     /* =========================================================================
