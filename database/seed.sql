@@ -12,7 +12,8 @@
      • 37 cặp Owner/Jockey hỗ trợ (summer26_owner01..37 / summer26_jockey01..37)
      • 2 Referee, 2 Doctor, 1 Spectator (kèm ví 1000 điểm)
      • Tournament GIẢI ĐUA NGỰA MÙA HÈ 2026: 3 round, race 4/2/1, 01–30/09/2026,
-       MaxHorses=10, TopPerRace, AdvancementCount=2
+       MaxHorses=10, TopPerRace, AdvancementCount=2; tổng purse 500.000.000
+       (Vòng loại 50tr×4 + Bán kết 75tr×2 + Chung kết 150tr)
      • GIẢI GIAO HỮU THÁNG 9-2026 (song song 05–25/09/2026, Open Registration,
        2 pairing friendly26_* Confirmed) — demo vận hành nhiều giải cùng lúc
      • GIẢI ĐUA NGỰA MÙA XUÂN 2026 (01–31/03/2026, Completed) — lịch sử đầy đủ:
@@ -169,7 +170,8 @@ BEGIN TRY
      AdvancementRule,AdvancementCount,CreatedAt,UpdatedAt,CreatedBy)
     VALUES (N'GIẢI ĐUA NGỰA MÙA HÈ 2026',N'Demo 38 pairing, 4 vòng loại, 2 bán kết, 1 chung kết.',
      '2026-09-01T00:00:00','2026-09-30T23:59:59',10,'Thoroughbred','Turf',1600,'Open',3,
-     100000000,1000000,2.00,1.00,'Open Registration','TopPerRace',2,@Now,@Now,@AdminId);
+     500000000,1000000,2.00,1.00,'Open Registration','TopPerRace',2,@Now,@Now,@AdminId);
+    -- Tổng purse 500.000.000 = Vòng loại 50tr×4 (200tr) + Bán kết 75tr×2 (150tr) + Chung kết 150tr.
 
     DECLARE @TId INT=(SELECT TournamentId FROM Tournaments WHERE [Name]=N'GIẢI ĐUA NGỰA MÙA HÈ 2026');
     IF EXISTS (SELECT 1 FROM Tournaments WHERE TournamentId=@TId AND (MaxHorses<>10 OR AdvancementRule<>'TopPerRace' OR AdvancementCount<>2))
@@ -191,10 +193,10 @@ BEGIN TRY
             @F INT=(SELECT RoundId FROM Rounds WHERE TournamentId=@TId AND SequenceOrder=3);
     INSERT Races (RoundId,RaceNumber,ScheduledTime,PurseAmount,[Status],IsPostPositionDrawn,IsPredictionGateClosed,ConfirmationCutoffHours,ProtestDeadlineMinutes,CreatedAt,UpdatedAt)
     SELECT v.RoundId,v.RaceNo,v.Dt,v.Purse,'Upcoming',0,0,24,120,@Now,@Now
-    FROM (VALUES (@Q,1,CONVERT(DATETIME2,'2026-09-05T09:00:00'),10000000),(@Q,2,CONVERT(DATETIME2,'2026-09-05T11:00:00'),10000000),
-                 (@Q,3,CONVERT(DATETIME2,'2026-09-06T09:00:00'),10000000),(@Q,4,CONVERT(DATETIME2,'2026-09-06T11:00:00'),10000000),
-                 (@S,1,CONVERT(DATETIME2,'2026-09-15T09:00:00'),15000000),(@S,2,CONVERT(DATETIME2,'2026-09-15T11:00:00'),15000000),
-                 (@F,1,CONVERT(DATETIME2,'2026-09-25T15:00:00'),30000000))v(RoundId,RaceNo,Dt,Purse)
+    FROM (VALUES (@Q,1,CONVERT(DATETIME2,'2026-09-05T09:00:00'),50000000),(@Q,2,CONVERT(DATETIME2,'2026-09-05T11:00:00'),50000000),
+                 (@Q,3,CONVERT(DATETIME2,'2026-09-06T09:00:00'),50000000),(@Q,4,CONVERT(DATETIME2,'2026-09-06T11:00:00'),50000000),
+                 (@S,1,CONVERT(DATETIME2,'2026-09-15T09:00:00'),75000000),(@S,2,CONVERT(DATETIME2,'2026-09-15T11:00:00'),75000000),
+                 (@F,1,CONVERT(DATETIME2,'2026-09-25T15:00:00'),150000000))v(RoundId,RaceNo,Dt,Purse)
     WHERE NOT EXISTS (SELECT 1 FROM Races r WHERE r.RoundId=v.RoundId AND r.RaceNumber=v.RaceNo);
 
     /* -------------------------------------- TICKET REWARD CODES (patch 008 — plaintext)
