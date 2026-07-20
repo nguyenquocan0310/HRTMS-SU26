@@ -16,9 +16,12 @@ namespace HRTMS.Infrastructure.Services
         private readonly IAuditLogService _auditLog;
         private readonly INotificationService _notificationService; // FIX #7
 
-        // Thưởng dự đoán Win cố định 200 điểm (quyết định nhóm 2026-07-11, PRD.1):
-        // KHÔNG cấu hình theo Tournament — schema v2 đã bỏ cột PredictionRewardPoints.
-        private const int PredictionWinRewardPoints = 200;
+        // Thưởng dự đoán Win = PointsPlaced * multiplier (thay cho mức cố định 200
+        // trước đây, vốn khiến số điểm đặt cược không ảnh hưởng gì đến phần thưởng
+        // — đặt 10 hay 10000 điểm khi thắng đều nhận y hệt nhau). Multiplier x2
+        // giữ đúng tinh thần "thắng thì lãi gấp đôi", đơn giản, dễ hiểu, không cần
+        // đổi schema hay thêm cấu hình theo Tournament.
+        private const decimal PredictionWinMultiplier = 2.0m;
 
         public ResultService(HRTMSDbContext context, IAuditLogService auditLog, INotificationService notificationService)
         {
@@ -200,7 +203,7 @@ namespace HRTMS.Infrastructure.Services
 
                 await _auditLog.LogAsync(
                     actorId: adminUserId,
-                    action: "Declare_Official",
+                    action: "Công bố kết quả chính thức",
                     entityName: "Race",
                     entityId: race.RaceId.ToString(),
                     oldValue: "Unofficial",
@@ -320,9 +323,6 @@ namespace HRTMS.Infrastructure.Services
 
             int settled = 0, refunded = 0;
 
-            // Schema v2 đã bỏ Tournament.PredictionRewardPoints → dùng hằng số chuẩn (+200).
-            var rewardPoints = PredictionWinRewardPoints;
-
             // Tập ngựa về Nhất chính thức — cho phép đồng hạng
             var winningEntryIds = race.RaceEntries
                 .Where(re => re.FinishPosition == 1 && re.Status != "Cancelled" && re.Status != "Disqualified")
@@ -351,6 +351,11 @@ namespace HRTMS.Infrastructure.Services
 
                 if (winningEntryIds.Contains(pred.RaceEntryId))
                 {
+                    // Thưởng theo đúng số điểm người đó đã đặt, không phải mức cố định
+                    // chung cho mọi người — ai đặt nhiều rủi ro hơn thì thắng nhiều hơn.
+                    var rewardPoints = (int)Math.Round(
+                        pred.PointsPlaced * PredictionWinMultiplier, MidpointRounding.AwayFromZero);
+
                     pred.Status = "Won";
                     pred.PointsAwarded = rewardPoints;
                     rewardBySpectator[pred.SpectatorId] =
@@ -381,11 +386,14 @@ namespace HRTMS.Infrastructure.Services
                 .Except(winnerIds)
                 .ToList();
 
-            if (winnerIds.Count > 0)
-                await _notificationService.SendBulkAsync(
-                    recipientIds: winnerIds,
-                    title: "Dự đoán thắng! 🎉",
-                    message: $"Bạn dự đoán đúng kết quả cuộc đua #{race.RaceNumber}. Bạn được cộng {rewardPoints} điểm vào ví.",
+            // Mỗi Spectator thắng nhận số điểm khác nhau (tỷ lệ theo mức đặt cược),
+            // nên không thể gộp chung 1 message qua SendBulkAsync như trước nữa —
+            // gửi riêng từng người kèm đúng số điểm họ thực nhận.
+            foreach (var (spectatorId, amount) in rewardBySpectator)
+                await _notificationService.SendAsync(
+                    spectatorId,
+                    "Dự đoán thắng! 🎉",
+                    $"Bạn dự đoán đúng kết quả cuộc đua #{race.RaceNumber}. Bạn được cộng {amount} điểm vào ví.",
                     type: "Both",
                     relatedEntityType: "Race",
                     relatedEntityId: race.RaceId);
