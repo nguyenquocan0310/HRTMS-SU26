@@ -192,7 +192,7 @@ BEGIN TRY
             @S INT=(SELECT RoundId FROM Rounds WHERE TournamentId=@TId AND SequenceOrder=2),
             @F INT=(SELECT RoundId FROM Rounds WHERE TournamentId=@TId AND SequenceOrder=3);
     INSERT Races (RoundId,RaceNumber,ScheduledTime,PurseAmount,[Status],IsPostPositionDrawn,IsPredictionGateClosed,ConfirmationCutoffHours,ProtestDeadlineMinutes,CreatedAt,UpdatedAt)
-    SELECT v.RoundId,v.RaceNo,v.Dt,v.Purse,'Upcoming',0,0,24,120,@Now,@Now
+    SELECT v.RoundId,v.RaceNo,v.Dt,v.Purse,'Upcoming',0,0,24,10,@Now,@Now   -- patch 008: cửa sổ khiếu nại 10 phút
     FROM (VALUES (@Q,1,CONVERT(DATETIME2,'2026-09-05T09:00:00'),50000000),(@Q,2,CONVERT(DATETIME2,'2026-09-05T11:00:00'),50000000),
                  (@Q,3,CONVERT(DATETIME2,'2026-09-06T09:00:00'),50000000),(@Q,4,CONVERT(DATETIME2,'2026-09-06T11:00:00'),50000000),
                  (@S,1,CONVERT(DATETIME2,'2026-09-15T09:00:00'),75000000),(@S,2,CONVERT(DATETIME2,'2026-09-15T11:00:00'),75000000),
@@ -267,8 +267,8 @@ BEGIN TRY
         DECLARE @FrRound INT = SCOPE_IDENTITY();
 
         INSERT Races (RoundId,RaceNumber,ScheduledTime,PurseAmount,[Status],IsPostPositionDrawn,IsPredictionGateClosed,ConfirmationCutoffHours,ProtestDeadlineMinutes,CreatedAt,UpdatedAt)
-        VALUES (@FrRound,1,'2026-09-10T09:00:00',15000000,'Upcoming',0,0,24,120,@Now,@Now),
-               (@FrRound,2,'2026-09-10T15:00:00',15000000,'Upcoming',0,0,24,120,@Now,@Now);
+        VALUES (@FrRound,1,'2026-09-10T09:00:00',15000000,'Upcoming',0,0,24,10,@Now,@Now),
+               (@FrRound,2,'2026-09-10T15:00:00',15000000,'Upcoming',0,0,24,10,@Now,@Now);
 
         INSERT TournamentParticipants (TournamentId,UserId,[Role],[Status],ScreeningStatus,RegisteredAt,ApprovedBy,ApprovedAt)
         SELECT @FrTId,u.UserId,u.[Role],'Approved','AutoEligible',@Now,@AdminId,@Now
@@ -356,6 +356,8 @@ BEGIN TRY
         DECLARE @SpQ INT=(SELECT RoundId FROM Rounds WHERE TournamentId=@SpTId AND SequenceOrder=1);
         DECLARE @SpF INT=(SELECT RoundId FROM Rounds WHERE TournamentId=@SpTId AND SequenceOrder=2);
 
+        -- Race lịch sử GIỮ ProtestDeadlineMinutes=120: chúng đã diễn ra dưới quy định cũ.
+        -- Patch 008 chỉ đổi DEFAULT cho race MỚI (10 phút), không viết lại lịch sử.
         INSERT Races (RoundId,RaceNumber,ScheduledTime,ActualStartTime,PurseAmount,[Status],IsPostPositionDrawn,IsPredictionGateClosed,ConfirmationCutoffHours,ProtestDeadlineMinutes,CreatedAt,UpdatedAt)
         VALUES (@SpQ,1,'2026-03-08T09:00:00','2026-03-08T09:02:00',15000000,'Official',1,1,24,120,@T0,'2026-03-08T11:00:00'),
                (@SpQ,2,'2026-03-08T15:00:00','2026-03-08T15:03:00',15000000,'Official',1,1,24,120,@T0,'2026-03-08T17:00:00'),
@@ -429,10 +431,13 @@ BEGIN TRY
         JOIN Pairings pg ON pg.TournamentId=@SpTId AND pg.HorseId=h.HorseId;
 
         /* Biên bản trận đua — đã khóa */
-        INSERT RaceReports (RaceId,LeadRefereeId,Notes,IsLocked,SubmittedAt,LockedAt)
+        -- ProtestWindowClosedAt (patch 009): trọng tài đã đóng sớm cửa sổ khiếu nại
+        -- (30 phút sau khi nộp biên bản, trước hạn 120 phút) rồi mới khóa biên bản.
+        INSERT RaceReports (RaceId,LeadRefereeId,Notes,IsLocked,SubmittedAt,LockedAt,ProtestWindowClosedAt)
         SELECT r.RaceId,CASE WHEN r.RaceNumber=2 AND r.RoundId=@SpQ THEN @Ref2 ELSE @Ref1 END,
                N'Trận đua diễn ra đúng lịch, không có khiếu nại.',1,
-               DATEADD(HOUR,1,r.ScheduledTime),DATEADD(HOUR,3,r.ScheduledTime)
+               DATEADD(HOUR,1,r.ScheduledTime),DATEADD(HOUR,3,r.ScheduledTime),
+               DATEADD(MINUTE,90,r.ScheduledTime)
         FROM Races r WHERE r.RoundId IN (@SpQ,@SpF);
 
         /* Payout đã trả: mỗi race Top 3 theo 50/30/20; chia Owner 80% / Jockey 20% */

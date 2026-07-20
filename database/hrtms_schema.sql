@@ -27,9 +27,16 @@
 --                                  đã bị loại bỏ trong schema demo.
 --   008_ticket_code_plaintext.sql: đã fold — TicketRewardCodes dùng Code VARCHAR(20)
 --                                  plaintext + UQ_TicketRewardCodes_Code (bỏ CodeHash).
+--   008_120_to_10_minutes.sql    : đã fold — Races.ProtestDeadlineMinutes DEFAULT 120 -> 10
+--                                  (đặt tên constraint DF_Races_ProtestDeadlineMinutes).
+--                                  ⚠️ Trùng số 008 với patch ticket — hai file khác nhau,
+--                                  không phụ thuộc nhau nên thứ tự áp dụng tuỳ ý.
+--   009_ref_can_close_early.sql  : đã fold — RaceReports.ProtestWindowClosedAt + trigger
+--                                  trg_RaceReports_Immutable thêm cột này vào whitelist.
+--   010_audit_action_nvarchar.sql: đã fold — AuditLogs.Action VARCHAR(50) -> NVARCHAR(100).
 --
 -- Thời điểm cập nhật : 2026-07-16
--- Cách tạo           : schema gốc + patch 001→008 theo thứ tự; thay đổi xóa của
+-- Cách tạo           : schema gốc + patch 001→010 theo thứ tự; thay đổi xóa của
 --                      patch 007 (bỏ COI) và 008 (008_ticket_code_plaintext.sql —
 --                      TicketRewardCodes.Code plaintext thay CodeHash) được fold
 --                      trực tiếp vào DDL cuối.
@@ -315,7 +322,8 @@ CREATE TABLE Races (
     IsPostPositionDrawn      BIT            NOT NULL DEFAULT 0,
     IsPredictionGateClosed   BIT            NOT NULL DEFAULT 0,
     ConfirmationCutoffHours  INT            NOT NULL DEFAULT 24,
-    ProtestDeadlineMinutes   INT            NOT NULL DEFAULT 10,
+    ProtestDeadlineMinutes   INT            NOT NULL
+        CONSTRAINT DF_Races_ProtestDeadlineMinutes DEFAULT (10),   -- patch 008: 120 -> 10 phút
     CreatedAt                DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
     UpdatedAt                DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
 
@@ -492,7 +500,7 @@ CREATE TABLE RaceReports (
     IsLocked       BIT            NOT NULL DEFAULT 0,
     SubmittedAt    DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
     LockedAt       DATETIME2      NULL,
-    ProtestWindowClosedAt DATETIME2 NULL,
+    ProtestWindowClosedAt DATETIME2 NULL,   -- patch 009: Referee đóng sớm cửa sổ khiếu nại
 
     CONSTRAINT PK_RaceReports PRIMARY KEY (RaceReportId),
     CONSTRAINT FK_RaceReports_Race FOREIGN KEY (RaceId) REFERENCES Races(RaceId) ON DELETE NO ACTION,
@@ -643,7 +651,7 @@ GO
 CREATE TABLE AuditLogs (
     AuditLogId  INT            IDENTITY(1,1) NOT NULL,
     ActorId     INT            NOT NULL,
-    [Action]    NVARCHAR(100)  NOT NULL,
+    [Action]    NVARCHAR(100)  NOT NULL,   -- patch 010: VARCHAR(50) -> NVARCHAR(100) cho mô tả tiếng Việt
     EntityName  VARCHAR(50)    NOT NULL,
     EntityId    VARCHAR(50)    NOT NULL,
     OldValue    NVARCHAR(MAX)  NULL,
@@ -703,7 +711,7 @@ BEGIN
             IsLocked      = i.IsLocked,
             SubmittedAt   = i.SubmittedAt,
             LockedAt      = i.LockedAt,
-            ProtestWindowClosedAt = i.ProtestWindowClosedAt
+            ProtestWindowClosedAt = i.ProtestWindowClosedAt   -- patch 009: nếu thiếu, update bị bỏ âm thầm
         FROM RaceReports rr
         INNER JOIN inserted i ON rr.RaceReportId = i.RaceReportId;
     END
@@ -1291,7 +1299,7 @@ GO
 PRINT 'Patch 006 applied: role System + seed system user (actor cho job tự động).';
 GO
 
-PRINT N'HOÀN TẤT: schema HRTMS được tạo mới (schema gốc + patch 001-008).';
+PRINT N'HOÀN TẤT: schema HRTMS được tạo mới (schema gốc + patch 001-010).';
 GO
 
 SET NOEXEC OFF;
