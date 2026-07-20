@@ -239,7 +239,7 @@ namespace HRTMS.Infrastructure.Services
             // 4. Ghi AuditLog
             await _auditLog.LogAsync(
                 actorId: createdByUserId,
-                action: "Create_Tournament",
+                action: "Tạo giải đấu mới",
                 entityName: "Tournament",
                 entityId: tournament.TournamentId.ToString(),
                 newValue: tournament.Name
@@ -433,7 +433,7 @@ namespace HRTMS.Infrastructure.Services
             {
                 await _auditLog.LogAsync(
                     actorId: adminUserId,
-                    action: "Update_Tournament",
+                    action: "Cập nhật thông tin giải đấu",
                     entityName: "Tournament",
                     entityId: tournamentId.ToString(),
                     newValue: string.Join("; ", changes));
@@ -515,7 +515,7 @@ namespace HRTMS.Infrastructure.Services
             await _context.SaveChangesAsync();
             await _auditLog.LogAsync(
                 actorId: adminUserId,
-                action: "Change_Tournament_Status",
+                action: "Đổi trạng thái giải đấu",
                 entityName: "Tournament",
                 entityId: tournamentId.ToString(),
                 oldValue: oldStatus,
@@ -603,7 +603,7 @@ namespace HRTMS.Infrastructure.Services
                                     entry.RaceEntryId));
                                 _auditLog.LogDeferred(
                                     actorId: adminUserId,
-                                    action: "Update_Entry_Fee_Status",
+                                    action: "Cập nhật trạng thái lệ phí",
                                     entityName: "RaceEntry",
                                     entityId: entry.RaceEntryId.ToString(),
                                     oldValue: "Paid",
@@ -679,7 +679,7 @@ namespace HRTMS.Infrastructure.Services
                     {
                         _auditLog.LogDeferred(
                             actorId: adminUserId,
-                            action: "Cancel_Tournament_PursePayout",
+                            action: "Hủy tiền thưởng do giải đấu bị hủy",
                             entityName: "PursePayout",
                             entityId: payout.PursePayoutId.ToString(),
                             oldValue: oldPayoutStatus,
@@ -695,7 +695,7 @@ namespace HRTMS.Infrastructure.Services
                 // Bug 4 fix — dùng oldStatus thật thay vì hardcode "Active"
                 await _auditLog.LogAsync(
                     actorId: adminUserId,
-                    action: "Cancel_Tournament",
+                    action: "Hủy giải đấu",
                     entityName: "Tournament",
                     entityId: tournamentId.ToString(),
                     oldValue: oldStatus,
@@ -800,7 +800,7 @@ namespace HRTMS.Infrastructure.Services
 
             await _auditLog.LogAsync(
                 actorId: adminUserId,
-                action: "Set_Prize_Distributions",
+                action: "Cấu hình tỷ lệ chia thưởng",
                 entityName: "Tournament",
                 entityId: tournamentId.ToString(),
                 newValue: string.Join("; ", newItems.OrderBy(p => p.Position)
@@ -877,7 +877,7 @@ namespace HRTMS.Infrastructure.Services
 
             await _auditLog.LogAsync(
                 actorId: adminUserId,
-                action: "Create_Round",
+                action: "Tạo vòng đấu mới",
                 entityName: "Round",
                 entityId: round.RoundId.ToString(),
                 newValue: $"Tournament={tournamentId};Sequence={dto.SequenceOrder};Name={dto.Name};ScheduledDate={dto.ScheduledDate:u}");
@@ -955,7 +955,7 @@ namespace HRTMS.Infrastructure.Services
 
             await _auditLog.LogAsync(
                 actorId: adminUserId,
-                action: "Create_Race",
+                action: "Tạo cuộc đua mới",
                 entityName: "Race",
                 entityId: race.RaceId.ToString(),
                 newValue: $"Round={roundId};RaceNumber={dto.RaceNumber};ScheduledTime={dto.ScheduledTime:u};Purse={dto.PurseAmount}");
@@ -1052,7 +1052,7 @@ namespace HRTMS.Infrastructure.Services
             {
                 await _auditLog.LogAsync(
                     actorId: adminUserId,
-                    action: "Update_Race",
+                    action: "Cập nhật thông tin cuộc đua",
                     entityName: "Race",
                     entityId: raceId.ToString(),
                     newValue: string.Join("; ", raceChanges));

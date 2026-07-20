@@ -112,7 +112,7 @@ public class WalletService : IWalletService
 
             await _auditLog.LogAsync(
                 actorId: spectatorId,
-                action: "RedeemTicketCode",
+                action: "Đổi mã thưởng lấy điểm",
                 entityName: "TicketRewardCode",
                 entityId: code.TicketRewardCodeId.ToString(),
                 newValue: $"+{code.PointAmount}",
@@ -182,7 +182,7 @@ public class WalletService : IWalletService
         // Audit: KHÔNG ghi raw code, chỉ ghi metadata batch.
         await _auditLog.LogAsync(
             actorId: adminId,
-            action: "CreateTicketCodes",
+            action: "Tạo lô mã thưởng mới",
             entityName: "TicketRewardCode",
             entityId: "batch",
             newValue: $"count={dto.Quantity};reward={dto.RewardAmount};expiresAt={dto.ExpiresAt:o}",

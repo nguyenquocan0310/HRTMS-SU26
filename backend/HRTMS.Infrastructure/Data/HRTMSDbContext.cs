@@ -84,8 +84,7 @@ public partial class HRTMSDbContext : DbContext
             entity.HasIndex(e => new { e.EntityName, e.EntityId }, "IX_AuditLogs_Entity");
 
             entity.Property(e => e.Action)
-                .HasMaxLength(50)
-                .IsUnicode(false);
+                .HasMaxLength(100);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
             entity.Property(e => e.EntityId)
                 .HasMaxLength(50)
