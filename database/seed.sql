@@ -12,10 +12,12 @@
      • 37 cặp Owner/Jockey hỗ trợ (summer26_owner01..37 / summer26_jockey01..37)
      • 2 Referee, 2 Doctor, 1 Spectator (kèm ví 1000 điểm)
      • Tournament GIẢI ĐUA NGỰA MÙA HÈ 2026: 3 round, race 4/2/1, 01–30/09/2026,
-       MaxHorses=10, TopPerRace, AdvancementCount=2; tổng purse 500.000.000
+       MaxHorses=10, TopPerRace, AdvancementCount=5; tổng purse 500.000.000
        (Vòng loại 50tr×4 + Bán kết 75tr×2 + Chung kết 150tr)
      • GIẢI GIAO HỮU THÁNG 9-2026 (song song 05–25/09/2026, Open Registration,
-       2 pairing friendly26_* Confirmed) — demo vận hành nhiều giải cùng lúc
+       1 round / 1 race, MaxHorses=10, 2 pairing friendly26_* Confirmed)
+       — demo vận hành nhiều giải cùng lúc + demo nhanh MỘT race duy nhất
+       (bổ sung 8 pairing cho đủ 10 bằng `src\demo\seed2`)
      • GIẢI ĐUA NGỰA MÙA XUÂN 2026 (01–31/03/2026, Completed) — lịch sử đầy đủ:
        2 round / 3 race Official, 8 pairing spring26_*, kết quả, biên bản khóa,
        payout đã trả, thông báo — xem lại như một giải thật
@@ -170,12 +172,17 @@ BEGIN TRY
      AdvancementRule,AdvancementCount,CreatedAt,UpdatedAt,CreatedBy)
     VALUES (N'GIẢI ĐUA NGỰA MÙA HÈ 2026',N'Demo 38 pairing, 4 vòng loại, 2 bán kết, 1 chung kết.',
      '2026-09-01T00:00:00','2026-09-30T23:59:59',10,'Thoroughbred','Turf',1600,'Open',3,
-     500000000,1000000,2.00,1.00,'Open Registration','TopPerRace',2,@Now,@Now,@AdminId);
+     500000000,1000000,2.00,1.00,'Open Registration','TopPerRace',5,@Now,@Now,@AdminId);
     -- Tổng purse 500.000.000 = Vòng loại 50tr×4 (200tr) + Bán kết 75tr×2 (150tr) + Chung kết 150tr.
 
     DECLARE @TId INT=(SELECT TournamentId FROM Tournaments WHERE [Name]=N'GIẢI ĐUA NGỰA MÙA HÈ 2026');
-    IF EXISTS (SELECT 1 FROM Tournaments WHERE TournamentId=@TId AND (MaxHorses<>10 OR AdvancementRule<>'TopPerRace' OR AdvancementCount<>2))
-        THROW 51003,N'Cấu hình tournament hiện có không khớp MaxHorses=10, TopPerRace=2.',1;
+    -- Giải đã tồn tại từ lần seed trước (AdvancementCount=2) thì nâng lên 5 cho khớp
+    -- kịch bản demo 4 race × Top5 = 20 bán kết → 2 race × Top5 = 10 chung kết.
+    UPDATE Tournaments SET AdvancementCount=5,UpdatedAt=@Now
+    WHERE TournamentId=@TId AND AdvancementRule='TopPerRace' AND AdvancementCount<>5;
+
+    IF EXISTS (SELECT 1 FROM Tournaments WHERE TournamentId=@TId AND (MaxHorses<>10 OR AdvancementRule<>'TopPerRace' OR AdvancementCount<>5))
+        THROW 51003,N'Cấu hình tournament hiện có không khớp MaxHorses=10, TopPerRace=5.',1;
 
     INSERT PrizeDistributions (TournamentId,[Position],Percentage,CreatedAt,UpdatedAt)
     SELECT @TId,v.Pos,v.Pct,@Now,@Now FROM (VALUES (1,50.00),(2,25.00),(3,15.00),(4,7.00),(5,3.00))v(Pos,Pct)
@@ -215,10 +222,14 @@ BEGIN TRY
     /* =========================================================================
        GIẢI PHỤ SONG SONG — "GIẢI GIAO HỮU THÁNG 9-2026"
        Trùng thời gian với giải chính (05–25/09/2026) để minh họa vận hành
-       NHIỀU GIẢI CÙNG LÚC. 1 round + 2 race Upcoming, 2 pairing Confirmed sẵn
-       (dùng demo allocate đa giải và case lỗi PAIRING_TOURNAMENT_MISMATCH khi
-       lỡ chọn pairing của giải này allocate vào race giải chính).
+       NHIỀU GIẢI CÙNG LÚC. 1 round + 1 race Upcoming, MaxHorses=10, 2 pairing
+       Confirmed sẵn (dùng demo allocate đa giải và case lỗi
+       PAIRING_TOURNAMENT_MISMATCH khi lỡ chọn pairing của giải này allocate
+       vào race giải chính).
        Account riêng (friendly26_*) — không đụng 38 pairing của giải chính.
+       Chỉ 1 race ⇒ dùng làm kịch bản demo NGẮN: chạy trọn vòng đời một cuộc
+       đua mà không phải đi hết 7 race của giải chính. Bổ sung 8 pairing cho
+       đủ 10 bằng `src\demo\seed2\01_friendly_pairings_and_fee.sql`.
        ========================================================================= */
     DECLARE @FrAcc TABLE (N INT PRIMARY KEY, OwnerName NVARCHAR(100), JockeyName NVARCHAR(100), HorseName NVARCHAR(100), HorseColor NVARCHAR(50));
     INSERT @FrAcc VALUES
@@ -253,8 +264,8 @@ BEGIN TRY
         INSERT Tournaments ([Name],[Description],StartDate,EndDate,MaxHorses,AllowedBreed,TrackType,RaceDistance,RaceCategory,
          MinJockeyExperienceYears,PurseAmount,EntryFeeAmount,PreRaceWeightThresholdKg,PostRaceWeightDiffThresholdKg,[Status],
          AdvancementRule,AdvancementCount,CreatedAt,UpdatedAt,CreatedBy)
-        VALUES (N'GIẢI GIAO HỮU THÁNG 9-2026',N'Giải giao hữu chạy song song với Giải Mùa Hè 2026 — minh họa vận hành nhiều giải cùng lúc.',
-         '2026-09-05T00:00:00','2026-09-25T23:59:59',6,'Thoroughbred','Turf',1400,'Open',2,
+        VALUES (N'GIẢI GIAO HỮU THÁNG 9-2026',N'Giải giao hữu 1 cuộc đua duy nhất, chạy song song với Giải Mùa Hè 2026 — demo nhanh trọn vòng đời một race.',
+         '2026-09-05T00:00:00','2026-09-25T23:59:59',10,'Thoroughbred','Turf',1400,'Open',2,
          30000000,500000,2.00,1.00,'Open Registration','TopPerRace',2,@Now,@Now,@AdminId);
 
         DECLARE @FrTId INT = SCOPE_IDENTITY();
@@ -266,9 +277,10 @@ BEGIN TRY
         VALUES (@FrTId,N'Vòng đấu chính',1,'2026-09-10T08:00:00','Upcoming',@Now);
         DECLARE @FrRound INT = SCOPE_IDENTITY();
 
+        -- MỘT race duy nhất; purse race = toàn bộ purse giải (30tr) để tổng
+        -- purse các race không vượt Tournaments.PurseAmount (guard TournamentService).
         INSERT Races (RoundId,RaceNumber,ScheduledTime,PurseAmount,[Status],IsPostPositionDrawn,IsPredictionGateClosed,ConfirmationCutoffHours,ProtestDeadlineMinutes,CreatedAt,UpdatedAt)
-        VALUES (@FrRound,1,'2026-09-10T09:00:00',15000000,'Upcoming',0,0,24,10,@Now,@Now),
-               (@FrRound,2,'2026-09-10T15:00:00',15000000,'Upcoming',0,0,24,10,@Now,@Now);
+        VALUES (@FrRound,1,'2026-09-10T09:00:00',30000000,'Upcoming',0,0,24,10,@Now,@Now);
 
         INSERT TournamentParticipants (TournamentId,UserId,[Role],[Status],ScreeningStatus,RegisteredAt,ApprovedBy,ApprovedAt)
         SELECT @FrTId,u.UserId,u.[Role],'Approved','AutoEligible',@Now,@AdminId,@Now
@@ -290,6 +302,31 @@ BEGIN TRY
         JOIN Users o ON o.Username=CONCAT('friendly26_owner0',a.N)
         JOIN Horses h ON h.OwnerId=o.UserId AND h.[Name]=a.HorseName
         JOIN Users j ON j.Username=CONCAT('friendly26_jockey0',a.N);
+    END;
+
+    /* Nâng cấp DB đã seed bản cũ (MaxHorses=6, 2 race) sang cấu hình 1 race.
+       Chỉ hạ race 2 khi nó CHƯA có RaceEntry nào — có dữ liệu thật thì dừng,
+       không tự xóa. */
+    DECLARE @FrTIdFix INT=(SELECT TournamentId FROM Tournaments WHERE [Name]=N'GIẢI GIAO HỮU THÁNG 9-2026');
+    IF @FrTIdFix IS NOT NULL
+    BEGIN
+        UPDATE Tournaments SET MaxHorses=10,UpdatedAt=@Now
+        WHERE TournamentId=@FrTIdFix AND MaxHorses<10;
+
+        DECLARE @FrRace2 INT=(SELECT r.RaceId FROM Races r JOIN Rounds rd ON rd.RoundId=r.RoundId
+                              WHERE rd.TournamentId=@FrTIdFix AND r.RaceNumber=2);
+        IF @FrRace2 IS NOT NULL
+        BEGIN
+            IF EXISTS (SELECT 1 FROM RaceEntries WHERE RaceId=@FrRace2)
+                THROW 51004,N'Giải giao hữu cần còn 1 race nhưng race 2 đã có RaceEntry — xử lý tay trước khi seed lại.',1;
+            DELETE FROM RefereeAssignments WHERE RaceId=@FrRace2;
+            DELETE FROM DoctorAssignments  WHERE RaceId=@FrRace2;
+            DELETE FROM Races WHERE RaceId=@FrRace2;
+        END;
+
+        UPDATE r SET PurseAmount=30000000,UpdatedAt=@Now
+        FROM Races r JOIN Rounds rd ON rd.RoundId=r.RoundId
+        WHERE rd.TournamentId=@FrTIdFix AND r.RaceNumber=1 AND r.PurseAmount<30000000;
     END;
 
     /* =========================================================================
