@@ -15,7 +15,7 @@ namespace HRTMS.Core.DTOs.Tournament
         public string Name { get; set; } = string.Empty;
         [Range(1, 100)]
         public int SequenceOrder { get; set; }
-        [Required]
-        public DateTime ScheduledDate { get; set; }
+        [Required(ErrorMessage = "Vui lòng nhập ngày của vòng.")]
+        public DateTime? ScheduledDate { get; set; }
     }
 }
