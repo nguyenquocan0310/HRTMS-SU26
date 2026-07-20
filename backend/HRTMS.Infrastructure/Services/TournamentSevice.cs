@@ -821,9 +821,10 @@ namespace HRTMS.Infrastructure.Services
                 ?? throw new KeyNotFoundException($"Không tìm thấy giải #{tournamentId}.");
 
             EnsureTournamentStructureEditable(tournament.Status);
+            var scheduledDate = dto.ScheduledDate!.Value;
 
             // Validate date nằm trong cửa sổ giải
-            if (dto.ScheduledDate < tournament.StartDate || dto.ScheduledDate > tournament.EndDate)
+            if (scheduledDate < tournament.StartDate || scheduledDate > tournament.EndDate)
                 throw new ArgumentException(
                     $"ScheduledDate phải nằm trong [{tournament.StartDate:d}, {tournament.EndDate:d}]");
 
@@ -848,7 +849,7 @@ namespace HRTMS.Infrastructure.Services
                     ? previousRound.Races.Max(r => r.ScheduledTime)
                     : previousRound.ScheduledDate;
 
-                if (dto.ScheduledDate <= previousBoundary)
+                if (scheduledDate <= previousBoundary)
                     throw new ArgumentException(
                         $"ScheduledDate phải sau {(previousRound.Races.Count > 0 ? "cuộc đua cuối" : "ngày")} của vòng trước (Round #{previousRound.RoundId}, {previousBoundary:u})");
             }
@@ -858,7 +859,7 @@ namespace HRTMS.Infrastructure.Services
                 .Where(r => r.SequenceOrder > dto.SequenceOrder)
                 .OrderBy(r => r.SequenceOrder)
                 .FirstOrDefault();
-            if (nextRound != null && dto.ScheduledDate >= nextRound.ScheduledDate)
+            if (nextRound != null && scheduledDate >= nextRound.ScheduledDate)
                 throw new ArgumentException(
                     $"ScheduledDate phải trước ngày của vòng kế tiếp (Round #{nextRound.RoundId}, {nextRound.ScheduledDate:u})");
 
@@ -867,7 +868,7 @@ namespace HRTMS.Infrastructure.Services
                 TournamentId = tournamentId,
                 Name = dto.Name,
                 SequenceOrder = dto.SequenceOrder,
-                ScheduledDate = dto.ScheduledDate,
+                ScheduledDate = scheduledDate,
                 Status = "Upcoming",
                 UpdatedAt = DateTime.UtcNow,
             };
@@ -880,7 +881,7 @@ namespace HRTMS.Infrastructure.Services
                 action: "Tạo vòng đấu mới",
                 entityName: "Round",
                 entityId: round.RoundId.ToString(),
-                newValue: $"Tournament={tournamentId};Sequence={dto.SequenceOrder};Name={dto.Name};ScheduledDate={dto.ScheduledDate:u}");
+                newValue: $"Tournament={tournamentId};Sequence={dto.SequenceOrder};Name={dto.Name};ScheduledDate={scheduledDate:u}");
 
             return new RoundResponseDto
             {
@@ -905,17 +906,19 @@ namespace HRTMS.Infrastructure.Services
             var tournament = round.Tournament;
             EnsureTournamentStructureEditable(tournament.Status);
             ValidateRaceDistanceOverride(dto.RaceDistanceOverride);
+            var scheduledTime = dto.ScheduledTime!.Value;
+            var purseAmount = dto.PurseAmount!.Value;
 
             // Validate thời gian
-            if (dto.ScheduledTime <= DateTime.UtcNow)
+            if (scheduledTime <= DateTime.UtcNow)
                 throw new ArgumentException("Thời gian thi đấu phải ở tương lai.");
 
-            if (dto.ScheduledTime < tournament.StartDate || dto.ScheduledTime > tournament.EndDate)
+            if (scheduledTime < tournament.StartDate || scheduledTime > tournament.EndDate)
                 throw new ArgumentException(
                     $"Thời gian thi đấu phải nằm trong thời gian diễn ra giải ({tournament.StartDate:d} - {tournament.EndDate:d}).");
 
             // Bug 8 fix — kiểm tra trùng RaceNumber trong cùng round
-            if (dto.ScheduledTime < round.ScheduledDate)
+            if (scheduledTime < round.ScheduledDate)
                 throw new ArgumentException("Thời gian thi đấu không được sớm hơn ngày của vòng.");
 
             var isDuplicateRaceNumber = await _context.Races
@@ -928,16 +931,16 @@ namespace HRTMS.Infrastructure.Services
                 .Where(r => r.Round.TournamentId == tournament.TournamentId)
                 .SumAsync(r => r.PurseAmount);
 
-            if (existingPurseTotal + dto.PurseAmount > tournament.PurseAmount)
+            if (existingPurseTotal + purseAmount > tournament.PurseAmount)
                 throw new ArgumentException(
-                    $"Tổng giải thưởng các cuộc đua ({existingPurseTotal + dto.PurseAmount}) vượt quá tổng giải thưởng của giải ({tournament.PurseAmount}).");
+                    $"Tổng giải thưởng các cuộc đua ({existingPurseTotal + purseAmount}) vượt quá tổng giải thưởng của giải ({tournament.PurseAmount}).");
 
             var race = new Race
             {
                 RoundId = roundId,
                 RaceNumber = dto.RaceNumber,
-                ScheduledTime = dto.ScheduledTime,
-                PurseAmount = dto.PurseAmount,
+                ScheduledTime = scheduledTime,
+                PurseAmount = purseAmount,
                 TrackTypeOverride = dto.TrackTypeOverride,
                 RaceDistanceOverride = dto.RaceDistanceOverride,
                 Status = "Upcoming",
@@ -958,7 +961,7 @@ namespace HRTMS.Infrastructure.Services
                 action: "Tạo cuộc đua mới",
                 entityName: "Race",
                 entityId: race.RaceId.ToString(),
-                newValue: $"Round={roundId};RaceNumber={dto.RaceNumber};ScheduledTime={dto.ScheduledTime:u};Purse={dto.PurseAmount}");
+                newValue: $"Round={roundId};RaceNumber={dto.RaceNumber};ScheduledTime={scheduledTime:u};Purse={purseAmount}");
 
             return new RaceResponseDto
             {
@@ -987,11 +990,13 @@ namespace HRTMS.Infrastructure.Services
             var tournament = race.Round.Tournament;
             EnsureTournamentStructureEditable(tournament.Status);
             ValidateRaceDistanceOverride(dto.RaceDistanceOverride);
+            var scheduledTime = dto.ScheduledTime!.Value;
+            var purseAmount = dto.PurseAmount!.Value;
 
             // Chỉ các trường nhạy cảm mới bị đóng băng sau khi bốc thăm hoặc đã có Prediction.
             // Cho phép sửa các trường không nhạy cảm (PurseAmount, cutoff...) ngay cả khi đã đóng băng.
             var sensitiveChanged =
-                race.ScheduledTime != dto.ScheduledTime ||
+                race.ScheduledTime != scheduledTime ||
                 race.RaceDistanceOverride != dto.RaceDistanceOverride ||
                 race.TrackTypeOverride != dto.TrackTypeOverride;
 
@@ -1000,29 +1005,29 @@ namespace HRTMS.Infrastructure.Services
                 await _raceEntry.EnsureRaceConfigEditableAsync(raceId);
 
             // Validate cửa sổ thời gian (chỉ khi ScheduledTime thay đổi).
-            if (race.ScheduledTime != dto.ScheduledTime)
+            if (race.ScheduledTime != scheduledTime)
             {
-                if (dto.ScheduledTime <= DateTime.UtcNow)
+                if (scheduledTime <= DateTime.UtcNow)
                     throw new ArgumentException("Thời gian thi đấu phải ở tương lai.");
 
-                if (dto.ScheduledTime < tournament.StartDate || dto.ScheduledTime > tournament.EndDate)
+                if (scheduledTime < tournament.StartDate || scheduledTime > tournament.EndDate)
                     throw new ArgumentException(
                         $"Thời gian thi đấu phải nằm trong thời gian diễn ra giải ({tournament.StartDate:d} - {tournament.EndDate:d}).");
 
-                if (dto.ScheduledTime < race.Round.ScheduledDate)
+                if (scheduledTime < race.Round.ScheduledDate)
                     throw new ArgumentException("Thời gian thi đấu không được sớm hơn ngày của vòng.");
             }
 
             // Tổng PurseAmount không vượt quỹ giải (trừ chính race này).
-            if (race.PurseAmount != dto.PurseAmount)
+            if (race.PurseAmount != purseAmount)
             {
                 var otherPurseTotal = await _context.Races
                     .Where(r => r.Round.TournamentId == tournament.TournamentId && r.RaceId != raceId)
                     .SumAsync(r => r.PurseAmount);
 
-                if (otherPurseTotal + dto.PurseAmount > tournament.PurseAmount)
+                if (otherPurseTotal + purseAmount > tournament.PurseAmount)
                     throw new ArgumentException(
-                        $"Tổng giải thưởng các cuộc đua ({otherPurseTotal + dto.PurseAmount}) vượt quá tổng giải thưởng của giải ({tournament.PurseAmount}).");
+                        $"Tổng giải thưởng các cuộc đua ({otherPurseTotal + purseAmount}) vượt quá tổng giải thưởng của giải ({tournament.PurseAmount}).");
             }
 
             var raceChanges = new List<string>();
@@ -1031,15 +1036,15 @@ namespace HRTMS.Infrastructure.Services
                 if (!EqualityComparer<T>.Default.Equals(oldValue, newValue))
                     raceChanges.Add($"{field}: {oldValue} -> {newValue}");
             }
-            TrackRaceChange("ScheduledTime", race.ScheduledTime, dto.ScheduledTime);
-            TrackRaceChange("PurseAmount", race.PurseAmount, dto.PurseAmount);
+            TrackRaceChange("ScheduledTime", race.ScheduledTime, scheduledTime);
+            TrackRaceChange("PurseAmount", race.PurseAmount, purseAmount);
             TrackRaceChange("TrackTypeOverride", race.TrackTypeOverride, dto.TrackTypeOverride);
             TrackRaceChange("RaceDistanceOverride", race.RaceDistanceOverride, dto.RaceDistanceOverride);
             TrackRaceChange("ConfirmationCutoffHours", race.ConfirmationCutoffHours, dto.ConfirmationCutoffHours);
             TrackRaceChange("ProtestDeadlineMinutes", race.ProtestDeadlineMinutes, dto.ProtestDeadlineMinutes);
 
-            race.ScheduledTime = dto.ScheduledTime;
-            race.PurseAmount = dto.PurseAmount;
+            race.ScheduledTime = scheduledTime;
+            race.PurseAmount = purseAmount;
             race.TrackTypeOverride = dto.TrackTypeOverride;
             race.RaceDistanceOverride = dto.RaceDistanceOverride;
             race.ConfirmationCutoffHours = dto.ConfirmationCutoffHours;
