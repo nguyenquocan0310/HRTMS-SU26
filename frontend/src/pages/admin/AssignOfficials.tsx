@@ -5,9 +5,11 @@ import { getActiveUsersByRole, type ActiveUser } from '../../services/approvalSe
 import {
   getRefereesByRace, assignReferee, removeReferee,
   getDoctorsByRace, assignDoctor, removeDoctor,
-  type RefereeAssignment, type DoctorAssignment,
+  getAvailableOfficials,
+  type RefereeAssignment, type DoctorAssignment, type AvailableOfficial,
 } from '../../services/officialAssignmentService';
 import styles from './AssignOfficials.module.scss';
+
 
 interface TournamentOption { id: number; name: string; }
 interface RaceOption { id: number; label: string; scheduledTime: string; status: string; }
@@ -30,8 +32,9 @@ const AssignOfficials = () => {
   const [loadingAssignments, setLoadingAssignments] = useState(false);
 
   // Available personnel from pending-approvals (approved ones)
-  const [availableReferees, setAvailableReferees] = useState<ActiveUser[]>([]);
-  const [availableDoctors, setAvailableDoctors] = useState<ActiveUser[]>([]);
+// Available personnel — lấy theo đúng Race đang chọn (đã lọc roster + trùng giờ)
+  const [availableReferees, setAvailableReferees] = useState<AvailableOfficial[]>([]);
+  const [availableDoctors, setAvailableDoctors] = useState<AvailableOfficial[]>([]);
 
   const [modal, setModal] = useState<ModalType>(null);
   const [search, setSearch] = useState('');
@@ -83,10 +86,23 @@ const AssignOfficials = () => {
 
   // Load available personnel
 // Load available personnel (Active referees/doctors, không phải danh sách chờ duyệt)
+// Load available officials theo đúng Race đang chọn — gọi lại mỗi khi đổi Race
   useEffect(() => {
-    getActiveUsersByRole('Referee').then(setAvailableReferees).catch(() => {});
-    getActiveUsersByRole('Doctor').then(setAvailableDoctors).catch(() => {});
-  }, []);
+    if (!selectedRace) {
+      setAvailableReferees([]);
+      setAvailableDoctors([]);
+      return;
+    }
+    getAvailableOfficials(selectedRace.id)
+      .then(({ referees: r, doctors: d }) => {
+        setAvailableReferees(r);
+        setAvailableDoctors(d);
+      })
+      .catch(() => {
+        setAvailableReferees([]);
+        setAvailableDoctors([]);
+      });
+  }, [selectedRace]);
 
   const reloadAssignments = async () => {
     if (!selectedRace) return;
@@ -98,7 +114,7 @@ const AssignOfficials = () => {
     setDoctors(d);
   };
 
-  const handleAssignReferee = async (person: ActiveUser) => {
+  const handleAssignReferee = async (person: AvailableOfficial) => {
     if (!selectedRace) return;
     setActionLoading(true);
     setError(''); setMsg('');
@@ -112,7 +128,7 @@ const AssignOfficials = () => {
     } finally { setActionLoading(false); }
   };
 
-  const handleAssignDoctor = async (person: ActiveUser) => {
+  const handleAssignDoctor = async (person: AvailableOfficial) => {
     if (!selectedRace) return;
     setActionLoading(true);
     setError(''); setMsg('');
@@ -350,7 +366,7 @@ const AssignOfficials = () => {
                     <span className={styles.personName}>{p.fullName}</span>
                     <span className={styles.personMeta}>{p.email}</span>
                     <span className={`${styles.personStatus} ${styles.statusApproved}`}>
-                      {p.status}
+                      {p.profileStatus}
                     </span>
                   </div>
                   <button
