@@ -50,16 +50,25 @@ export interface RaceEntry {
 
 export interface JockeyInvitation {
   invitationID: string;
+  tournamentID: number;
   raceID: string;
   ownerID: string;
   jockeyID: string;
   jockeyName?: string;
-  status: 'Pending' | 'Accepted' | 'Confirmed' | 'Declined' | 'Cancelled';
+  status: 'Pending' | 'Accepted' | 'Confirmed' | 'Declined' | 'Rejected' | 'Expired' | 'Cancelled';
   invitedAt: Date;
   respondedAt?: Date;
   horseID?: string;
   horseName?: string;
   requestMessage?: string;
+}
+
+export interface AvailableJockey {
+  jockeyId: number;
+  fullName: string;
+  licenseCertificate: string;
+  experienceYears: number;
+  healthStatus?: string;
 }
 
 export interface Breed {

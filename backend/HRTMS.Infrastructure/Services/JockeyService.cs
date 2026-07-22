@@ -243,16 +243,16 @@ public class JockeyService : IJockeyService
             throw new KeyNotFoundException("TOURNAMENT_NOT_FOUND");
         }
 
-        var ownerHorseIds = await _context.Horses
-            .Where(h => h.OwnerId == ownerId)
-            .Select(h => h.HorseId)
-            .ToListAsync();
-
-        var pendingJockeyIds = await _context.Pairings
+        // Giữ các Jockey đã có lời mời của chính Owner trong kết quả để frontend
+        // có thể hiển thị Pending/Accepted/Confirmed đúng trạng thái. Chỉ loại Jockey
+        // đã Accepted/Confirmed với Owner khác trong cùng giải.
+        var unavailableJockeyIds = await _context.Pairings
             .Where(p =>
-                ownerHorseIds.Contains(p.HorseId) &&
-                p.Status == "Pending")
+                p.TournamentId == tournamentId &&
+                p.Horse.OwnerId != ownerId &&
+                (p.Status == "Accepted" || p.Status == "Confirmed"))
             .Select(p => p.JockeyId)
+            .Distinct()
             .ToListAsync();
 
         var rosterJockeyIds = await _context.TournamentParticipants
@@ -269,7 +269,7 @@ public class JockeyService : IJockeyService
                 j.Status == "Active" &&
                 j.ExperienceYears >= tournament.MinJockeyExperienceYears &&
                 rosterJockeyIds.Contains(j.JockeyId) &&
-                !pendingJockeyIds.Contains(j.JockeyId));
+                !unavailableJockeyIds.Contains(j.JockeyId));
 
         var total = await query.CountAsync();
 

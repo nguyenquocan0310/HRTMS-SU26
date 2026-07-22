@@ -1,4 +1,5 @@
 import type {
+  AvailableJockey,
   Horse,
   OwnerEarnings,
   RaceEntry,
@@ -10,9 +11,9 @@ import { apiFetch } from './apiClient';
 
 export const getMyHorses = async (): Promise<Horse[]> => {
   try {
-    const res = await apiFetch<any>('/horses/my');
+    const res = await apiFetch<ApiResponse<Horse[]> | Horse[]>('/horses/my');
     // Backend trả ApiResponse<T> hoặc thẳng array
-    return res?.data || (Array.isArray(res) ? res : []);
+    return Array.isArray(res) ? res : res.data ?? [];
   } catch (error) {
     console.error('Error fetching my horses:', error);
     throw error;
@@ -21,8 +22,8 @@ export const getMyHorses = async (): Promise<Horse[]> => {
 
 export const getHorseById = async (id: number): Promise<Horse> => {
   try {
-    const res = await apiFetch<any>(`/horses/${id}`);
-    return res?.data || res;
+    const res = await apiFetch<ApiResponse<Horse> | Horse>(`/horses/${id}`);
+    return unwrapApiResponse(res, 'Không tải được thông tin ngựa.');
   } catch (error) {
     console.error(`Error fetching horse with ID ${id}:`, error);
     throw error;
@@ -36,11 +37,11 @@ export const createHorse = async (
   data: Omit<Horse, 'horseID' | 'ownerID' | 'createdAt'>
 ): Promise<Horse> => {
   try {
-    const res = await apiFetch<any>('/horses', {
+    const res = await apiFetch<ApiResponse<Horse> | Horse>('/horses', {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    return res?.data || res;
+    return unwrapApiResponse(res, 'Tạo hồ sơ ngựa thất bại.');
   } catch (error) {
     console.error('Error creating horse:', error);
     throw error;
@@ -76,14 +77,11 @@ export const getHorseEnrollments = async (
   horseId: number | string
 ): Promise<HorseEnrollmentResponse[] | null> => {
   try {
-    const res = await apiFetch<any>(`/horses/${horseId}/enrollments`);
+    const res = await apiFetch<
+      HorseEnrollmentResponse[] | CollectionEnvelope<HorseEnrollmentResponse>
+    >(`/horses/${horseId}/enrollments`);
     // Backend có thể trả ApiResponse<list> hoặc thẳng array
-    if (Array.isArray(res)) return res;
-    if (Array.isArray(res?.data)) return res.data;
-    if (Array.isArray(res?.data?.items)) return res.data.items;
-    // Single enrollment wrapped in data
-    if (res?.data && typeof res.data === 'object' && !Array.isArray(res.data)) return [res.data];
-    return [];
+    return extractCollection(res);
   } catch (error) {
     console.error(`Error fetching enrollments for horse ${horseId}:`, error);
     return null; // null = network error; [] = no enrollments
@@ -115,23 +113,41 @@ export const getMyRaceEntries = async (
 /**
  * Get available jockeys for a tournament
  */
-export const getAvailableJockeys = async (tournamentId: number = 1, page: number = 1, pageSize: number = 20): Promise<any[]> => {
+interface CollectionEnvelope<T> {
+  data?: T | T[] | { items?: T[] };
+  items?: T[];
+}
+
+export interface OwnerPairingRecord {
+  pairingId: number;
+  tournamentId: number;
+  horse: { horseId: number; name: string; breed?: string };
+  jockey: { jockeyId: number; fullName: string; licenseCertificate?: string; experienceYears?: number };
+  requestMessage?: string;
+  status: 'Pending' | 'Accepted' | 'Confirmed' | 'Declined' | 'Rejected' | 'Expired' | 'Cancelled';
+  createdAt: string;
+}
+
+function extractCollection<T>(data: T[] | CollectionEnvelope<T>): T[] {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data.data)) return data.data;
+  if (data.data && typeof data.data === 'object' && 'items' in data.data && Array.isArray(data.data.items)) {
+    return data.data.items;
+  }
+  if (data.data) return [data.data as T];
+  if (Array.isArray(data.items)) return data.items;
+  return [];
+}
+
+export const getAvailableJockeys = async (tournamentId: number = 1, page: number = 1, pageSize: number = 20): Promise<AvailableJockey[]> => {
   try {
     const params = new URLSearchParams();
     params.set('tournamentId', String(tournamentId));
     params.set('page', String(page));
     params.set('pageSize', String(pageSize));
 
-    const data = await apiFetch<any>(`/jockeys/available?${params.toString()}`);
-
-    // Extract array of jockeys from standard API response envelopes
-    if (Array.isArray(data)) return data;
-    if (data && data.data) {
-      if (Array.isArray(data.data)) return data.data;
-      if (data.data.items && Array.isArray(data.data.items)) return data.data.items;
-    }
-    if (data && data.items && Array.isArray(data.items)) return data.items;
-    return [];
+    const data = await apiFetch<AvailableJockey[] | CollectionEnvelope<AvailableJockey>>(`/jockeys/available?${params.toString()}`);
+    return extractCollection(data);
   } catch (error) {
     console.error('Error fetching available jockeys:', error);
     throw error;
@@ -146,7 +162,7 @@ export const getOwnerPairings = async (
   horseId?: string,
   page: number = 1,
   pageSize: number = 20
-): Promise<any[]> => {
+): Promise<OwnerPairingRecord[]> => {
   try {
     const params = new URLSearchParams();
     if (status) params.append('status', status);
@@ -154,16 +170,8 @@ export const getOwnerPairings = async (
     params.append('page', String(page));
     params.append('pageSize', String(pageSize));
 
-    const data = await apiFetch<any>(`/owner/pairings?${params.toString()}`);
-
-    // Extract array of pairings from standard API response envelopes
-    if (Array.isArray(data)) return data;
-    if (data && data.data) {
-      if (Array.isArray(data.data)) return data.data;
-      if (data.data.items && Array.isArray(data.data.items)) return data.data.items;
-    }
-    if (data && data.items && Array.isArray(data.items)) return data.items;
-    return [];
+    const data = await apiFetch<OwnerPairingRecord[] | CollectionEnvelope<OwnerPairingRecord>>(`/owner/pairings?${params.toString()}`);
+    return extractCollection(data);
   } catch (error) {
     console.error('Error fetching owner pairings:', error);
     throw error;
@@ -182,8 +190,8 @@ export interface InviteJockeyPayload {
  * API trả trực tiếp PairingResponseDto (không có ApiResponse wrapper).
  * apiFetch sẽ throw nếu HTTP status không phải 2xx — không cần check .success.
  */
-export const inviteJockey = async (payload: InviteJockeyPayload): Promise<any> => {
-  return apiFetch<any>('/pairings', {
+export const inviteJockey = async (payload: InviteJockeyPayload): Promise<unknown> => {
+  return apiFetch<unknown>('/pairings', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -196,9 +204,8 @@ export const inviteJockey = async (payload: InviteJockeyPayload): Promise<any> =
  * Owner xác nhận ghép cặp sau khi Jockey đã accept.
  * Pairing chuyển từ Accepted → Confirmed.
  */
-export const confirmPairing = async (pairingId: string | number): Promise<any> => {
-  interface ApiResponse<T> { success: boolean; message: string; data: T | null }
-  const res = await apiFetch<ApiResponse<any>>(`/pairings/${pairingId}/confirm`, {
+export const confirmPairing = async (pairingId: string | number): Promise<unknown> => {
+  const res = await apiFetch<ApiResponse<unknown>>(`/pairings/${pairingId}/confirm`, {
     method: 'PATCH',
   });
   // Backend trả success:false với message chi tiết khi nghiệp vụ không hợp lệ
@@ -212,9 +219,9 @@ export const confirmPairing = async (pairingId: string | number): Promise<any> =
  * PATCH /api/pairings/{id}/cancel
  * Owner chỉ có thể hủy lời mời đang Pending hoặc Accepted.
  */
-export const cancelPairing = async (pairingId: string | number): Promise<any> => {
+export const cancelPairing = async (pairingId: string | number): Promise<unknown> => {
   try {
-    const res = await apiFetch<any>(`/pairings/${pairingId}/cancel`, {
+    const res = await apiFetch<ApiResponse<unknown>>(`/pairings/${pairingId}/cancel`, {
       method: 'PATCH',
     });
 
@@ -228,13 +235,16 @@ export const cancelPairing = async (pairingId: string | number): Promise<any> =>
     const normalized = message.toLowerCase();
 
     if (normalized.includes('pairing was not found') || normalized.includes('pairing_not_found')) {
-      throw new Error('Không tìm thấy lời mời ghép cặp.');
+      throw new Error('Không tìm thấy lời mời ghép cặp.', { cause: error });
     }
     if (normalized.includes('does not belong') || normalized.includes('horse_not_owned')) {
-      throw new Error('Bạn không có quyền hủy lời mời này.');
+      throw new Error('Bạn không có quyền hủy lời mời này.', { cause: error });
     }
     if (normalized.includes('only pending or accepted') || normalized.includes('invalid_status')) {
-      throw new Error('Chỉ có thể hủy lời mời đang chờ hoặc đã được Jockey chấp nhận nhưng chưa xác nhận ghép cặp.');
+      throw new Error(
+        'Chỉ có thể hủy lời mời đang chờ hoặc đã được Jockey chấp nhận nhưng chưa xác nhận ghép cặp.',
+        { cause: error }
+      );
     }
 
     throw error instanceof Error ? error : new Error('Hủy lời mời ghép cặp thất bại.');
