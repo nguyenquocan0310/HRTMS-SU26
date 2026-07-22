@@ -197,10 +197,11 @@ public class PairingService : IPairingService
         int jockeyId,
         int pairingId)
     {
-        // Jockey accept chi doi Pending -> Accepted
-        // Owner se confirm sau de thanh Confirmed
+        // Giải có phí: Jockey accept -> Accepted, Owner nộp lệ phí rồi Admin đối chiếu.
+        // Giải miễn phí: hệ thống xác nhận ngay, không phát sinh thao tác Owner thừa.
         var pairing = await _context.Pairings
             .Include(p => p.Horse)
+            .Include(p => p.Tournament)
             .FirstOrDefaultAsync(p => p.PairingId == pairingId);
 
         if (pairing == null)
@@ -227,11 +228,24 @@ public class PairingService : IPairingService
         pairing.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
+        // ConfirmAsync ghi EntryFeePayment Verified Amount=0 và hủy các pairing còn
+        // treo của cùng ngựa. Dùng Horse.OwnerId nội bộ, không nhận ownerId từ client.
+        if (pairing.Tournament.EntryFeeAmount == 0)
+        {
+            var autoConfirmed = await ConfirmAsync(pairing.Horse.OwnerId, pairingId);
+            return new PairingActionResponseDto
+            {
+                PairingId = autoConfirmed.PairingId,
+                Status = autoConfirmed.Status,
+                Message = "Giải đấu không thu lệ phí. Cặp thi đấu đã được xác nhận tự động."
+            };
+        }
+
         // Gui thong bao cho Owner de vao xac nhan cuoi cung (email + in-app)
         await _notification.SendAsync(
             pairing.Horse.OwnerId,
             "Nài ngựa đã chấp nhận lời mời",
-            $"Nài ngựa đã chấp nhận ghép cặp cùng ngựa '{pairing.Horse.Name}'. Vui lòng xác nhận cặp thi đấu.",
+            $"Nài ngựa đã chấp nhận ghép cặp cùng ngựa '{pairing.Horse.Name}'. Vui lòng nộp lệ phí để Ban tổ chức đối chiếu.",
             type: "Both",
             relatedEntityType: "Pairing",
             relatedEntityId: pairing.PairingId);
@@ -241,7 +255,7 @@ public class PairingService : IPairingService
             PairingId = pairing.PairingId,
             Status = pairing.Status,
             Message =
-                "Đã chấp nhận lời mời ghép cặp. Đang chờ chủ ngựa xác nhận."
+                "Đã chấp nhận lời mời ghép cặp. Đang chờ chủ ngựa nộp lệ phí."
         };
     }
 

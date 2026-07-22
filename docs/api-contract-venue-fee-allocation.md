@@ -29,6 +29,10 @@ Admin bốc thăm (hoặc AutoDrawJob tự chạy khi còn <= 24h)
 Owner **không còn** bước tự confirm pairing (giải thu phí) và **không còn** bước tự
 confirm entry. Xác nhận đến từ việc Admin verify lệ phí.
 
+Với giải `entryFeeAmount = 0`, Jockey accept lời mời sẽ tự tạo payment `Verified`
+với số tiền `0` và chuyển Pairing sang `Confirmed`. Owner không gọi endpoint confirm
+và UI không hiển thị nút “Giải miễn phí”.
+
 ---
 
 ## 1. Venue — sân đua (patch 011)
