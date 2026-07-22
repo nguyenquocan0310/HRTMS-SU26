@@ -190,6 +190,32 @@ public class SchedulingController : ControllerBase
         }
     }
 
+    // Admin chốt vòng: phân race + bốc thăm toàn bộ race đủ điều kiện.
+    // KHÔNG phải một transaction duy nhất: allocate là một transaction, mỗi draw
+    // là một transaction riêng. Race không bốc được nằm trong skippedDraws kèm
+    // lý do; phần đã làm xong KHÔNG bị rollback. Gọi lại endpoint này an toàn.
+    [HttpPost("admin/rounds/{roundId:int}/finalize")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> FinalizeRound(int roundId)
+    {
+        if (!TryGetUserId(out var adminId))
+            return UnauthorizedResult();
+
+        try
+        {
+            var result = await _service.FinalizeRoundAsync(adminId, roundId);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(Err("ROUND_NOT_FOUND", "Không tìm thấy vòng đấu."));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return MapAllocateError(ex.Message);
+        }
+    }
+
     // Admin bốc thăm vị trí xuất phát (nguyên tử).
     [HttpPost("admin/races/{raceId:int}/draw")]
     [Authorize(Roles = "Admin")]
@@ -214,6 +240,21 @@ public class SchedulingController : ControllerBase
         catch (InvalidOperationException ex) when (ex.Message == "NO_ELIGIBLE_ENTRIES")
         {
             return UnprocessableEntity(Err("NO_ELIGIBLE_ENTRIES", "Chưa có ngựa hợp lệ để bốc thăm."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "NOT_ENOUGH_ENTRIES")
+        {
+            return UnprocessableEntity(Err("NOT_ENOUGH_ENTRIES",
+                "Cuộc đua cần ít nhất 2 ngựa hợp lệ mới bốc thăm được."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "ENTRIES_NOT_ALL_CONFIRMED")
+        {
+            return UnprocessableEntity(Err("ENTRIES_NOT_ALL_CONFIRMED",
+                "Còn đăng ký chưa được xác nhận nên chưa thể chốt danh sách xuất phát."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "MAX_LANES_REACHED")
+        {
+            return Conflict(Err("MAX_LANES_REACHED",
+                "Số ngựa hợp lệ vượt quá số làn xuất phát của sân đua."));
         }
         catch (InvalidOperationException ex) when (ex.Message == "TOURNAMENT_NOT_OPEN_FOR_SCHEDULING")
         {

@@ -57,5 +57,13 @@ public static class HangfireExtensions
             "auto-allocate-job",
             svc => svc.AutoAllocateDueRoundsAsync(),
             "10 * * * *");
+
+        // Mỗi giờ (phút thứ 20, sau auto-allocate-job): bốc thăm race Upcoming còn
+        // <= 24h là tới giờ chạy. Dùng CHUNG DrawPostPositionsAsync với manual draw
+        // nên guard giống hệt; race đã bốc trả ALREADY_DRAWN và được bỏ qua.
+        recurring.AddOrUpdate<IRaceEntryService>(
+            "auto-draw-job",
+            svc => svc.AutoDrawDueRacesAsync(),
+            "20 * * * *");
     }
 }

@@ -613,7 +613,7 @@ public class RaceEntryService : IRaceEntryService
     public async Task<PostPositionDrawResultDto> DrawPostPositionsAsync(int adminId, int raceId)
     {
         var race = await _context.Races
-            .Include(r => r.Round).ThenInclude(rd => rd.Tournament)
+            .Include(r => r.Round).ThenInclude(rd => rd.Tournament).ThenInclude(t => t.Venue)
             .FirstOrDefaultAsync(r => r.RaceId == raceId)
             ?? throw new KeyNotFoundException("RACE_NOT_FOUND");
 
@@ -624,7 +624,7 @@ public class RaceEntryService : IRaceEntryService
         // Cung guard voi AllocateAsync: giai phai o Open/Closed Registration.
         EnsureTournamentOpenForScheduling(race.Round.Tournament.Status);
 
-        // Chi boc cho cac entry hop le (Pending/Confirmed), bo qua Cancelled.
+        // Chi boc cho cac entry hop le (Pending/Confirmed), bo qua Cancelled/Scratched.
         var entries = await _context.RaceEntries
             .Include(e => e.Pairing).ThenInclude(p => p.Horse)
             .Where(e => e.RaceId == raceId && ActiveEntryStatuses.Contains(e.Status))
@@ -632,6 +632,22 @@ public class RaceEntryService : IRaceEntryService
 
         if (entries.Count == 0)
             throw new InvalidOperationException("NO_ELIGIBLE_ENTRIES");
+
+        // Mot minh mot ngua thi khong thanh cuoc dua — chan boc tham som thay vi
+        // tao mot starting list vo nghia.
+        if (entries.Count < 2)
+            throw new InvalidOperationException("NOT_ENOUGH_ENTRIES");
+
+        // Sau auto-allocate moi entry deu Confirmed. Con entry Pending nghia la
+        // du lieu cu (flow Owner tu xac nhan) chua duoc xu ly xong -> chan boc tham
+        // de khong chot danh sach voi ngua chua chac tham gia.
+        if (entries.Any(e => e.Status != "Confirmed"))
+            throw new InvalidOperationException("ENTRIES_NOT_ALL_CONFIRMED");
+
+        // Khong the boc nhieu ngua hon so cong xuat phat cua san.
+        var laneCount = race.Round.Tournament.Venue?.LaneCount;
+        if (laneCount.HasValue && entries.Count > laneCount.Value)
+            throw new InvalidOperationException("MAX_LANES_REACHED");
 
         // Xao tron Fisher-Yates trong bo nho (deterministic, kiem soat duoc — KHONG order by Guid tren DB).
         var rng = Random.Shared;
@@ -646,22 +662,39 @@ public class RaceEntryService : IRaceEntryService
         try
         {
             var now = DateTime.UtcNow;
+
+            // Guard nguyen tu: chi mot tien trinh lat duoc co IsPostPositionDrawn
+            // false -> true. Hai Admin (hoac manual draw + AutoDrawJob) chay song
+            // song thi ke thua cuoc nhan rowcount 0 -> ALREADY_DRAWN, khong the
+            // xao tron lai cong da duoc tien trinh kia gan.
+            var claimed = await _context.Races
+                .Where(r => r.RaceId == raceId && !r.IsPostPositionDrawn)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(r => r.IsPostPositionDrawn, true)
+                    .SetProperty(r => r.UpdatedAt, now));
+
+            if (claimed == 0)
+            {
+                await tx.RollbackAsync();
+                throw new InvalidOperationException("ALREADY_DRAWN");
+            }
+
             for (int pos = 0; pos < entries.Count; pos++)
             {
                 entries[pos].PostPosition = pos + 1;
                 entries[pos].UpdatedAt = now;
             }
 
-            race.IsPostPositionDrawn = true;
-            race.UpdatedAt = now;
-
             await _context.SaveChangesAsync();
             await tx.CommitAsync();
+
+            race.IsPostPositionDrawn = true;
+            race.UpdatedAt = now;
         }
         catch (DbUpdateException)
         {
             await tx.RollbackAsync();
-            // Hai phien boc tham song song -> vi pham UNIQUE -> bao xung dot.
+            // UNIQUE(RaceId, PostPosition) bi vi pham -> bao xung dot.
             throw new InvalidOperationException("DRAW_CONFLICT");
         }
 
@@ -696,6 +729,186 @@ public class RaceEntryService : IRaceEntryService
                 })
                 .ToList()
         };
+    }
+
+    // =====================================================================
+    // Chốt vòng: phân race + bốc thăm toàn bộ
+    // =====================================================================
+    // RANH GIỚI TRANSACTION (có chủ ý, không phải một transaction duy nhất):
+    //   • Allocate  : một transaction riêng — hoặc cả vòng được phân, hoặc không.
+    //   • Mỗi draw  : một transaction riêng cho từng race.
+    // Không gộp được vì mỗi bước gửi notification sau khi commit; gộp thì một
+    // race không đủ điều kiện bốc thăm sẽ rollback cả phần phân race đã đúng.
+    //
+    // HỆ QUẢ khi lỗi giữa chừng: phần đã phân race và các race đã bốc thăm VẪN
+    // giữ nguyên (không rollback). Race chưa bốc được liệt kê trong SkippedDraws
+    // kèm lý do để Admin xử lý tiếp — trạng thái luôn đọc được, không mơ hồ.
+    // Gọi lại /finalize an toàn: allocate đã xong trả ROUND_ALREADY_ALLOCATED và
+    // được bỏ qua, các race đã bốc trả ALREADY_DRAWN và cũng được bỏ qua.
+    public async Task<FinalizeRoundResultDto> FinalizeRoundAsync(int actorId, int roundId)
+    {
+        AutoAllocateResultDto allocation;
+        try
+        {
+            allocation = await AutoAllocateRoundAsync(actorId, roundId);
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "ROUND_ALREADY_ALLOCATED")
+        {
+            // Đã phân ở lần gọi trước -> đi thẳng sang bốc thăm.
+            allocation = await BuildAllocationSnapshotAsync(roundId);
+        }
+
+        var races = await _context.Races
+            .Where(r => r.RoundId == roundId && r.Status != "Cancelled")
+            .OrderBy(r => r.RaceNumber)
+            .ToListAsync();
+
+        var result = new FinalizeRoundResultDto
+        {
+            RoundId = roundId,
+            Allocation = allocation
+        };
+
+        foreach (var race in races)
+        {
+            try
+            {
+                result.Draws.Add(await DrawPostPositionsAsync(actorId, race.RaceId));
+            }
+            catch (InvalidOperationException ex)
+            {
+                // Race không đủ điều kiện bốc thăm KHÔNG làm hỏng cả thao tác —
+                // ghi lại lý do để Admin xử lý riêng.
+                result.SkippedDraws.Add(new FinalizeSkippedRaceDto
+                {
+                    RaceId = race.RaceId,
+                    RaceNumber = race.RaceNumber,
+                    Reason = ex.Message
+                });
+            }
+        }
+
+        await _audit.LogAsync(actorId, "Chốt vòng đấu (phân race + bốc thăm)", "Round",
+            roundId.ToString(), null,
+            $"Allocated={allocation.AllocatedCount};Drawn={result.Draws.Count};" +
+            $"Skipped={result.SkippedDraws.Count}");
+
+        return result;
+    }
+
+    // Ảnh chụp phân bổ hiện có — dùng khi vòng đã allocate từ trước nên
+    // AutoAllocateRoundAsync không chạy lại.
+    private async Task<AutoAllocateResultDto> BuildAllocationSnapshotAsync(int roundId)
+    {
+        var round = await _context.Rounds
+            .Include(r => r.Tournament).ThenInclude(t => t.Venue)
+            .Include(r => r.Races)
+            .FirstAsync(r => r.RoundId == roundId);
+
+        var races = round.Races
+            .Where(r => r.Status != "Cancelled")
+            .OrderBy(r => r.RaceNumber)
+            .ToList();
+        var raceIds = races.Select(r => r.RaceId).ToList();
+
+        var entries = await _context.RaceEntries
+            .Where(e => raceIds.Contains(e.RaceId) && ActiveEntryStatuses.Contains(e.Status))
+            .Select(e => new
+            {
+                e.RaceEntryId,
+                e.RaceId,
+                e.PairingId,
+                e.Pairing.HorseId,
+                HorseName = e.Pairing.Horse.Name,
+                e.Pairing.JockeyId,
+                JockeyName = e.Pairing.Jockey.Jockey.FullName
+            })
+            .ToListAsync();
+
+        var capacityPerRace = round.Tournament.Venue == null
+            ? round.Tournament.MaxHorses
+            : Math.Min(round.Tournament.MaxHorses, round.Tournament.Venue.LaneCount);
+
+        return new AutoAllocateResultDto
+        {
+            RoundId = roundId,
+            TournamentId = round.TournamentId,
+            PoolSize = entries.Count,
+            CapacityPerRace = capacityPerRace,
+            RaceCount = races.Count,
+            TotalCapacity = capacityPerRace * races.Count,
+            AllocatedCount = entries.Count,
+            WaitlistedCount = 0,
+            Races = races.Select(r => new AutoAllocateRaceDto
+            {
+                RaceId = r.RaceId,
+                RaceNumber = r.RaceNumber,
+                ScheduledTime = r.ScheduledTime,
+                EntryCount = entries.Count(e => e.RaceId == r.RaceId),
+                Entries = entries
+                    .Where(e => e.RaceId == r.RaceId)
+                    .Select(e => new AutoAllocateEntryDto
+                    {
+                        RaceEntryId = e.RaceEntryId,
+                        PairingId = e.PairingId,
+                        HorseId = e.HorseId,
+                        HorseName = e.HorseName,
+                        JockeyId = e.JockeyId,
+                        JockeyName = e.JockeyName
+                    }).ToList()
+            }).ToList()
+        };
+    }
+
+    // =====================================================================
+    // Job nén: tự động bốc thăm race sắp chạy
+    // =====================================================================
+    public async Task<int> AutoDrawDueRacesAsync()
+    {
+        var now = DateTime.UtcNow;
+        var horizon = now.AddHours(24);
+
+        // Race Upcoming, chưa bốc thăm, còn <= 24h là tới giờ chạy.
+        var raceIds = await _context.Races
+            .Where(r => !r.IsPostPositionDrawn &&
+                        r.Status == "Upcoming" &&
+                        r.ScheduledTime > now &&
+                        r.ScheduledTime <= horizon &&
+                        (r.Round.Tournament.Status == "Open Registration" ||
+                         r.Round.Tournament.Status == "Closed Registration"))
+            .Select(r => r.RaceId)
+            .ToListAsync();
+
+        if (raceIds.Count == 0)
+            return 0;
+
+        var systemActorId = await _context.Users
+            .Where(u => u.Role == "System" && u.Status == "Active")
+            .Select(u => u.UserId)
+            .FirstOrDefaultAsync();
+        if (systemActorId == 0)
+            throw new InvalidOperationException("SYSTEM_USER_NOT_FOUND");
+
+        var drawn = 0;
+        foreach (var raceId in raceIds)
+        {
+            try
+            {
+                // CÙNG service với manual draw — không có nhánh code bốc thăm riêng
+                // cho job, nên guard và thứ tự gán cổng luôn giống nhau.
+                await DrawPostPositionsAsync(systemActorId, raceId);
+                drawn++;
+            }
+            catch (InvalidOperationException)
+            {
+                // Chưa đủ 2 entry / còn entry chưa Confirmed / vừa bị tiến trình
+                // khác bốc trước — đều là trạng thái hợp lệ để bỏ qua, job giờ sau
+                // sẽ thử lại.
+                continue;
+            }
+        }
+
+        return drawn;
     }
 
     // =====================================================================

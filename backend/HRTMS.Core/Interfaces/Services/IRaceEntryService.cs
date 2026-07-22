@@ -19,11 +19,18 @@ public interface IRaceEntryService
     // chưa bốc thăm và còn chỗ.
     Task<RaceEntryResponseDto> MoveEntryAsync(int adminId, int raceEntryId, int targetRaceId);
 
+    // Chốt vòng: auto-allocate rồi bốc thăm mọi race đủ điều kiện.
+    // KHÔNG phải một transaction duy nhất — xem chú thích ở implementation.
+    Task<FinalizeRoundResultDto> FinalizeRoundAsync(int actorId, int roundId);
+
     // Bốc thăm vị trí xuất phát nguyên tử trong một transaction.
     Task<PostPositionDrawResultDto> DrawPostPositionsAsync(int adminId, int raceId);
 
     // Job nén (Hangfire): auto-allocate vòng 1 của giải đã quá PaymentDeadline.
     Task<int> AutoAllocateDueRoundsAsync();
+
+    // Job nén (Hangfire): bốc thăm race Upcoming sắp chạy (<= 24h) đã đủ điều kiện.
+    Task<int> AutoDrawDueRacesAsync();
 
     // Lấy lịch thi đấu công khai (không yêu cầu đăng nhập).
     Task<RaceScheduleDto> GetRaceScheduleAsync(int raceId);
