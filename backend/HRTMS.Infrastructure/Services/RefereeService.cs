@@ -11,11 +11,16 @@ public class RefereeService : IRefereeService
 {
     private readonly HRTMSDbContext _context;
     private readonly INotificationService _notificationService;
+    private readonly ITokenBlacklistService _tokenBlacklistService;
 
-    public RefereeService(HRTMSDbContext context, INotificationService notificationService)
+    public RefereeService(
+        HRTMSDbContext context,
+        INotificationService notificationService,
+        ITokenBlacklistService tokenBlacklistService)
     {
         _context = context;
         _notificationService = notificationService;
+        _tokenBlacklistService = tokenBlacklistService;
     }
 
     public async Task<RefereeProfileDto?> GetProfileAsync(int refereeId)
@@ -46,11 +51,13 @@ public class RefereeService : IRefereeService
         if (certificationChanged)
         {
             referee.CertificationLevel = normalizedCertification;
+            referee.Status = "Pending";
+            referee.RejectionReason = null;
 
-            if (referee.Status == "Active")
+            if (referee.Referee != null)
             {
-                referee.Status = "Pending";
-                referee.RejectionReason = null;
+                referee.Referee.Status = "Pending";
+                referee.Referee.UpdatedAt = DateTime.UtcNow;
             }
         }
 
@@ -80,13 +87,16 @@ public class RefereeService : IRefereeService
 
         await _context.SaveChangesAsync();
 
-        if (certificationChanged && referee.Status == "Pending")
+        if (certificationChanged)
         {
+            await _tokenBlacklistService.BlacklistUserAsync(refereeId);
+
             await _notificationService.SendAsync(
                 refereeId,
                 "Hồ sơ Trọng tài đang chờ duyệt lại",
                 "Bạn vừa cập nhật Certification Level. Hồ sơ của bạn sẽ tạm chuyển về " +
-                "trạng thái chờ duyệt (Pending) cho tới khi Admin xác nhận lại chứng chỉ mới.",
+                "trạng thái chờ duyệt (Pending) cho tới khi Admin xác nhận lại chứng chỉ mới. " +
+                "Vui lòng đăng nhập lại sau khi Admin phê duyệt.",
                 type: "Both",
                 relatedEntityType: "RefereeProfiles",
                 relatedEntityId: refereeId);

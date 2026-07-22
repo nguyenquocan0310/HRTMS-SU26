@@ -17,6 +17,8 @@ public static class ApplicationServiceExtensions
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IAuditLogService, AuditLogService>();
         services.AddScoped<ITournamentServices, TournamentSevice>();
+        services.AddScoped<IVenueService, VenueService>();
+        services.AddScoped<IEntryFeePaymentService, EntryFeePaymentService>();
         services.AddScoped<ITournamentParticipantService, TournamentParticipantService>();
         services.AddScoped<ITokenBlacklistService, TokenBlacklistService>();
         services.AddScoped<IJockeyService, JockeyService>();
@@ -44,7 +46,6 @@ public static class ApplicationServiceExtensions
         services.AddScoped<IStartingListService, StartingListService>();
         services.AddScoped<IReportService, ReportService>();
         services.AddScoped<ILiveRaceService, LiveRaceService>();
-        services.AddScoped<IProtestService, ProtestService>();
         services.AddScoped<ILeaderboardService, LeaderboardService>();
         return services;
     }

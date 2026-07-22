@@ -15,6 +15,8 @@ import TabPostPositionDraw from "./tabs/TabPostPositionDraw";
 import TabRoster from "./tabs/TabRoster";
 import * as tournamentService from "../../services/tournamentService";
 import type { TournamentResponse } from "../../services/tournamentService";
+import { getVenues, type Venue } from "../../services/venueService";
+import { adminError, adminLabel } from "../../utils/adminLabels";
 import styles from "./TournamentBuilder.module.scss";
 import {
   validateBasicInfo,
@@ -34,7 +36,9 @@ export type RaceCategory = "Open" | "Classic" | "Maiden";
 // Phải khớp ĐÚNG với DB (CHK_Tournaments_Status) và state machine ở BE.
 export type TournamentStatus =
   | "Draft"
+  | "OpenRegistration"
   | "Open Registration"
+  | "ClosedRegistration"
   | "Closed Registration"
   | "Pre-Race"
   | "In-Progress"
@@ -46,6 +50,7 @@ export type TournamentStatus =
 export const NEXT_STATUS: Partial<Record<TournamentStatus, TournamentStatus>> =
   {
     Draft: "Open Registration",
+    OpenRegistration: "Closed Registration",
     "Open Registration": "Closed Registration",
     "Closed Registration": "Pre-Race",
     "Pre-Race": "In-Progress",
@@ -54,8 +59,12 @@ export const NEXT_STATUS: Partial<Record<TournamentStatus, TournamentStatus>> =
 
 export interface TournamentBasicInfo {
   name: string;
+  description: string;
   startDate: string;
   endDate: string;
+  venueId: number | "";
+  venueLaneCount: number | null;
+  venueTrackLengthMeters: number | null;
   allowedBreed: AllowedBreed | "";
   trackType: TrackType | "";
   raceDistance: number | "";
@@ -64,6 +73,10 @@ export interface TournamentBasicInfo {
   minJockeyExperienceYears: number | "";
   purseAmount: number | "";
   entryFeeAmount: number;
+  paymentDeadline: string;
+  refundDeadline: string;
+  clearRefundDeadline: boolean;
+  advancementCount: number | "";
   preRaceWeightThresholdKg: number;
   postRaceWeightDiffThresholdKg: number;
 }
@@ -113,8 +126,12 @@ export const createEmptyTournament = (): TournamentDraft => ({
   status: "Draft",
   basicInfo: {
     name: "",
+    description: "",
     startDate: "",
     endDate: "",
+    venueId: "",
+    venueLaneCount: null,
+    venueTrackLengthMeters: null,
     allowedBreed: "",
     trackType: "",
     raceDistance: "",
@@ -123,6 +140,10 @@ export const createEmptyTournament = (): TournamentDraft => ({
     minJockeyExperienceYears: "",
     purseAmount: "",
     entryFeeAmount: 0,
+    paymentDeadline: "",
+    refundDeadline: "",
+    clearRefundDeadline: false,
+    advancementCount: 5,
     preRaceWeightThresholdKg: 2.0,
     postRaceWeightDiffThresholdKg: 1.0,
   },
@@ -137,11 +158,11 @@ export const createEmptyTournament = (): TournamentDraft => ({
 });
 
 const TABS = [
-  { key: "basic", label: "Thông số" },
-  { key: "prize", label: "Prize Distribution" },
-  { key: "rounds", label: "Rounds & Races" },
-  { key: "roster", label: "Roster" },
-  { key: "draw", label: "Post Position Draw" },
+  { key: "basic", label: "Thông tin giải đấu" },
+  { key: "prize", label: "Quỹ thưởng" },
+  { key: "rounds", label: "Vòng đấu và cuộc đua" },
+  { key: "roster", label: "Danh sách người tham gia" },
+  { key: "draw", label: "Bốc thăm vị trí xuất phát" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -156,6 +177,13 @@ const toTimeInputFromDateTime = (value?: string | null): string => {
   if (!value) return "";
   const timePart = value.split("T")[1];
   return timePart ? timePart.slice(0, 5) : "";
+};
+const toDateTimeLocal = (value?: string | null): string => {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const local = new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
 };
 
 // Đường dẫn route
@@ -179,6 +207,8 @@ const TournamentBuilder = () => {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showAllErrors, setShowAllErrors] = useState(false);
   const [validationSummary, setValidationSummary] = useState<string[]>([]);
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [venuesError, setVenuesError] = useState("");
 
   const [tournamentList, setTournamentList] = useState<TournamentResponse[]>(
     [],
@@ -219,6 +249,14 @@ const TournamentBuilder = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, routeId]);
 
+  useEffect(() => {
+    if (view !== "wizard") return;
+    void getVenues().then((items) => {
+      setVenues(items);
+      setVenuesError("");
+    }).catch((err) => setVenuesError(adminError(err, "Không tải được danh sách trường đua.")));
+  }, [view]);
+
   // ─── Handlers ────────────────────────────────────────────────────────────
   // Điều hướng sang wizard tạo mới (useEffect sẽ reset draft khi tới URL).
   const handleCreateNew = () => navigate(WIZARD_PATH);
@@ -236,11 +274,15 @@ const TournamentBuilder = () => {
         status: t.status as TournamentStatus,
         basicInfo: {
           name: t.name,
+          description: t.description ?? "",
           // BE trả DateTime → JSON ISO "2026-06-30T18:00:00".
           // <input type="date"> chỉ nhận "yyyy-MM-dd" nên phải cắt 10 ký tự đầu,
           // nếu không ô ngày sẽ hiển thị trống.
           startDate: toDateInput(t.startDate),
           endDate: toDateInput(t.endDate),
+          venueId: t.venueId ?? "",
+          venueLaneCount: t.laneCount ?? null,
+          venueTrackLengthMeters: t.trackLengthMeters ?? null,
           allowedBreed: t.allowedBreed as AllowedBreed,
           trackType: t.trackType as TrackType,
           raceDistance: t.raceDistance,
@@ -249,6 +291,10 @@ const TournamentBuilder = () => {
           minJockeyExperienceYears: t.minJockeyExperienceYears,
           purseAmount: t.purseAmount,
           entryFeeAmount: t.entryFeeAmount,
+          paymentDeadline: toDateTimeLocal(t.paymentDeadline),
+          refundDeadline: toDateTimeLocal(t.refundDeadline),
+          clearRefundDeadline: false,
+          advancementCount: t.advancementCount ?? 5,
           preRaceWeightThresholdKg: t.preRaceWeightThresholdKg,
           postRaceWeightDiffThresholdKg: t.postRaceWeightDiffThresholdKg,
         },
@@ -327,9 +373,11 @@ const TournamentBuilder = () => {
     const b = draft.basicInfo;
     return {
       name: b.name,
+      description: b.description || undefined,
       startDate: b.startDate,
       endDate: b.endDate,
       maxHorses: typeof b.maxHorses === "number" ? b.maxHorses : undefined,
+      venueId: typeof b.venueId === "number" ? b.venueId : undefined,
       allowedBreed: b.allowedBreed,
       trackType: b.trackType,
       raceDistance:
@@ -342,8 +390,13 @@ const TournamentBuilder = () => {
       purseAmount:
         typeof b.purseAmount === "number" ? b.purseAmount : undefined,
       entryFeeAmount: b.entryFeeAmount,
+      paymentDeadline: b.paymentDeadline ? new Date(b.paymentDeadline).toISOString() : undefined,
+      refundDeadline: b.refundDeadline ? new Date(b.refundDeadline).toISOString() : undefined,
+      clearRefundDeadline: b.clearRefundDeadline,
       preRaceWeightThresholdKg: b.preRaceWeightThresholdKg,
       postRaceWeightDiffThresholdKg: b.postRaceWeightDiffThresholdKg,
+      advancementRule: "TopPerRace",
+      advancementCount: typeof b.advancementCount === "number" ? b.advancementCount : undefined,
     };
   };
 
@@ -351,7 +404,7 @@ const TournamentBuilder = () => {
   // Tournament đã tồn tại trên BE có id là số nguyên thật — dùng để phân biệt
   // giữa "tạo mới" (POST) và "cập nhật" (PUT).
   const isNewDraft = draft.id.startsWith("t-");
-  const isReadOnly = !isNewDraft && draft.status !== "Draft";
+  const isReadOnly = !isNewDraft && draft.status !== "Draft" && draft.status !== "Open Registration" && draft.status !== "OpenRegistration";
 
   const basicValidation = validateBasicInfo(draft.basicInfo, isNewDraft);
   const prizeValidation = validatePrizeDistribution(draft.prizeDistribution);
@@ -439,17 +492,17 @@ const TournamentBuilder = () => {
     const roundsInvalid = hasRoundsErrors(roundsValidation);
 
     if (basicInvalid) {
-      summary.push("Tab Thông số còn dữ liệu chưa hợp lệ.");
+      summary.push("Thông tin giải đấu còn dữ liệu chưa hợp lệ.");
     }
 
     if (Object.keys(prizeValidation.fieldErrors).length > 0) {
-      summary.push("Prize Distribution còn tỷ lệ không hợp lệ.");
+      summary.push("Quỹ thưởng còn tỷ lệ không hợp lệ.");
     }
 
     summary.push(...prizeValidation.structureErrors);
 
     if (Object.keys(roundsValidation.fieldErrors).length > 0) {
-      summary.push("Rounds & Races còn dữ liệu chưa hợp lệ.");
+      summary.push("Vòng đấu và cuộc đua còn dữ liệu chưa hợp lệ.");
     }
 
     summary.push(...roundsValidation.structureErrors);
@@ -548,8 +601,8 @@ const TournamentBuilder = () => {
     },
     {
       key: "status",
-      header: "Status",
-      render: (row) => <StatusBadge status={row.status as StatusType} />,
+      header: "Trạng thái",
+      render: (row) => <StatusBadge status={row.status as StatusType} label={adminLabel(row.status)} />,
     },
     {
       key: "action",
@@ -573,11 +626,11 @@ const TournamentBuilder = () => {
             >
               {isDraftRow ? (
                 <>
-                  <FiEdit2 size={13} /> Edit
+                  <FiEdit2 size={13} /> Chỉnh sửa
                 </>
               ) : (
                 <>
-                  <FiEye size={13} /> View Detail
+                  <FiEye size={13} /> Xem chi tiết
                 </>
               )}
             </button>
@@ -591,7 +644,7 @@ const TournamentBuilder = () => {
               >
                 {advancingId === row.tournamentId
                   ? "Đang chuyển..."
-                  : `→ ${next}`}
+                  : `→ ${adminLabel(next)}`}
               </button>
             )}
           </div>
@@ -607,13 +660,13 @@ const TournamentBuilder = () => {
     return (
       <div className={styles.container}>
         <div className={styles.header}>
-          <h1 className={styles.heading}>Tournament Builder</h1>
+          <h1 className={styles.heading}>Quản lý giải đấu</h1>
           <button
             type="button"
             className={styles.createBtn}
             onClick={handleCreateNew}
           >
-            <FiPlus size={16} /> Create Tournament
+            <FiPlus size={16} /> Tạo giải đấu
           </button>
         </div>
 
@@ -647,9 +700,7 @@ const TournamentBuilder = () => {
           ← Quay lại danh sách
         </button>
         <h1 className={styles.heading}>
-          {draft.basicInfo.name.trim() !== ""
-            ? draft.basicInfo.name
-            : "Tạo giải đấu mới"}
+          {isNewDraft ? "Tạo giải đấu mới" : "Chỉnh sửa giải đấu"}
         </h1>
       </div>
 
@@ -681,6 +732,8 @@ const TournamentBuilder = () => {
             readOnly={isReadOnly}
             showAllErrors={showAllErrors}
             isCreateMode={isNewDraft}
+            venues={venues}
+            venuesError={venuesError}
           />
         )}
 
@@ -755,7 +808,7 @@ const TournamentBuilder = () => {
             className={styles.cancelTournamentBtn}
             onClick={() => setShowCancelModal(true)}
           >
-            Cancel Tournament
+            Hủy tạo giải
           </button>
           <div className={styles.actionBarRight}>
             <button
@@ -764,7 +817,7 @@ const TournamentBuilder = () => {
               onClick={handleSaveDraft}
               disabled={isSaving}
             >
-              {isSaving ? "Đang lưu..." : "Save Draft"}
+              {isSaving ? "Đang lưu..." : "Lưu bản nháp"}
             </button>
             <button
               type="button"
@@ -772,7 +825,7 @@ const TournamentBuilder = () => {
               onClick={handlePublish}
               disabled={isSaving}
             >
-              {isSaving ? "Đang xử lý..." : "Publish"}
+              {isSaving ? "Đang xử lý..." : "Mở đăng ký"}
             </button>
           </div>
         </div>

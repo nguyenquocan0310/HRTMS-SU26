@@ -88,6 +88,7 @@ const TabPostPositionDraw = ({ rounds, onChange, readOnly }: Props) => {
   }
 
   const entries = schedule?.entries ?? [];
+  const eligibleEntries = entries.filter((entry) => entry.status === 'Confirmed');
   const isDrawn = schedule?.isPostPositionDrawn ?? selected?.race.isPostPositionDrawn ?? false;
 
   return (
@@ -106,7 +107,7 @@ const TabPostPositionDraw = ({ rounds, onChange, readOnly }: Props) => {
       {selected && raceId && <>
         <div className={styles.statusRow}>
           {isDrawn ? <span className={styles.drawnBadge}><FiCheckCircle size={14} /> Đã bốc thăm</span> : <span className={styles.notDrawnBadge}>Chưa bốc thăm</span>}
-          {!readOnly && <button type="button" className={styles.randomizeBtn} onClick={() => void handleDraw()} disabled={drawing || loading || isDrawn || entries.length === 0}>
+          {!readOnly && <button type="button" className={styles.randomizeBtn} onClick={() => void handleDraw()} disabled={drawing || loading || isDrawn || eligibleEntries.length < 2}>
             <FiShuffle size={15} /> {drawing ? 'Đang bốc thăm...' : 'Bốc thăm vị trí'}
           </button>}
         </div>
@@ -117,6 +118,7 @@ const TabPostPositionDraw = ({ rounds, onChange, readOnly }: Props) => {
             {entries.map((entry) => <div key={entry.raceEntryId} className={styles.entryRow}><span className={styles.horseName}>{entry.horseName}</span><span>{entry.jockeyName}</span><span className={`${styles.postPosition} ${entry.postPosition ? styles.postPositionAssigned : ''}`}>{entry.postPosition ?? '—'}</span></div>)}
           </div>
         )}
+        {!loading && !isDrawn && entries.length > 0 && eligibleEntries.length < 2 && <div className={styles.emptyState}>Cần ít nhất 2 ngựa hợp lệ mới bốc thăm được (hiện có {eligibleEntries.length}).</div>}
       </>}
     </div>
   );

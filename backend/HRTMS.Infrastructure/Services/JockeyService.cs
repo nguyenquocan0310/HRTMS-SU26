@@ -12,11 +12,16 @@ public class JockeyService : IJockeyService
 {
     private readonly HRTMSDbContext _context;
     private readonly INotificationService _notificationService;
+    private readonly ITokenBlacklistService _tokenBlacklistService;
 
-    public JockeyService(HRTMSDbContext context, INotificationService notificationService)
+    public JockeyService(
+        HRTMSDbContext context,
+        INotificationService notificationService,
+        ITokenBlacklistService tokenBlacklistService)
     {
         _context = context;
         _notificationService = notificationService;
+        _tokenBlacklistService = tokenBlacklistService;
     }
 
     public async Task<JockeyProfileDto?> GetProfileAsync(int jockeyId)
@@ -58,6 +63,9 @@ public class JockeyService : IJockeyService
 
         var oldLicense = jockey.LicenseCertificate;
         var oldStatus = jockey.Status;
+        var oldSelfDeclaredWeight = jockey.SelfDeclaredWeight;
+        var oldBloodType = jockey.BloodType;
+        var oldHealthStatus = jockey.HealthStatus;
         var licenseChanged = false;
 
         if (!string.IsNullOrWhiteSpace(dto.LicenseCertificate))
@@ -85,6 +93,18 @@ public class JockeyService : IJockeyService
                 // pattern HRS.6 cua Horse: sua field nhay cam -> ve Pending).
                 jockey.Status = "Pending";
                 jockey.RejectionReason = null;
+
+                // BUGFIX: JockeyProfile.Status va Users.Status phai dong bo.
+                // Truoc day chi doi JockeyProfile.Status -> user van Users.Status
+                // = "Active" nen van dang nhap/dung he thong binh thuong du UI
+                // hien "Pending". Doi ca Users.Status de login/authorization thuc
+                // su bi chan cho toi khi Admin duyet lai (giong pattern ApproveJockey
+                // set ca profile.Status va user.Status = "Active").
+                if (jockey.Jockey != null)
+                {
+                    jockey.Jockey.Status = "Pending";
+                    jockey.Jockey.UpdatedAt = DateTime.UtcNow;
+                }
             }
         }
 
@@ -121,24 +141,43 @@ public class JockeyService : IJockeyService
 
         jockey.UpdatedAt = DateTime.UtcNow;
 
-        if (licenseChanged)
+        var anyChanged = licenseChanged ||
+            oldSelfDeclaredWeight != jockey.SelfDeclaredWeight ||
+            oldBloodType != jockey.BloodType ||
+            oldHealthStatus != jockey.HealthStatus;
+
+        if (anyChanged)
         {
+            jockey.Status = "Pending";
+            jockey.RejectionReason = null;
+
+            if (jockey.Jockey != null)
+            {
+                jockey.Jockey.Status = "Pending";
+                jockey.Jockey.UpdatedAt = DateTime.UtcNow;
+            }
+
             _context.AuditLogs.Add(new AuditLog
             {
                 ActorId = jockeyId,
-                Action = "Update_Jockey_License",
+                Action = licenseChanged ? "Update_Jockey_License" : "Update_Jockey_Profile",
                 EntityName = "JockeyProfiles",
                 EntityId = jockeyId.ToString(),
                 OldValue = JsonSerializer.Serialize(new
                 {
                     LicenseCertificate = oldLicense,
-                    Status = oldStatus
+                    Status = oldStatus,
+                    SelfDeclaredWeight = oldSelfDeclaredWeight,
+                    BloodType = oldBloodType,
+                    HealthStatus = oldHealthStatus
                 }),
                 NewValue = JsonSerializer.Serialize(new
                 {
-                    LicenseCertificate =
-                        jockey.LicenseCertificate,
-                    jockey.Status
+                    LicenseCertificate = jockey.LicenseCertificate,
+                    jockey.Status,
+                    jockey.SelfDeclaredWeight,
+                    jockey.BloodType,
+                    jockey.HealthStatus
                 }),
                 CreatedAt = DateTime.UtcNow
             });
@@ -146,13 +185,16 @@ public class JockeyService : IJockeyService
 
         await _context.SaveChangesAsync();
 
-        if (licenseChanged)
+        if (anyChanged)
         {
+            await _tokenBlacklistService.BlacklistUserAsync(jockeyId);
+
             await _notificationService.SendAsync(
                 jockeyId,
                 "Hồ sơ Jockey đang chờ duyệt lại",
-                "Bạn vừa cập nhật License Certificate. Hồ sơ của bạn sẽ tạm chuyển về " +
-                "trạng thái chờ duyệt (Pending) cho tới khi Admin xác nhận lại chứng chỉ mới.",
+                "Bạn vừa cập nhật thông tin hồ sơ. Hồ sơ của bạn đã được chuyển về " +
+                "trạng thái chờ duyệt (Pending) cho tới khi Admin phê duyệt lại. " +
+                "Vui lòng đăng nhập lại sau khi hồ sơ được phê duyệt.",
                 type: "Both",
                 relatedEntityType: "JockeyProfiles",
                 relatedEntityId: jockeyId);
@@ -201,16 +243,16 @@ public class JockeyService : IJockeyService
             throw new KeyNotFoundException("TOURNAMENT_NOT_FOUND");
         }
 
-        var ownerHorseIds = await _context.Horses
-            .Where(h => h.OwnerId == ownerId)
-            .Select(h => h.HorseId)
-            .ToListAsync();
-
-        var pendingJockeyIds = await _context.Pairings
+        // Giữ các Jockey đã có lời mời của chính Owner trong kết quả để frontend
+        // có thể hiển thị Pending/Accepted/Confirmed đúng trạng thái. Chỉ loại Jockey
+        // đã Accepted/Confirmed với Owner khác trong cùng giải.
+        var unavailableJockeyIds = await _context.Pairings
             .Where(p =>
-                ownerHorseIds.Contains(p.HorseId) &&
-                p.Status == "Pending")
+                p.TournamentId == tournamentId &&
+                p.Horse.OwnerId != ownerId &&
+                (p.Status == "Accepted" || p.Status == "Confirmed"))
             .Select(p => p.JockeyId)
+            .Distinct()
             .ToListAsync();
 
         var rosterJockeyIds = await _context.TournamentParticipants
@@ -227,7 +269,7 @@ public class JockeyService : IJockeyService
                 j.Status == "Active" &&
                 j.ExperienceYears >= tournament.MinJockeyExperienceYears &&
                 rosterJockeyIds.Contains(j.JockeyId) &&
-                !pendingJockeyIds.Contains(j.JockeyId));
+                !unavailableJockeyIds.Contains(j.JockeyId));
 
         var total = await query.CountAsync();
 

@@ -11,11 +11,16 @@ public class DoctorService : IDoctorService
 {
     private readonly HRTMSDbContext _context;
     private readonly INotificationService _notificationService;
+    private readonly ITokenBlacklistService _tokenBlacklistService;
 
-    public DoctorService(HRTMSDbContext context, INotificationService notificationService)
+    public DoctorService(
+        HRTMSDbContext context,
+        INotificationService notificationService,
+        ITokenBlacklistService tokenBlacklistService)
     {
         _context = context;
         _notificationService = notificationService;
+        _tokenBlacklistService = tokenBlacklistService;
     }
 
     public async Task<DoctorProfileDto?> GetProfileAsync(int doctorId)
@@ -57,6 +62,15 @@ public class DoctorService : IDoctorService
             {
                 doctor.Status = "Pending";
                 doctor.RejectionReason = null;
+
+                // BUGFIX: dong bo Users.Status voi DoctorProfile.Status.
+                // Neu khong doi Users.Status, user van con Active o bang Users
+                // nen van dang nhap/su dung binh thuong du profile hien Pending.
+                if (doctor.Doctor != null)
+                {
+                    doctor.Doctor.Status = "Pending";
+                    doctor.Doctor.UpdatedAt = DateTime.UtcNow;
+                }
             }
         }
 
@@ -88,11 +102,14 @@ public class DoctorService : IDoctorService
 
         if (licenseChanged && doctor.Status == "Pending")
         {
+            await _tokenBlacklistService.BlacklistUserAsync(doctorId);
+
             await _notificationService.SendAsync(
                 doctorId,
                 "Hồ sơ Bác sĩ đang chờ duyệt lại",
                 "Bạn vừa cập nhật Medical License Number. Hồ sơ của bạn sẽ tạm chuyển về " +
-                "trạng thái chờ duyệt (Pending) cho tới khi Admin xác nhận lại chứng chỉ mới.",
+                "trạng thái chờ duyệt (Pending) cho tới khi Admin xác nhận lại chứng chỉ mới. " +
+                "Vui lòng đăng nhập lại sau khi Admin phê duyệt.",
                 type: "Both",
                 relatedEntityType: "DoctorProfiles",
                 relatedEntityId: doctorId);

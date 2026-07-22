@@ -101,4 +101,18 @@ namespace HRTMS.Core.DTOs.LiveRace
 		public string Status { get; set; } = string.Empty; // "Unofficial"
 		public int RaceReportId { get; set; }
 	}
+
+	// PATCH /api/referees/races/{raceId}/entries/{raceEntryId}/dnf
+	public class MarkDnfDto
+	{
+		public string Reason { get; set; } = string.Empty;
+	}
+
+	public class MarkDnfResultDto
+	{
+		public int RaceEntryId { get; set; }
+		public int RaceId { get; set; }
+		public string FinishStatus { get; set; } = "DNF";
+		public string DnfReason { get; set; } = string.Empty;
+	}
 }

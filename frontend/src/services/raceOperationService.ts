@@ -93,21 +93,13 @@ export const allocateEntry = (
   raceId: number,
   pairingId: number
 ): Promise<RaceEntryResponse> =>
-  apiFetch<ApiResponse<RaceEntryResponse>>(
+  apiFetch<RaceEntryResponse>(
     `/admin/races/${raceId}/entries`,
     {
       method: 'POST',
       body: JSON.stringify({ pairingId }),
     }
-  ).then((res) => {
-    if (!res.success || !res.data) {
-      throw new Error(
-        res.message || 'Allocate không trả về dữ liệu.'
-      );
-    }
-
-    return res.data;
-  });
+  );
 
 export interface PostPositionAssignment {
   raceEntryId: number;

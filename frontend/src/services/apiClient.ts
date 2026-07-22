@@ -6,12 +6,25 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localho
 export interface ApiErrorResponse {
   success?: boolean;
   message?: string;
+  error?: string;
   data?: null;
   // ASP.NET tự động trả format này khi lỗi validate ở tầng DataAnnotations
   // (vd MinLength, Required trên các DTO), khác với format
   // {success,message} tùy chỉnh của tầng business logic.
   title?: string;
   errors?: Record<string, string[]>;
+}
+
+/** Lỗi HTTP có kèm mã nghiệp vụ do API trả về. */
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    public readonly code?: string,
+    public readonly status?: number,
+  ) {
+    super(message);
+    this.name = 'ApiRequestError';
+  }
 }
 
 /**
@@ -48,7 +61,7 @@ export async function apiFetch<T>(
         sessionStorage.setItem('authReason', 'expired');
         window.location.href = '/login';
       }
-      throw new Error('Sai Password hoặc Email. Vui lòng đăng nhập lại.');
+      throw new ApiRequestError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'UNAUTHORIZED', 401);
     }
 
 let errorBody: ApiErrorResponse | null = null;
@@ -60,14 +73,14 @@ let errorBody: ApiErrorResponse | null = null;
 
     // Ưu tiên message tùy chỉnh của BE (tầng business logic).
     if (errorBody?.message) {
-      throw new Error(errorBody.message);
+      throw new ApiRequestError(errorBody.message, errorBody.error, response.status);
     }
 
     // Fallback: lỗi validate tự động của ASP.NET (dạng { title, errors: {...} }).
     if (errorBody?.errors) {
       const detailMessages = Object.values(errorBody.errors).flat();
       if (detailMessages.length > 0) {
-        throw new Error(detailMessages.join(' '));
+        throw new ApiRequestError(detailMessages.join(' '), errorBody.error, response.status);
       }
     }
 
@@ -77,7 +90,11 @@ let errorBody: ApiErrorResponse | null = null;
       409: 'Dữ liệu đã thay đổi hoặc đang có xung đột. Vui lòng tải lại và thử lại.',
       422: 'Dữ liệu chưa đáp ứng điều kiện để thực hiện thao tác.',
     };
-    throw new Error(errorBody?.title ?? fallbackMessage[response.status] ?? 'Không thể kết nối với hệ thống. Vui lòng thử lại.');
+    throw new ApiRequestError(
+      errorBody?.title ?? fallbackMessage[response.status] ?? 'Không thể kết nối với hệ thống. Vui lòng thử lại.',
+      errorBody?.error,
+      response.status,
+    );
   }
 
   // Một số API trả về 204 No Content
@@ -86,4 +103,28 @@ let errorBody: ApiErrorResponse | null = null;
   }
 
   return response.json();
+}
+
+/** Tải file được bảo vệ bởi JWT (chứng từ lệ phí, giấy tờ...) dưới dạng Blob. */
+export async function apiFetchBlob(path: string, options: RequestInit = {}): Promise<Blob> {
+  const token = sessionStorage.getItem('token') ?? localStorage.getItem('token');
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+  });
+
+  if (!response.ok) {
+    let errorBody: ApiErrorResponse | null = null;
+    try { errorBody = await response.json(); } catch { /* File endpoint may not have JSON errors. */ }
+    throw new ApiRequestError(
+      errorBody?.message ?? 'Không thể mở chứng từ.',
+      errorBody?.error,
+      response.status,
+    );
+  }
+
+  return response.blob();
 }

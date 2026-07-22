@@ -14,6 +14,7 @@ namespace HRTMS.Core.DTOs.Tournament
     {
         [Required, MaxLength(200)] 
         public string Name { get; set; } = string.Empty;
+        [MaxLength(4000, ErrorMessage = "Mô tả giải đấu tối đa 4000 ký tự.")]
         public string? Description { get; set; }
         [Required]
         public DateTime StartDate { get; set; }
@@ -21,6 +22,11 @@ namespace HRTMS.Core.DTOs.Tournament
         public DateTime EndDate { get; set; }
         [Range(1, int.MaxValue, ErrorMessage ="MaxHorses must above 0")]
         public int MaxHorses { get; set; }
+
+        // Sân đua (patch 012) — BẮT BUỘC cho giải mới. Venue.LaneCount là trần cứng
+        // của MaxHorses; TrackType của giải được suy ra từ sân, không nhận tự do.
+        [Range(1, int.MaxValue, ErrorMessage = "VenueId is required")]
+        public int VenueId { get; set; }
 
         // Single-select, 4 giá trị hợp lệ
         [Required]
@@ -40,6 +46,20 @@ namespace HRTMS.Core.DTOs.Tournament
         // 0 = miễn phí
         [Range(0, double.MaxValue)]
         public decimal EntryFeeAmount { get; set; } = 0;
+
+        // Hạn nộp lệ phí (patch 013) — BẮT BUỘC với MỌI giải, kể cả giải miễn phí.
+        // Với giải free ngữ nghĩa là "hạn chốt đăng ký": AutoAllocateJob lấy đúng
+        // mốc này làm trigger, không có thì job mù và cả chuỗi tự động chết.
+        // Rule: now < PaymentDeadline <= StartDate - 24h (chừa buffer cho
+        // auto-allocate + auto-draw T-24h trước race đầu).
+        [Required(ErrorMessage = "Phải đặt hạn nộp lệ phí.")]
+        public DateTime PaymentDeadline { get; set; }
+
+        // Hạn hoàn phí khi rút lui. CHỈ áp dụng khi EntryFeeAmount > 0.
+        // KHÔNG bắt buộc: bỏ trống thì giải thu phí tự nhận mặc định
+        // StartDate - 24h (trùng mốc bốc thăm), giải miễn phí để NULL.
+        // Nhập tay thì phải nằm trong [PaymentDeadline, StartDate].
+        public DateTime? RefundDeadline { get; set; }
         // Ngưỡng cân nặng
         public decimal PreRaceWeightThresholdKg { get; set; } = 2.0m;
         public decimal PostRaceWeightDiffThresholdKg { get; set; } = 1.0m;

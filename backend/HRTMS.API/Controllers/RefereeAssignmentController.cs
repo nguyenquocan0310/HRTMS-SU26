@@ -1,4 +1,5 @@
-﻿using HRTMS.Core.DTOs.Referee;
+﻿using System.Security.Claims;
+using HRTMS.Core.DTOs.Referee;
 using HRTMS.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -26,10 +27,13 @@ public class RefereeAssignmentController : ControllerBase
     {
         try
         {
+            var adminUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
             // Admin gan Referee vao Race
             var result = await _refereeAssignmentService.AssignAsync(
                 raceId,
-                dto);
+                dto,
+                adminUserId);
 
             return Created(
                 $"/api/admin/races/{raceId}/referees/{result.RefereeId}",
@@ -151,10 +155,13 @@ public class RefereeAssignmentController : ControllerBase
     {
         try
         {
+            var adminUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
             // Go Referee khoi Race
             await _refereeAssignmentService.RemoveAsync(
                 raceId,
-                refereeId);
+                refereeId,
+                adminUserId);
 
             return NoContent();
         }

@@ -20,6 +20,8 @@ public partial class HRTMSDbContext : DbContext
 
     public virtual DbSet<DoctorProfile> DoctorProfiles { get; set; }
 
+    public virtual DbSet<EntryFeePayment> EntryFeePayments { get; set; }
+
 
     public virtual DbSet<Horse> Horses { get; set; }
 
@@ -37,8 +39,6 @@ public partial class HRTMSDbContext : DbContext
 
     public virtual DbSet<PrizeDistribution> PrizeDistributions { get; set; }
 
-    public virtual DbSet<Protest> Protests { get; set; }
-
     public virtual DbSet<PursePayout> PursePayouts { get; set; }
 
     public virtual DbSet<Race> Races { get; set; }
@@ -53,6 +53,8 @@ public partial class HRTMSDbContext : DbContext
 
     public virtual DbSet<Round> Rounds { get; set; }
 
+    public virtual DbSet<RoundWaitlist> RoundWaitlist { get; set; }
+
     public virtual DbSet<SpectatorProfile> SpectatorProfiles { get; set; }
 
     public virtual DbSet<TicketRewardCode> TicketRewardCodes { get; set; }
@@ -62,6 +64,8 @@ public partial class HRTMSDbContext : DbContext
     public virtual DbSet<TournamentParticipant> TournamentParticipants { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
+
+    public virtual DbSet<Venue> Venues { get; set; }
 
     public virtual DbSet<Violation> Violations { get; set; }
 
@@ -84,8 +88,7 @@ public partial class HRTMSDbContext : DbContext
             entity.HasIndex(e => new { e.EntityName, e.EntityId }, "IX_AuditLogs_Entity");
 
             entity.Property(e => e.Action)
-                .HasMaxLength(50)
-                .IsUnicode(false);
+                .HasMaxLength(100);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
             entity.Property(e => e.EntityId)
                 .HasMaxLength(50)
@@ -418,39 +421,6 @@ public partial class HRTMSDbContext : DbContext
                 .HasConstraintName("FK_PrizeDist_Tournament");
         });
 
-        modelBuilder.Entity<Protest>(entity =>
-        {
-            entity.Property(e => e.Description).HasMaxLength(500);
-            entity.Property(e => e.PenaltyApplied)
-                .HasMaxLength(20)
-                .IsUnicode(false);
-            entity.Property(e => e.RefereeDecision).HasMaxLength(500);
-            entity.Property(e => e.Status)
-                .HasMaxLength(20)
-                .IsUnicode(false)
-                .HasDefaultValue("Pending");
-            entity.Property(e => e.SubmittedAt).HasDefaultValueSql("(getutcdate())");
-
-            entity.HasOne(d => d.AccusedRaceEntry).WithMany(p => p.Protests)
-                .HasForeignKey(d => d.AccusedRaceEntryId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Protests_AccusedEntry");
-
-            entity.HasOne(d => d.Race).WithMany(p => p.Protests)
-                .HasForeignKey(d => d.RaceId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Protests_Race");
-
-            entity.HasOne(d => d.SubmittedByUser).WithMany(p => p.Protests)
-                .HasForeignKey(d => d.SubmittedByUserId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Protests_SubmittedBy");
-
-            entity.HasOne(d => d.Violation).WithMany(p => p.Protests)
-                .HasForeignKey(d => d.ViolationId)
-                .HasConstraintName("FK_Protests_Violation");
-        });
-
         modelBuilder.Entity<PursePayout>(entity =>
         {
             entity.Property(e => e.CalculatedAmount).HasColumnType("decimal(18, 2)");
@@ -487,7 +457,6 @@ public partial class HRTMSDbContext : DbContext
 
             entity.Property(e => e.ConfirmationCutoffHours).HasDefaultValue(24);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
-            entity.Property(e => e.ProtestDeadlineMinutes).HasDefaultValue(10);
             entity.Property(e => e.PurseAmount).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.Status)
                 .HasMaxLength(20)
@@ -731,6 +700,96 @@ public partial class HRTMSDbContext : DbContext
             entity.HasOne(d => d.CreatedByNavigation).WithMany(p => p.Tournaments)
                 .HasForeignKey(d => d.CreatedBy)
                 .HasConstraintName("FK_Tournaments_CreatedBy");
+
+            entity.HasOne(d => d.Venue).WithMany(p => p.Tournaments)
+                .HasForeignKey(d => d.VenueId)
+                .HasConstraintName("FK_Tournaments_Venue");
+        });
+
+        // Danh sách chờ theo vòng (patch 014).
+        modelBuilder.Entity<RoundWaitlist>(entity =>
+        {
+            entity.HasKey(e => e.WaitlistId);
+
+            entity.ToTable("RoundWaitlist");
+
+            entity.HasIndex(e => new { e.RoundId, e.PairingId }, "UQ_RoundWaitlist_RoundPairing")
+                .IsUnique();
+
+            entity.HasIndex(e => new { e.RoundId, e.Position }, "UQ_RoundWaitlist_RoundPosition")
+                .IsUnique();
+
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
+
+            entity.HasOne(d => d.Round).WithMany()
+                .HasForeignKey(d => d.RoundId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_RoundWaitlist_Round");
+
+            entity.HasOne(d => d.Pairing).WithMany()
+                .HasForeignKey(d => d.PairingId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_RoundWaitlist_Pairing");
+        });
+
+        // Nộp & đối chiếu lệ phí (patch 013).
+        modelBuilder.Entity<EntryFeePayment>(entity =>
+        {
+            entity.HasKey(e => e.PaymentId);
+
+            entity.HasIndex(e => new { e.Status, e.SubmittedAt }, "IX_EFP_Status");
+
+            // Filtered unique index: chỉ MỘT payment hiệu lực cho mỗi Pairing.
+            // Rejected/Refunded không tính -> Owner nộp lại được sau khi bị từ chối.
+            entity.HasIndex(e => e.PairingId, "UQ_EFP_ActivePerPairing")
+                .IsUnique()
+                .HasFilter("[Status] IN ('PendingVerification','Verified')");
+
+            entity.Property(e => e.Amount).HasColumnType("decimal(12, 2)");
+            entity.Property(e => e.Method)
+                .HasMaxLength(10)
+                .IsUnicode(false);
+            entity.Property(e => e.ReceiptNo).HasMaxLength(50);
+            entity.Property(e => e.TransferRef).HasMaxLength(100);
+            entity.Property(e => e.ProofFileName).HasMaxLength(255);
+            entity.Property(e => e.ProofFilePath)
+                .HasMaxLength(500)
+                .IsUnicode(false);
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasDefaultValue("PendingVerification");
+            entity.Property(e => e.SubmittedAt).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.RejectReason).HasMaxLength(500);
+
+            entity.HasOne(d => d.Pairing).WithMany(p => p.EntryFeePayments)
+                .HasForeignKey(d => d.PairingId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_EFP_Pairing");
+
+            entity.HasOne(d => d.VerifiedByNavigation).WithMany()
+                .HasForeignKey(d => d.VerifiedBy)
+                .HasConstraintName("FK_EFP_VerifiedBy");
+        });
+
+        // Sân đua (patch 012).
+        modelBuilder.Entity<Venue>(entity =>
+        {
+            entity.HasKey(e => e.VenueId);
+
+            entity.HasIndex(e => e.IsActive, "IX_Venues_IsActive");
+
+            entity.HasIndex(e => e.Name, "UQ_Venues_Name").IsUnique();
+
+            entity.Property(e => e.Name).HasMaxLength(200);
+            entity.Property(e => e.Address).HasMaxLength(500);
+            entity.Property(e => e.City).HasMaxLength(100);
+            entity.Property(e => e.TrackType)
+                .HasMaxLength(20)
+                .IsUnicode(false);
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("(getutcdate())");
         });
 
         modelBuilder.Entity<TournamentParticipant>(entity =>

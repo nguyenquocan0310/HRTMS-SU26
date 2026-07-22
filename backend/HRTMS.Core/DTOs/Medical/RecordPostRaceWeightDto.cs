@@ -4,8 +4,8 @@ namespace HRTMS.Core.DTOs.Medical;
 
 public class RecordPostRaceWeightDto
 {
-    [Required(ErrorMessage = "PostRaceJockeyWeight is required.")]
-    [Range(1, 300, ErrorMessage = "PostRaceJockeyWeight must be greater than 0.")]
+    [Required(ErrorMessage = "PostRaceJockeyWeight là bắt buộc.")]
+    [Range(1, 300, ErrorMessage = "PostRaceJockeyWeight phải lớn hơn 0.")]
     public decimal PostRaceJockeyWeight { get; set; }
 }
 
@@ -19,5 +19,7 @@ public class PostRaceWeightResultDto
     public decimal WeightDifference { get; set; }
     public decimal ThresholdKg { get; set; }
     public bool IsWeightFlagged { get; set; }
+    public bool IsEmergencyDisqualified { get; set; }
+    public string RaceEntryStatus { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
 }

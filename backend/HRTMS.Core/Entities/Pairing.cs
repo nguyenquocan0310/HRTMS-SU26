@@ -27,6 +27,8 @@ public partial class Pairing
 
     public virtual JockeyProfile Jockey { get; set; } = null!;
 
+    public virtual ICollection<EntryFeePayment> EntryFeePayments { get; set; } = new List<EntryFeePayment>();
+
     public virtual ICollection<RaceEntry> RaceEntries { get; set; } = new List<RaceEntry>();
 
     public virtual Tournament Tournament { get; set; } = null!;

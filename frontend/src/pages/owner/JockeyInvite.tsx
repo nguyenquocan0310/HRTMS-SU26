@@ -1,14 +1,17 @@
-import { useState, useEffect } from 'react';
-import type { JockeyInvitation, Horse } from '../../types/owner.types';
+import { useCallback, useEffect, useState } from 'react';
+import type { AvailableJockey, JockeyInvitation, Horse } from '../../types/owner.types';
 import { cancelPairing, getAvailableJockeys, getMyHorses, getMyTournamentHorseEnrollments, getOwnerPairings, inviteJockey, confirmPairing } from '../../services/ownerService';
 import { getMyTournamentParticipations, type ParticipationResponse } from '../../services/tournamentService';
+import { getJockeyInviteState, type JockeyInviteAction } from './jockeyInviteState';
 
 const PAIRING_STATUS: Record<string, { label: string; cls: string; dot: string }> = {
-  Pending:   { label: 'Chờ xác nhận',          cls: 'bg-yellow-50 text-yellow-700 border-yellow-200', dot: 'bg-yellow-500' },
-  Accepted:  { label: 'Chờ xác nhận',          cls: 'bg-blue-50 text-blue-700 border-blue-200',       dot: 'bg-blue-500' },
+  Pending:   { label: 'Chờ Jockey phản hồi',   cls: 'bg-yellow-50 text-yellow-700 border-yellow-200', dot: 'bg-yellow-500' },
+  Accepted:  { label: 'Chờ Owner xác nhận',    cls: 'bg-blue-50 text-blue-700 border-blue-200',       dot: 'bg-blue-500' },
   Confirmed: { label: 'Đã xác nhận ghép cặp',  cls: 'bg-green-50 text-green-700 border-green-200',    dot: 'bg-green-500' },
   Declined:  { label: 'Bị từ chối',            cls: 'bg-red-50 text-red-700 border-red-200',          dot: 'bg-red-500' },
   Cancelled: { label: 'Đã hủy',                cls: 'bg-gray-50 text-gray-500 border-gray-200',       dot: 'bg-gray-400' },
+  Rejected:  { label: 'Bị từ chối',            cls: 'bg-red-50 text-red-700 border-red-200',          dot: 'bg-red-500' },
+  Expired:   { label: 'Đã hết hạn',             cls: 'bg-gray-50 text-gray-500 border-gray-200',       dot: 'bg-gray-400' },
 };
 
 const JOCKEY_RESPONSE: Record<string, { label: string; cls: string; dot: string }> = {
@@ -17,6 +20,8 @@ const JOCKEY_RESPONSE: Record<string, { label: string; cls: string; dot: string 
   Confirmed: { label: 'Đã chấp nhận',   cls: 'bg-green-50 text-green-700 border-green-200',    dot: 'bg-green-500' },
   Declined:  { label: 'Đã từ chối',     cls: 'bg-red-50 text-red-700 border-red-200',          dot: 'bg-red-500' },
   Cancelled: { label: 'Đã hủy',         cls: 'bg-gray-50 text-gray-500 border-gray-200',       dot: 'bg-gray-400' },
+  Rejected:  { label: 'Đã từ chối',     cls: 'bg-red-50 text-red-700 border-red-200',          dot: 'bg-red-500' },
+  Expired:   { label: 'Đã hết hạn',      cls: 'bg-gray-50 text-gray-500 border-gray-200',       dot: 'bg-gray-400' },
 };
 
 function StatusBadge({ status, kind }: { status: JockeyInvitation['status']; kind: 'pairing' | 'response' }) {
@@ -33,13 +38,21 @@ function StatusBadge({ status, kind }: { status: JockeyInvitation['status']; kin
 // Shared input class
 const inputCls = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all bg-white';
 
+const ACTION_PRESENTATION: Record<JockeyInviteAction, { label: string; disabled: boolean; cls: string }> = {
+  invite: { label: 'Mời tham gia', disabled: false, cls: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' },
+  invited: { label: 'Đã gửi lời mời', disabled: true, cls: 'border-amber-200 bg-amber-50 text-amber-700' },
+  confirm: { label: 'Xác nhận ghép cặp', disabled: false, cls: 'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700' },
+  paired: { label: 'Đã ghép cặp', disabled: true, cls: 'border-gray-200 bg-gray-100 text-gray-500' },
+  reinvite: { label: 'Mời lại', disabled: false, cls: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' },
+};
+
 export default function JockeyInvite() {
   const [invitations, setInvitations] = useState<JockeyInvitation[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [jockeyName, setJockeyName] = useState('');
   const [requestMessage, setRequestMessage] = useState('');
   const [error, setError] = useState('');
-  const [availableJockeys, setAvailableJockeys] = useState<any[]>([]);
+  const [availableJockeys, setAvailableJockeys] = useState<AvailableJockey[]>([]);
   const [loadingJockeys, setLoadingJockeys] = useState(false);
   const [selectedJockeyId, setSelectedJockeyId] = useState('');
   const [horses, setHorses] = useState<Horse[]>([]);
@@ -62,10 +75,46 @@ export default function JockeyInvite() {
   const [approvedTournaments, setApprovedTournaments] = useState<ParticipationResponse[]>([]);
   const [loadingTournaments, setLoadingTournaments] = useState(false);
   const [selectedTournamentId, setSelectedTournamentId] = useState<number | null>(null);
+  const [selectedContextHorseId, setSelectedContextHorseId] = useState('');
+
+  const closeInviteModal = useCallback(() => {
+    setShowModal(false);
+    setError('');
+    setJockeyName('');
+    setSelectedJockeyId('');
+    setSelectedHorseId('');
+    setRequestMessage('');
+  }, []);
+
+  const openInviteModal = useCallback((jockeyId = '', name = '', horseId = selectedContextHorseId) => {
+    setError('');
+    setSelectedJockeyId(jockeyId);
+    setJockeyName(name);
+    setSelectedHorseId(horseId);
+    setRequestMessage('');
+    setShowModal(true);
+  }, [selectedContextHorseId]);
+
+  useEffect(() => {
+    if (!showModal) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeInviteModal();
+    };
+
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [closeInviteModal, showModal]);
 
   const getHorseNameById = (horseID?: string, horseName?: string) => {
     if (!horseID) return 'Chưa gán ngựa';
-    const found = horses.find(h => String(h.horseID || (h as any).id || (h as any).horseId) === String(horseID));
+    const found = horses.find(h => String(h.horseID || h.horseId || '') === String(horseID));
     if (found) return found.name;
     if (horseName) return horseName;
     return `Ngựa (ID: ${horseID})`;
@@ -115,18 +164,14 @@ export default function JockeyInvite() {
   // ── Chỉ tải jockey và ngựa đã được duyệt trong đúng giải đang chọn ──────────
   useEffect(() => {
     if (!selectedTournamentId) {
-      setAvailableJockeys([]);
-      setEligibleHorses([]);
-      setSelectedHorseId('');
       return;
     }
     const fetchTournamentOptions = async () => {
       try {
         setLoadingJockeys(true);
         setLoadingHorses(true);
-        setSelectedHorseId('');
         const [jockeyData, enrollments] = await Promise.all([
-          getAvailableJockeys(selectedTournamentId, 1, 20),
+          getAvailableJockeys(selectedTournamentId, 1, 100),
           getMyTournamentHorseEnrollments(selectedTournamentId, 'Approved'),
         ]);
         setAvailableJockeys(jockeyData);
@@ -136,9 +181,17 @@ export default function JockeyInvite() {
             .filter((entry) => entry.status === 'Enrolled' && entry.adminApprovalStatus === 'Approved')
             .map((entry) => String(entry.horseId))
         );
-        setEligibleHorses(horses.filter((horse) =>
-          eligibleHorseIds.has(String(horse.horseID || (horse as any).id || (horse as any).horseId || ''))
-        ));
+        const nextEligibleHorses = horses.filter((horse) =>
+          eligibleHorseIds.has(String(horse.horseID || horse.horseId || ''))
+        );
+        setEligibleHorses(nextEligibleHorses);
+        setSelectedContextHorseId((currentHorseId) => {
+          const stillEligible = nextEligibleHorses.some((horse) =>
+            String(horse.horseID || horse.horseId || '') === currentHorseId);
+          return stillEligible
+            ? currentHorseId
+            : String(nextEligibleHorses[0]?.horseID || nextEligibleHorses[0]?.horseId || '');
+        });
       } catch (err) {
         console.error('Failed to fetch tournament invitation options:', err);
         setAvailableJockeys([]);
@@ -149,27 +202,27 @@ export default function JockeyInvite() {
       }
     };
     fetchTournamentOptions();
-  }, [selectedTournamentId, horses]);
+  }, [selectedTournamentId, horses, refreshTrigger]);
 
   useEffect(() => {
     const fetchInvitations = async () => {
       try {
         setLoadingInvitations(true);
-        const data = await getOwnerPairings(filterStatus, filterHorseId);
+        const data = await getOwnerPairings(undefined, undefined, 1, 100);
 
         // Map the backend pairings to our UI JockeyInvitation format
-        const mapped: JockeyInvitation[] = data.map((item: any) => {
+        const mapped: JockeyInvitation[] = data.map((item) => {
           return {
-            invitationID: String(item.pairingId || item.pairingID || item.id || `inv-${Date.now()}-${Math.random()}`),
-            raceID: item.raceId || item.raceID || item.requestMessage || 'N/A',
-            ownerID: item.ownerId || item.ownerID || '',
-            jockeyID: String(item.jockey?.jockeyId || item.jockeyId || item.jockeyID || ''),
-            jockeyName: item.jockey?.fullName || item.jockeyName || item.jockey?.name || 'N/A',
-            status: item.status || 'Pending',
-            invitedAt: item.createdAt ? new Date(item.createdAt) : (item.invitedAt ? new Date(item.invitedAt) : new Date()),
-            respondedAt: item.respondedAt ? new Date(item.respondedAt) : undefined,
-            horseID: String(item.horse?.horseId || item.horseId || item.horseID || ''),
-            horseName: item.horse?.name || '',
+            invitationID: String(item.pairingId),
+            tournamentID: item.tournamentId,
+            raceID: item.requestMessage || 'N/A',
+            ownerID: '',
+            jockeyID: String(item.jockey.jockeyId),
+            jockeyName: item.jockey.fullName || 'N/A',
+            status: item.status,
+            invitedAt: new Date(item.createdAt),
+            horseID: String(item.horse.horseId),
+            horseName: item.horse.name || '',
             requestMessage: item.requestMessage || '',
           };
         });
@@ -182,7 +235,13 @@ export default function JockeyInvite() {
     };
 
     fetchInvitations();
-  }, [filterStatus, filterHorseId, refreshTrigger]);
+  }, [refreshTrigger]);
+
+  useEffect(() => {
+    const refreshOnFocus = () => setRefreshTrigger((current) => current + 1);
+    window.addEventListener('focus', refreshOnFocus);
+    return () => window.removeEventListener('focus', refreshOnFocus);
+  }, []);
 
   const handleSendInvitation = async () => {
     setError('');
@@ -205,6 +264,25 @@ export default function JockeyInvite() {
       return;
     }
 
+    const currentState = getJockeyInviteState(
+      selectedJockeyId,
+      selectedTournamentId,
+      selectedHorseId,
+      invitations,
+    );
+    if (currentState.action === 'invited') {
+      setError('Lời mời cho Jockey và ngựa này đã được gửi trước đó.');
+      return;
+    }
+    if (currentState.action === 'confirm') {
+      setError('Jockey đã chấp nhận. Vui lòng xác nhận ghép cặp thay vì gửi lời mời mới.');
+      return;
+    }
+    if (currentState.action === 'paired') {
+      setError('Jockey và ngựa này đã được ghép cặp.');
+      return;
+    }
+
     // ── Build payload — all IDs as number ──────────────────────────────────────
     const payload = {
       tournamentId: selectedTournamentId,
@@ -222,21 +300,23 @@ export default function JockeyInvite() {
       // ── Success: reset form, close modal, refresh list, switch tab ────────────
       setJockeyName('');
       setSelectedJockeyId('');
+      setSelectedContextHorseId(String(payload.horseId));
       setSelectedHorseId('');
       setRequestMessage('');
       setShowModal(false);
       setRefreshTrigger((prev) => prev + 1);
       setActiveTab('history');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('POST /api/pairings failed:', err);
       // Surface real backend message (apiFetch throws Error with BE message)
-      const msg = err?.message || err?.response?.data?.message || 'Đã xảy ra lỗi khi gửi lời mời. Vui lòng thử lại.';
+      const msg = err instanceof Error
+        ? err.message
+        : 'Đã xảy ra lỗi khi gửi lời mời. Vui lòng thử lại.';
       setError(msg);
     } finally {
       setSending(false);
     }
   };
-
 
   const handleConfirmPairing = async (invitationID: string) => {
     setConfirmError(null);
@@ -253,9 +333,13 @@ export default function JockeyInvite() {
       );
       // Also trigger a full refetch to sync with backend
       setRefreshTrigger((prev) => prev + 1);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to confirm pairing:', err);
-      setConfirmError(err?.message || 'Đã xảy ra lỗi khi xác nhận ghép cặp. Vui lòng thử lại.');
+      setConfirmError(
+        err instanceof Error
+          ? err.message
+          : 'Đã xảy ra lỗi khi xác nhận ghép cặp. Vui lòng thử lại.'
+      );
     } finally {
       setConfirmingId(null);
     }
@@ -284,6 +368,21 @@ export default function JockeyInvite() {
     }
   };
 
+  const handleAvailableAction = (
+    action: JockeyInviteAction,
+    jockey: AvailableJockey,
+    pairing?: JockeyInvitation,
+  ) => {
+    if (action === 'confirm' && pairing) {
+      void handleConfirmPairing(pairing.invitationID);
+      return;
+    }
+
+    if (action === 'invite' || action === 'reinvite') {
+      openInviteModal(String(jockey.jockeyId), jockey.fullName);
+    }
+  };
+
   // Main Render
   return (
     <div>
@@ -294,11 +393,7 @@ export default function JockeyInvite() {
           <p className="text-base text-slate-500 mt-2">Quản lý lời mời và tìm kỵ sĩ khả dụng</p>
         </div>
         <button
-          onClick={() => {
-            setSelectedJockeyId('');
-            setJockeyName('');
-            setShowModal(true);
-          }}
+          onClick={() => openInviteModal()}
           className="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-full transition-colors"
         >
           + Gửi lời mời mới
@@ -314,7 +409,10 @@ export default function JockeyInvite() {
           ].map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key as 'available' | 'history')}
+              onClick={() => {
+                setActiveTab(tab.key as 'available' | 'history');
+                setRefreshTrigger((current) => current + 1);
+              }}
               className={`px-4 py-2.5 text-sm font-semibold transition-all border-b-2 -mb-px ${
                 activeTab === tab.key
                   ? 'border-blue-600 text-blue-600'
@@ -352,6 +450,25 @@ export default function JockeyInvite() {
                 ))}
               </select>
             )}
+            {selectedTournamentId && (
+              <>
+                <label className="ml-0 text-xs font-semibold text-gray-500 whitespace-nowrap sm:ml-4">Ngựa:</label>
+                <select
+                  value={selectedContextHorseId}
+                  onChange={(event) => setSelectedContextHorseId(event.target.value)}
+                  disabled={loadingHorses || eligibleHorses.length === 0}
+                  className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white disabled:bg-gray-100"
+                  aria-label="Chọn ngựa để đối chiếu lời mời"
+                >
+                  {eligibleHorses.length === 0 ? (
+                    <option value="">Không có ngựa đủ điều kiện</option>
+                  ) : eligibleHorses.map((horse) => {
+                    const horseId = String(horse.horseID || horse.horseId || '');
+                    return <option key={horseId} value={horseId}>{horse.name}</option>;
+                  })}
+                </select>
+              </>
+            )}
           </div>
 
           <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden">
@@ -382,11 +499,25 @@ export default function JockeyInvite() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {availableJockeys.map((j) => {
-                    const jId = String(j.jockeyId || j.jockeyID || j.id || '');
+                    const jId = String(j.jockeyId);
+                    const inviteState = getJockeyInviteState(
+                      jId,
+                      selectedTournamentId,
+                      selectedContextHorseId,
+                      invitations,
+                    );
+                    const presentation = ACTION_PRESENTATION[inviteState.action];
+                    const isConfirmingThisPairing = inviteState.pairing?.invitationID === confirmingId;
+                    const disabled = presentation.disabled || isConfirmingThisPairing || !selectedContextHorseId;
                     return (
                       <tr key={jId} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3 font-medium text-gray-800">{j.fullName || 'N/A'}</td>
-                        <td className="px-4 py-3 text-gray-600">{j.licenseCertificate || 'N/A'}</td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center gap-1 rounded border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+                            <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                            Đã xác thực
+                          </span>
+                        </td>
                         <td className="px-4 py-3 text-gray-600">{j.experienceYears || 0} năm</td>
                         <td className="px-4 py-3">
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded border ${
@@ -400,14 +531,13 @@ export default function JockeyInvite() {
                         </td>
                         <td className="px-4 py-3">
                           <button
-                            onClick={() => {
-                              setSelectedJockeyId(jId);
-                              setJockeyName(j.fullName || '');
-                              setShowModal(true);
-                            }}
-                            className="px-3.5 py-2 text-xs font-bold text-blue-700 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-full transition-colors"
+                            type="button"
+                            onClick={() => handleAvailableAction(inviteState.action, j, inviteState.pairing)}
+                            disabled={disabled}
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${presentation.cls}`}
                           >
-                            Mời tham gia
+                            {isConfirmingThisPairing && <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />}
+                            {isConfirmingThisPairing ? 'Đang xác nhận...' : presentation.label}
                           </button>
                         </td>
                       </tr>
@@ -433,7 +563,7 @@ export default function JockeyInvite() {
               >
                 <option value="">Tất cả ngựa</option>
                 {horses.map((h) => {
-                  const hId = String(h.horseID || (h as any).id || (h as any).horseId || '');
+                  const hId = String(h.horseID || h.horseId || '');
                   return (
                     <option key={hId} value={hId}>
                       {h.name} (ID: {hId})
@@ -530,33 +660,20 @@ export default function JockeyInvite() {
                                 disabled
                                 className="inline-flex cursor-not-allowed items-center whitespace-nowrap rounded-full border border-gray-200 bg-gray-100 px-3.5 py-2 text-xs font-bold text-gray-500"
                               >
-                                Xác nhận ghép cặp
+                                Đã ghép cặp
                               </button>
-                            ) : invitation.status === 'Cancelled' ? (
+                            ) : invitation.status === 'Cancelled' || invitation.status === 'Declined' || invitation.status === 'Rejected' || invitation.status === 'Expired' ? (
                               <button
                                 type="button"
-                                disabled
-                                className="inline-flex cursor-not-allowed items-center whitespace-nowrap rounded-full border border-gray-200 bg-gray-100 px-3.5 py-2 text-xs font-bold text-gray-500"
+                                onClick={() => {
+                                  setSelectedTournamentId(invitation.tournamentID);
+                                  setSelectedContextHorseId(invitation.horseID || '');
+                                  openInviteModal(invitation.jockeyID, invitation.jockeyName || '', invitation.horseID || '');
+                                }}
+                                className="inline-flex items-center whitespace-nowrap rounded-full border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100"
                               >
-                                Hủy lời mời
+                                Mời lại
                               </button>
-                            ) : invitation.status === 'Declined' ? (
-                              <div className="flex flex-wrap items-center gap-2">
-                                <button
-                                  type="button"
-                                  disabled
-                                  className="inline-flex cursor-not-allowed items-center whitespace-nowrap rounded-full border border-gray-200 bg-gray-100 px-3.5 py-2 text-xs font-bold text-gray-500"
-                                >
-                                  Xác nhận ghép cặp
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled
-                                  className="inline-flex cursor-not-allowed items-center whitespace-nowrap rounded-full border border-gray-200 bg-gray-100 px-3.5 py-2 text-xs font-bold text-gray-500"
-                                >
-                                  Hủy lời mời
-                                </button>
-                              </div>
                             ) : invitation.status === 'Accepted' || canCancel ? (
                               <div className="flex flex-wrap items-center gap-2">
                                 {invitation.status === 'Accepted' && (
@@ -601,21 +718,28 @@ export default function JockeyInvite() {
 
       {/* Send Invitation Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-lg">
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-40 cursor-default bg-black/40"
+            onClick={closeInviteModal}
+            aria-label="Đóng modal gửi lời mời"
+          />
+          <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="invite-jockey-title"
+              className="pointer-events-auto max-h-[calc(100vh-2rem)] w-full max-w-lg overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-xl"
+            >
             {/* Modal header */}
             <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-base font-bold text-gray-900">Gửi lời mời cho jockey</h3>
+              <h3 id="invite-jockey-title" className="text-base font-bold text-gray-900">Gửi lời mời cho jockey</h3>
               <button
-                onClick={() => {
-                  setShowModal(false);
-                  setError('');
-                  setJockeyName('');
-                  setSelectedJockeyId('');
-                  setSelectedHorseId('');
-                  setRequestMessage('');
-                }}
+                type="button"
+                onClick={closeInviteModal}
                 className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                aria-label="Đóng modal"
               >
                 ×
               </button>
@@ -644,10 +768,10 @@ export default function JockeyInvite() {
                       const targetId = e.target.value;
                       setSelectedJockeyId(targetId);
                       const jockeyObj = availableJockeys.find(j =>
-                        String(j.jockeyId || j.jockeyID || j.id) === targetId
+                        String(j.jockeyId) === targetId
                       );
                       if (jockeyObj) {
-                        setJockeyName(jockeyObj.fullName || jockeyObj.jockeyName || jockeyObj.name || '');
+                        setJockeyName(jockeyObj.fullName || '');
                       } else {
                         setJockeyName('');
                       }
@@ -656,9 +780,9 @@ export default function JockeyInvite() {
                   >
                     <option value="">— Chọn Jockey —</option>
                     {availableJockeys.map((j) => {
-                      const idVal = String(j.jockeyId || j.jockeyID || j.id || '');
-                      const nameVal = j.fullName || j.name || j.jockeyName || 'Jockey không tên';
-                      const licVal = j.licenseCertificate || j.licenseNumber ? ` (GPLX: ${j.licenseCertificate || j.licenseNumber})` : '';
+                      const idVal = String(j.jockeyId);
+                      const nameVal = j.fullName || 'Jockey không tên';
+                      const licVal = ' (Chứng chỉ: Đã xác thực)';
                       const expVal = j.experienceYears ? ` - ${j.experienceYears} năm KN` : '';
                       return (
                         <option key={idVal} value={idVal}>
@@ -702,7 +826,7 @@ export default function JockeyInvite() {
                   >
                     <option value="">— Chọn Ngựa —</option>
                     {eligibleHorses.map((h) => {
-                      const hId = h.horseID || (h as any).id || (h as any).horseId || '';
+                      const hId = h.horseID || h.horseId || '';
                       return (
                         <option key={hId} value={hId}>
                           {h.name} (ID: {hId})
@@ -736,20 +860,15 @@ export default function JockeyInvite() {
             {/* Modal footer */}
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3 rounded-b-xl">
               <button
-                onClick={() => {
-                  setShowModal(false);
-                  setError('');
-                  setJockeyName('');
-                  setSelectedJockeyId('');
-                  setSelectedHorseId('');
-                  setRequestMessage('');
-                }}
+                type="button"
+                onClick={closeInviteModal}
                 disabled={sending}
                 className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-white transition-colors disabled:opacity-50"
               >
                 Hủy
               </button>
               <button
+                type="button"
                 onClick={handleSendInvitation}
                 disabled={sending}
                 className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
@@ -760,8 +879,9 @@ export default function JockeyInvite() {
                 {sending ? 'Đang gửi...' : 'Gửi lời mời'}
               </button>
             </div>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

@@ -16,9 +16,12 @@ namespace HRTMS.Infrastructure.Services
         private readonly IAuditLogService _auditLog;
         private readonly INotificationService _notificationService; // FIX #7
 
-        // Thưởng dự đoán Win cố định 200 điểm (quyết định nhóm 2026-07-11, PRD.1):
-        // KHÔNG cấu hình theo Tournament — schema v2 đã bỏ cột PredictionRewardPoints.
-        private const int PredictionWinRewardPoints = 200;
+        // Thưởng dự đoán Win = PointsPlaced * multiplier (thay cho mức cố định 200
+        // trước đây, vốn khiến số điểm đặt cược không ảnh hưởng gì đến phần thưởng
+        // — đặt 10 hay 10000 điểm khi thắng đều nhận y hệt nhau). Multiplier x2
+        // giữ đúng tinh thần "thắng thì lãi gấp đôi", đơn giản, dễ hiểu, không cần
+        // đổi schema hay thêm cấu hình theo Tournament.
+        private const decimal PredictionWinMultiplier = 2.0m;
 
         public ResultService(HRTMSDbContext context, IAuditLogService auditLog, INotificationService notificationService)
         {
@@ -36,6 +39,7 @@ namespace HRTMS.Infrastructure.Services
                 .Include(r => r.Round).ThenInclude(rd => rd.Tournament)
                 .Include(r => r.RaceReport)
                 .Include(r => r.RaceEntries)
+                    .ThenInclude(re => re.ViolationRaceEntries)
                 .Where(r => r.Status == "Unofficial");
 
             if (tournamentId.HasValue)
@@ -46,14 +50,6 @@ namespace HRTMS.Infrastructure.Services
 
             // FIX J1: load hết dữ liệu phụ trợ 1 lần (thay vì 2 query/race trong vòng lặp),
             // rồi xử lý ở memory — cùng pattern với Module L (LeaderboardService).
-            var raceIds = races.Select(r => r.RaceId).ToList();
-            var racesWithPendingProtests = await _context.Protests
-                .Where(p => raceIds.Contains(p.RaceId) && p.Status == "Pending")
-                .Select(p => p.RaceId)
-                .Distinct()
-                .ToListAsync();
-            var pendingProtestRaceIds = racesWithPendingProtests.ToHashSet();
-
             var tournamentIds = races.Select(r => r.Round.TournamentId).Distinct().ToList();
             var allDistributions = await _context.PrizeDistributions
                 .Where(pd => tournamentIds.Contains(pd.TournamentId))
@@ -66,14 +62,9 @@ namespace HRTMS.Infrastructure.Services
 
             foreach (var race in races)
             {
-                var hasPendingProtests = pendingProtestRaceIds.Contains(race.RaceId);
-
                 var prizeOk = validTournamentIds.Contains(race.Round.TournamentId);
                 var rankingOk = IsRankingIntegrityValid(race.RaceEntries);
                 var weighOutOk = IsPostRaceWeighInComplete(race.RaceEntries);
-                var protestDeadline = ProtestWindowPolicy.GetDeadline(race);
-                var protestWindowClosed = ProtestWindowPolicy.IsClosed(race, DateTime.UtcNow);
-
                 result.Add(new UnofficialRaceListItemDto
                 {
                     RaceId = race.RaceId,
@@ -84,12 +75,9 @@ namespace HRTMS.Infrastructure.Services
                     ScheduledTime = race.ScheduledTime,
                     HasRaceReport = race.RaceReport != null,
                     IsRaceReportLocked = race.RaceReport?.IsLocked ?? false,
-                    HasPendingProtests = hasPendingProtests,
                     PrizeDistributionsConfigured = prizeOk,
                     RankingIntegrityValid = rankingOk,
                     PostRaceWeighInComplete = weighOutOk,
-                    ProtestWindowClosed = protestWindowClosed,
-                    ProtestDeadlineAt = protestDeadline
                 });
             }
 
@@ -111,6 +99,7 @@ namespace HRTMS.Infrastructure.Services
                 .Include(r => r.RaceReport)
                 .Include(r => r.RaceEntries).ThenInclude(re => re.Pairing).ThenInclude(p => p.Horse)
                 .Include(r => r.RaceEntries).ThenInclude(re => re.Pairing).ThenInclude(p => p.Jockey)
+                .Include(r => r.RaceEntries).ThenInclude(re => re.ViolationRaceEntries)
                 .Include(r => r.Predictions)
                 .FirstOrDefaultAsync(r => r.RaceId == raceId)
                 ?? throw new KeyNotFoundException($"Không tìm thấy cuộc đua #{raceId}.");
@@ -131,12 +120,6 @@ namespace HRTMS.Infrastructure.Services
             if (race.RaceReport.IsLocked)
                 throw new InvalidOperationException("Biên bản thi đấu đã bị khóa từ trước");
 
-            var hasPendingProtests = await _context.Protests
-                .AnyAsync(p => p.RaceId == raceId && p.Status == "Pending");
-            if (hasPendingProtests)
-                throw new InvalidOperationException(
-                    "Còn khiếu nại chưa xử lý xong nên chưa thể công bố kết quả chính thức.");
-
             if (!await IsPrizeDistributionsValidAsync(race.Round.TournamentId))
                 throw new InvalidOperationException(
                     "Giải chưa cấu hình đủ tỷ lệ chia thưởng (tổng phải đạt 100%).");
@@ -149,16 +132,6 @@ namespace HRTMS.Infrastructure.Services
             if (!IsPostRaceWeighInComplete(race.RaceEntries))
                 throw new InvalidOperationException(
                     "Còn cặp đấu chưa được cân sau đua.");
-
-            // Đối xứng với ProtestService.EnsureSubmissionWindowOpen: Owner/Jockey
-            // còn quyền nộp Protest tới khi hết ProtestDeadlineMinutes, nên Admin
-            // không được Declare Official sớm hơn mốc đó (tránh khóa RaceReport
-            // và tước quyền khiếu nại của họ).
-            if (!ProtestWindowPolicy.IsClosed(race, DateTime.UtcNow))
-                throw new InvalidOperationException(
-                    $"Cửa sổ khiếu nại vẫn còn hiệu lực đến " +
-                    $"{ProtestWindowPolicy.GetDeadline(race):yyyy-MM-dd HH:mm} UTC, " +
-                    "chưa thể công bố kết quả chính thức.");
 
             // ---------------------------------------------------------------
             // ACID TRANSACTION — 6 BƯỚC
@@ -200,7 +173,7 @@ namespace HRTMS.Infrastructure.Services
 
                 await _auditLog.LogAsync(
                     actorId: adminUserId,
-                    action: "Declare_Official",
+                    action: "Công bố kết quả chính thức",
                     entityName: "Race",
                     entityId: race.RaceId.ToString(),
                     oldValue: "Unofficial",
@@ -255,6 +228,7 @@ namespace HRTMS.Infrastructure.Services
                 var finishers = race.RaceEntries
                     .Where(re => re.Status != "Cancelled" &&
                                  re.Status != "Disqualified" &&
+                                 !re.ViolationRaceEntries.Any(v => v.ViolationCode == "DNF-001" && v.Penalty == "Scratch") &&
                                  re.FinishPosition != null)
                     .ToList();
 
@@ -320,9 +294,6 @@ namespace HRTMS.Infrastructure.Services
 
             int settled = 0, refunded = 0;
 
-            // Schema v2 đã bỏ Tournament.PredictionRewardPoints → dùng hằng số chuẩn (+200).
-            var rewardPoints = PredictionWinRewardPoints;
-
             // Tập ngựa về Nhất chính thức — cho phép đồng hạng
             var winningEntryIds = race.RaceEntries
                 .Where(re => re.FinishPosition == 1 && re.Status != "Cancelled" && re.Status != "Disqualified")
@@ -351,6 +322,11 @@ namespace HRTMS.Infrastructure.Services
 
                 if (winningEntryIds.Contains(pred.RaceEntryId))
                 {
+                    // Thưởng theo đúng số điểm người đó đã đặt, không phải mức cố định
+                    // chung cho mọi người — ai đặt nhiều rủi ro hơn thì thắng nhiều hơn.
+                    var rewardPoints = (int)Math.Round(
+                        pred.PointsPlaced * PredictionWinMultiplier, MidpointRounding.AwayFromZero);
+
                     pred.Status = "Won";
                     pred.PointsAwarded = rewardPoints;
                     rewardBySpectator[pred.SpectatorId] =
@@ -381,11 +357,14 @@ namespace HRTMS.Infrastructure.Services
                 .Except(winnerIds)
                 .ToList();
 
-            if (winnerIds.Count > 0)
-                await _notificationService.SendBulkAsync(
-                    recipientIds: winnerIds,
-                    title: "Dự đoán thắng! 🎉",
-                    message: $"Bạn dự đoán đúng kết quả cuộc đua #{race.RaceNumber}. Bạn được cộng {rewardPoints} điểm vào ví.",
+            // Mỗi Spectator thắng nhận số điểm khác nhau (tỷ lệ theo mức đặt cược),
+            // nên không thể gộp chung 1 message qua SendBulkAsync như trước nữa —
+            // gửi riêng từng người kèm đúng số điểm họ thực nhận.
+            foreach (var (spectatorId, amount) in rewardBySpectator)
+                await _notificationService.SendAsync(
+                    spectatorId,
+                    "Dự đoán thắng! 🎉",
+                    $"Bạn dự đoán đúng kết quả cuộc đua #{race.RaceNumber}. Bạn được cộng {amount} điểm vào ví.",
                     type: "Both",
                     relatedEntityType: "Race",
                     relatedEntityId: race.RaceId);
@@ -460,7 +439,7 @@ namespace HRTMS.Infrastructure.Services
         {
             foreach (var entry in entries)
             {
-                if (entry.Status == "Cancelled" || entry.Status == "Disqualified" || entry.FinishPosition == null)
+                if (entry.Status == "Cancelled" || entry.Status == "Disqualified" || entry.ViolationRaceEntries.Any(v => v.ViolationCode == "DNF-001" && v.Penalty == "Scratch") || entry.FinishPosition == null)
                     continue;
 
                 entry.PointsAwarded = entry.FinishPosition switch
@@ -487,7 +466,7 @@ namespace HRTMS.Infrastructure.Services
 
             // Nhóm theo FinishPosition để xử lý đồng hạng
             var finishersByPosition = race.RaceEntries
-                .Where(re => re.Status != "Cancelled" && re.Status != "Disqualified" && re.FinishPosition != null)
+                .Where(re => re.Status != "Cancelled" && re.Status != "Disqualified" && !re.ViolationRaceEntries.Any(v => v.ViolationCode == "DNF-001" && v.Penalty == "Scratch") && re.FinishPosition != null)
                 .GroupBy(re => re.FinishPosition!.Value)
                 .OrderBy(g => g.Key)
                 .ToList();
@@ -601,7 +580,7 @@ namespace HRTMS.Infrastructure.Services
         private static bool IsRankingIntegrityValid(IEnumerable<RaceEntry> entries)
         {
             var positions = entries
-                .Where(re => re.Status != "Cancelled" && re.Status != "Disqualified")
+                .Where(re => re.Status != "Cancelled" && re.Status != "Disqualified" && !re.ViolationRaceEntries.Any(v => v.ViolationCode == "DNF-001" && v.Penalty == "Scratch"))
                 .Select(re => re.FinishPosition)
                 .ToList();
 
@@ -628,7 +607,7 @@ namespace HRTMS.Infrastructure.Services
         private static bool IsPostRaceWeighInComplete(IEnumerable<RaceEntry> entries)
         {
             return entries
-                .Where(re => re.Status != "Cancelled" && re.Status != "Disqualified")
+                .Where(re => re.Status != "Cancelled" && re.Status != "Disqualified" && !re.ViolationRaceEntries.Any(v => v.ViolationCode == "DNF-001" && v.Penalty == "Scratch"))
                 .All(re => re.PostRaceJockeyWeight != null);
         }
     }

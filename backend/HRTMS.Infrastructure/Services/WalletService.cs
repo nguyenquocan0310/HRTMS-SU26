@@ -32,19 +32,6 @@ public class WalletService : IWalletService
     public async Task<ApiResponse<RedeemTicketCodeResponseDto>> RedeemTicketCodeAsync(
         int spectatorId, RedeemTicketCodeDto dto, string? ipAddress)
     {
-        // ACC.1.2: Spectator đăng ký tối giản, nhưng khi redeem ticket code (nhận
-        // reward) phải bổ sung đủ phone + CCCD. Đọc từ Users (spectatorId lấy từ JWT
-        // claim ở controller, không tin request param) — cùng pattern check identity
-        // với TournamentParticipantService (Module A của Hào chưa có helper riêng;
-        // khi có IIdentityCompletenessChecker thì thay đoạn này bằng helper đó).
-        var identityComplete = await _context.Users.AnyAsync(u =>
-            u.UserId == spectatorId &&
-            u.PhoneNumber != null &&
-            u.IdentityHash != null);
-        if (!identityComplete)
-            return ApiResponse<RedeemTicketCodeResponseDto>.Fail(
-                "Bạn cần bổ sung số điện thoại và số CCCD trong hồ sơ trước khi đổi mã vé thưởng.");
-
         var rawCode = dto.Code.Trim();
         var now = DateTime.UtcNow;
 
@@ -112,7 +99,7 @@ public class WalletService : IWalletService
 
             await _auditLog.LogAsync(
                 actorId: spectatorId,
-                action: "RedeemTicketCode",
+                action: "Đổi mã thưởng lấy điểm",
                 entityName: "TicketRewardCode",
                 entityId: code.TicketRewardCodeId.ToString(),
                 newValue: $"+{code.PointAmount}",
@@ -182,7 +169,7 @@ public class WalletService : IWalletService
         // Audit: KHÔNG ghi raw code, chỉ ghi metadata batch.
         await _auditLog.LogAsync(
             actorId: adminId,
-            action: "CreateTicketCodes",
+            action: "Tạo lô mã thưởng mới",
             entityName: "TicketRewardCode",
             entityId: "batch",
             newValue: $"count={dto.Quantity};reward={dto.RewardAmount};expiresAt={dto.ExpiresAt:o}",

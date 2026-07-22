@@ -51,7 +51,7 @@ public class PredictionService : IPredictionService
 
         await _auditLog.LogAsync(
             actorId: adminId,
-            action: dto.IsPredictionGateClosed ? "ClosePredictionGate" : "OpenPredictionGate",
+            action: dto.IsPredictionGateClosed ? "Đóng cổng dự đoán" : "Mở cổng dự đoán",
             entityName: "Races",
             entityId: race.RaceId.ToString(),
             ipAddress: ipAddress
@@ -300,7 +300,7 @@ public class PredictionService : IPredictionService
 
             await _auditLog.LogAsync(
                 actorId: spectatorId,
-                action: "PlacePrediction",
+                action: "Đặt dự đoán kết quả",
                 entityName: "Predictions",
                 entityId: prediction.PredictionId.ToString(),
                 ipAddress: ipAddress

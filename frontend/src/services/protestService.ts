@@ -109,3 +109,17 @@ export const ruleProtest = async (
   });
   return unwrap(response, onMessage);
 };
+
+export const closeProtestWindow = async (
+  raceId: string | number,
+  onMessage?: MessageHandler
+): Promise<void> => {
+  const id = positiveId(raceId, 'raceId');
+  const response = await apiFetch<ApiResponse<unknown>>(`/protests/races/${id}/close-window`, {
+    method: 'POST',
+  });
+  if (!response.success) {
+    throw new Error(response.message || 'Không thể đóng cửa sổ khiếu nại.');
+  }
+  onMessage?.(response.message);
+};

@@ -13,10 +13,14 @@ namespace HRTMS.Core.DTOs.Tournament
     {
         [MaxLength(200)]
         public string? Name { get; set; }
+        [MaxLength(4000, ErrorMessage = "Mô tả giải đấu tối đa 4000 ký tự.")]
         public string? Description { get; set; }
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
         public int? MaxHorses { get; set; }
+        // Sân đua (patch 012). Đổi sân bị khóa khi giải đã Open Registration —
+        // số làn của sân quyết định sức chứa mà enrollment đã được xét theo.
+        public int? VenueId { get; set; }
         public string? AllowedBreed { get; set; }
         public string? TrackType { get; set; }
         public int? RaceDistance { get; set; }
@@ -24,6 +28,16 @@ namespace HRTMS.Core.DTOs.Tournament
         public int? MinJockeyExperienceYears { get; set; }
         public decimal? PurseAmount { get; set; }
         public decimal? EntryFeeAmount { get; set; }
+
+        // Deadline lệ phí (patch 013). Chỉ sửa được khi giải còn Draft/Open
+        // Registration VÀ chưa qua PaymentDeadline hiện tại (job đã chạy thì khóa).
+        public DateTime? PaymentDeadline { get; set; }
+
+        // Gửi RefundDeadline = null KHÔNG xóa được giá trị cũ (không phân biệt được
+        // "không gửi" với "gửi null") — dùng ClearRefundDeadline = true để bỏ hoàn phí.
+        public DateTime? RefundDeadline { get; set; }
+
+        public bool ClearRefundDeadline { get; set; }
         public decimal? PreRaceWeightThresholdKg { get; set; }
         public decimal? PostRaceWeightDiffThresholdKg { get; set; }
 

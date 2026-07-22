@@ -18,6 +18,7 @@ public static class ViolationCodeCatalog
         new() { Code = "FALSE-001", Name = "False start", Description = "Xuất phát sai hoặc gây xuất phát lại." },
         new() { Code = "GEAR-001", Name = "Unsafe equipment", Description = "Trang thiết bị không an toàn hoặc không đúng quy định." },
         new() { Code = "WEIGHT-001", Name = "Weight irregularity", Description = "Sai lệch cân nặng cần trọng tài xem xét." },
+        new() { Code = "DNF-001", Name = "Did not finish", Description = "Ngựa đã xuất phát nhưng bỏ cuộc trong lúc race Live." },
         new() { Code = "CONDUCT-001", Name = "Dangerous riding", Description = "Điều khiển ngựa nguy hiểm hoặc phi thể thao." }
     };
 

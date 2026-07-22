@@ -72,6 +72,8 @@ import SpectatorProfile from './pages/spectator/SpectatorProfile'
 import RaceOperations from './pages/admin/RaceOperation'
 import RaceList from './pages/admin/RaceList'
 import EntryFees from './pages/admin/EntryFees'
+import Venues from './pages/admin/Venues'
+import PostPositionDraw from './pages/admin/PostPositionDraw'
 
 // ── Placeholder Admin ──
 
@@ -213,6 +215,8 @@ export default function App() {
           <Route path="race-operations" element={<RaceOperations />} />
           <Route path="race-list" element={<RaceList />} />
           <Route path="entry-fees" element={<EntryFees />} />
+          <Route path="venues" element={<Venues />} />
+          <Route path="post-position-draw" element={<PostPositionDraw />} />
           <Route
   path="purse-payouts"
   element={<PursePayouts />}

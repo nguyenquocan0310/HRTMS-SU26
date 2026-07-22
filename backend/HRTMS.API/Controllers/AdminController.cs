@@ -88,7 +88,7 @@ public class AdminController : ControllerBase
 
         await _auditLogService.LogAsync(
             actorId: CurrentAdminId,
-            action: "Suspend_User",
+            action: "Tạm ngưng tài khoản",
             entityName: "User",
             entityId: user.UserId.ToString(),
             oldValue: oldStatus,
@@ -129,7 +129,7 @@ public class AdminController : ControllerBase
 
         await _auditLogService.LogAsync(
             actorId: CurrentAdminId,
-            action: "Activate_User",
+            action: "Kích hoạt tài khoản",
             entityName: "User",
             entityId: user.UserId.ToString(),
             oldValue: oldStatus,
@@ -175,7 +175,7 @@ public class AdminController : ControllerBase
 
         await _auditLogService.LogAsync(
             actorId: CurrentAdminId,
-            action: "Approve_Referee",
+            action: "Duyệt hồ sơ trọng tài",
             entityName: "RefereeProfile",
             entityId: profile.RefereeId.ToString(),
             oldValue: $"RefereeProfile.Status={oldProfileStatus}, User.Status={oldUserStatus}",
@@ -224,7 +224,7 @@ public class AdminController : ControllerBase
 
         await _auditLogService.LogAsync(
             actorId: CurrentAdminId,
-            action: "Reject_Referee",
+            action: "Từ chối hồ sơ trọng tài",
             entityName: "RefereeProfile",
             entityId: profile.RefereeId.ToString(),
             oldValue: $"RefereeProfile.Status={oldProfileStatus}, User.Status={oldUserStatus}",
@@ -270,7 +270,7 @@ public class AdminController : ControllerBase
 
         await _auditLogService.LogAsync(
             actorId: CurrentAdminId,
-            action: "Approve_Doctor",
+            action: "Duyệt hồ sơ bác sĩ",
             entityName: "DoctorProfile",
             entityId: profile.DoctorId.ToString(),
             oldValue: $"DoctorProfile.Status={oldProfileStatus}, User.Status={oldUserStatus}",
@@ -319,7 +319,7 @@ public class AdminController : ControllerBase
 
         await _auditLogService.LogAsync(
             actorId: CurrentAdminId,
-            action: "Reject_Doctor",
+            action: "Từ chối hồ sơ bác sĩ",
             entityName: "DoctorProfile",
             entityId: profile.DoctorId.ToString(),
             oldValue: $"DoctorProfile.Status={oldProfileStatus}, User.Status={oldUserStatus}",
@@ -394,7 +394,7 @@ public class AdminController : ControllerBase
 
         await _auditLogService.LogAsync(
             actorId: CurrentAdminId,
-            action: "Approve_Jockey",
+            action: "Duyệt hồ sơ nài ngựa",
             entityName: "JockeyProfile",
             entityId: profile.JockeyId.ToString(),
             oldValue: $"JockeyProfile.Status={oldProfileStatus}, User.Status={oldUserStatus}",
@@ -443,7 +443,7 @@ public class AdminController : ControllerBase
 
         await _auditLogService.LogAsync(
             actorId: CurrentAdminId,
-            action: "Reject_Jockey",
+            action: "Từ chối hồ sơ nài ngựa",
             entityName: "JockeyProfile",
             entityId: profile.JockeyId.ToString(),
             oldValue: $"JockeyProfile.Status={oldProfileStatus}, User.Status={oldUserStatus}",
@@ -473,6 +473,8 @@ public class AdminController : ControllerBase
                 u.Username,
                 u.FullName,
                 u.Email,
+                u.PhoneNumber,
+                u.DateOfBirth,
                 u.Role,
                 u.Status,
                 u.FailedLoginAttempts,
@@ -514,6 +516,8 @@ public class AdminController : ControllerBase
                     u.Username,
                     u.FullName,
                     u.Email,
+                    u.PhoneNumber,
+                    u.DateOfBirth,
                     Role = "Referee",
                     ProfileStatus = r.Status,
                     r.CertificationLevel,
@@ -532,6 +536,8 @@ public class AdminController : ControllerBase
                     u.Username,
                     u.FullName,
                     u.Email,
+                    u.PhoneNumber,
+                    u.DateOfBirth,
                     Role = "Doctor",
                     ProfileStatus = d.Status,
                     CertificationLevel = d.MedicalLicenseNumber,
@@ -550,6 +556,8 @@ public class AdminController : ControllerBase
                     u.Username,
                     u.FullName,
                     u.Email,
+                    u.PhoneNumber,
+                    u.DateOfBirth,
                     Role = "Jockey",
                     ProfileStatus = j.Status,
                     CertificationLevel = j.LicenseCertificate,
@@ -565,6 +573,8 @@ public class AdminController : ControllerBase
             r.Username,
             r.FullName,
             r.Email,
+            r.PhoneNumber,
+            r.DateOfBirth,
             r.Role,
             r.ProfileStatus,
             r.CertificationLevel,
@@ -578,6 +588,8 @@ public class AdminController : ControllerBase
             d.Username,
             d.FullName,
             d.Email,
+            d.PhoneNumber,
+            d.DateOfBirth,
             d.Role,
             d.ProfileStatus,
             d.CertificationLevel,
@@ -591,6 +603,8 @@ public class AdminController : ControllerBase
             j.Username,
             j.FullName,
             j.Email,
+            j.PhoneNumber,
+            j.DateOfBirth,
             j.Role,
             j.ProfileStatus,
             j.CertificationLevel,

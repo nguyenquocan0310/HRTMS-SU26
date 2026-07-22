@@ -5,11 +5,18 @@ import {
   createPrediction,
   getPredictionFormScores,
   getPredictionGateStatus,
+  getRaceLiveStatus,
   getSpectatorWallet,
   type PredictionFormScore,
   type PredictionGateStatus,
   type SpectatorWallet,
 } from '../../services/spectatorService'
+
+type PredictionHorse = PredictionFormScore & {
+  raceEntryStatus: string
+  isWithdrawn: boolean
+  isEligibleForPrediction: boolean
+}
 
 export default function PredictionPage() {
   const navigate = useNavigate()
@@ -18,9 +25,9 @@ export default function PredictionPage() {
   const validRaceId = Number.isInteger(raceId) && raceId > 0
   const [wallet, setWallet] = useState<SpectatorWallet | null>(null)
   const [gate, setGate] = useState<PredictionGateStatus | null>(null)
-  const [horses, setHorses] = useState<PredictionFormScore[]>([])
+  const [horses, setHorses] = useState<PredictionHorse[]>([])
   const [selectedEntryId, setSelectedEntryId] = useState<number | null>(null)
-  const [pointsPlaced, setPointsPlaced] = useState(50)
+  const [pointsPlaced, setPointsPlaced] = useState('50')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -44,14 +51,29 @@ export default function PredictionPage() {
     try {
       setLoading(true)
       setError('')
-      const [walletResult, gateResult, scoreResult] = await Promise.all([
+      const [walletResult, gateResult, scoreResult, liveStatusResult] = await Promise.all([
         getSpectatorWallet(),
         getPredictionGateStatus(raceId),
         getPredictionFormScores(raceId),
+        getRaceLiveStatus(raceId),
       ])
+      const liveEntryById = new Map(liveStatusResult.entries.map((entry) => [entry.raceEntryId, entry]))
+      const predictionHorses = scoreResult
+        .map((score): PredictionHorse => {
+          const entry = liveEntryById.get(score.raceEntryId)
+          const raceEntryStatus = entry?.status ?? 'Unavailable'
+          const isWithdrawn = entry?.isWithdrawn ?? true
+          return {
+            ...score,
+            raceEntryStatus,
+            isWithdrawn,
+            isEligibleForPrediction: raceEntryStatus.toLowerCase() === 'confirmed' && !isWithdrawn,
+          }
+        })
+        .sort((left, right) => Number(right.isEligibleForPrediction) - Number(left.isEligibleForPrediction) || right.formScore - left.formScore)
       setWallet(walletResult)
       setGate(gateResult)
-      setHorses(scoreResult)
+      setHorses(predictionHorses)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không tải được dữ liệu dự đoán.')
     } finally {
@@ -96,19 +118,24 @@ export default function PredictionPage() {
   }
 
   useEffect(() => {
-    setSelectedEntryId(null)
-    setMessage('')
-    if (validRaceId) {
-      loadPredictionForm()
-    } else {
-      loadRaceOptions()
-    }
+    const loadId = window.setTimeout(() => {
+      setSelectedEntryId(null)
+      setMessage('')
+      if (validRaceId) {
+        void loadPredictionForm()
+      } else {
+        void loadRaceOptions()
+      }
+    }, 0)
+    return () => window.clearTimeout(loadId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [raceId, validRaceId])
 
   const selectedHorse = useMemo(
     () => horses.find((item) => item.raceEntryId === selectedEntryId) ?? null,
     [horses, selectedEntryId]
   )
+  const selectedHorseIsEligible = Boolean(selectedHorse?.isEligibleForPrediction)
   const balance = wallet?.balance ?? 0
   const canPredict = Boolean(
     gate?.canPredict &&
@@ -116,21 +143,25 @@ export default function PredictionPage() {
     !gate.isPredictionGateClosed &&
     gate.raceStatus.toLowerCase() === 'pre-race'
   )
-  const validPoints = Number.isInteger(pointsPlaced) && pointsPlaced > 0 && pointsPlaced <= balance
-  const canSubmit = canPredict && selectedEntryId != null && validPoints && !submitting
+  const pointsPlacedValue = pointsPlaced === '' ? 0 : Number(pointsPlaced)
+  const validPoints = /^\d+$/.test(pointsPlaced) && Number.isSafeInteger(pointsPlacedValue) && pointsPlacedValue > 0 && pointsPlacedValue <= balance
+  const canSubmit = canPredict && selectedEntryId != null && selectedHorseIsEligible && validPoints && !submitting
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
     if (!canSubmit || selectedEntryId == null) return
-    if (!window.confirm(`Xác nhận đặt ${pointsPlaced} điểm cho ${selectedHorse?.horseName ?? 'ngựa đã chọn'}?`)) return
+    const selectedHorseName = selectedHorse?.horseName ?? 'ngựa đã chọn'
+    if (!window.confirm(`Xác nhận đặt ${pointsPlacedValue} điểm cho ${selectedHorseName}?`)) return
     try {
       setSubmitting(true)
       setError('')
       setMessage('')
-      const result = await createPrediction({ raceId, raceEntryId: selectedEntryId, pointsPlaced })
-      setMessage(`Đã gửi dự đoán thành công. Số dư còn lại: ${result.walletBalanceAfter.toLocaleString('vi-VN')} điểm.`)
-      setWallet(await getSpectatorWallet())
+      const result = await createPrediction({ raceId, raceEntryId: selectedEntryId, pointsPlaced: pointsPlacedValue })
+      setMessage(`Đã đặt ${pointsPlacedValue.toLocaleString('vi-VN')} điểm cho ${selectedHorseName} thành công. Số dư còn lại: ${result.walletBalanceAfter.toLocaleString('vi-VN')} điểm.`)
+      setWallet((current) => current ? { ...current, balance: result.walletBalanceAfter } : current)
       setSelectedEntryId(null)
+      setPointsPlaced('')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không thể gửi dự đoán.')
     } finally {
@@ -146,7 +177,7 @@ export default function PredictionPage() {
       </header>
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-      {message && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</div>}
+      {message && <div className="flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 sm:flex-row sm:items-center sm:justify-between"><span>{message}</span><button type="button" onClick={() => navigate('/spectator/my-predictions')} className="shrink-0 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-100">Xem lịch sử dự đoán</button></div>}
 
       {loading ? (
         <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center text-sm text-gray-500">Đang tải dữ liệu dự đoán...</div>
@@ -232,18 +263,25 @@ export default function PredictionPage() {
           )}
 
           <section className="space-y-4">
-            <div><h2 className="text-xl font-bold text-gray-900">Chọn ngựa</h2><p className="text-sm text-gray-500">Form score chỉ là dữ liệu tham khảo.</p></div>
+            <div><h2 className="text-xl font-bold text-gray-900">Chọn ngựa</h2><p className="text-sm text-gray-500">Điểm phong độ (Form Score) từ 0–100: 40% lịch sử ngựa, 35% lịch sử jockey và 25% kết quả theo loại vòng. Chưa có lịch sử thì điểm bằng 0; đây không phải số điểm đã cược.</p></div>
             {horses.length === 0 ? (
               <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-500">Chưa có ngựa đủ điều kiện để dự đoán.</div>
             ) : (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {horses.map((horse) => {
                   const selected = selectedEntryId === horse.raceEntryId
+                  const eligible = horse.isEligibleForPrediction && !horse.isWithdrawn && horse.raceEntryStatus.toLowerCase() === 'confirmed'
+                  const unavailableLabel = horse.raceEntryStatus.toLowerCase() === 'disqualified'
+                    ? 'Đã loại'
+                    : horse.isWithdrawn || horse.raceEntryStatus.toLowerCase() === 'cancelled'
+                      ? 'Không tham gia'
+                      : 'Không đủ điều kiện'
                   return (
-                    <button type="button" key={horse.raceEntryId} disabled={!canPredict} onClick={() => setSelectedEntryId(horse.raceEntryId)} className={`rounded-2xl border p-5 text-left transition ${selected ? 'border-amber-500 bg-amber-50 shadow-sm' : 'border-gray-200 bg-white hover:border-amber-300'} disabled:cursor-not-allowed disabled:opacity-60`}>
-                      <p className="text-lg font-bold text-gray-900">{horse.horseName}</p>
+                    <button type="button" key={horse.raceEntryId} disabled={!canPredict || !eligible} onClick={() => setSelectedEntryId(horse.raceEntryId)} className={`relative rounded-2xl border p-5 text-left transition ${selected ? 'border-amber-500 bg-amber-50 shadow-sm' : eligible ? 'border-gray-200 bg-white hover:border-amber-300' : 'border-red-200 bg-red-50/40'} disabled:cursor-not-allowed disabled:opacity-70`}>
+                      {!eligible && <span className="absolute right-4 top-4 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-bold text-red-700">{unavailableLabel}</span>}
+                      <p className={`pr-24 text-lg font-bold ${eligible ? 'text-gray-900' : 'text-gray-500'}`}>{horse.horseName}</p>
                       <p className="mt-1 text-sm text-gray-500">Kỵ sĩ: {horse.jockeyName}</p>
-                      <div className="mt-4 border-t border-gray-100 pt-3"><p className="text-xs uppercase text-gray-400">Form score</p><p className="text-xl font-black text-amber-700">{horse.formScore}</p></div>
+                      <div className="mt-4 border-t border-gray-100 pt-3"><p className="text-xs uppercase text-gray-400">Điểm phong độ</p><p className={`text-xl font-black ${eligible ? 'text-amber-700' : 'text-gray-400'}`}>{horse.formScore}</p></div>
                     </button>
                   )
                 })}
@@ -253,13 +291,13 @@ export default function PredictionPage() {
 
           <form onSubmit={handleSubmit} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:items-end">
-              <div><label className="mb-2 block text-sm font-bold text-gray-700">Điểm dự đoán</label><input type="number" min={1} max={balance} value={pointsPlaced} disabled={!canPredict} onChange={(event) => setPointsPlaced(Number(event.target.value))} className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm font-bold focus:border-amber-500 focus:outline-none disabled:bg-gray-100" /><p className="mt-1 text-xs text-gray-400">Không được vượt quá số dư hiện tại.</p></div>
+              <div><label htmlFor="prediction-points" className="mb-2 block text-sm font-bold text-gray-700">Điểm dự đoán</label><input id="prediction-points" type="text" inputMode="numeric" pattern="[0-9]*" value={pointsPlaced} disabled={!canPredict} onChange={(event) => { const digits = event.target.value.replace(/\D/g, ''); setPointsPlaced(digits.replace(/^0+(?=\d)/, '')) }} className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm font-bold focus:border-amber-500 focus:outline-none disabled:bg-gray-100" /><p className="mt-1 text-xs text-gray-400">Không được vượt quá số dư hiện tại.</p></div>
               <button type="submit" disabled={!canSubmit} className="rounded-xl bg-amber-600 px-6 py-3 text-sm font-bold text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500">{submitting ? 'Đang gửi...' : 'Xác nhận dự đoán Win'}</button>
             </div>
-            {canPredict && selectedEntryId == null && <p className="mt-4 text-sm font-semibold text-amber-700">Vui lòng chọn một ngựa trước khi xác nhận.</p>}
-            {pointsPlaced <= 0 && <p className="mt-2 text-sm font-semibold text-red-600">Điểm dự đoán phải lớn hơn 0.</p>}
-            {pointsPlaced > balance && <p className="mt-2 text-sm font-semibold text-red-600">Số dư ví không đủ.</p>}
-            {selectedHorse && <p className="mt-4 text-sm text-gray-600">Đã chọn: <strong>{selectedHorse.horseName}</strong> · Số dư sau khi đặt: <strong>{(balance - pointsPlaced).toLocaleString('vi-VN')} điểm</strong></p>}
+            {!message && canPredict && selectedEntryId == null && <p className="mt-4 text-sm font-semibold text-amber-700">Vui lòng chọn một ngựa trước khi xác nhận.</p>}
+            {!message && pointsPlaced !== '' && pointsPlacedValue <= 0 && <p className="mt-2 text-sm font-semibold text-red-600">Điểm dự đoán phải lớn hơn 0.</p>}
+            {!message && pointsPlacedValue > balance && <p className="mt-2 text-sm font-semibold text-red-600">Số dư ví không đủ.</p>}
+            {selectedHorse && <p className="mt-4 text-sm text-gray-600">Đã chọn: <strong>{selectedHorse.horseName}</strong> · Số dư sau khi đặt: <strong>{(balance - pointsPlacedValue).toLocaleString('vi-VN')} điểm</strong></p>}
           </form>
         </>
       ) : null}

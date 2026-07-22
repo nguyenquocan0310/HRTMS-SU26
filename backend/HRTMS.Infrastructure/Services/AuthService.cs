@@ -120,7 +120,7 @@ public class AuthService : IAuthService
 
         await _auditLog.LogAsync(
             actorId: user.UserId,
-            action: "Login",
+            action: "Đăng nhập",
             entityName: "Users",
             entityId: user.UserId.ToString(),
             ipAddress: ipAddress,
@@ -224,7 +224,7 @@ public class AuthService : IAuthService
 
             await _auditLog.LogAsync(
                 actorId: user.UserId,
-                action: "Register",
+                action: "Đăng ký tài khoản mới",
                 entityName: "Users",
                 entityId: user.UserId.ToString(),
                 ipAddress: ipAddress,
@@ -334,7 +334,7 @@ public class AuthService : IAuthService
 
             await _auditLog.LogAsync(
                 actorId: adminId,
-                action: "Admin_Create_User",
+                action: "Admin tạo tài khoản mới",
                 entityName: "Users",
                 entityId: user.UserId.ToString(),
                 newValue: $"Role={dto.Role}, Status={initialStatus}, Email={normalizedEmail}",
@@ -376,7 +376,7 @@ public class AuthService : IAuthService
 
         await _auditLog.LogAsync(
             actorId: userId,
-            action: "Logout",
+            action: "Đăng xuất",
             entityName: "Users",
             entityId: userId.ToString(),
             ipAddress: ipAddress,
@@ -447,7 +447,7 @@ public class AuthService : IAuthService
 
         await _auditLog.LogAsync(
             actorId: userId,
-            action: "Reset_Password",
+            action: "Đặt lại mật khẩu",
             entityName: "Users",
             entityId: userId.ToString());
 

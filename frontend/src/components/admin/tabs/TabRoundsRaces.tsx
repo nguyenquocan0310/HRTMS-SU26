@@ -116,9 +116,17 @@ const TabRoundsRaces = ({
   const validationBasicInfo: TournamentBasicInfo = {
     name: '',
 
+    description: '',
+
     startDate: tournamentStartDate,
 
     endDate: tournamentEndDate,
+
+    venueId: '',
+
+    venueLaneCount: null,
+
+    venueTrackLengthMeters: null,
 
     allowedBreed: '',
 
@@ -135,6 +143,14 @@ const TabRoundsRaces = ({
     purseAmount: tournamentPurse,
 
     entryFeeAmount: 0,
+
+    paymentDeadline: '',
+
+    refundDeadline: '',
+
+    clearRefundDeadline: false,
+
+    advancementCount: 1,
 
     preRaceWeightThresholdKg: 1,
 
@@ -368,7 +384,7 @@ const TabRoundsRaces = ({
               styles.purseLabel
             }
           >
-            Tournament Purse
+            Quỹ thưởng giải đấu
           </span>
 
           <strong>
@@ -384,7 +400,7 @@ const TabRoundsRaces = ({
               styles.purseLabel
             }
           >
-            Total Race Purse
+            Tổng quỹ thưởng các cuộc đua
           </span>
 
           <strong
@@ -745,7 +761,7 @@ const TabRoundsRaces = ({
                                   styles.raceNumberBadge
                                 }
                               >
-                                Race #
+                                Cuộc đua #
                                 {
                                   race.raceNumber
                                 }
@@ -776,8 +792,8 @@ const TabRoundsRaces = ({
                                       race.id
                                     )
                                   }
-                                  aria-label="Xóa Race"
-                                  title="Xóa Race"
+                                  aria-label="Xóa cuộc đua"
+                                  title="Xóa cuộc đua"
                                 >
                                   <FiTrash2
                                     size={
@@ -800,8 +816,7 @@ const TabRoundsRaces = ({
                                 }
                               >
                                 <label>
-                                  Race
-                                  Number
+                                  Số cuộc đua
                                 </label>
 
                                 <input
@@ -973,8 +988,7 @@ const TabRoundsRaces = ({
                                 }
                               >
                                 <label>
-                                  Purse
-                                  Amount
+                                  Quỹ thưởng
                                 </label>
 
                                 <input
@@ -1041,8 +1055,7 @@ const TabRoundsRaces = ({
                                 }
                               >
                                 <label>
-                                  Distance
-                                  Override
+                                  Cự ly ghi đè
                                 </label>
 
                                 <input
@@ -1110,8 +1123,7 @@ const TabRoundsRaces = ({
                                 }
                               >
                                 <label>
-                                  Track Type
-                                  Override
+                                  Loại mặt sân ghi đè
                                 </label>
 
                                 <select
@@ -1146,15 +1158,15 @@ const TabRoundsRaces = ({
                                   </option>
 
                                   <option value="Turf">
-                                    Turf
+                                    Đường cỏ
                                   </option>
 
                                   <option value="Dirt">
-                                    Dirt
+                                    Đường đất
                                   </option>
 
                                   <option value="Synthetic">
-                                    Synthetic
+                                    Mặt sân tổng hợp
                                   </option>
                                 </select>
                               </div>
@@ -1180,7 +1192,7 @@ const TabRoundsRaces = ({
                           size={14}
                         />
 
-                        Thêm Race
+                        Thêm cuộc đua
                       </button>
                     )}
                   </div>
@@ -1203,7 +1215,7 @@ const TabRoundsRaces = ({
         >
           <FiPlus size={16} />
 
-          Thêm Round
+          Thêm vòng đấu
         </button>
       )}
     </div>

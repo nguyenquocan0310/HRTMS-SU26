@@ -12,9 +12,13 @@
      • 37 cặp Owner/Jockey hỗ trợ (summer26_owner01..37 / summer26_jockey01..37)
      • 2 Referee, 2 Doctor, 1 Spectator (kèm ví 1000 điểm)
      • Tournament GIẢI ĐUA NGỰA MÙA HÈ 2026: 3 round, race 4/2/1, 01–30/09/2026,
-       MaxHorses=10, TopPerRace, AdvancementCount=2
+       MaxHorses=10, TopPerRace, AdvancementCount=5; tổng purse 500.000.000
+       (Vòng loại 50tr×4 + Bán kết 75tr×2 + Chung kết 150tr)
      • GIẢI GIAO HỮU THÁNG 9-2026 (song song 05–25/09/2026, Open Registration,
-       2 pairing friendly26_* Confirmed) — demo vận hành nhiều giải cùng lúc
+       1 round / 1 race, MaxHorses=10, 0 pairing ban đầu — account/ngựa/roster
+       friendly26_* sẵn sàng để ghép cặp bằng UI hoặc seed2)
+       — demo vận hành nhiều giải cùng lúc + demo nhanh MỘT race duy nhất
+       (bổ sung 9 pairing hỗ trợ cho đủ 10 bằng `src\demo\seed2`)
      • GIẢI ĐUA NGỰA MÙA XUÂN 2026 (01–31/03/2026, Completed) — lịch sử đầy đủ:
        2 round / 3 race Official, 8 pairing spring26_*, kết quả, biên bản khóa,
        payout đã trả, thông báo — xem lại như một giải thật
@@ -169,11 +173,17 @@ BEGIN TRY
      AdvancementRule,AdvancementCount,CreatedAt,UpdatedAt,CreatedBy)
     VALUES (N'GIẢI ĐUA NGỰA MÙA HÈ 2026',N'Demo 38 pairing, 4 vòng loại, 2 bán kết, 1 chung kết.',
      '2026-09-01T00:00:00','2026-09-30T23:59:59',10,'Thoroughbred','Turf',1600,'Open',3,
-     100000000,1000000,2.00,1.00,'Open Registration','TopPerRace',2,@Now,@Now,@AdminId);
+     500000000,1000000,2.00,1.00,'Open Registration','TopPerRace',5,@Now,@Now,@AdminId);
+    -- Tổng purse 500.000.000 = Vòng loại 50tr×4 (200tr) + Bán kết 75tr×2 (150tr) + Chung kết 150tr.
 
     DECLARE @TId INT=(SELECT TournamentId FROM Tournaments WHERE [Name]=N'GIẢI ĐUA NGỰA MÙA HÈ 2026');
-    IF EXISTS (SELECT 1 FROM Tournaments WHERE TournamentId=@TId AND (MaxHorses<>10 OR AdvancementRule<>'TopPerRace' OR AdvancementCount<>2))
-        THROW 51003,N'Cấu hình tournament hiện có không khớp MaxHorses=10, TopPerRace=2.',1;
+    -- Giải đã tồn tại từ lần seed trước (AdvancementCount=2) thì nâng lên 5 cho khớp
+    -- kịch bản demo 4 race × Top5 = 20 bán kết → 2 race × Top5 = 10 chung kết.
+    UPDATE Tournaments SET AdvancementCount=5,UpdatedAt=@Now
+    WHERE TournamentId=@TId AND AdvancementRule='TopPerRace' AND AdvancementCount<>5;
+
+    IF EXISTS (SELECT 1 FROM Tournaments WHERE TournamentId=@TId AND (MaxHorses<>10 OR AdvancementRule<>'TopPerRace' OR AdvancementCount<>5))
+        THROW 51003,N'Cấu hình tournament hiện có không khớp MaxHorses=10, TopPerRace=5.',1;
 
     INSERT PrizeDistributions (TournamentId,[Position],Percentage,CreatedAt,UpdatedAt)
     SELECT @TId,v.Pos,v.Pct,@Now,@Now FROM (VALUES (1,50.00),(2,25.00),(3,15.00),(4,7.00),(5,3.00))v(Pos,Pct)
@@ -189,12 +199,12 @@ BEGIN TRY
     DECLARE @Q INT=(SELECT RoundId FROM Rounds WHERE TournamentId=@TId AND SequenceOrder=1),
             @S INT=(SELECT RoundId FROM Rounds WHERE TournamentId=@TId AND SequenceOrder=2),
             @F INT=(SELECT RoundId FROM Rounds WHERE TournamentId=@TId AND SequenceOrder=3);
-    INSERT Races (RoundId,RaceNumber,ScheduledTime,PurseAmount,[Status],IsPostPositionDrawn,IsPredictionGateClosed,ConfirmationCutoffHours,ProtestDeadlineMinutes,CreatedAt,UpdatedAt)
-    SELECT v.RoundId,v.RaceNo,v.Dt,v.Purse,'Upcoming',0,0,24,120,@Now,@Now
-    FROM (VALUES (@Q,1,CONVERT(DATETIME2,'2026-09-05T09:00:00'),10000000),(@Q,2,CONVERT(DATETIME2,'2026-09-05T11:00:00'),10000000),
-                 (@Q,3,CONVERT(DATETIME2,'2026-09-06T09:00:00'),10000000),(@Q,4,CONVERT(DATETIME2,'2026-09-06T11:00:00'),10000000),
-                 (@S,1,CONVERT(DATETIME2,'2026-09-15T09:00:00'),15000000),(@S,2,CONVERT(DATETIME2,'2026-09-15T11:00:00'),15000000),
-                 (@F,1,CONVERT(DATETIME2,'2026-09-25T15:00:00'),30000000))v(RoundId,RaceNo,Dt,Purse)
+    INSERT Races (RoundId,RaceNumber,ScheduledTime,PurseAmount,[Status],IsPostPositionDrawn,IsPredictionGateClosed,ConfirmationCutoffHours,CreatedAt,UpdatedAt)
+    SELECT v.RoundId,v.RaceNo,v.Dt,v.Purse,'Upcoming',0,0,24,@Now,@Now
+    FROM (VALUES (@Q,1,CONVERT(DATETIME2,'2026-09-05T09:00:00'),50000000),(@Q,2,CONVERT(DATETIME2,'2026-09-05T11:00:00'),50000000),
+                 (@Q,3,CONVERT(DATETIME2,'2026-09-06T09:00:00'),50000000),(@Q,4,CONVERT(DATETIME2,'2026-09-06T11:00:00'),50000000),
+                 (@S,1,CONVERT(DATETIME2,'2026-09-15T09:00:00'),75000000),(@S,2,CONVERT(DATETIME2,'2026-09-15T11:00:00'),75000000),
+                 (@F,1,CONVERT(DATETIME2,'2026-09-25T15:00:00'),150000000))v(RoundId,RaceNo,Dt,Purse)
     WHERE NOT EXISTS (SELECT 1 FROM Races r WHERE r.RoundId=v.RoundId AND r.RaceNumber=v.RaceNo);
 
     /* -------------------------------------- TICKET REWARD CODES (patch 008 — plaintext)
@@ -213,10 +223,14 @@ BEGIN TRY
     /* =========================================================================
        GIẢI PHỤ SONG SONG — "GIẢI GIAO HỮU THÁNG 9-2026"
        Trùng thời gian với giải chính (05–25/09/2026) để minh họa vận hành
-       NHIỀU GIẢI CÙNG LÚC. 1 round + 2 race Upcoming, 2 pairing Confirmed sẵn
-       (dùng demo allocate đa giải và case lỗi PAIRING_TOURNAMENT_MISMATCH khi
-       lỡ chọn pairing của giải này allocate vào race giải chính).
+       NHIỀU GIẢI CÙNG LÚC. 1 round + 1 race Upcoming, MaxHorses=10.
+       **0 PAIRING BAN ĐẦU** — chỉ dựng account/ngựa/roster `friendly26_*` ở
+       trạng thái sẵn sàng ghép cặp; việc ghép cặp do UI (cặp chính) và seed2
+       (9 cặp hỗ trợ) đảm nhiệm.
        Account riêng (friendly26_*) — không đụng 38 pairing của giải chính.
+       Chỉ 1 race ⇒ dùng làm kịch bản demo NGẮN: chạy trọn vòng đời một cuộc
+       đua mà không phải đi hết 7 race của giải chính. Bổ sung 9 pairing cho
+       đủ 10 bằng `src\demo\seed2\01_friendly_support_pairings.sql`.
        ========================================================================= */
     DECLARE @FrAcc TABLE (N INT PRIMARY KEY, OwnerName NVARCHAR(100), JockeyName NVARCHAR(100), HorseName NVARCHAR(100), HorseColor NVARCHAR(50));
     INSERT @FrAcc VALUES
@@ -251,8 +265,8 @@ BEGIN TRY
         INSERT Tournaments ([Name],[Description],StartDate,EndDate,MaxHorses,AllowedBreed,TrackType,RaceDistance,RaceCategory,
          MinJockeyExperienceYears,PurseAmount,EntryFeeAmount,PreRaceWeightThresholdKg,PostRaceWeightDiffThresholdKg,[Status],
          AdvancementRule,AdvancementCount,CreatedAt,UpdatedAt,CreatedBy)
-        VALUES (N'GIẢI GIAO HỮU THÁNG 9-2026',N'Giải giao hữu chạy song song với Giải Mùa Hè 2026 — minh họa vận hành nhiều giải cùng lúc.',
-         '2026-09-05T00:00:00','2026-09-25T23:59:59',6,'Thoroughbred','Turf',1400,'Open',2,
+        VALUES (N'GIẢI GIAO HỮU THÁNG 9-2026',N'Giải giao hữu 1 cuộc đua duy nhất, chạy song song với Giải Mùa Hè 2026 — demo nhanh trọn vòng đời một race.',
+         '2026-09-05T00:00:00','2026-09-25T23:59:59',10,'Thoroughbred','Turf',1400,'Open',2,
          30000000,500000,2.00,1.00,'Open Registration','TopPerRace',2,@Now,@Now,@AdminId);
 
         DECLARE @FrTId INT = SCOPE_IDENTITY();
@@ -264,9 +278,10 @@ BEGIN TRY
         VALUES (@FrTId,N'Vòng đấu chính',1,'2026-09-10T08:00:00','Upcoming',@Now);
         DECLARE @FrRound INT = SCOPE_IDENTITY();
 
-        INSERT Races (RoundId,RaceNumber,ScheduledTime,PurseAmount,[Status],IsPostPositionDrawn,IsPredictionGateClosed,ConfirmationCutoffHours,ProtestDeadlineMinutes,CreatedAt,UpdatedAt)
-        VALUES (@FrRound,1,'2026-09-10T09:00:00',15000000,'Upcoming',0,0,24,120,@Now,@Now),
-               (@FrRound,2,'2026-09-10T15:00:00',15000000,'Upcoming',0,0,24,120,@Now,@Now);
+        -- MỘT race duy nhất; purse race = toàn bộ purse giải (30tr) để tổng
+        -- purse các race không vượt Tournaments.PurseAmount (guard TournamentService).
+        INSERT Races (RoundId,RaceNumber,ScheduledTime,PurseAmount,[Status],IsPostPositionDrawn,IsPredictionGateClosed,ConfirmationCutoffHours,CreatedAt,UpdatedAt)
+        VALUES (@FrRound,1,'2026-09-10T09:00:00',30000000,'Upcoming',0,0,24,@Now,@Now);
 
         INSERT TournamentParticipants (TournamentId,UserId,[Role],[Status],ScreeningStatus,RegisteredAt,ApprovedBy,ApprovedAt)
         SELECT @FrTId,u.UserId,u.[Role],'Approved','AutoEligible',@Now,@AdminId,@Now
@@ -282,12 +297,50 @@ BEGIN TRY
         SELECT h.HorseId,@FrTId,h.OwnerId,'Enrolled','AutoEligible','Approved',@Now,@Now
         FROM Horses h JOIN Users u ON u.UserId=h.OwnerId AND u.Username LIKE 'friendly26_owner%';
 
-        INSERT Pairings (TournamentId,HorseId,JockeyId,[Status],RequestMessage,ResponseReason,CreatedAt,UpdatedAt)
-        SELECT @FrTId,h.HorseId,j.UserId,'Confirmed',N'Ghép cặp giải giao hữu.',N'Chủ ngựa đã xác nhận.',@Now,@Now
-        FROM @FrAcc a
-        JOIN Users o ON o.Username=CONCAT('friendly26_owner0',a.N)
-        JOIN Horses h ON h.OwnerId=o.UserId AND h.[Name]=a.HorseName
-        JOIN Users j ON j.Username=CONCAT('friendly26_jockey0',a.N);
+        -- KHÔNG seed Pairing cho giải giao hữu: giải bắt đầu với 0 pairing.
+        -- Ngựa/nài/roster đã sẵn sàng để GHÉP CẶP bằng UI hoặc bằng seed2.
+        -- Pairing chính do 2 tài khoản nguyenan159246+* tạo qua UI; 9 cặp hỗ trợ
+        -- do `src\demo\seed2\01_friendly_support_pairings.sql` tạo.
+    END;
+
+    /* Nâng cấp DB đã seed bản cũ (MaxHorses=6, 2 race) sang cấu hình 1 race.
+       Chỉ hạ race 2 khi nó CHƯA có RaceEntry nào — có dữ liệu thật thì dừng,
+       không tự xóa. */
+    DECLARE @FrTIdFix INT=(SELECT TournamentId FROM Tournaments WHERE [Name]=N'GIẢI GIAO HỮU THÁNG 9-2026');
+    IF @FrTIdFix IS NOT NULL
+    BEGIN
+        UPDATE Tournaments SET MaxHorses=10,UpdatedAt=@Now
+        WHERE TournamentId=@FrTIdFix AND MaxHorses<10;
+
+        DECLARE @FrRace2 INT=(SELECT r.RaceId FROM Races r JOIN Rounds rd ON rd.RoundId=r.RoundId
+                              WHERE rd.TournamentId=@FrTIdFix AND r.RaceNumber=2);
+        IF @FrRace2 IS NOT NULL
+        BEGIN
+            -- Chỉ xóa khi race 2 hoàn toàn TRỐNG. Kiểm đủ MỌI bảng con có FK tới
+            -- Races (RaceEntries, Predictions, RaceReports) — có bất kỳ
+            -- dữ liệu thật nào thì DỪNG, không tự xóa.
+            IF EXISTS (SELECT 1 FROM RaceEntries WHERE RaceId=@FrRace2)
+            OR EXISTS (SELECT 1 FROM Predictions WHERE RaceId=@FrRace2)
+            OR EXISTS (SELECT 1 FROM RaceReports WHERE RaceId=@FrRace2)
+                THROW 51004,N'Giải giao hữu cần còn 1 race nhưng race 2 đã có dữ liệu (entry/prediction/biên bản) — xử lý tay trước khi seed lại.',1;
+            DELETE FROM RefereeAssignments WHERE RaceId=@FrRace2;
+            DELETE FROM DoctorAssignments  WHERE RaceId=@FrRace2;
+            DELETE FROM Races WHERE RaceId=@FrRace2;
+        END;
+
+        UPDATE r SET PurseAmount=30000000,UpdatedAt=@Now
+        FROM Races r JOIN Rounds rd ON rd.RoundId=r.RoundId
+        WHERE rd.TournamentId=@FrTIdFix AND r.RaceNumber=1 AND r.PurseAmount<30000000;
+
+        -- Giải giao hữu phải bắt đầu với 0 pairing. DB seed bản cũ có 2 pairing
+        -- friendly26_* → gỡ, nhưng CHỈ khi chưa được allocate vào race nào.
+        IF EXISTS (SELECT 1 FROM Pairings p WHERE p.TournamentId=@FrTIdFix)
+        BEGIN
+            IF EXISTS (SELECT 1 FROM RaceEntries e JOIN Pairings p ON p.PairingId=e.PairingId
+                       WHERE p.TournamentId=@FrTIdFix)
+                THROW 51005,N'Giải giao hữu cần 0 pairing ban đầu nhưng đã có pairing được allocate vào race — xử lý tay trước khi seed lại.',1;
+            DELETE FROM Pairings WHERE TournamentId=@FrTIdFix;
+        END;
     END;
 
     /* =========================================================================
@@ -354,10 +407,10 @@ BEGIN TRY
         DECLARE @SpQ INT=(SELECT RoundId FROM Rounds WHERE TournamentId=@SpTId AND SequenceOrder=1);
         DECLARE @SpF INT=(SELECT RoundId FROM Rounds WHERE TournamentId=@SpTId AND SequenceOrder=2);
 
-        INSERT Races (RoundId,RaceNumber,ScheduledTime,ActualStartTime,PurseAmount,[Status],IsPostPositionDrawn,IsPredictionGateClosed,ConfirmationCutoffHours,ProtestDeadlineMinutes,CreatedAt,UpdatedAt)
-        VALUES (@SpQ,1,'2026-03-08T09:00:00','2026-03-08T09:02:00',15000000,'Official',1,1,24,120,@T0,'2026-03-08T11:00:00'),
-               (@SpQ,2,'2026-03-08T15:00:00','2026-03-08T15:03:00',15000000,'Official',1,1,24,120,@T0,'2026-03-08T17:00:00'),
-               (@SpF,1,'2026-03-22T15:00:00','2026-03-22T15:01:00',30000000,'Official',1,1,24,120,@T0,'2026-03-22T17:00:00');
+        INSERT Races (RoundId,RaceNumber,ScheduledTime,ActualStartTime,PurseAmount,[Status],IsPostPositionDrawn,IsPredictionGateClosed,ConfirmationCutoffHours,CreatedAt,UpdatedAt)
+        VALUES (@SpQ,1,'2026-03-08T09:00:00','2026-03-08T09:02:00',15000000,'Official',1,1,24,@T0,'2026-03-08T11:00:00'),
+               (@SpQ,2,'2026-03-08T15:00:00','2026-03-08T15:03:00',15000000,'Official',1,1,24,@T0,'2026-03-08T17:00:00'),
+               (@SpF,1,'2026-03-22T15:00:00','2026-03-22T15:01:00',30000000,'Official',1,1,24,@T0,'2026-03-22T17:00:00');
 
         INSERT TournamentParticipants (TournamentId,UserId,[Role],[Status],ScreeningStatus,RegisteredAt,ApprovedBy,ApprovedAt)
         SELECT @SpTId,u.UserId,u.[Role],'Approved','AutoEligible',@T0,@AdminId,@T0
@@ -429,7 +482,7 @@ BEGIN TRY
         /* Biên bản trận đua — đã khóa */
         INSERT RaceReports (RaceId,LeadRefereeId,Notes,IsLocked,SubmittedAt,LockedAt)
         SELECT r.RaceId,CASE WHEN r.RaceNumber=2 AND r.RoundId=@SpQ THEN @Ref2 ELSE @Ref1 END,
-               N'Trận đua diễn ra đúng lịch, không có khiếu nại.',1,
+               N'Trận đua diễn ra đúng lịch.',1,
                DATEADD(HOUR,1,r.ScheduledTime),DATEADD(HOUR,3,r.ScheduledTime)
         FROM Races r WHERE r.RoundId IN (@SpQ,@SpF);
 
@@ -459,6 +512,100 @@ BEGIN TRY
         JOIN Pairings pg ON pg.PairingId=e.PairingId
         JOIN Horses h ON h.HorseId=pg.HorseId
         WHERE e.FinishPosition<=3;
+    END;
+
+    /* ============================================================ VENUE + LỆ PHÍ
+       Yêu cầu patch 012 + 012 đã chạy. Khối này idempotent như phần trên.
+       ------------------------------------------------------------------------ */
+    IF OBJECT_ID('Venues','U') IS NOT NULL AND OBJECT_ID('EntryFeePayments','U') IS NOT NULL
+    BEGIN
+        /* Sân đua — trùng dữ liệu patch 012, MERGE theo [Name] nên chạy sau patch
+           cũng không nhân bản. */
+        MERGE Venues AS target
+        USING (VALUES
+            (N'Trường đua Phú Thọ',          N'Số 2 Lê Đại Hành, Phường 15, Quận 11', N'TP. Hồ Chí Minh', 'Dirt', 1800, 12, 1),
+            (N'Trường đua Đại Nam',          N'Khu du lịch Đại Nam, Hiệp An',         N'Bình Dương',      'Dirt', 1500, 10, 1),
+            (N'Trường đua Thiên Mã Madagui', N'Khu du lịch Madagui, Đạ Huoai',        N'Lâm Đồng',        'Turf', 1200,  6, 1),
+            (N'Trường đua Sóc Sơn',          N'Xã Tân Minh, Huyện Sóc Sơn',           N'Hà Nội',          'Turf', 2000, 14, 0)
+        ) AS source ([Name],[Address],City,TrackType,TrackLengthMeters,LaneCount,IsActive)
+            ON target.[Name] = source.[Name]
+        WHEN NOT MATCHED BY TARGET THEN
+            INSERT ([Name],[Address],City,TrackType,TrackLengthMeters,LaneCount,IsActive)
+            VALUES (source.[Name],source.[Address],source.City,source.TrackType,
+                    source.TrackLengthMeters,source.LaneCount,source.IsActive);
+
+        DECLARE @VPhuTho INT=(SELECT VenueId FROM Venues WHERE [Name]=N'Trường đua Phú Thọ'),
+                @VDaiNam INT=(SELECT VenueId FROM Venues WHERE [Name]=N'Trường đua Đại Nam');
+
+        /* Gán sân cho 3 giải demo. Cả 3 đều MaxHorses=10 nên vừa Phú Thọ (12 làn)
+           và vừa cả Đại Nam (10 làn) — không vi phạm MAX_HORSES_EXCEEDS_LANES.
+           TrackType phải khớp sân: cả hai sân demo đều 'Dirt'. */
+        UPDATE Tournaments SET VenueId=@VPhuTho, TrackType='Dirt', UpdatedAt=@Now
+        WHERE [Name] IN (N'GIẢI ĐUA NGỰA MÙA HÈ 2026',N'GIẢI ĐUA NGỰA MÙA XUÂN 2026')
+          AND (VenueId IS NULL OR VenueId<>@VPhuTho);
+
+        UPDATE Tournaments SET VenueId=@VDaiNam, TrackType='Dirt', UpdatedAt=@Now
+        WHERE [Name]=N'GIẢI GIAO HỮU THÁNG 9-2026'
+          AND (VenueId IS NULL OR VenueId<>@VDaiNam);
+
+        /* Hạn nộp phí:
+           - Mùa Hè: còn hạn (14 ngày nữa) -> demo nộp/verify/reject bình thường.
+           - Giao Hữu: ĐÃ QUÁ HẠN 1 giờ -> demo FeeDeadlineJob auto reject. */
+        UPDATE Tournaments
+        SET PaymentDeadline=DATEADD(DAY,14,@Now), RefundDeadline=DATEADD(DAY,21,@Now), UpdatedAt=@Now
+        WHERE [Name]=N'GIẢI ĐUA NGỰA MÙA HÈ 2026' AND PaymentDeadline IS NULL;
+
+        UPDATE Tournaments
+        SET PaymentDeadline=DATEADD(HOUR,-1,@Now), RefundDeadline=DATEADD(DAY,7,@Now), UpdatedAt=@Now
+        WHERE [Name]=N'GIẢI GIAO HỮU THÁNG 9-2026' AND PaymentDeadline IS NULL;
+
+        /* Bất biến "Pairing Confirmed <=> có payment Verified": backfill cho mọi
+           pairing Confirmed do phần seed ở trên tạo ra, nếu chưa có payment active. */
+        INSERT EntryFeePayments (PairingId,Amount,Method,ReceiptNo,[Status],SubmittedAt,VerifiedBy,VerifiedAt)
+        SELECT p.PairingId, t.EntryFeeAmount, 'Cash',
+               CONCAT('SEED-', p.PairingId), 'Verified',
+               DATEADD(DAY,-3,@Now), @AdminId, DATEADD(DAY,-3,@Now)
+        FROM Pairings p
+        JOIN Tournaments t ON t.TournamentId=p.TournamentId
+        WHERE p.[Status]='Confirmed'
+          AND NOT EXISTS (SELECT 1 FROM EntryFeePayments e
+                          WHERE e.PairingId=p.PairingId
+                            AND e.[Status] IN ('PendingVerification','Verified'));
+
+        /* Demo đủ trạng thái Pairing ở giải Mùa Hè: lấy 3 pairing đang 'Accepted'
+           (nếu có) đưa lần lượt sang PendingVerification / Rejected-payment.
+           Pending + Accepted + Confirmed đã có sẵn từ phần seed ở trên. */
+        DECLARE @SummerTId INT=(SELECT TournamentId FROM Tournaments WHERE [Name]=N'GIẢI ĐUA NGỰA MÙA HÈ 2026');
+        DECLARE @SummerFee DECIMAL(12,2)=(SELECT EntryFeeAmount FROM Tournaments WHERE TournamentId=@SummerTId);
+
+        /* (a) Một pairing chờ Admin đối chiếu — Transfer, có mã giao dịch. */
+        DECLARE @PendVerId INT=(SELECT TOP 1 p.PairingId FROM Pairings p
+            WHERE p.TournamentId=@SummerTId AND p.[Status]='Accepted'
+              AND NOT EXISTS (SELECT 1 FROM EntryFeePayments e WHERE e.PairingId=p.PairingId)
+            ORDER BY p.PairingId);
+
+        IF @PendVerId IS NOT NULL
+        BEGIN
+            INSERT EntryFeePayments (PairingId,Amount,Method,TransferRef,[Status],SubmittedAt)
+            VALUES (@PendVerId,@SummerFee,'Transfer',N'FT260722000123','PendingVerification',DATEADD(HOUR,-2,@Now));
+
+            UPDATE Pairings SET [Status]='PendingVerification', UpdatedAt=@Now
+            WHERE PairingId=@PendVerId;
+        END;
+
+        /* (b) Một pairing từng bị từ chối lệ phí — payment 'Rejected', pairing quay
+               về 'Accepted' để demo Owner nộp lại (Rejected không nằm trong filter
+               của UQ_EFP_ActivePerPairing nên nộp lại không vướng unique). */
+        DECLARE @RejId INT=(SELECT TOP 1 p.PairingId FROM Pairings p
+            WHERE p.TournamentId=@SummerTId AND p.[Status]='Accepted'
+              AND p.PairingId<>ISNULL(@PendVerId,0)
+              AND NOT EXISTS (SELECT 1 FROM EntryFeePayments e WHERE e.PairingId=p.PairingId)
+            ORDER BY p.PairingId);
+
+        IF @RejId IS NOT NULL
+            INSERT EntryFeePayments (PairingId,Amount,Method,ReceiptNo,[Status],SubmittedAt,VerifiedBy,VerifiedAt,RejectReason)
+            VALUES (@RejId,@SummerFee,'Cash',N'BL-000199','Rejected',DATEADD(DAY,-1,@Now),
+                    @AdminId,DATEADD(HOUR,-20,@Now),N'Ảnh biên lai mờ, không đọc được số tiền.');
     END;
 
     COMMIT TRANSACTION;
@@ -492,5 +639,28 @@ JOIN Tournaments t ON t.TournamentId=rd.TournamentId AND t.[Name]=N'GIẢI ĐUA 
 GROUP BY rd.SequenceOrder,rd.[Name],r.RaceNumber,r.PurseAmount ORDER BY rd.SequenceOrder,r.RaceNumber;
 
 SELECT Code,PointAmount,[Status],ExpiresAt FROM TicketRewardCodes WHERE Code LIKE 'TKT-DEMO%' ORDER BY Code;
+
+/* Sân đua + hạn lệ phí + phân bố trạng thái pairing/payment (patch 012/013) */
+IF OBJECT_ID('Venues','U') IS NOT NULL
+    SELECT VenueId,[Name],City,TrackType,TrackLengthMeters,LaneCount,IsActive FROM Venues ORDER BY [Name];
+
+IF COL_LENGTH('Tournaments','VenueId') IS NOT NULL
+    SELECT t.[Name] AS Giai, v.[Name] AS San, v.LaneCount, t.MaxHorses,
+           CASE WHEN v.LaneCount IS NULL THEN NULL
+                ELSE (CASE WHEN t.MaxHorses < v.LaneCount THEN t.MaxHorses ELSE v.LaneCount END)
+           END AS SucChuaMoiRace,
+           t.EntryFeeAmount, t.PaymentDeadline, t.RefundDeadline
+    FROM Tournaments t LEFT JOIN Venues v ON v.VenueId=t.VenueId
+    WHERE t.[Name] IN (N'GIẢI ĐUA NGỰA MÙA HÈ 2026',N'GIẢI GIAO HỮU THÁNG 9-2026',N'GIẢI ĐUA NGỰA MÙA XUÂN 2026')
+    ORDER BY t.StartDate;
+
+IF OBJECT_ID('EntryFeePayments','U') IS NOT NULL
+BEGIN
+    SELECT p.[Status] AS TrangThaiPairing, COUNT(*) AS SoLuong
+    FROM Pairings p GROUP BY p.[Status] ORDER BY p.[Status];
+
+    SELECT e.[Status] AS TrangThaiPayment, COUNT(*) AS SoLuong
+    FROM EntryFeePayments e GROUP BY e.[Status] ORDER BY e.[Status];
+END;
 
 SELECT N'Seed hợp nhất hoàn tất: Admin + 2 tài khoản chính + 37 cặp hỗ trợ + staff + tournament 4/2/1 + 5 mã ticket.' AS KetQua;

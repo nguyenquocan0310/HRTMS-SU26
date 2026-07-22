@@ -15,7 +15,7 @@ namespace HRTMS.Infrastructure.Services;
 /// </summary>
 public class ReportService : IReportService
 {
-    public const string AuditAction = "Export_Report";
+    public const string AuditAction = "Xuất báo cáo";
     public const string AuditEntityName = "Report";
 
     private const string RaceOfficial = "Official";

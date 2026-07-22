@@ -5,6 +5,7 @@ using HRTMS.Core.Entities;
 using HRTMS.Core.Interfaces.Services;
 using HRTMS.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 
 namespace HRTMS.Infrastructure.Services;
 
@@ -105,6 +106,12 @@ public class PairingService : IPairingService
             throw new InvalidOperationException(
                 "JOCKEY_NOT_APPROVED_IN_TOURNAMENT");
         }
+
+        // Bao vệ cả trường hợp hai request gửi đồng thời: các bước kiểm tra active/
+        // duplicate và insert phải nằm trong cùng transaction serializable.
+        await using var transaction = await _context.Database
+            .BeginTransactionAsync(IsolationLevel.Serializable);
+
         // Kiem tra Jockey da co cap Accepted/Confirmed trong cung giai
         // hoac trong tournament khac bi trung thoi gian voi giai hien tai hay chua
         var overlappingTournamentIds = await _context.Tournaments
@@ -166,6 +173,7 @@ public class PairingService : IPairingService
 
         _context.Pairings.Add(pairing);
         await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
 
         var messagePart = string.IsNullOrWhiteSpace(dto.RequestMessage)
             ? ""
@@ -197,10 +205,11 @@ public class PairingService : IPairingService
         int jockeyId,
         int pairingId)
     {
-        // Jockey accept chi doi Pending -> Accepted
-        // Owner se confirm sau de thanh Confirmed
+        // Giải có phí: Jockey accept -> Accepted, Owner nộp lệ phí rồi Admin đối chiếu.
+        // Giải miễn phí: hệ thống xác nhận ngay, không phát sinh thao tác Owner thừa.
         var pairing = await _context.Pairings
             .Include(p => p.Horse)
+            .Include(p => p.Tournament)
             .FirstOrDefaultAsync(p => p.PairingId == pairingId);
 
         if (pairing == null)
@@ -227,11 +236,24 @@ public class PairingService : IPairingService
         pairing.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
+        // ConfirmAsync ghi EntryFeePayment Verified Amount=0 và hủy các pairing còn
+        // treo của cùng ngựa. Dùng Horse.OwnerId nội bộ, không nhận ownerId từ client.
+        if (pairing.Tournament.EntryFeeAmount == 0)
+        {
+            var autoConfirmed = await ConfirmAsync(pairing.Horse.OwnerId, pairingId);
+            return new PairingActionResponseDto
+            {
+                PairingId = autoConfirmed.PairingId,
+                Status = autoConfirmed.Status,
+                Message = "Giải đấu không thu lệ phí. Cặp thi đấu đã được xác nhận tự động."
+            };
+        }
+
         // Gui thong bao cho Owner de vao xac nhan cuoi cung (email + in-app)
         await _notification.SendAsync(
             pairing.Horse.OwnerId,
             "Nài ngựa đã chấp nhận lời mời",
-            $"Nài ngựa đã chấp nhận ghép cặp cùng ngựa '{pairing.Horse.Name}'. Vui lòng xác nhận cặp thi đấu.",
+            $"Nài ngựa đã chấp nhận ghép cặp cùng ngựa '{pairing.Horse.Name}'. Vui lòng nộp lệ phí để Ban tổ chức đối chiếu.",
             type: "Both",
             relatedEntityType: "Pairing",
             relatedEntityId: pairing.PairingId);
@@ -241,7 +263,7 @@ public class PairingService : IPairingService
             PairingId = pairing.PairingId,
             Status = pairing.Status,
             Message =
-                "Đã chấp nhận lời mời ghép cặp. Đang chờ chủ ngựa xác nhận."
+                "Đã chấp nhận lời mời ghép cặp. Đang chờ chủ ngựa nộp lệ phí."
         };
     }
 
@@ -255,6 +277,7 @@ public class PairingService : IPairingService
         var pairing = await _context.Pairings
             .Include(p => p.Horse)
             .Include(p => p.Jockey)
+            .Include(p => p.Tournament)
             .FirstOrDefaultAsync(p => p.PairingId == pairingId);
 
         if (pairing == null)
@@ -270,6 +293,16 @@ public class PairingService : IPairingService
         if (pairing.Status != "Accepted")
         {
             throw new InvalidOperationException("INVALID_STATUS");
+        }
+
+        // DEPRECATED (patch 013): Owner KHÔNG còn tự xác nhận cặp đấu ở giải có thu
+        // phí — xác nhận nay đến từ việc Admin verify lệ phí
+        // (EntryFeePaymentService.VerifyAsync). Chặn ở đây để không có hai đường
+        // cùng đưa Pairing lên Confirmed, và để Owner không bypass thanh toán.
+        // Giải miễn phí (EntryFeeAmount = 0) vẫn dùng endpoint này.
+        if (pairing.Tournament.EntryFeeAmount != 0)
+        {
+            throw new InvalidOperationException("ENTRY_FEE_REQUIRED");
         }
 
         if (pairing.Horse.AdminApprovalStatus != "Approved")
@@ -302,6 +335,27 @@ public class PairingService : IPairingService
 
         pairing.Status = "Confirmed";
         pairing.UpdatedAt = DateTime.UtcNow;
+
+        // Giải miễn phí vẫn ghi một payment Verified (Amount = 0) để giữ MỘT nguồn
+        // sự thật: "Pairing Confirmed <=> có payment Verified". Auto-allocate nhờ đó
+        // chỉ kiểm tra một điều kiện, không phải rẽ nhánh theo giải free/có phí.
+        var hasActivePayment = await _context.EntryFeePayments
+            .AnyAsync(p => p.PairingId == pairingId &&
+                           (p.Status == "PendingVerification" || p.Status == "Verified"));
+        if (!hasActivePayment)
+        {
+            _context.EntryFeePayments.Add(new EntryFeePayment
+            {
+                PairingId = pairingId,
+                Amount = 0,
+                Method = "Cash",
+                ReceiptNo = "FREE-ENTRY",
+                Status = "Verified",
+                SubmittedAt = pairing.UpdatedAt,
+                VerifiedBy = ownerId,
+                VerifiedAt = pairing.UpdatedAt
+            });
+        }
 
         var otherPairings = await _context.Pairings
             .Where(p =>

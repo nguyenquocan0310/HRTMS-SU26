@@ -101,6 +101,158 @@ public class SchedulingController : ControllerBase
         }
     }
 
+    // Admin chốt danh sách và tự động phân toàn bộ pool vào các race của vòng.
+    // Thay cho việc click allocate từng pairing ở case thông thường.
+    [HttpPost("admin/rounds/{roundId:int}/auto-allocate")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> AutoAllocate(int roundId)
+    {
+        if (!TryGetUserId(out var adminId))
+            return UnauthorizedResult();
+
+        try
+        {
+            var result = await _service.AutoAllocateRoundAsync(adminId, roundId);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(Err("ROUND_NOT_FOUND", "Không tìm thấy vòng đấu."));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return MapAllocateError(ex.Message);
+        }
+    }
+
+    // Preview (dry-run) trước khi chốt — KHÔNG ghi DB.
+    // Trả danh sách được chọn, danh sách chờ, số ngựa mỗi race và cảnh báo.
+    // `assignmentIsFinal = false`: ngựa nào vào race nào chỉ chốt ở bước thật.
+    [HttpPost("admin/rounds/{roundId:int}/auto-allocate/preview")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> PreviewAutoAllocate(int roundId)
+    {
+        try
+        {
+            var result = await _service.PreviewAllocateRoundAsync(roundId);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(Err("ROUND_NOT_FOUND", "Không tìm thấy vòng đấu."));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return MapAllocateError(ex.Message);
+        }
+    }
+
+    // Danh sách chờ đã lưu của một vòng (bảng RoundWaitlist).
+    [HttpGet("admin/rounds/{roundId:int}/waitlist")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetWaitlist(int roundId)
+    {
+        try
+        {
+            return Ok(await _service.GetRoundWaitlistAsync(roundId));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(Err("ROUND_NOT_FOUND", "Không tìm thấy vòng đấu."));
+        }
+    }
+
+    // Admin điều chỉnh thủ công sau auto-allocate: chuyển entry sang race khác
+    // TRONG CÙNG vòng.
+    [HttpPut("admin/race-entries/{id:int}/move")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> MoveEntry(int id, [FromBody] MoveEntryDto dto)
+    {
+        if (!TryGetUserId(out var adminId))
+            return UnauthorizedResult();
+
+        try
+        {
+            var result = await _service.MoveEntryAsync(adminId, id, dto.TargetRaceId);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex) when (ex.Message == "ENTRY_NOT_FOUND")
+        {
+            return NotFound(Err("ENTRY_NOT_FOUND", "Không tìm thấy đăng ký cuộc đua."));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(Err("TARGET_RACE_NOT_FOUND", "Không tìm thấy cuộc đua đích."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "MAX_LANES_REACHED")
+        {
+            return Conflict(Err("MAX_LANES_REACHED",
+                "Cuộc đua đích đã kín làn xuất phát."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "PAIRING_FEE_NOT_PAID")
+        {
+            return UnprocessableEntity(Err("PAIRING_FEE_NOT_PAID",
+                "Cặp đấu chưa được xác nhận lệ phí nên không thể xếp vào cuộc đua."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "RACE_NOT_IN_SAME_ROUND")
+        {
+            return UnprocessableEntity(Err("RACE_NOT_IN_SAME_ROUND",
+                "Chỉ có thể chuyển sang cuộc đua khác trong cùng vòng đấu."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "ALREADY_DRAWN")
+        {
+            return Conflict(Err("ALREADY_DRAWN",
+                "Cuộc đua đã bốc thăm nên không thể chuyển ngựa."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "DUPLICATE_IN_RACE")
+        {
+            return Conflict(Err("DUPLICATE_IN_RACE", "Ngựa hoặc nài này đã có trong cuộc đua đích."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "SAME_RACE")
+        {
+            return UnprocessableEntity(Err("SAME_RACE", "Đăng ký đã ở cuộc đua này."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "INVALID_STATUS")
+        {
+            return Conflict(Err("INVALID_STATUS", "Đăng ký không còn hiệu lực nên không thể chuyển."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "INVALID_RACE_STATE")
+        {
+            return UnprocessableEntity(Err("INVALID_RACE_STATE", "Cuộc đua đích không cho phép xếp ngựa vào."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "TOURNAMENT_NOT_OPEN_FOR_SCHEDULING")
+        {
+            return UnprocessableEntity(Err("TOURNAMENT_NOT_OPEN_FOR_SCHEDULING",
+                "Giải đấu chưa mở đăng ký hoặc đã kết thúc nên không thể xếp lịch thi đấu."));
+        }
+    }
+
+    // Admin chốt vòng: phân race + bốc thăm toàn bộ race đủ điều kiện.
+    // KHÔNG phải một transaction duy nhất: allocate là một transaction, mỗi draw
+    // là một transaction riêng. Race không bốc được nằm trong skippedDraws kèm
+    // lý do; phần đã làm xong KHÔNG bị rollback. Gọi lại endpoint này an toàn.
+    [HttpPost("admin/rounds/{roundId:int}/finalize")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> FinalizeRound(int roundId)
+    {
+        if (!TryGetUserId(out var adminId))
+            return UnauthorizedResult();
+
+        try
+        {
+            var result = await _service.FinalizeRoundAsync(adminId, roundId);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(Err("ROUND_NOT_FOUND", "Không tìm thấy vòng đấu."));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return MapAllocateError(ex.Message);
+        }
+    }
+
     // Admin bốc thăm vị trí xuất phát (nguyên tử).
     [HttpPost("admin/races/{raceId:int}/draw")]
     [Authorize(Roles = "Admin")]
@@ -125,6 +277,21 @@ public class SchedulingController : ControllerBase
         catch (InvalidOperationException ex) when (ex.Message == "NO_ELIGIBLE_ENTRIES")
         {
             return UnprocessableEntity(Err("NO_ELIGIBLE_ENTRIES", "Chưa có ngựa hợp lệ để bốc thăm."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "NOT_ENOUGH_ENTRIES")
+        {
+            return UnprocessableEntity(Err("NOT_ENOUGH_ENTRIES",
+                "Cuộc đua cần ít nhất 2 ngựa hợp lệ mới bốc thăm được."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "ENTRIES_NOT_ALL_CONFIRMED")
+        {
+            return UnprocessableEntity(Err("ENTRIES_NOT_ALL_CONFIRMED",
+                "Còn đăng ký chưa được xác nhận nên chưa thể chốt danh sách xuất phát."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "MAX_LANES_REACHED")
+        {
+            return Conflict(Err("MAX_LANES_REACHED",
+                "Số ngựa hợp lệ vượt quá số làn xuất phát của sân đua."));
         }
         catch (InvalidOperationException ex) when (ex.Message == "TOURNAMENT_NOT_OPEN_FOR_SCHEDULING")
         {
@@ -211,6 +378,11 @@ public class SchedulingController : ControllerBase
             return UnprocessableEntity(Err("RACE_NOT_UPCOMING",
                 "Cuộc đua đã bắt đầu hoặc kết thúc nên không thể rút đăng ký."));
         }
+        catch (InvalidOperationException ex) when (ex.Message == "LATE_WITHDRAW_REASON_REQUIRED")
+        {
+            return BadRequest(Err("LATE_WITHDRAW_REASON_REQUIRED",
+                "Rút lui sau Pre-Race phải nêu lý do ít nhất 10 ký tự."));
+        }
         catch (InvalidOperationException ex) when (ex.Message == "WITHDRAW_AFTER_CUTOFF")
         {
             return UnprocessableEntity(Err("WITHDRAW_AFTER_CUTOFF",
@@ -278,6 +450,26 @@ public class SchedulingController : ControllerBase
     }
 
     // ---------------- helpers ----------------
+
+    // Mã lỗi auto-allocate dùng chung cho /auto-allocate và /finalize.
+    private IActionResult MapAllocateError(string code) => code switch
+    {
+        "ROUND_ALREADY_ALLOCATED" => Conflict(Err(code,
+            "Vòng đấu này đã được phân ngựa vào cuộc đua rồi.")),
+        "ROUND_ALREADY_DRAWN" => Conflict(Err(code,
+            "Vòng đấu này đã bốc thăm nên không thể phân lại.")),
+        "NO_RACES_IN_ROUND" => UnprocessableEntity(Err(code,
+            "Vòng đấu chưa có cuộc đua nào để phân ngựa.")),
+        "NO_ELIGIBLE_PAIRINGS" => UnprocessableEntity(Err(code,
+            "Chưa có cặp đấu nào đủ điều kiện (đã xác nhận lệ phí) để phân vào cuộc đua.")),
+        "PREVIOUS_ROUND_NOT_COMPLETED" => UnprocessableEntity(Err(code,
+            "Vòng đấu trước chưa hoàn tất nên chưa thể phân ngựa vào vòng này.")),
+        "VENUE_REQUIRED" => UnprocessableEntity(Err(code,
+            "Giải đấu chưa được gán sân đua nên không xác định được số làn xuất phát.")),
+        "TOURNAMENT_NOT_OPEN_FOR_SCHEDULING" => UnprocessableEntity(Err(code,
+            "Giải đấu chưa mở đăng ký hoặc đã kết thúc nên không thể xếp lịch thi đấu.")),
+        _ => UnprocessableEntity(Err(code, code))
+    };
 
     private bool TryGetUserId(out int userId)
     {

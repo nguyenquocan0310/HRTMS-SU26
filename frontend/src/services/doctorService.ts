@@ -1,4 +1,5 @@
 import { apiFetch } from './apiClient';
+import { calculateWeightDifference, parseWeightValue } from '../utils/paddockWeight';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -67,6 +68,8 @@ export interface PreRaceWeightResponse {
   weightDifference?: number | null;
   thresholdKg?: number | null;
   isWeightWarning?: boolean;
+  isEmergencyDisqualified?: boolean;
+  raceEntryStatus?: string | null;
   message?: string;
 }
 
@@ -131,8 +134,7 @@ export interface RaceEntryHealthProfile {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
-const nullableNumber = (value: unknown): number | null =>
-  typeof value === 'number' && Number.isFinite(value) ? value : null;
+const nullableNumber = (value: unknown): number | null => parseWeightValue(value);
 
 const nullableString = (value: unknown): string | null =>
   typeof value === 'string' ? value : null;
@@ -147,11 +149,10 @@ const normalizeRaceEntry = (value: unknown): DoctorRaceEntry | null => {
   if (!Number.isFinite(raceEntryId)) return null;
   const selfDeclaredWeight = nullableNumber(item.selfDeclaredWeight ?? jockey?.selfDeclaredWeight);
   const preRaceJockeyWeight = nullableNumber(item.preRaceJockeyWeight ?? item.preRaceWeight);
-  const computedWeightDifference =
-    nullableNumber(item.weightDifference) ??
-    (typeof preRaceJockeyWeight === 'number' && typeof selfDeclaredWeight === 'number'
-      ? Number((preRaceJockeyWeight - selfDeclaredWeight).toFixed(1))
-      : null);
+  const computedWeightDifference = calculateWeightDifference(
+    preRaceJockeyWeight,
+    selfDeclaredWeight
+  );
   const status = nullableString(item.status ?? item.raceEntryStatus) ?? 'Confirmed';
 
   return {
