@@ -3,6 +3,7 @@ import { FiFlag } from 'react-icons/fi'
 import { GiHorseHead } from 'react-icons/gi'
 import type { LiveRaceEntry, RaceLiveStatus } from '../../services/spectatorService'
 import { useLiveRaceProgress } from '../../hooks/useLiveRaceProgress'
+import SpectatorRaceStatusBadge from './SpectatorRaceStatusBadge'
 
 interface LiveRaceAnimationProps {
   race: RaceLiveStatus
@@ -99,7 +100,7 @@ export default function LiveRaceAnimation({ race }: LiveRaceAnimationProps) {
             )}
             {isLive && (
               <>
-                <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-red-700">Đã chạy {formatClock(elapsedSeconds)}</span>
+                <SpectatorRaceStatusBadge status={race.status} label={`Đã chạy ${formatClock(elapsedSeconds)}`} />
                 <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-gray-700">{Math.round(baseProgress * 100)}%</span>
               </>
             )}
@@ -165,9 +166,7 @@ export default function LiveRaceAnimation({ race }: LiveRaceAnimationProps) {
         <div className="border-b border-gray-200 px-5 py-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-bold text-gray-900">Bảng xếp hạng</h2>
-            <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${hasBackendResult ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : isLive ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-gray-200 bg-gray-50 text-gray-600'}`}>
-              {rankingLabel}
-            </span>
+            <SpectatorRaceStatusBadge status={race.status} label={rankingLabel} />
           </div>
         </div>
         <div className="overflow-x-auto">
