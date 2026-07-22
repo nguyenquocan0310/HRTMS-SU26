@@ -124,6 +124,15 @@ public class PairingController : ControllerBase
                 message = "Đã tồn tại lời mời ghép cặp đang chờ hoặc đã được chấp nhận cho ngựa và nài này."
             });
         }
+        catch (InvalidOperationException ex)
+            when (ex.Message == "JOCKEY_ALREADY_HAS_ACTIVE_PAIRING")
+        {
+            return Conflict(new
+            {
+                error = "JOCKEY_ALREADY_HAS_ACTIVE_PAIRING",
+                message = "Nài ngựa này đã có một ghép cặp đang hoạt động trong giải trùng lịch."
+            });
+        }
     }
 
     [HttpPatch("pairings/{id:int}/accept")]

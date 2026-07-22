@@ -5,6 +5,7 @@ using HRTMS.Core.Entities;
 using HRTMS.Core.Interfaces.Services;
 using HRTMS.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 
 namespace HRTMS.Infrastructure.Services;
 
@@ -105,6 +106,12 @@ public class PairingService : IPairingService
             throw new InvalidOperationException(
                 "JOCKEY_NOT_APPROVED_IN_TOURNAMENT");
         }
+
+        // Bao vệ cả trường hợp hai request gửi đồng thời: các bước kiểm tra active/
+        // duplicate và insert phải nằm trong cùng transaction serializable.
+        await using var transaction = await _context.Database
+            .BeginTransactionAsync(IsolationLevel.Serializable);
+
         // Kiem tra Jockey da co cap Accepted/Confirmed trong cung giai
         // hoac trong tournament khac bi trung thoi gian voi giai hien tai hay chua
         var overlappingTournamentIds = await _context.Tournaments
@@ -166,6 +173,7 @@ public class PairingService : IPairingService
 
         _context.Pairings.Add(pairing);
         await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
 
         var messagePart = string.IsNullOrWhiteSpace(dto.RequestMessage)
             ? ""
