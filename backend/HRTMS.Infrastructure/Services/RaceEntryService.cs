@@ -1174,6 +1174,7 @@ public class RaceEntryService : IRaceEntryService
         var entry = await _context.RaceEntries
             .Include(e => e.Race)
             .Include(e => e.Pairing).ThenInclude(p => p.Horse)
+            .Include(e => e.Pairing).ThenInclude(p => p.Tournament)
             .FirstOrDefaultAsync(e => e.RaceEntryId == raceEntryId)
             ?? throw new KeyNotFoundException("ENTRY_NOT_FOUND");
 
@@ -1220,6 +1221,9 @@ public class RaceEntryService : IRaceEntryService
         var isScratch = entry.Race.IsPostPositionDrawn;
         var targetStatus = isScratch ? "Scratched" : "Cancelled";
 
+        // Kết quả hoàn lệ phí — gán trong transaction, dùng lại ở response/notify.
+        var refundOutcome = "NotApplicable";
+
         // Cascade flow (reject enrollment / update horse / cancel race) có thể đã mở
         // transaction bên ngoài — không mở lồng, chỉ commit/rollback khi mình là chủ.
         var ownsTransaction = _context.Database.CurrentTransaction == null;
@@ -1252,12 +1256,41 @@ public class RaceEntryService : IRaceEntryService
                 };
             }
 
-            // Entry đã thanh toán -> chuyển Refund Pending để Module N xử lý hoàn phí.
-            if (entry.EntryFeeStatus == "Paid")
+            // ─── Hoàn lệ phí theo RefundDeadline (patch 012) ─────────────────
+            // Trước đây entry 'Paid' luôn chuyển 'Refund Pending' vô điều kiện,
+            // bỏ qua hoàn toàn RefundDeadline. Nay:
+            //   RefundDeadline NULL   -> giải không có chính sách hoàn phí.
+            //   now <= RefundDeadline -> hoàn: entry 'Refund Pending' +
+            //                            payment 'Verified' -> 'RefundPending'.
+            //   now >  RefundDeadline -> KHÔNG hoàn; entry vẫn Cancelled/Scratched
+            //                            nhưng giữ 'Paid', payment giữ 'Verified'.
+            var refundDeadline = entry.Pairing.Tournament.RefundDeadline;
+
+            if (entry.EntryFeeStatus != "Paid")
             {
+                refundOutcome = "NotApplicable";
+            }
+            else if (!refundDeadline.HasValue)
+            {
+                refundOutcome = "NoRefundPolicy";
+            }
+            else if (now > refundDeadline.Value)
+            {
+                refundOutcome = "DeadlinePassed";
+            }
+            else
+            {
+                refundOutcome = "Refunding";
+
                 await _context.RaceEntries
                     .Where(e => e.RaceEntryId == raceEntryId)
                     .ExecuteUpdateAsync(s => s.SetProperty(e => e.EntryFeeStatus, "Refund Pending"));
+
+                // Đồng bộ EntryFeePayments để Module N có một nguồn sự thật khi
+                // xử lý chi hoàn — chỉ đụng payment đang 'Verified'.
+                await _context.EntryFeePayments
+                    .Where(p => p.PairingId == entry.PairingId && p.Status == "Verified")
+                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, "RefundPending"));
             }
 
             // SCH.5: hoàn điểm ảo NGAY trong transaction withdraw — cộng ví + ghi sổ cái
@@ -1293,10 +1326,24 @@ public class RaceEntryService : IRaceEntryService
 
             // Bao Owner va Jockey cua cap dau bi huy (dung SRS: 3 ben).
             // Pairing.JockeyId = Users.UserId (shared PK voi JockeyProfiles).
+            // Owner phải được nói rõ tiền có được hoàn hay không — đây là điểm dễ
+            // khiếu nại nhất của luồng rút lui.
+            var refundNote = refundOutcome switch
+            {
+                "Refunding" =>
+                    $" Lệ phí đang được xử lý hoàn (hạn hoàn phí {refundDeadline:dd/MM/yyyy HH:mm} giờ UTC).",
+                "DeadlinePassed" =>
+                    $" Đã quá hạn hoàn phí ({refundDeadline:dd/MM/yyyy HH:mm} giờ UTC) nên lệ phí KHÔNG được hoàn.",
+                "NoRefundPolicy" =>
+                    " Giải đấu này không áp dụng hoàn lệ phí.",
+                _ => string.Empty
+            };
+
             await _notification.SendAsync(
                 entry.Pairing.Horse.OwnerId,
                 "Đăng ký cuộc đua đã bị hủy",
-                $"Ngựa '{entry.Pairing.Horse.Name}' đã rút khỏi cuộc đua #{entry.RaceId}. Lý do: {reason}.",
+                $"Ngựa '{entry.Pairing.Horse.Name}' đã rút khỏi cuộc đua #{entry.RaceId}. Lý do: {reason}." +
+                refundNote,
                 type: "Both",
                 relatedEntityType: "RaceEntry",
                 relatedEntityId: raceEntryId);
@@ -1331,9 +1378,14 @@ public class RaceEntryService : IRaceEntryService
             await _audit.LogAsync(actorId,
                 isSystem ? "Tự động hủy đăng ký đua (quá hạn xác nhận)" : "Rút khỏi cuộc đua",
                 "RaceEntry", raceEntryId.ToString(),
-                entry.Status, $"{targetStatus};Refunded={refunded};Reason={reason}");
+                entry.Status,
+                $"{targetStatus};Refunded={refunded};Fee={refundOutcome};Reason={reason}");
 
             if (tx != null) await tx.CommitAsync();
+
+            var baseMessage = isScratch
+                ? "Đã rút khỏi cuộc đua sau bốc thăm; cổng xuất phát để trống và điểm dự đoán đã hoàn."
+                : "Đã hủy đăng ký, giải phóng vị trí xuất phát và hoàn điểm dự đoán.";
 
             return new WithdrawResultDto
             {
@@ -1341,9 +1393,15 @@ public class RaceEntryService : IRaceEntryService
                 Status = targetStatus,
                 RefundedPredictions = refunded,
                 AlreadyWithdrawn = false,
-                Message = isScratch
-                    ? "Đã rút khỏi cuộc đua sau bốc thăm; cổng xuất phát để trống và điểm dự đoán đã hoàn."
-                    : "Đã hủy đăng ký, giải phóng vị trí xuất phát và hoàn điểm dự đoán."
+                RefundOutcome = refundOutcome,
+                RefundDeadline = refundDeadline,
+                Message = baseMessage + refundOutcome switch
+                {
+                    "Refunding" => " Lệ phí đang chờ hoàn.",
+                    "DeadlinePassed" => " Đã quá hạn hoàn phí nên lệ phí không được hoàn.",
+                    "NoRefundPolicy" => " Giải đấu này không áp dụng hoàn lệ phí.",
+                    _ => string.Empty
+                }
             };
         }
         catch

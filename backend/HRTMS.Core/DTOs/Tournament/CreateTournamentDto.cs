@@ -45,6 +45,18 @@ namespace HRTMS.Core.DTOs.Tournament
         // 0 = miễn phí
         [Range(0, double.MaxValue)]
         public decimal EntryFeeAmount { get; set; } = 0;
+
+        // Hạn nộp lệ phí (patch 012) — BẮT BUỘC với MỌI giải, kể cả giải miễn phí.
+        // Với giải free ngữ nghĩa là "hạn chốt đăng ký": AutoAllocateJob lấy đúng
+        // mốc này làm trigger, không có thì job mù và cả chuỗi tự động chết.
+        // Rule: now < PaymentDeadline <= StartDate - 24h (chừa buffer cho
+        // auto-allocate + auto-draw T-24h trước race đầu).
+        [Required(ErrorMessage = "Phải đặt hạn nộp lệ phí.")]
+        public DateTime PaymentDeadline { get; set; }
+
+        // Hạn hoàn phí khi rút lui. CHỈ áp dụng khi EntryFeeAmount > 0.
+        // NULL = giải không hoàn phí. Rule: PaymentDeadline <= RefundDeadline <= StartDate.
+        public DateTime? RefundDeadline { get; set; }
         // Ngưỡng cân nặng
         public decimal PreRaceWeightThresholdKg { get; set; } = 2.0m;
         public decimal PostRaceWeightDiffThresholdKg { get; set; } = 1.0m;

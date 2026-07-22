@@ -119,6 +119,53 @@ namespace HRTMS.Infrastructure.Services
                 throw new ArgumentException($"Tổng giải thưởng các cuộc đua ({allocatedPurse}) vượt quá tổng giải thưởng của giải ({tournament.PurseAmount}).");
         }
 
+        // Buffer bắt buộc giữa hạn nộp lệ phí và ngày khai mạc: sau PaymentDeadline
+        // hệ thống còn phải auto-allocate rồi auto-draw (AutoDrawJob chạy khi race
+        // còn <= 24h). Deadline sát StartDate thì draw không kịp.
+        private static readonly TimeSpan PaymentDeadlineBuffer = TimeSpan.FromHours(24);
+
+        // Deadline lệ phí (patch 012) — rule dùng chung cho Create/Update.
+        //   PaymentDeadline : BẮT BUỘC mọi giải (giải free = hạn chốt đăng ký,
+        //                     vì AutoAllocateJob lấy mốc này làm trigger).
+        //                     now < PaymentDeadline <= StartDate - 24h.
+        //   RefundDeadline  : chỉ khi EntryFeeAmount > 0; optional (NULL = không
+        //                     hoàn phí). PaymentDeadline <= RefundDeadline <= StartDate.
+        //
+        // enforceFutureDeadline = false khi Update mà Admin KHÔNG đổi PaymentDeadline:
+        // giải cũ có deadline đã trôi qua vẫn phải sửa được field khác.
+        private static void ValidateDeadlines(
+            DateTime? paymentDeadline,
+            DateTime? refundDeadline,
+            DateTime startDate,
+            decimal entryFeeAmount,
+            bool enforceFutureDeadline)
+        {
+            if (!paymentDeadline.HasValue)
+                throw new InvalidOperationException("PAYMENT_DEADLINE_REQUIRED");
+
+            var pd = paymentDeadline.Value;
+
+            if (enforceFutureDeadline && pd <= DateTime.UtcNow)
+                throw new InvalidOperationException("PAYMENT_DEADLINE_OUT_OF_RANGE");
+
+            if (pd > startDate - PaymentDeadlineBuffer)
+                throw new InvalidOperationException("PAYMENT_DEADLINE_OUT_OF_RANGE");
+
+            if (!refundDeadline.HasValue)
+                return;
+
+            // Giải miễn phí thì không có gì để hoàn — đặt hạn hoàn phí là vô nghĩa.
+            if (entryFeeAmount <= 0)
+                throw new InvalidOperationException("REFUND_DEADLINE_INVALID");
+
+            var rd = refundDeadline.Value;
+
+            // Cửa sổ hoàn phí đóng trước hạn đóng tiền là vô nghĩa: người nộp đúng
+            // hạn chót sẽ không bao giờ có cửa rút.
+            if (rd < pd || rd > startDate)
+                throw new InvalidOperationException("REFUND_DEADLINE_INVALID");
+        }
+
         // Sân đua (patch 011) — nạp venue và kiểm tra mọi ràng buộc dùng chung cho
         // Create/Update. Trả về venue để caller lấy TrackType/LaneCount.
         // maxHorses là giá trị SAU merge (giá trị giải sẽ có sau thao tác này).
@@ -165,6 +212,8 @@ namespace HRTMS.Infrastructure.Services
                 AllocatedPurse = allocatedPurse,
                 RemainingPurse = t.PurseAmount - allocatedPurse,
                 EntryFeeAmount = t.EntryFeeAmount,
+                PaymentDeadline = t.PaymentDeadline,
+                RefundDeadline = t.RefundDeadline,
                 PreRaceWeightThresholdKg = t.PreRaceWeightThresholdKg,
                 PostRaceWeightDiffThresholdKg = t.PostRaceWeightDiffThresholdKg,
                 Status = t.Status,
@@ -222,6 +271,12 @@ namespace HRTMS.Infrastructure.Services
                 throw new ArgumentException($"Hạng đua không hợp lệ: {dto.RaceCategory}");
             ValidateRaceDistance(dto.RaceDistance, nameof(dto.RaceDistance));
 
+            // Deadline lệ phí (patch 012) — bắt buộc cho giải mới.
+            ValidateDeadlines(
+                dto.PaymentDeadline, dto.RefundDeadline,
+                dto.StartDate, dto.EntryFeeAmount,
+                enforceFutureDeadline: true);
+
             // Sân đua (patch 011) — bắt buộc cho giải mới, phải active, và MaxHorses
             // không được vượt số làn của sân.
             var venue = await LoadAndValidateVenueAsync(dto.VenueId, dto.MaxHorses);
@@ -265,6 +320,8 @@ namespace HRTMS.Infrastructure.Services
                 MinJockeyExperienceYears = dto.MinJockeyExperienceYears,
                 PurseAmount = dto.PurseAmount,
                 EntryFeeAmount = dto.EntryFeeAmount,
+                PaymentDeadline = dto.PaymentDeadline,
+                RefundDeadline = dto.RefundDeadline,
                 PreRaceWeightThresholdKg = dto.PreRaceWeightThresholdKg,
                 PostRaceWeightDiffThresholdKg = dto.PostRaceWeightDiffThresholdKg,
                 // Khong truyen -> giu default entity (TopPerRace / 5).
@@ -435,11 +492,43 @@ namespace HRTMS.Infrastructure.Services
             // TrackType luôn suy ra từ sân; client gửi giá trị mâu thuẫn thì báo lỗi.
             if (mergedVenue != null && dto.TrackType != null && dto.TrackType != mergedVenue.TrackType)
                 throw new InvalidOperationException("TRACK_TYPE_VENUE_MISMATCH");
+
+            // ─── Deadline lệ phí (patch 012) ────────────────────────────────
+            var mergedPaymentDeadline = dto.PaymentDeadline ?? tournament.PaymentDeadline;
+            var mergedRefundDeadline = dto.ClearRefundDeadline
+                ? null
+                : dto.RefundDeadline ?? tournament.RefundDeadline;
+
+            var changingDeadline =
+                (dto.PaymentDeadline.HasValue && dto.PaymentDeadline != tournament.PaymentDeadline) ||
+                (dto.RefundDeadline.HasValue && dto.RefundDeadline != tournament.RefundDeadline) ||
+                (dto.ClearRefundDeadline && tournament.RefundDeadline != null);
+
+            // Đã qua hạn nộp lệ phí nghĩa là FeeDeadlineJob đã chạy (pairing trễ đã
+            // bị Declined) và AutoAllocateJob đã lấy mốc này làm trigger. Dời deadline
+            // sau thời điểm đó sẽ mâu thuẫn với dữ liệu job vừa ghi.
+            if (changingDeadline &&
+                tournament.PaymentDeadline.HasValue &&
+                DateTime.UtcNow > tournament.PaymentDeadline.Value)
+            {
+                throw new InvalidOperationException("DEADLINE_LOCKED");
+            }
+
             var mergedMinJockeyExperienceYears = dto.MinJockeyExperienceYears ?? tournament.MinJockeyExperienceYears;
             var mergedPurseAmount = dto.PurseAmount ?? tournament.PurseAmount;
             var mergedEntryFeeAmount = dto.EntryFeeAmount ?? tournament.EntryFeeAmount;
             var mergedPreRaceWeightThresholdKg = dto.PreRaceWeightThresholdKg ?? tournament.PreRaceWeightThresholdKg;
             var mergedPostRaceWeightDiffThresholdKg = dto.PostRaceWeightDiffThresholdKg ?? tournament.PostRaceWeightDiffThresholdKg;
+
+            // Chạy sau khi có mergedEntryFeeAmount: rule RefundDeadline phụ thuộc
+            // việc giải có thu phí hay không.
+            ValidateDeadlines(
+                mergedPaymentDeadline, mergedRefundDeadline,
+                mergedStartDate, mergedEntryFeeAmount,
+                // Chỉ bắt "deadline phải ở tương lai" khi Admin THỰC SỰ đổi mốc —
+                // giải cũ có deadline đã trôi qua vẫn phải sửa được field khác.
+                enforceFutureDeadline: dto.PaymentDeadline.HasValue &&
+                                       dto.PaymentDeadline != tournament.PaymentDeadline);
 
             ValidateTournamentWindow(mergedStartDate, mergedEndDate);
             ValidateTournamentNumbers(
@@ -490,6 +579,10 @@ namespace HRTMS.Infrastructure.Services
                 () => tournament.PurseAmount = dto.PurseAmount.Value);
             if (dto.EntryFeeAmount.HasValue) Apply("EntryFeeAmount", tournament.EntryFeeAmount, dto.EntryFeeAmount.Value,
                 () => tournament.EntryFeeAmount = dto.EntryFeeAmount.Value);
+            Apply("PaymentDeadline", tournament.PaymentDeadline, mergedPaymentDeadline,
+                () => tournament.PaymentDeadline = mergedPaymentDeadline);
+            Apply("RefundDeadline", tournament.RefundDeadline, mergedRefundDeadline,
+                () => tournament.RefundDeadline = mergedRefundDeadline);
             if (dto.PreRaceWeightThresholdKg.HasValue) Apply("PreRaceWeightThresholdKg",
                 tournament.PreRaceWeightThresholdKg, dto.PreRaceWeightThresholdKg.Value,
                 () => tournament.PreRaceWeightThresholdKg = dto.PreRaceWeightThresholdKg.Value);

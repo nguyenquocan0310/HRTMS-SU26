@@ -28,6 +28,9 @@ namespace HRTMS.Core.DTOs.Tournament
         // Phần quỹ giải còn lại chưa phân bổ cho Race nào = PurseAmount - AllocatedPurse.
         public decimal RemainingPurse { get; set; }
         public decimal EntryFeeAmount { get; set; }
+        // Deadline lệ phí (patch 012). RefundDeadline NULL = giải không hoàn phí.
+        public DateTime? PaymentDeadline { get; set; }
+        public DateTime? RefundDeadline { get; set; }
         public decimal PreRaceWeightThresholdKg { get; set; }
         public decimal PostRaceWeightDiffThresholdKg { get; set; }
         public string Status { get; set; } = string.Empty;

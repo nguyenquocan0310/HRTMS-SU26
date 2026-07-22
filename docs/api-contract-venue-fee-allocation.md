@@ -234,9 +234,60 @@ Trả file stream. Errors: `404 PAYMENT_NOT_FOUND` · `404 PROOF_NOT_FOUND` · `
   và cả prefix-collision kiểu `/uploads-evil`.
 - Owner khác pairing → `403`, **không** lộ chứng từ của pairing khác.
 
-### 2.7 Deadline ở Tournament
-`Tournaments.PaymentDeadline` / `RefundDeadline` (`DATETIME2 NULL`).
-NULL = không áp hạn, job bỏ qua.
+### 2.7 Deadline ở Tournament — RULE ĐÃ CHỐT
+
+`Tournaments.PaymentDeadline` / `RefundDeadline` (`DATETIME2 NULL` ở DB, rule
+enforce ở `TournamentService`).
+
+**`PaymentDeadline` — BẮT BUỘC với MỌI giải**, kể cả giải miễn phí.
+Với giải free ngữ nghĩa là **"hạn chốt đăng ký"**: `AutoAllocateJob` lấy đúng mốc
+này làm trigger (`Tournament.PaymentDeadline < now`), không có thì job **mù** và
+cả chuỗi tự động (reject phí trễ → auto-allocate → auto-draw) chết từ gốc.
+
+```
+now < PaymentDeadline <= StartDate - 24h
+```
+Buffer 24h là bắt buộc: sau deadline hệ thống còn phải auto-allocate rồi
+auto-draw (`AutoDrawJob` chỉ chạy khi race còn <= 24h). Deadline sát `StartDate`
+thì draw không kịp.
+
+**`RefundDeadline` — optional, chỉ khi `EntryFeeAmount > 0`.**
+`NULL` = giải không hoàn phí.
+```
+PaymentDeadline <= RefundDeadline <= StartDate
+```
+Cửa sổ hoàn phí đóng **trước** hạn đóng tiền là vô nghĩa — người nộp đúng hạn
+chót sẽ không bao giờ có cửa rút.
+
+**Update:** chỉ sửa được khi giải còn `Draft`/`Open Registration` (guard status
+sẵn có) **và** chưa qua `PaymentDeadline` hiện tại — job đã chạy thì dời mốc sẽ
+mâu thuẫn với dữ liệu job vừa ghi.
+
+> `UpdateTournamentDto.RefundDeadline = null` **không xoá** được giá trị cũ
+> (không phân biệt "không gửi" với "gửi null"). Dùng `ClearRefundDeadline: true`
+> để bỏ chính sách hoàn phí.
+
+| Điều kiện | Error | HTTP |
+|---|---|---|
+| Thiếu `PaymentDeadline` | `PAYMENT_DEADLINE_REQUIRED` | 422 |
+| Ngoài khoảng `now`..`StartDate-24h` | `PAYMENT_DEADLINE_OUT_OF_RANGE` | 422 |
+| `RefundDeadline` sai khoảng, hoặc đặt cho giải free | `REFUND_DEADLINE_INVALID` | 422 |
+| Đổi deadline sau khi đã qua `PaymentDeadline` | `DEADLINE_LOCKED` | 422 |
+
+### 2.8 Hoàn lệ phí khi rút lui — `RefundDeadline`
+
+`WithdrawAsync` nhánh lệ phí (entry `EntryFeeStatus = "Paid"`):
+
+| Điều kiện | Hành vi | `refundOutcome` |
+|---|---|---|
+| Entry chưa trả phí / giải free | không làm gì | `NotApplicable` |
+| `RefundDeadline` NULL | **không hoàn** (policy giải không hoàn phí) | `NoRefundPolicy` |
+| `now <= RefundDeadline` | entry → `Refund Pending`, payment `Verified` → `RefundPending` | `Refunding` |
+| `now > RefundDeadline` | **giữ** `Paid`/`Verified`, entry vẫn `Cancelled`/`Scratched` | `DeadlinePassed` |
+
+`WithdrawResultDto` trả thêm `refundOutcome` + `refundDeadline` để FE hiển thị và
+đếm ngược. Owner luôn nhận notification nói rõ tiền có được hoàn hay không — đây
+là điểm dễ khiếu nại nhất của luồng rút lui.
 
 ---
 
@@ -501,6 +552,10 @@ Mọi job dùng system user (`Role = "System"`, patch 006) làm audit actor. Thi
 | `LANE_COUNT_BELOW_TOURNAMENT_MAX_HORSES` | 422 | Venue |
 | `MAX_HORSES_EXCEEDS_LANES` | 422 | Tournament |
 | `TRACK_TYPE_VENUE_MISMATCH` | 422 | Tournament |
+| `PAYMENT_DEADLINE_REQUIRED` | 422 | Tournament |
+| `PAYMENT_DEADLINE_OUT_OF_RANGE` | 422 | Tournament |
+| `REFUND_DEADLINE_INVALID` | 422 | Tournament |
+| `DEADLINE_LOCKED` | 422 | Tournament |
 | `INVALID_PAYMENT_METHOD` | 400 | Fee |
 | `RECEIPT_NO_REQUIRED` | 400 | Fee |
 | `TRANSFER_REF_REQUIRED` | 400 | Fee |

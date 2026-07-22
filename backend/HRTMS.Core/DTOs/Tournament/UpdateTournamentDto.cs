@@ -27,6 +27,16 @@ namespace HRTMS.Core.DTOs.Tournament
         public int? MinJockeyExperienceYears { get; set; }
         public decimal? PurseAmount { get; set; }
         public decimal? EntryFeeAmount { get; set; }
+
+        // Deadline lệ phí (patch 012). Chỉ sửa được khi giải còn Draft/Open
+        // Registration VÀ chưa qua PaymentDeadline hiện tại (job đã chạy thì khóa).
+        public DateTime? PaymentDeadline { get; set; }
+
+        // Gửi RefundDeadline = null KHÔNG xóa được giá trị cũ (không phân biệt được
+        // "không gửi" với "gửi null") — dùng ClearRefundDeadline = true để bỏ hoàn phí.
+        public DateTime? RefundDeadline { get; set; }
+
+        public bool ClearRefundDeadline { get; set; }
         public decimal? PreRaceWeightThresholdKg { get; set; }
         public decimal? PostRaceWeightDiffThresholdKg { get; set; }
 
