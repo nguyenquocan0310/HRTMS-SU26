@@ -58,7 +58,7 @@ namespace HRTMS.API.Controllers
             }
         }
 
-        // Mã lỗi sân đua (patch 011) + deadline lệ phí (patch 012) dùng chung cho
+        // Mã lỗi sân đua (patch 012) + deadline lệ phí (patch 013) dùng chung cho
         // Create/Update — cùng map sang 422.
         private static bool IsVenueError(string code) =>
             code is "VENUE_INACTIVE" or "MAX_HORSES_EXCEEDS_LANES"

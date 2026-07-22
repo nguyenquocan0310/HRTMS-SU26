@@ -7,7 +7,7 @@ using System.Security.Claims;
 
 namespace HRTMS.API.Controllers;
 
-// Module E/N — Nộp & đối chiếu lệ phí (patch 012).
+// Module E/N — Nộp & đối chiếu lệ phí (patch 013).
 // Owner nộp -> Pairing PendingVerification -> Admin verify -> Pairing Confirmed.
 [Tags("fee-payments")]
 [ApiController]

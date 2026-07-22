@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace HRTMS.Core.DTOs.Payment
 {
-    // Owner nộp thông tin lệ phí cho một Pairing (patch 012).
+    // Owner nộp thông tin lệ phí cho một Pairing (patch 013).
     // Gửi dạng multipart/form-data vì kèm file chứng từ (tùy chọn).
     public class SubmitFeePaymentDto
     {

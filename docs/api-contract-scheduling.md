@@ -3,7 +3,7 @@
 Controller: `SchedulingController` · Base: `/api`
 Auth: JWT Bearer. Role lấy từ claim, ActorId lấy từ `NameIdentifier`.
 
-> ⚠️ **CẬP NHẬT (patch 011/012)** — xem **[api-contract-venue-fee-allocation.md](api-contract-venue-fee-allocation.md)**.
+> ⚠️ **CẬP NHẬT (patch 012/013)** — xem **[api-contract-venue-fee-allocation.md](api-contract-venue-fee-allocation.md)**.
 > Flow đã đổi: Owner nộp lệ phí → Admin verify → Pairing `Confirmed` → Admin bấm
 > **auto-allocate cả vòng** (không click từng pairing) → entry sinh ra đã `Confirmed`.
 > Phần nào dưới đây mâu thuẫn với tài liệu đó thì **tài liệu đó thắng**.
@@ -133,13 +133,13 @@ Hệ thống **không có điểm số** — chỉ có tiền thưởng (`Earnin
 
 **Allocation round sau (SCH.1):** round trước phải `Completed`; pairing phải `Qualified`/`AlsoEligible` ở round trước. Round đầu: allocate tự do từ pairing `Confirmed`.
 
-**Overflow/split — ĐÃ CÓ ENDPOINT (patch 011/012):** `POST /api/admin/rounds/{id}/auto-allocate`
+**Overflow/split — ĐÃ CÓ ENDPOINT (patch 012/013):** `POST /api/admin/rounds/{id}/auto-allocate`
 chia round-robin toàn bộ pool vào các race của vòng, sức chứa mỗi race =
 `min(MaxHorses, Venue.LaneCount)`. Pool vượt tổng sức chứa → phần dư trả về trong
 `waitlist` của response (ưu tiên theo thời điểm verify lệ phí ở vòng 1, theo
 `AdvancementStatus`/`AdvancementRank` ở vòng sau).
 
-> **ĐÃ CHỐT (patch 013):** waiting-list được persist vào bảng **`RoundWaitlist`**
+> **ĐÃ CHỐT (patch 014):** waiting-list được persist vào bảng **`RoundWaitlist`**
 > (`RoundId`, `PairingId`, `Position`, `CreatedAt`). Trước đó `AlsoEligible` là giá
 > trị của `RaceEntries.AdvancementStatus` nên **chỉ tồn tại khi pairing ĐÃ có entry
 > ở một race** — vòng 1 chưa có entry nào nên không có chỗ lưu.

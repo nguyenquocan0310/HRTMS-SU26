@@ -20,7 +20,7 @@ public interface IRaceEntryService
     // (Fisher-Yates); xem AssignmentIsFinal.
     Task<AutoAllocateResultDto> PreviewAllocateRoundAsync(int roundId);
 
-    // Danh sách chờ đã persist của một vòng (bảng RoundWaitlist, patch 013).
+    // Danh sách chờ đã persist của một vòng (bảng RoundWaitlist, patch 014).
     Task<List<AutoAllocateWaitlistDto>> GetRoundWaitlistAsync(int roundId);
 
     // Manual override: chuyển entry sang race khác TRONG CÙNG vòng, race đích

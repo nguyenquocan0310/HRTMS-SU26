@@ -6,7 +6,7 @@ using System.Security.Claims;
 
 namespace HRTMS.API.Controllers;
 
-// Module B — Sân đua (patch 011).
+// Module B — Sân đua (patch 012).
 // GET /api/venues là public (FE cần hiển thị sân của giải cho khán giả);
 // mọi thao tác ghi nằm dưới /api/admin/venues và yêu cầu role Admin.
 [Tags("venues")]

@@ -1,6 +1,6 @@
 # API Contract — Venue, Lệ phí, Tự động phân race & Bốc thăm
 
-Patch DB liên quan: `011_venue.sql`, `012_entry_fee_payment.sql`.
+Patch DB liên quan: `012_venue.sql`, `013_entry_fee_payment.sql`.
 Auth: JWT Bearer. Role lấy từ claim, ActorId lấy từ `NameIdentifier`.
 
 Tài liệu này bổ sung cho `api-contract-scheduling.md` và `api-contract-tournament.md`.
@@ -35,7 +35,7 @@ và UI không hiển thị nút “Giải miễn phí”.
 
 ---
 
-## 1. Venue — sân đua (patch 011)
+## 1. Venue — sân đua (patch 012)
 
 `Venue.LaneCount` = số cổng xuất phát, là **trần cứng** cho sức chứa mỗi cuộc đua.
 
@@ -144,7 +144,7 @@ nhưng giải đã có sân thì không được gỡ bỏ.
 
 ---
 
-## 2. Entry Fee Payment (patch 012)
+## 2. Entry Fee Payment (patch 013)
 
 ### 2.1 State machine
 
@@ -391,7 +391,7 @@ vào**, không quyết định **vào race nào**.
 Owner tự xác nhận. Một transaction; audit; notify từng Owner sau commit:
 > "Ngựa '[Tên]' đã được phân vào Cuộc đua #[X], lúc [Y]."
 
-### 3.1b Preview (dry-run) — patch 013
+### 3.1b Preview (dry-run) — patch 014
 `POST /api/admin/rounds/{roundId}/auto-allocate/preview` · Role: **Admin**
 
 **KHÔNG ghi DB.** Dùng **chung** `BuildAllocationPlanAsync` với thao tác chốt thật
@@ -428,7 +428,7 @@ Mọi error code giống `/auto-allocate`.
 > điểm chốt* nên **không** tất định → `races[].entries` để **rỗng** ở preview.
 > FE **không** được hiển thị mapping ngựa→race ở bước preview; kết quả thật sẽ khác.
 
-### 3.1c Danh sách chờ đã lưu — patch 013
+### 3.1c Danh sách chờ đã lưu — patch 014
 `GET /api/admin/rounds/{roundId}/waitlist` · Role: **Admin**
 
 `200 OK` → `AutoAllocateWaitlistDto[]`, sắp theo `position` tăng dần (1 = gọi bù trước).

@@ -2,7 +2,7 @@ using System;
 
 namespace HRTMS.Core.Entities;
 
-// Danh sách chờ theo vòng (patch 013).
+// Danh sách chờ theo vòng (patch 014).
 // Lưu phần dư khi pool đủ điều kiện vượt tổng sức chứa của vòng.
 //
 // KHÁC AlsoEligible: AlsoEligible là RaceEntries.AdvancementStatus nên chỉ tồn tại

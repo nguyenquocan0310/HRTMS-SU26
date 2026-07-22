@@ -27,7 +27,7 @@ public class FileStorageService : IFileStorageService
 
         Directory.CreateDirectory(_rootPath);
 
-        // Kho RIÊNG cho chứng từ lệ phí (patch 012) — tách khỏi kho chứng chỉ để
+        // Kho RIÊNG cho chứng từ lệ phí (patch 013) — tách khỏi kho chứng chỉ để
         // một lỗi phân quyền ở endpoint proof không làm lộ hồ sơ cá nhân/CCCD.
         var configuredProofPath = config["FileStorage:FeeProofsPath"];
         _feeProofRootPath = !string.IsNullOrWhiteSpace(configuredProofPath)

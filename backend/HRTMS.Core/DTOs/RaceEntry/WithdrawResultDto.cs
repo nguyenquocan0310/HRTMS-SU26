@@ -13,7 +13,7 @@ public class WithdrawResultDto
     // true neu entry da o trang thai Cancelled tu truoc (khong co thay doi moi).
     public bool AlreadyWithdrawn { get; set; }
 
-    // Ket qua hoan le phi (patch 012):
+    // Ket qua hoan le phi (patch 013):
     //   'NotApplicable' — entry chua tra phi / giai mien phi.
     //   'NoRefundPolicy' — giai khong dat RefundDeadline => khong hoan phi.
     //   'Refunding'     — con trong han, payment chuyen RefundPending cho Module N.

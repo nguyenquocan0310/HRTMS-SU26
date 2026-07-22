@@ -2,7 +2,7 @@ using System;
 
 namespace HRTMS.Core.Entities;
 
-// Nộp & đối chiếu lệ phí tham gia (patch 012).
+// Nộp & đối chiếu lệ phí tham gia (patch 013).
 // Một Pairing chỉ có MỘT payment đang hiệu lực (PendingVerification/Verified) —
 // bảo đảm bởi filtered unique index UQ_EFP_ActivePerPairing.
 // Pairing chỉ chuyển Confirmed khi payment được Admin verify.

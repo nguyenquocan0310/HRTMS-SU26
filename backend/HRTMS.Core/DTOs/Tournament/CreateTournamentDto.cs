@@ -23,7 +23,7 @@ namespace HRTMS.Core.DTOs.Tournament
         [Range(1, int.MaxValue, ErrorMessage ="MaxHorses must above 0")]
         public int MaxHorses { get; set; }
 
-        // Sân đua (patch 011) — BẮT BUỘC cho giải mới. Venue.LaneCount là trần cứng
+        // Sân đua (patch 012) — BẮT BUỘC cho giải mới. Venue.LaneCount là trần cứng
         // của MaxHorses; TrackType của giải được suy ra từ sân, không nhận tự do.
         [Range(1, int.MaxValue, ErrorMessage = "VenueId is required")]
         public int VenueId { get; set; }
@@ -47,7 +47,7 @@ namespace HRTMS.Core.DTOs.Tournament
         [Range(0, double.MaxValue)]
         public decimal EntryFeeAmount { get; set; } = 0;
 
-        // Hạn nộp lệ phí (patch 012) — BẮT BUỘC với MỌI giải, kể cả giải miễn phí.
+        // Hạn nộp lệ phí (patch 013) — BẮT BUỘC với MỌI giải, kể cả giải miễn phí.
         // Với giải free ngữ nghĩa là "hạn chốt đăng ký": AutoAllocateJob lấy đúng
         // mốc này làm trigger, không có thì job mù và cả chuỗi tự động chết.
         // Rule: now < PaymentDeadline <= StartDate - 24h (chừa buffer cho

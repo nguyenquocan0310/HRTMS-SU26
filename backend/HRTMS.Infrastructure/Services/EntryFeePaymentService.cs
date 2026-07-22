@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HRTMS.Infrastructure.Services;
 
-// Module E/N — Nộp & đối chiếu lệ phí (patch 012).
+// Module E/N — Nộp & đối chiếu lệ phí (patch 013).
 //
 // Đây là bước THAY THẾ cho PairingService.ConfirmAsync trong flow mới: Owner
 // không tự bấm confirm cặp đấu nữa. Owner nộp lệ phí -> Pairing sang

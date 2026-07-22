@@ -1,5 +1,5 @@
 /* =============================================================================
-   Patch 013 — Module E: RoundWaitlist (danh sách chờ theo vòng)
+   Patch 014 — Module E: RoundWaitlist (danh sách chờ theo vòng)
    -----------------------------------------------------------------------------
    Vấn đề patch này giải quyết:
      `AlsoEligible` là giá trị của RaceEntries.AdvancementStatus nên CHỈ tồn tại

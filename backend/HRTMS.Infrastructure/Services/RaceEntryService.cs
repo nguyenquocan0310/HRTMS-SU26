@@ -252,7 +252,7 @@ public class RaceEntryService : IRaceEntryService
                 created.Add((entry, candidate, race));
             }
 
-            // Danh sách chờ được PERSIST (patch 013) — trước đây chỉ trả trong
+            // Danh sách chờ được PERSIST (patch 014) — trước đây chỉ trả trong
             // response rồi mất. Position 1 = gọi bù trước.
             // Xoá bản cũ trước khi ghi để chạy lại không vướng
             // UQ_RoundWaitlist_RoundPairing / _RoundPosition.
@@ -1087,7 +1087,7 @@ public class RaceEntryService : IRaceEntryService
             IsPostPositionDrawn = race.IsPostPositionDrawn,
             ConfirmationCutoffHours = race.ConfirmationCutoffHours,
             ConfirmationCutoffTime = race.ScheduledTime.AddHours(-race.ConfirmationCutoffHours),
-            // San dua (patch 011) — ke thua tu giai.
+            // San dua (patch 012) — ke thua tu giai.
             VenueName = venue?.Name,
             VenueCity = venue?.City,
             VenueTrackType = venue?.TrackType,
@@ -1215,7 +1215,7 @@ public class RaceEntryService : IRaceEntryService
 
         var now = DateTime.UtcNow;
 
-        // Rút SAU bốc thăm (patch 012) -> 'Scratched': GIỮ nguyên PostPosition để
+        // Rút SAU bốc thăm (patch 013) -> 'Scratched': GIỮ nguyên PostPosition để
         // cổng đó bỏ trống, không bốc lại và không xô lệch cổng của ngựa khác.
         // Rút TRƯỚC bốc thăm -> 'Cancelled', giải phóng chỗ cho pairing khác.
         var isScratch = entry.Race.IsPostPositionDrawn;
@@ -1256,7 +1256,7 @@ public class RaceEntryService : IRaceEntryService
                 };
             }
 
-            // ─── Hoàn lệ phí theo RefundDeadline (patch 012) ─────────────────
+            // ─── Hoàn lệ phí theo RefundDeadline (patch 013) ─────────────────
             // Trước đây entry 'Paid' luôn chuyển 'Refund Pending' vô điều kiện,
             // bỏ qua hoàn toàn RefundDeadline. Nay:
             //   RefundDeadline NULL   -> giải không có chính sách hoàn phí.

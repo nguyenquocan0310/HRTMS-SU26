@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Http;
 
 namespace HRTMS.Core.Interfaces.Services
 {
-    // Module E/N — nộp & đối chiếu lệ phí (patch 012).
+    // Module E/N — nộp & đối chiếu lệ phí (patch 013).
     public interface IEntryFeePaymentService
     {
         Task<FeePaymentResponseDto> SubmitAsync(

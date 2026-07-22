@@ -51,8 +51,6 @@ public partial class User
 
     public virtual OwnerProfile? OwnerProfile { get; set; }
 
-    public virtual ICollection<Protest> Protests { get; set; } = new List<Protest>();
-
     public virtual ICollection<PursePayout> PursePayoutRecipientUsers { get; set; } = new List<PursePayout>();
 
     public virtual ICollection<PursePayout> PursePayoutUpdatedByAdmins { get; set; } = new List<PursePayout>();

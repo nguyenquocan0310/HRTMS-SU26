@@ -1,5 +1,5 @@
 /* =============================================================================
-   Patch 012 — Module E/N: Entry Fee Payment (nộp & đối chiếu lệ phí)
+   Patch 013 — Module E/N: Entry Fee Payment (nộp & đối chiếu lệ phí)
    -----------------------------------------------------------------------------
    Mục tiêu:
      • Bảng EntryFeePayments — Owner nộp thông tin lệ phí cho MỘT Pairing,

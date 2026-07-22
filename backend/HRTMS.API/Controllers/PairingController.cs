@@ -352,7 +352,7 @@ public class PairingController : ControllerBase
         }
     }
 
-    // DEPRECATED (patch 012) với giải CÓ THU PHÍ: Owner không còn tự xác nhận cặp
+    // DEPRECATED (patch 013) với giải CÓ THU PHÍ: Owner không còn tự xác nhận cặp
     // đấu — xác nhận đến từ POST /api/pairings/{id}/fee-payment rồi Admin verify.
     // Gọi endpoint này trên giải thu phí trả 422 ENTRY_FEE_REQUIRED.
     // Giải miễn phí (EntryFeeAmount = 0) vẫn dùng endpoint này bình thường.

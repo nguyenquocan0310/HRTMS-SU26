@@ -1,5 +1,5 @@
 /* =============================================================================
-   Patch 011 — Module B/E: Venues (sân đua) + Tournaments.VenueId
+   Patch 012 — Module B/E: Venues (sân đua) + Tournaments.VenueId
    -----------------------------------------------------------------------------
    Mục tiêu:
      • Bảng Venues — sân đua vật lý. Số làn (LaneCount) của sân là TRẦN CỨNG cho

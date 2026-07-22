@@ -1,6 +1,6 @@
 namespace HRTMS.Core.DTOs.RaceEntry;
 
-// Kết quả auto-allocate một vòng đấu (patch 012/Module E).
+// Kết quả auto-allocate một vòng đấu (patch 013/Module E).
 public class AutoAllocateResultDto
 {
     public int RoundId { get; set; }
@@ -92,7 +92,7 @@ public class AutoAllocateSelectedDto
 }
 
 // Pairing đủ điều kiện nhưng vượt sức chứa của vòng.
-// Được PERSIST vào bảng RoundWaitlist khi chốt (patch 013).
+// Được PERSIST vào bảng RoundWaitlist khi chốt (patch 014).
 public class AutoAllocateWaitlistDto
 {
     // Thứ tự gọi bù, 1 = gọi trước. Khớp RoundWaitlist.Position.

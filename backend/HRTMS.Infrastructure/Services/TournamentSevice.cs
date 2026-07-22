@@ -124,7 +124,7 @@ namespace HRTMS.Infrastructure.Services
         // còn <= 24h). Deadline sát StartDate thì draw không kịp.
         private static readonly TimeSpan PaymentDeadlineBuffer = TimeSpan.FromHours(24);
 
-        // Deadline lệ phí (patch 012) — rule dùng chung cho Create/Update.
+        // Deadline lệ phí (patch 013) — rule dùng chung cho Create/Update.
         //   PaymentDeadline : BẮT BUỘC mọi giải (giải free = hạn chốt đăng ký,
         //                     vì AutoAllocateJob lấy mốc này làm trigger).
         //                     now < PaymentDeadline <= StartDate - 24h.
@@ -185,7 +185,7 @@ namespace HRTMS.Infrastructure.Services
             return derived < paymentDeadline ? paymentDeadline : derived;
         }
 
-        // Sân đua (patch 011) — nạp venue và kiểm tra mọi ràng buộc dùng chung cho
+        // Sân đua (patch 012) — nạp venue và kiểm tra mọi ràng buộc dùng chung cho
         // Create/Update. Trả về venue để caller lấy TrackType/LaneCount.
         // maxHorses là giá trị SAU merge (giá trị giải sẽ có sau thao tác này).
         private async Task<Venue> LoadAndValidateVenueAsync(int venueId, int maxHorses)
@@ -259,8 +259,7 @@ namespace HRTMS.Infrastructure.Services
                         Status = race.Status,
                         IsPostPositionDrawn = race.IsPostPositionDrawn,
                         ConfirmationCutoffHours = race.ConfirmationCutoffHours,
-                        ProtestDeadlineMinutes = race.ProtestDeadlineMinutes,
-                        // Sân đua kế thừa từ giải (patch 011).
+                        // Sân đua kế thừa từ giải.
                         VenueName = t.Venue?.Name,
                         VenueCity = t.Venue?.City,
                         VenueTrackType = t.Venue?.TrackType,
@@ -290,7 +289,7 @@ namespace HRTMS.Infrastructure.Services
                 throw new ArgumentException($"Hạng đua không hợp lệ: {dto.RaceCategory}");
             ValidateRaceDistance(dto.RaceDistance, nameof(dto.RaceDistance));
 
-            // Deadline lệ phí (patch 012) — bắt buộc cho giải mới.
+            // Deadline lệ phí (patch 013) — bắt buộc cho giải mới.
             // Không gửi RefundDeadline thì giải thu phí vẫn có chính sách hoàn phí
             // mặc định; giải miễn phí không có gì để hoàn nên để NULL.
             var refundDeadline = dto.RefundDeadline
@@ -303,7 +302,7 @@ namespace HRTMS.Infrastructure.Services
                 dto.StartDate, dto.EntryFeeAmount,
                 enforceFutureDeadline: true);
 
-            // Sân đua (patch 011) — bắt buộc cho giải mới, phải active, và MaxHorses
+            // Sân đua (patch 012) — bắt buộc cho giải mới, phải active, và MaxHorses
             // không được vượt số làn của sân.
             var venue = await LoadAndValidateVenueAsync(dto.VenueId, dto.MaxHorses);
 
@@ -504,7 +503,7 @@ namespace HRTMS.Infrastructure.Services
             var mergedEndDate = dto.EndDate ?? tournament.EndDate;
             var mergedMaxHorses = dto.MaxHorses ?? tournament.MaxHorses;
 
-            // Sân đua (patch 011). Rule mới bắt buộc VenueId cho MỌI lần cập nhật:
+            // Sân đua (patch 012). Rule mới bắt buộc VenueId cho MỌI lần cập nhật:
             // giải cũ (VenueId NULL) vẫn ĐỌC được bình thường, nhưng muốn sửa thì
             // phải gán sân. Validate chạy khi đổi sân HOẶC khi đổi MaxHorses
             // (MaxHorses mới có thể vượt số làn của sân hiện tại).
@@ -521,7 +520,7 @@ namespace HRTMS.Infrastructure.Services
             if (mergedVenue != null && dto.TrackType != null && dto.TrackType != mergedVenue.TrackType)
                 throw new InvalidOperationException("TRACK_TYPE_VENUE_MISMATCH");
 
-            // ─── Deadline lệ phí (patch 012) ────────────────────────────────
+            // ─── Deadline lệ phí (patch 013) ────────────────────────────────
             var mergedEntryFeeAmount = dto.EntryFeeAmount ?? tournament.EntryFeeAmount;
             var mergedPaymentDeadline = dto.PaymentDeadline ?? tournament.PaymentDeadline;
             var mergedRefundDeadline = dto.ClearRefundDeadline
@@ -1164,7 +1163,6 @@ namespace HRTMS.Infrastructure.Services
                 // Chỉ mở sau khi Referee chốt official starting list.
                 IsPredictionGateClosed = true,
                 ConfirmationCutoffHours = dto.ConfirmationCutoffHours,
-                ProtestDeadlineMinutes = dto.ProtestDeadlineMinutes,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
             };
@@ -1191,7 +1189,6 @@ namespace HRTMS.Infrastructure.Services
                 Status = race.Status,
                 IsPostPositionDrawn = race.IsPostPositionDrawn,
                 ConfirmationCutoffHours = race.ConfirmationCutoffHours,
-                ProtestDeadlineMinutes = race.ProtestDeadlineMinutes,
             };
         }
 
@@ -1257,14 +1254,11 @@ namespace HRTMS.Infrastructure.Services
             TrackRaceChange("TrackTypeOverride", race.TrackTypeOverride, dto.TrackTypeOverride);
             TrackRaceChange("RaceDistanceOverride", race.RaceDistanceOverride, dto.RaceDistanceOverride);
             TrackRaceChange("ConfirmationCutoffHours", race.ConfirmationCutoffHours, dto.ConfirmationCutoffHours);
-            TrackRaceChange("ProtestDeadlineMinutes", race.ProtestDeadlineMinutes, dto.ProtestDeadlineMinutes);
-
             race.ScheduledTime = scheduledTime;
             race.PurseAmount = purseAmount;
             race.TrackTypeOverride = dto.TrackTypeOverride;
             race.RaceDistanceOverride = dto.RaceDistanceOverride;
             race.ConfirmationCutoffHours = dto.ConfirmationCutoffHours;
-            race.ProtestDeadlineMinutes = dto.ProtestDeadlineMinutes;
             race.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -1291,7 +1285,6 @@ namespace HRTMS.Infrastructure.Services
                 Status = race.Status,
                 IsPostPositionDrawn = race.IsPostPositionDrawn,
                 ConfirmationCutoffHours = race.ConfirmationCutoffHours,
-                ProtestDeadlineMinutes = race.ProtestDeadlineMinutes,
             };
         }
     }

@@ -37,14 +37,14 @@ public partial class Tournament
 
     public string Status { get; set; } = null!;
 
-    // Sân đua (patch 011). NULL ở DB cho giải cũ tạo trước patch; TournamentService
+    // Sân đua (patch 012). NULL ở DB cho giải cũ tạo trước patch; TournamentService
     // bắt buộc giá trị này khi tạo/cập nhật giải mới.
     public int? VenueId { get; set; }
 
-    // Hạn nộp lệ phí (patch 012). NULL = giải không áp hạn; FeeDeadlineJob bỏ qua.
+    // Hạn nộp lệ phí (patch 013). NULL = giải không áp hạn; FeeDeadlineJob bỏ qua.
     public DateTime? PaymentDeadline { get; set; }
 
-    // Hạn hoàn phí khi rút lui (patch 012). NULL = không hoàn.
+    // Hạn hoàn phí khi rút lui (patch 013). NULL = không hoàn.
     public DateTime? RefundDeadline { get; set; }
 
     // Progression (patch 002): rule chọn ngựa đi tiếp + Top N per race.

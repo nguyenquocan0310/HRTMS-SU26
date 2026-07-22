@@ -87,8 +87,6 @@ public partial class RaceEntry
 
     public virtual ICollection<Prediction> Predictions { get; set; } = new List<Prediction>();
 
-    public virtual ICollection<Protest> Protests { get; set; } = new List<Protest>();
-
     public virtual ICollection<PursePayout> PursePayouts { get; set; } = new List<PursePayout>();
 
     public virtual Race Race { get; set; } = null!;

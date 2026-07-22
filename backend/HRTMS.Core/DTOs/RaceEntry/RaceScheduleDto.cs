@@ -21,7 +21,7 @@ public class RaceScheduleDto
     // DEPRECATED: Owner khong con tu confirm entry (xac nhan den tu verify le phi).
     public DateTime ConfirmationCutoffTime { get; set; }
 
-    // San dua (patch 011) — ke thua tu giai. NULL voi giai cu chua gan san.
+    // San dua (patch 012) — ke thua tu giai. NULL voi giai cu chua gan san.
     public string? VenueName { get; set; }
 
     public string? VenueCity { get; set; }

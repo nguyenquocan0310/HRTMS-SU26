@@ -287,7 +287,7 @@ public class PairingService : IPairingService
             throw new InvalidOperationException("INVALID_STATUS");
         }
 
-        // DEPRECATED (patch 012): Owner KHÔNG còn tự xác nhận cặp đấu ở giải có thu
+        // DEPRECATED (patch 013): Owner KHÔNG còn tự xác nhận cặp đấu ở giải có thu
         // phí — xác nhận nay đến từ việc Admin verify lệ phí
         // (EntryFeePaymentService.VerifyAsync). Chặn ở đây để không có hai đường
         // cùng đưa Pairing lên Confirmed, và để Owner không bypass thanh toán.

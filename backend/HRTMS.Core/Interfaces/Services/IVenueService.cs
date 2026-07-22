@@ -2,7 +2,7 @@ using HRTMS.Core.DTOs.Venue;
 
 namespace HRTMS.Core.Interfaces.Services
 {
-    // Module B — quản lý sân đua (patch 011).
+    // Module B — quản lý sân đua (patch 012).
     public interface IVenueService
     {
         // includeInactive chỉ dành cho Admin; endpoint public luôn gọi với false.

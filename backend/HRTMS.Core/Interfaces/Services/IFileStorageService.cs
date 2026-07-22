@@ -19,7 +19,7 @@ public interface IFileStorageService
     void DeleteIfExists(string storedFilePath);
 
     /// <summary>
-    /// Lưu chứng từ lệ phí (patch 012) vào kho private RIÊNG, tách khỏi kho chứng
+    /// Lưu chứng từ lệ phí (patch 013) vào kho private RIÊNG, tách khỏi kho chứng
     /// chỉ để một lỗi phân quyền ở endpoint này không làm lộ hồ sơ cá nhân/CCCD.
     /// Dùng chung bộ validate (extension, kích thước) với chứng chỉ.
     /// </summary>

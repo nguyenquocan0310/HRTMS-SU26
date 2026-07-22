@@ -19,22 +19,14 @@ namespace HRTMS.Core.DTOs.Result
         public bool IsRaceReportLocked { get; set; }
 
         // Các điều kiện chặn Declare Official
-        public bool HasPendingProtests { get; set; }
         public bool PrizeDistributionsConfigured { get; set; }
         public bool RankingIntegrityValid { get; set; }
         public bool PostRaceWeighInComplete { get; set; }
 
-        // Cửa sổ khiếu nại (RaceReport.SubmittedAt + Race.ProtestDeadlineMinutes).
-        // Owner/Jockey chỉ được nộp Protest khi còn hạn — nên Admin cũng không
-        // được Declare Official trước khi hạn này kết thúc.
-        public bool ProtestWindowClosed { get; set; }
-        public DateTime? ProtestDeadlineAt { get; set; }
-
         public bool CanDeclareOfficial =>
             HasRaceReport && !IsRaceReportLocked &&
-            !HasPendingProtests && PrizeDistributionsConfigured &&
-            RankingIntegrityValid && PostRaceWeighInComplete &&
-            ProtestWindowClosed;
+            PrizeDistributionsConfigured &&
+            RankingIntegrityValid && PostRaceWeighInComplete;
     }
 
     // ===========================================================================

@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HRTMS.Infrastructure.Services
 {
-    // Module B — quản lý sân đua (patch 011).
+    // Module B — quản lý sân đua (patch 012).
     // Theo convention HRTMS: service ném exception với "error code" là message
     // để Controller map sang HTTP status.
     public class VenueService : IVenueService

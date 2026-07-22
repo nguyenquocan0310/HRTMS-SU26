@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace HRTMS.Core.Entities;
 
-// Sân đua vật lý (patch 011). LaneCount là trần cứng cho sức chứa mỗi cuộc đua —
+// Sân đua vật lý (patch 012). LaneCount là trần cứng cho sức chứa mỗi cuộc đua —
 // không thể xếp nhiều ngựa hơn số cổng xuất phát của sân.
 public partial class Venue
 {
