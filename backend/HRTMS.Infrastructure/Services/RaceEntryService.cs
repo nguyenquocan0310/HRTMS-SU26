@@ -196,6 +196,418 @@ public class RaceEntryService : IRaceEntryService
     }
 
     // =====================================================================
+    // Tự động phân bổ cả vòng (Module E — thay cho việc click từng pairing)
+    // =====================================================================
+    // Round 1 : pairing Confirmed + lệ phí Verified, ưu tiên verify sớm hơn.
+    // Round 2+: entry Qualified/AlsoEligible ở vòng TRƯỚC (không quét lại toàn giải,
+    //           nên pairing đã đua vòng loại không bị "biến mất" ở vòng sau).
+    // Sức chứa mỗi race = min(Tournament.MaxHorses, Venue.LaneCount).
+    public async Task<AutoAllocateResultDto> AutoAllocateRoundAsync(int actorId, int roundId)
+    {
+        var round = await _context.Rounds
+            .Include(r => r.Tournament).ThenInclude(t => t.Venue)
+            .Include(r => r.Races)
+            .FirstOrDefaultAsync(r => r.RoundId == roundId)
+            ?? throw new KeyNotFoundException("ROUND_NOT_FOUND");
+
+        var tournament = round.Tournament;
+
+        EnsureTournamentOpenForScheduling(tournament.Status);
+
+        // Sức chứa lấy từ số làn của sân — không có sân thì không biết trần cứng.
+        if (tournament.Venue == null)
+            throw new InvalidOperationException("VENUE_REQUIRED");
+
+        var races = round.Races
+            .Where(r => r.Status != "Cancelled")
+            .OrderBy(r => r.RaceNumber)
+            .ToList();
+
+        if (races.Count == 0)
+            throw new InvalidOperationException("NO_RACES_IN_ROUND");
+
+        // Đã bốc thăm thì danh sách xuất phát đã chốt — không phân bổ lại.
+        if (races.Any(r => r.IsPostPositionDrawn))
+            throw new InvalidOperationException("ROUND_ALREADY_DRAWN");
+
+        // Idempotency: vòng đã có entry hợp lệ nghĩa là đã allocate.
+        var raceIds = races.Select(r => r.RaceId).ToList();
+        var hasEntries = await _context.RaceEntries
+            .AnyAsync(e => raceIds.Contains(e.RaceId) && ActiveEntryStatuses.Contains(e.Status));
+        if (hasEntries)
+            throw new InvalidOperationException("ROUND_ALREADY_ALLOCATED");
+
+        var previousRound = await _context.Rounds
+            .Where(r => r.TournamentId == round.TournamentId &&
+                        r.SequenceOrder < round.SequenceOrder)
+            .OrderByDescending(r => r.SequenceOrder)
+            .FirstOrDefaultAsync();
+
+        if (previousRound != null && previousRound.Status != "Completed")
+            throw new InvalidOperationException("PREVIOUS_ROUND_NOT_COMPLETED");
+
+        var pool = previousRound == null
+            ? await BuildFirstRoundPoolAsync(round.TournamentId)
+            : await BuildProgressionPoolAsync(round.TournamentId, previousRound.RoundId);
+
+        if (pool.Count == 0)
+            throw new InvalidOperationException("NO_ELIGIBLE_PAIRINGS");
+
+        var capacityPerRace = Math.Min(tournament.MaxHorses, tournament.Venue.LaneCount);
+        var totalCapacity = capacityPerRace * races.Count;
+
+        // Pool vượt sức chứa: giữ theo thứ tự ưu tiên đã sắp (fee verified sớm hơn
+        // ở vòng 1; Qualified trước AlsoEligible ở vòng sau), phần dư thành waitlist.
+        var selected = pool.Take(totalCapacity).ToList();
+        var waitlisted = pool.Skip(totalCapacity).ToList();
+
+        // Xáo trộn Fisher-Yates để thứ tự nộp phí KHÔNG quyết định vào race nào —
+        // ưu tiên chỉ dùng để chọn AI được vào, không dùng để chọn VÀO ĐÂU.
+        var rng = Random.Shared;
+        for (int i = selected.Count - 1; i > 0; i--)
+        {
+            int j = rng.Next(i + 1);
+            (selected[i], selected[j]) = (selected[j], selected[i]);
+        }
+
+        var now = DateTime.UtcNow;
+        var created = new List<(RaceEntry Entry, PoolCandidate Candidate, Race Race)>();
+
+        await using var tx = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            // Chia round-robin -> các race lệch nhau tối đa 1 ngựa.
+            for (int i = 0; i < selected.Count; i++)
+            {
+                var race = races[i % races.Count];
+                var candidate = selected[i];
+
+                var entry = new RaceEntry
+                {
+                    RaceId = race.RaceId,
+                    PairingId = candidate.PairingId,
+                    // Auto-allocate chỉ nhận pairing đã Confirmed + phí Verified nên
+                    // entry vào thẳng Confirmed: không còn bước Owner tự xác nhận.
+                    Status = "Confirmed",
+                    EntryFeeStatus = "Paid",
+                    IsWithdrawn = false,
+                    CreatedAt = now,
+                    UpdatedAt = now
+                };
+
+                _context.RaceEntries.Add(entry);
+                created.Add((entry, candidate, race));
+            }
+
+            await _context.SaveChangesAsync();
+
+            await _audit.LogAsync(actorId, "Tự động phân ngựa vào cuộc đua", "Round",
+                roundId.ToString(), null,
+                $"Allocated={created.Count};Waitlisted={waitlisted.Count};" +
+                $"Capacity={capacityPerRace}/race;Races={races.Count}");
+
+            await tx.CommitAsync();
+        }
+        catch (DbUpdateException ex) when (
+            ex.InnerException is SqlException sqlEx &&
+            (sqlEx.Number == 2601 || sqlEx.Number == 2627))
+        {
+            await tx.RollbackAsync();
+            // Một tiến trình khác (job hoặc Admin thứ hai) đã allocate trước.
+            throw new InvalidOperationException("ROUND_ALREADY_ALLOCATED");
+        }
+        catch
+        {
+            await tx.RollbackAsync();
+            throw;
+        }
+
+        // Notification sau khi commit — thất bại gửi tin không được rollback phân bổ.
+        foreach (var (entry, candidate, race) in created)
+        {
+            await _notification.SendAsync(
+                candidate.OwnerId,
+                "Ngựa đã được phân vào cuộc đua",
+                $"Ngựa '{candidate.HorseName}' đã được phân vào Cuộc đua #{race.RaceNumber}, " +
+                $"lúc {race.ScheduledTime:dd/MM/yyyy HH:mm} (giờ UTC).",
+                type: "Both",
+                relatedEntityType: "RaceEntry",
+                relatedEntityId: entry.RaceEntryId);
+        }
+
+        return new AutoAllocateResultDto
+        {
+            RoundId = roundId,
+            TournamentId = round.TournamentId,
+            PoolSize = pool.Count,
+            CapacityPerRace = capacityPerRace,
+            RaceCount = races.Count,
+            TotalCapacity = totalCapacity,
+            AllocatedCount = created.Count,
+            WaitlistedCount = waitlisted.Count,
+            Races = races.Select(r => new AutoAllocateRaceDto
+            {
+                RaceId = r.RaceId,
+                RaceNumber = r.RaceNumber,
+                ScheduledTime = r.ScheduledTime,
+                EntryCount = created.Count(c => c.Race.RaceId == r.RaceId),
+                Entries = created
+                    .Where(c => c.Race.RaceId == r.RaceId)
+                    .Select(c => new AutoAllocateEntryDto
+                    {
+                        RaceEntryId = c.Entry.RaceEntryId,
+                        PairingId = c.Candidate.PairingId,
+                        HorseId = c.Candidate.HorseId,
+                        HorseName = c.Candidate.HorseName,
+                        JockeyId = c.Candidate.JockeyId,
+                        JockeyName = c.Candidate.JockeyName
+                    }).ToList()
+            }).ToList(),
+            Waitlist = waitlisted.Select(c => new AutoAllocateWaitlistDto
+            {
+                PairingId = c.PairingId,
+                HorseId = c.HorseId,
+                HorseName = c.HorseName,
+                FeeVerifiedAt = c.FeeVerifiedAt
+            }).ToList()
+        };
+    }
+
+    // Ứng viên trong pool phân bổ.
+    private sealed record PoolCandidate(
+        int PairingId, int HorseId, string HorseName,
+        int JockeyId, string JockeyName, int OwnerId, DateTime? FeeVerifiedAt);
+
+    // Vòng 1: pairing Confirmed + lệ phí Verified + ngựa còn được duyệt trong giải.
+    // Ưu tiên fee verified sớm hơn khi pool vượt sức chứa.
+    private async Task<List<PoolCandidate>> BuildFirstRoundPoolAsync(int tournamentId)
+    {
+        var rows = await _context.Pairings
+            .Where(p => p.TournamentId == tournamentId && p.Status == "Confirmed")
+            .Select(p => new
+            {
+                p.PairingId,
+                p.HorseId,
+                HorseName = p.Horse.Name,
+                p.JockeyId,
+                JockeyName = p.Jockey.Jockey.FullName,
+                p.Horse.OwnerId,
+                // Bất biến "Confirmed <=> có payment Verified" do
+                // EntryFeePaymentService giữ; ở đây kiểm tra lại để pairing
+                // Confirmed bằng đường khác cũng không lọt vào pool.
+                FeeVerifiedAt = _context.EntryFeePayments
+                    .Where(f => f.PairingId == p.PairingId && f.Status == "Verified")
+                    .Select(f => (DateTime?)f.VerifiedAt)
+                    .FirstOrDefault(),
+                EnrollmentApproved = _context.HorseTournamentEntries
+                    .Any(e => e.HorseId == p.HorseId &&
+                              e.TournamentId == tournamentId &&
+                              e.Status == "Enrolled" &&
+                              e.AdminApprovalStatus == "Approved")
+            })
+            .ToListAsync();
+
+        return rows
+            .Where(r => r.FeeVerifiedAt != null && r.EnrollmentApproved)
+            // Nộp/verify sớm hơn được ưu tiên khi phải cắt theo sức chứa.
+            .OrderBy(r => r.FeeVerifiedAt)
+            .ThenBy(r => r.PairingId)
+            .Select(r => new PoolCandidate(
+                r.PairingId, r.HorseId, r.HorseName,
+                r.JockeyId, r.JockeyName, r.OwnerId, r.FeeVerifiedAt))
+            .ToList();
+    }
+
+    // Vòng 2+: CHỈ entry Qualified/AlsoEligible của vòng TRƯỚC.
+    // Qualified xếp trước AlsoEligible (AlsoEligible là danh sách dự bị), trong mỗi
+    // nhóm xếp theo AdvancementRank.
+    private async Task<List<PoolCandidate>> BuildProgressionPoolAsync(
+        int tournamentId, int previousRoundId)
+    {
+        var rows = await _context.RaceEntries
+            .Where(e => e.Race.RoundId == previousRoundId &&
+                        (e.AdvancementStatus == "Qualified" || e.AdvancementStatus == "AlsoEligible"))
+            .Select(e => new
+            {
+                e.PairingId,
+                e.Pairing.HorseId,
+                HorseName = e.Pairing.Horse.Name,
+                e.Pairing.JockeyId,
+                JockeyName = e.Pairing.Jockey.Jockey.FullName,
+                e.Pairing.Horse.OwnerId,
+                e.AdvancementStatus,
+                e.AdvancementRank,
+                PairingStatus = e.Pairing.Status,
+                EnrollmentApproved = _context.HorseTournamentEntries
+                    .Any(h => h.HorseId == e.Pairing.HorseId &&
+                              h.TournamentId == tournamentId &&
+                              h.Status == "Enrolled" &&
+                              h.AdminApprovalStatus == "Approved")
+            })
+            .ToListAsync();
+
+        return rows
+            // Pairing có thể bị hủy giữa chừng (ngựa rút khỏi giải) — không cho đi tiếp.
+            .Where(r => r.PairingStatus == "Confirmed" && r.EnrollmentApproved)
+            .GroupBy(r => r.PairingId)
+            .Select(g => g.First())
+            .OrderBy(r => r.AdvancementStatus == "Qualified" ? 0 : 1)
+            .ThenBy(r => r.AdvancementRank ?? int.MaxValue)
+            .ThenBy(r => r.PairingId)
+            .Select(r => new PoolCandidate(
+                r.PairingId, r.HorseId, r.HorseName,
+                r.JockeyId, r.JockeyName, r.OwnerId, null))
+            .ToList();
+    }
+
+    // =====================================================================
+    // Manual override: chuyển entry sang race khác cùng vòng
+    // =====================================================================
+    public async Task<RaceEntryResponseDto> MoveEntryAsync(
+        int adminId, int raceEntryId, int targetRaceId)
+    {
+        var entry = await _context.RaceEntries
+            .Include(e => e.Race).ThenInclude(r => r.Round).ThenInclude(rd => rd.Tournament)
+                .ThenInclude(t => t.Venue)
+            .Include(e => e.Pairing).ThenInclude(p => p.Horse)
+            .Include(e => e.Pairing).ThenInclude(p => p.Jockey).ThenInclude(j => j.Jockey)
+            .FirstOrDefaultAsync(e => e.RaceEntryId == raceEntryId)
+            ?? throw new KeyNotFoundException("ENTRY_NOT_FOUND");
+
+        if (!ActiveEntryStatuses.Contains(entry.Status))
+            throw new InvalidOperationException("INVALID_STATUS");
+
+        var targetRace = await _context.Races
+            .Include(r => r.Round).ThenInclude(rd => rd.Tournament).ThenInclude(t => t.Venue)
+            .FirstOrDefaultAsync(r => r.RaceId == targetRaceId)
+            ?? throw new KeyNotFoundException("TARGET_RACE_NOT_FOUND");
+
+        if (targetRace.RaceId == entry.RaceId)
+            throw new InvalidOperationException("SAME_RACE");
+
+        // Chỉ đổi trong CÙNG vòng — chuyển sang vòng khác sẽ phá guard progression
+        // (và cũng chặn luôn move cross-tournament).
+        if (targetRace.RoundId != entry.Race.RoundId)
+            throw new InvalidOperationException("RACE_NOT_IN_SAME_ROUND");
+
+        // Cả hai phía đều phải chưa bốc thăm: race nguồn đã bốc thì cổng đã công bố.
+        if (entry.Race.IsPostPositionDrawn || targetRace.IsPostPositionDrawn)
+            throw new InvalidOperationException("ALREADY_DRAWN");
+
+        if (targetRace.Status != "Upcoming")
+            throw new InvalidOperationException("INVALID_RACE_STATE");
+
+        EnsureTournamentOpenForScheduling(targetRace.Round.Tournament.Status);
+
+        // Manual move không được là đường vòng để đưa pairing chưa trả phí vào đua.
+        var feeVerified = await _context.EntryFeePayments
+            .AnyAsync(p => p.PairingId == entry.PairingId && p.Status == "Verified");
+        if (!feeVerified)
+            throw new InvalidOperationException("PAIRING_FEE_NOT_PAID");
+
+        var venue = targetRace.Round.Tournament.Venue;
+        var capacity = venue == null
+            ? targetRace.Round.Tournament.MaxHorses
+            : Math.Min(targetRace.Round.Tournament.MaxHorses, venue.LaneCount);
+
+        var targetCount = await _context.RaceEntries
+            .CountAsync(e => e.RaceId == targetRaceId && ActiveEntryStatuses.Contains(e.Status));
+        if (targetCount >= capacity)
+            throw new InvalidOperationException("MAX_LANES_REACHED");
+
+        var duplicate = await _context.RaceEntries
+            .AnyAsync(e => e.RaceId == targetRaceId &&
+                           ActiveEntryStatuses.Contains(e.Status) &&
+                           (e.Pairing.HorseId == entry.Pairing.HorseId ||
+                            e.Pairing.JockeyId == entry.Pairing.JockeyId));
+        if (duplicate)
+            throw new InvalidOperationException("DUPLICATE_IN_RACE");
+
+        var sourceRaceId = entry.RaceId;
+        entry.RaceId = targetRaceId;
+        // Chưa bốc thăm nên PostPosition phải rỗng; set lại cho chắc.
+        entry.PostPosition = null;
+        entry.UpdatedAt = DateTime.UtcNow;
+
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (
+            ex.InnerException is SqlException sqlEx &&
+            (sqlEx.Number == 2601 || sqlEx.Number == 2627))
+        {
+            throw new InvalidOperationException("DUPLICATE_IN_RACE");
+        }
+
+        await _audit.LogAsync(adminId, "Chuyển ngựa sang cuộc đua khác", "RaceEntry",
+            raceEntryId.ToString(), $"RaceId={sourceRaceId}", $"RaceId={targetRaceId}");
+
+        await _notification.SendAsync(
+            entry.Pairing.Horse.OwnerId,
+            "Ngựa được chuyển cuộc đua",
+            $"Ngựa '{entry.Pairing.Horse.Name}' đã được chuyển sang Cuộc đua #{targetRace.RaceNumber}, " +
+            $"lúc {targetRace.ScheduledTime:dd/MM/yyyy HH:mm} (giờ UTC).",
+            type: "Both",
+            relatedEntityType: "RaceEntry",
+            relatedEntityId: raceEntryId);
+
+        return MapToResponse(entry, entry.Pairing);
+    }
+
+    // =====================================================================
+    // Job nén: auto-allocate vòng 1 của giải đã quá hạn nộp phí
+    // =====================================================================
+    public async Task<int> AutoAllocateDueRoundsAsync()
+    {
+        var now = DateTime.UtcNow;
+
+        // Chỉ vòng ĐẦU (SequenceOrder nhỏ nhất) của giải đã quá PaymentDeadline.
+        // Vòng N+1 được kích hoạt sau khi vòng N Completed (ApplyProgressionAsync),
+        // không phải bởi job này.
+        var candidateRoundIds = await _context.Rounds
+            .Where(r => r.Tournament.PaymentDeadline != null &&
+                        r.Tournament.PaymentDeadline < now &&
+                        (r.Tournament.Status == "Open Registration" ||
+                         r.Tournament.Status == "Closed Registration") &&
+                        r.Status == "Upcoming" &&
+                        r.SequenceOrder == _context.Rounds
+                            .Where(x => x.TournamentId == r.TournamentId)
+                            .Min(x => x.SequenceOrder))
+            .Select(r => r.RoundId)
+            .ToListAsync();
+
+        if (candidateRoundIds.Count == 0)
+            return 0;
+
+        var systemActorId = await _context.Users
+            .Where(u => u.Role == "System" && u.Status == "Active")
+            .Select(u => u.UserId)
+            .FirstOrDefaultAsync();
+        if (systemActorId == 0)
+            throw new InvalidOperationException("SYSTEM_USER_NOT_FOUND");
+
+        var allocated = 0;
+        foreach (var roundId in candidateRoundIds)
+        {
+            try
+            {
+                await AutoAllocateRoundAsync(systemActorId, roundId);
+                allocated++;
+            }
+            catch (InvalidOperationException)
+            {
+                // Đã allocate / đã bốc thăm / chưa có pairing đủ điều kiện / thiếu
+                // sân — đều là trạng thái hợp lệ để BỎ QUA. Nhờ vậy job chạy lại
+                // mỗi giờ không tạo entry trùng và không làm hỏng vòng khác.
+                continue;
+            }
+        }
+
+        return allocated;
+    }
+
+    // =====================================================================
     // Bốc thăm vị trí xuất phát (NGUYÊN TỬ)
     // =====================================================================
     public async Task<PostPositionDrawResultDto> DrawPostPositionsAsync(int adminId, int raceId)
@@ -404,13 +816,13 @@ public class RaceEntryService : IRaceEntryService
         if (!isSystem && entry.Pairing.Horse.OwnerId != actorId)
             throw new UnauthorizedAccessException("FORBIDDEN");
 
-        // Da Cancelled -> tra ket qua idempotent, khong lam gi them.
-        if (entry.Status == "Cancelled")
+        // Da rut roi -> tra ket qua idempotent, khong lam gi them.
+        if (entry.Status is "Cancelled" or "Scratched")
         {
             return new WithdrawResultDto
             {
                 RaceEntryId = raceEntryId,
-                Status = "Cancelled",
+                Status = entry.Status,
                 RefundedPredictions = 0,
                 AlreadyWithdrawn = true,
                 Message = "Đăng ký này đã bị hủy trước đó."
@@ -437,6 +849,12 @@ public class RaceEntryService : IRaceEntryService
 
         var now = DateTime.UtcNow;
 
+        // Rút SAU bốc thăm (patch 012) -> 'Scratched': GIỮ nguyên PostPosition để
+        // cổng đó bỏ trống, không bốc lại và không xô lệch cổng của ngựa khác.
+        // Rút TRƯỚC bốc thăm -> 'Cancelled', giải phóng chỗ cho pairing khác.
+        var isScratch = entry.Race.IsPostPositionDrawn;
+        var targetStatus = isScratch ? "Scratched" : "Cancelled";
+
         // Cascade flow (reject enrollment / update horse / cancel race) có thể đã mở
         // transaction bên ngoài — không mở lồng, chỉ commit/rollback khi mình là chủ.
         var ownsTransaction = _context.Database.CurrentTransaction == null;
@@ -449,8 +867,8 @@ public class RaceEntryService : IRaceEntryService
                 .Where(e => e.RaceEntryId == raceEntryId &&
                             (e.Status == "Pending" || e.Status == "Confirmed"))
                 .ExecuteUpdateAsync(s => s
-                    .SetProperty(e => e.Status, "Cancelled")
-                    .SetProperty(e => e.PostPosition, e => isLateWithdrawal ? e.PostPosition : null)
+                    .SetProperty(e => e.Status, targetStatus)
+                    .SetProperty(e => e.PostPosition, e => isScratch ? e.PostPosition : null)
                     .SetProperty(e => e.IsWithdrawn, true)
                     .SetProperty(e => e.WithdrawalReason, reason)
                     .SetProperty(e => e.UpdatedAt, now));
@@ -462,7 +880,7 @@ public class RaceEntryService : IRaceEntryService
                 return new WithdrawResultDto
                 {
                     RaceEntryId = raceEntryId,
-                    Status = "Cancelled",
+                    Status = targetStatus,
                     RefundedPredictions = 0,
                     AlreadyWithdrawn = true,
                     Message = "Đăng ký đã được xử lý bởi một thao tác khác."
@@ -500,7 +918,9 @@ public class RaceEntryService : IRaceEntryService
                     adminIds,
                     "Khẩn: Có ngựa rút khỏi cuộc đua",
                     $"Mã đăng ký {raceEntryId} ở cuộc đua #{entry.RaceId} đã bị hủy. Lý do: {reason}. " +
-                    $"Vị trí xuất phát đã được giải phóng.",
+                    (isScratch
+                        ? $"Đã bốc thăm nên cổng số {entry.PostPosition} sẽ để trống."
+                        : "Vị trí xuất phát đã được giải phóng."),
                     type: "Both",
                     relatedEntityType: "RaceEntry",
                     relatedEntityId: raceEntryId);
@@ -524,7 +944,9 @@ public class RaceEntryService : IRaceEntryService
                 relatedEntityType: "RaceEntry",
                 relatedEntityId: raceEntryId);
 
-            if (isLateWithdrawal)
+            // Rut sau boc tham HOAC sau Pre-Race deu can bao Referee/Doctor de dieu
+            // phoi tai cho (cong bo trong, danh sach kiem tra doi).
+            if (isLateWithdrawal || isScratch)
             {
                 var refereeIds = await _context.RefereeAssignments
                     .Where(a => a.RaceId == entry.RaceId)
@@ -535,25 +957,28 @@ public class RaceEntryService : IRaceEntryService
                     .Select(a => a.DoctorId)
                     .ToListAsync();
                 await _notification.SendBulkAsync(refereeIds.Concat(doctorIds),
-                    "Khẩn: Rút lui sau Pre-Race",
-                    $"Race entry #{raceEntryId} đã rút sau khi hoàn tất kiểm tra trước đua. Lý do: {reason}.",
+                    isScratch ? "Khẩn: Ngựa rút sau bốc thăm" : "Khẩn: Rút lui sau Pre-Race",
+                    $"Race entry #{raceEntryId} đã rút khỏi cuộc đua #{entry.RaceId}. Lý do: {reason}." +
+                    (isScratch ? $" Cổng số {entry.PostPosition} để trống, KHÔNG bốc thăm lại." : string.Empty),
                     type: "Both", relatedEntityType: "RaceEntry", relatedEntityId: raceEntryId);
             }
 
             await _audit.LogAsync(actorId,
                 isSystem ? "Tự động hủy đăng ký đua (quá hạn xác nhận)" : "Rút khỏi cuộc đua",
                 "RaceEntry", raceEntryId.ToString(),
-                entry.Status, $"Cancelled;Refunded={refunded};Reason={reason}");
+                entry.Status, $"{targetStatus};Refunded={refunded};Reason={reason}");
 
             if (tx != null) await tx.CommitAsync();
 
             return new WithdrawResultDto
             {
                 RaceEntryId = raceEntryId,
-                Status = "Cancelled",
+                Status = targetStatus,
                 RefundedPredictions = refunded,
                 AlreadyWithdrawn = false,
-                Message = "Đã hủy đăng ký, giải phóng vị trí xuất phát và hoàn điểm dự đoán."
+                Message = isScratch
+                    ? "Đã rút khỏi cuộc đua sau bốc thăm; cổng xuất phát để trống và điểm dự đoán đã hoàn."
+                    : "Đã hủy đăng ký, giải phóng vị trí xuất phát và hoàn điểm dự đoán."
             };
         }
         catch

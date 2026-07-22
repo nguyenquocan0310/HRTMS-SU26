@@ -49,5 +49,13 @@ public static class HangfireExtensions
             "fee-deadline-job",
             svc => svc.RejectOverduePairingsAsync(),
             "0 * * * *");
+
+        // Mỗi giờ (lệch 10 phút so với fee-deadline-job để pairing quá hạn đã được
+        // xử lý xong trước khi chốt pool): auto-allocate vòng 1 của giải đã quá hạn
+        // nộp phí. Idempotent — vòng đã allocate bị bỏ qua.
+        recurring.AddOrUpdate<IRaceEntryService>(
+            "auto-allocate-job",
+            svc => svc.AutoAllocateDueRoundsAsync(),
+            "10 * * * *");
     }
 }
