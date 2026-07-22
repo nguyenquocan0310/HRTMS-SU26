@@ -49,6 +49,9 @@ test('reloads and renders the persisted ranking after the referee submits unoffi
   page.on('dialog', (dialog) => dialog.accept())
   await page.goto(`${BASE_URL}/referee/race-console?raceId=10`)
 
+  await expect(page.getByRole('columnheader', { name: 'GATE', exact: true })).toHaveCount(1)
+  await expect(page.getByRole('columnheader', { name: 'POST', exact: true })).toHaveCount(0)
+
   await page.getByRole('button', { name: 'Chốt kết quả sơ bộ' }).click()
   const rankInputs = page.getByPlaceholder('Thứ hạng')
   const timeInputs = page.getByPlaceholder('Thời gian, không bắt buộc')
