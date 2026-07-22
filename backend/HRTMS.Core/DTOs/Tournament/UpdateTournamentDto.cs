@@ -13,6 +13,7 @@ namespace HRTMS.Core.DTOs.Tournament
     {
         [MaxLength(200)]
         public string? Name { get; set; }
+        [MaxLength(4000, ErrorMessage = "Mô tả giải đấu tối đa 4000 ký tự.")]
         public string? Description { get; set; }
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }

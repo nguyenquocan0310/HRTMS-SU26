@@ -64,7 +64,8 @@ namespace HRTMS.API.Controllers
             code is "VENUE_INACTIVE" or "MAX_HORSES_EXCEEDS_LANES"
                  or "TRACK_TYPE_VENUE_MISMATCH" or "VENUE_REQUIRED"
                  or "PAYMENT_DEADLINE_REQUIRED" or "PAYMENT_DEADLINE_OUT_OF_RANGE"
-                 or "REFUND_DEADLINE_INVALID" or "DEADLINE_LOCKED";
+                 or "REFUND_DEADLINE_INVALID" or "DEADLINE_LOCKED"
+                 or "ADVANCEMENT_CONFIGURATION_LOCKED";
 
         private static ApiResponse<TournamentResponseDto> VenueError(string code) => code switch
         {
@@ -86,6 +87,8 @@ namespace HRTMS.API.Controllers
                 "Loại mặt sân của giải phải trùng với loại mặt sân của sân đua đã chọn."),
             "VENUE_REQUIRED" => ApiResponse<TournamentResponseDto>.Fail(code,
                 "Giải đấu phải được gán sân đua trước khi cập nhật."),
+            "ADVANCEMENT_CONFIGURATION_LOCKED" => ApiResponse<TournamentResponseDto>.Fail(code,
+                "Không thể sửa số lượng đi tiếp vì đã có kết quả xét đi tiếp hoặc cuộc đua đã công bố chính thức."),
             _ => ApiResponse<TournamentResponseDto>.Fail(code, code)
         };
 

@@ -467,9 +467,11 @@ namespace HRTMS.Infrastructure.Services
                 var hasOfficialRace = tournament.Rounds
                     .SelectMany(r => r.Races)
                     .Any(race => race.Status == "Official");
-                if (hasOfficialRace)
-                    throw new InvalidOperationException(
-                        "Không thể sửa cấu hình đi tiếp khi giải đã có cuộc đua ở trạng thái Official");
+                var hasAdvancementResult = await _context.RaceEntries.AnyAsync(entry =>
+                    entry.Race.Round.TournamentId == tournamentId &&
+                    entry.AdvancementStatus != null);
+                if (hasOfficialRace || hasAdvancementResult)
+                    throw new InvalidOperationException("ADVANCEMENT_CONFIGURATION_LOCKED");
             }
 
             var mergedStartDate = dto.StartDate ?? tournament.StartDate;
