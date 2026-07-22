@@ -34,9 +34,25 @@
 --   009_ref_can_close_early.sql  : đã fold — RaceReports.ProtestWindowClosedAt + trigger
 --                                  trg_RaceReports_Immutable thêm cột này vào whitelist.
 --   010_audit_action_nvarchar.sql: đã fold — AuditLogs.Action VARCHAR(50) -> NVARCHAR(100).
+--   011_venue.sql                : bảng Venues (TrackType/TrackLengthMeters/LaneCount 2..24/
+--                                  IsActive) + Tournaments.VenueId (NULL, FK, index).
+--                                  DDL đã fold; ⚠️ patch chứa SEED — 4 sân đua VN
+--                                  (Phú Thọ / Đại Nam / Thiên Mã Madagui active,
+--                                  Sóc Sơn inactive) giữ ở section Patch 011 cuối file.
+--                                  Backfill "giải cũ -> Phú Thọ" là no-op trên DB rỗng.
+--   012_entry_fee_payment.sql    : bảng EntryFeePayments + UQ_EFP_ActivePerPairing
+--                                  (filtered unique: PendingVerification/Verified) +
+--                                  IX_EFP_Status + Tournaments.PaymentDeadline/
+--                                  RefundDeadline. Đã fold cả 2 CHECK mở rộng:
+--                                  Pairings.Status += 'PendingVerification',
+--                                  RaceEntries.Status += 'Scratched'.
+--                                  Backfill payment là no-op trên DB rỗng.
+--   013_round_waitlist.sql       : bảng RoundWaitlist (RoundId, PairingId, Position,
+--                                  CreatedAt) + unique (RoundId,PairingId) và
+--                                  (RoundId,Position). Đã fold; không có seed.
 --
--- Thời điểm cập nhật : 2026-07-16
--- Cách tạo           : schema gốc + patch 001→010 theo thứ tự; thay đổi xóa của
+-- Thời điểm cập nhật : 2026-07-22
+-- Cách tạo           : schema gốc + patch 001→013 theo thứ tự; thay đổi xóa của
 --                      patch 007 (bỏ COI) và 008 (008_ticket_code_plaintext.sql —
 --                      TicketRewardCodes.Code plaintext thay CodeHash) được fold
 --                      trực tiếp vào DDL cuối.
@@ -46,8 +62,12 @@
 --      — bản cuối là bản của patch 006 (có role 'System').
 --   2. Patch 001 DROP cột/FK/INDEX của schema gốc rồi tạo bảng mới — hợp lệ vì mọi
 --      patch đều idempotent (IF EXISTS / IF NOT EXISTS).
---   3. Patch 001 (backfill) và 006 (system user) chứa INSERT — seed nằm trong patch.
+--   3. Patch 001 (backfill), 006 (system user) và 011 (4 sân đua) chứa INSERT —
+--      seed nằm trong patch.
 --   4. Không có bảng/cột/constraint/index trùng tên giữa các patch.
+--   5. Patch 012 KHÔNG dùng DROP/ADD CHECK như file patch gốc: trong snapshot thì
+--      CHK_Pairings_Status và CHK_RaceEntries_Status được viết thẳng ở CREATE TABLE
+--      với tập giá trị đã mở rộng (có 'PendingVerification' / 'Scratched').
 -- =============================================================================
 
 -- #############################################################################
@@ -57,7 +77,8 @@
 -- HRTMS - Horse Racing Tournament Management System
 -- DB Schema: SQL Server 2022 - 3NF - Phase 1 Final
 -- Project: SU26SWP03 | Version: 2.0 | Updated: 2026-06-27
--- 26 bảng nền; 28 bảng sau khi hợp nhất patches - PK/FK/CHECK/DEFAULT/UNIQUE/INDEX
+-- 26 bảng nền; 31 bảng sau khi hợp nhất patches 001-013 (thêm HorseTournamentEntries,
+-- Certificates, Venues, EntryFeePayments, RoundWaitlist) - PK/FK/CHECK/DEFAULT/UNIQUE/INDEX
 -- =============================================================================
 
 -- Không có database lifecycle trong snapshot. Runner demo không thực thi file này.
@@ -1398,7 +1419,63 @@ GO
 PRINT 'Patch 006 applied: role System + seed system user (actor cho job tự động).';
 GO
 
-PRINT N'HOÀN TẤT: schema HRTMS được tạo mới (schema gốc + patch 001-010).';
+/* =============================================================================
+   Patch 011 — Module B/E: Venues (sân đua)
+   -----------------------------------------------------------------------------
+   DDL (bảng Venues, Tournaments.VenueId + FK + index) đã FOLD vào phần CREATE
+   TABLE phía trên. Phần còn lại dưới đây là SEED — theo đúng convention của
+   patch 001/006: seed nằm trong patch nên phải có mặt trong snapshot.
+
+   Backfill "giải cũ -> sân Phú Thọ" của patch gốc là NO-OP trên DB mới rỗng
+   (chưa có Tournaments) nên không lặp lại ở đây.
+   ============================================================================= */
+
+MERGE Venues AS target
+USING (VALUES
+    (N'Trường đua Phú Thọ',          N'Số 2 Lê Đại Hành, Phường 15, Quận 11', N'TP. Hồ Chí Minh', 'Dirt', 1800, 12, 1),
+    (N'Trường đua Đại Nam',          N'Khu du lịch Đại Nam, Hiệp An',         N'Bình Dương',      'Dirt', 1500, 10, 1),
+    (N'Trường đua Thiên Mã Madagui', N'Khu du lịch Madagui, Đạ Huoai',        N'Lâm Đồng',        'Turf', 1200,  6, 1),
+    (N'Trường đua Sóc Sơn',          N'Xã Tân Minh, Huyện Sóc Sơn',           N'Hà Nội',          'Turf', 2000, 14, 0)
+) AS source ([Name],[Address],City,TrackType,TrackLengthMeters,LaneCount,IsActive)
+    ON target.[Name] = source.[Name]
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT ([Name],[Address],City,TrackType,TrackLengthMeters,LaneCount,IsActive)
+    VALUES (source.[Name],source.[Address],source.City,source.TrackType,
+            source.TrackLengthMeters,source.LaneCount,source.IsActive);
+GO
+
+PRINT 'Patch 011 applied: bảng Venues + Tournaments.VenueId + seed 4 sân đua VN.';
+GO
+
+/* =============================================================================
+   Patch 012 — Module E/N: Entry Fee Payment
+   -----------------------------------------------------------------------------
+   DDL đã FOLD vào phần CREATE TABLE phía trên:
+     • bảng EntryFeePayments + UQ_EFP_ActivePerPairing + IX_EFP_Status
+     • Tournaments.PaymentDeadline / RefundDeadline
+     • CHK_Pairings_Status   += 'PendingVerification'
+     • CHK_RaceEntries_Status += 'Scratched'
+
+   Backfill "payment Verified cho pairing đã Confirmed" của patch gốc là NO-OP
+   trên DB mới rỗng (chưa có Pairings) nên không lặp lại ở đây — seed thật nằm
+   trong database/seed.sql.
+   ============================================================================= */
+
+PRINT 'Patch 012 applied: bảng EntryFeePayments + deadline lệ phí + status PendingVerification/Scratched.';
+GO
+
+/* =============================================================================
+   Patch 013 — Module E: RoundWaitlist (danh sách chờ theo vòng)
+   -----------------------------------------------------------------------------
+   DDL đã FOLD vào phần CREATE TABLE phía trên (bảng RoundWaitlist +
+   UQ_RoundWaitlist_RoundPairing + UQ_RoundWaitlist_RoundPosition).
+   Patch không chứa seed.
+   ============================================================================= */
+
+PRINT 'Patch 013 applied: bảng RoundWaitlist (danh sách chờ vòng đấu).';
+GO
+
+PRINT N'HOÀN TẤT: schema HRTMS được tạo mới (schema gốc + patch 001-013).';
 GO
 
 SET NOEXEC OFF;
