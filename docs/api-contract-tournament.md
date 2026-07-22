@@ -82,6 +82,7 @@ POST /api/tournament
   "startDate":                     "2026-07-01T08:00:00Z",
   "endDate":                       "2026-07-15T18:00:00Z",
   "maxHorses":                     12,
+  "venueId":                       1,
   "allowedBreed":                  "Thoroughbred",
   "trackType":                     "Turf",
   "raceDistance":                  1600,
@@ -89,8 +90,11 @@ POST /api/tournament
   "minJockeyExperienceYears":      2,
   "purseAmount":                   300000000,
   "entryFeeAmount":                5000000,
+  "paymentDeadline":               "2026-06-28T08:00:00Z",
+  "refundDeadline":                "2026-06-29T08:00:00Z",
   "preRaceWeightThresholdKg":      2.0,
-  "postRaceWeightDiffThresholdKg": 1.0
+  "postRaceWeightDiffThresholdKg": 1.0,
+  "advancementCount":              3
 }
 ```
 
@@ -115,6 +119,13 @@ POST /api/tournament
 
 ---
 
+### Mô tả và cấu hình đi tiếp
+
+- `description` tùy chọn, plain text, tối đa 4000 ký tự. Client phải render text, không raw HTML.
+- `advancementCount` tùy chọn, phải lớn hơn 0. Nếu không gửi, giữ default DB/entity `5`;
+  `Declare Official` đọc `Tournament.AdvancementCount` đã lưu để xét Top N.
+- `venueId` và các deadline lệ phí là bắt buộc theo contract Tournament hiện tại.
+
 ### Business rules
 
 - Tournament được tạo với `status = "Draft"`, `createdAt = UtcNow`.
@@ -137,6 +148,12 @@ POST /api/tournament
     "startDate":                     "2026-07-01T08:00:00Z",
     "endDate":                       "2026-07-15T18:00:00Z",
     "maxHorses":                     12,
+    "venueId":                       1,
+    "venueName":                     "Trường đua Phú Thọ",
+    "venueCity":                     "TP. Hồ Chí Minh",
+    "laneCount":                     12,
+    "trackLengthMeters":             1800,
+    "raceCapacity":                  12,
     "allowedBreed":                  "Thoroughbred",
     "trackType":                     "Turf",
     "raceDistance":                  1600,
@@ -145,6 +162,8 @@ POST /api/tournament
     "allocatedPurse":                0,
     "remainingPurse":                300000000,
     "entryFeeAmount":                5000000,
+    "paymentDeadline":               "2026-06-28T08:00:00Z",
+    "refundDeadline":                "2026-06-29T08:00:00Z",
     "preRaceWeightThresholdKg":      2.0,
     "postRaceWeightDiffThresholdKg": 1.0,
     "status":                        "Draft",
@@ -621,7 +640,9 @@ Chỉ gửi các trường cần cập nhật (partial update).
 ```json
 {
   "name":        "Giải Đua Mùa Hè 2026 (Cập nhật)",
-  "purseAmount": 400000000
+  "description": "Mô tả mới bằng plain text.",
+  "purseAmount": 400000000,
+  "advancementCount": 3
 }
 ```
 
@@ -631,7 +652,10 @@ Chỉ gửi các trường cần cập nhật (partial update).
 
 - Chỉ được cập nhật khi `status ∈ {Draft, Open Registration}`.
 - Không cho sửa khi `status ∈ {Closed Registration, Completed, Cancelled}`.
-- Cho phép sửa `advancementRule`/`advancementCount` (partial). Riêng cấu hình đi tiếp còn bị chặn thêm nếu giải đã có bất kỳ cuộc đua nào `Official` (progression có thể đã tính) → 400. Rule không hợp lệ hoặc `advancementCount <= 0` → 400.
+- Cho phép sửa `description`/`advancementRule`/`advancementCount` (partial) tại `Draft` hoặc
+  `Open Registration`. Cấu hình đi tiếp bị khóa nếu đã có Race `Official` hoặc bất kỳ
+  `RaceEntry.AdvancementStatus` nào đã phát sinh → `422` với error code
+  `ADVANCEMENT_CONFIGURATION_LOCKED`. Rule không hợp lệ hoặc `advancementCount <= 0` → 400.
 
 ---
 
