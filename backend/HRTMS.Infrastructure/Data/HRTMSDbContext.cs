@@ -55,6 +55,8 @@ public partial class HRTMSDbContext : DbContext
 
     public virtual DbSet<Round> Rounds { get; set; }
 
+    public virtual DbSet<RoundWaitlist> RoundWaitlist { get; set; }
+
     public virtual DbSet<SpectatorProfile> SpectatorProfiles { get; set; }
 
     public virtual DbSet<TicketRewardCode> TicketRewardCodes { get; set; }
@@ -738,6 +740,32 @@ public partial class HRTMSDbContext : DbContext
             entity.HasOne(d => d.Venue).WithMany(p => p.Tournaments)
                 .HasForeignKey(d => d.VenueId)
                 .HasConstraintName("FK_Tournaments_Venue");
+        });
+
+        // Danh sách chờ theo vòng (patch 013).
+        modelBuilder.Entity<RoundWaitlist>(entity =>
+        {
+            entity.HasKey(e => e.WaitlistId);
+
+            entity.ToTable("RoundWaitlist");
+
+            entity.HasIndex(e => new { e.RoundId, e.PairingId }, "UQ_RoundWaitlist_RoundPairing")
+                .IsUnique();
+
+            entity.HasIndex(e => new { e.RoundId, e.Position }, "UQ_RoundWaitlist_RoundPosition")
+                .IsUnique();
+
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
+
+            entity.HasOne(d => d.Round).WithMany()
+                .HasForeignKey(d => d.RoundId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_RoundWaitlist_Round");
+
+            entity.HasOne(d => d.Pairing).WithMany()
+                .HasForeignKey(d => d.PairingId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_RoundWaitlist_Pairing");
         });
 
         // Nộp & đối chiếu lệ phí (patch 012).

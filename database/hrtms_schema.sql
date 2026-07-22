@@ -442,6 +442,30 @@ CREATE TABLE Pairings (
 );
 GO
 
+-- Danh sách chờ theo vòng (patch 013). Lưu phần dư khi pool đủ điều kiện vượt
+-- tổng sức chứa của vòng = min(MaxHorses, Venue.LaneCount) * số race.
+-- KHÁC AlsoEligible: AlsoEligible là entry ĐÃ đua vòng trước; RoundWaitlist là
+-- pairing chưa được phân vào race nào (cần thiết cho vòng 1, nơi chưa có entry).
+CREATE TABLE RoundWaitlist (
+    WaitlistId  INT         IDENTITY(1,1) NOT NULL,
+    RoundId     INT         NOT NULL,
+    PairingId   INT         NOT NULL,
+    [Position]  INT         NOT NULL,
+    CreatedAt   DATETIME2   NOT NULL DEFAULT GETUTCDATE(),
+
+    CONSTRAINT PK_RoundWaitlist PRIMARY KEY (WaitlistId),
+    CONSTRAINT FK_RoundWaitlist_Round FOREIGN KEY (RoundId) REFERENCES Rounds(RoundId),
+    CONSTRAINT FK_RoundWaitlist_Pairing FOREIGN KEY (PairingId) REFERENCES Pairings(PairingId),
+    CONSTRAINT CHK_RoundWaitlist_Position CHECK ([Position] > 0)
+);
+GO
+
+CREATE UNIQUE INDEX UQ_RoundWaitlist_RoundPairing ON RoundWaitlist (RoundId, PairingId);
+GO
+
+CREATE UNIQUE INDEX UQ_RoundWaitlist_RoundPosition ON RoundWaitlist (RoundId, [Position]);
+GO
+
 -- Nộp & đối chiếu lệ phí (patch 012). Pairing chỉ Confirmed khi payment Verified.
 CREATE TABLE EntryFeePayments (
     PaymentId       INT             IDENTITY(1,1) NOT NULL,

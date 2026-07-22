@@ -15,6 +15,14 @@ public interface IRaceEntryService
     // Một transaction; gọi lại khi vòng đã allocate -> ROUND_ALREADY_ALLOCATED.
     Task<AutoAllocateResultDto> AutoAllocateRoundAsync(int actorId, int roundId);
 
+    // Dry-run: dùng chung guard/pool/sức chứa với AutoAllocateRoundAsync nhưng
+    // KHÔNG ghi DB. Races[].Entries để rỗng vì mapping ngựa→race chỉ chốt lúc thật
+    // (Fisher-Yates); xem AssignmentIsFinal.
+    Task<AutoAllocateResultDto> PreviewAllocateRoundAsync(int roundId);
+
+    // Danh sách chờ đã persist của một vòng (bảng RoundWaitlist, patch 013).
+    Task<List<AutoAllocateWaitlistDto>> GetRoundWaitlistAsync(int roundId);
+
     // Manual override: chuyển entry sang race khác TRONG CÙNG vòng, race đích
     // chưa bốc thăm và còn chỗ.
     Task<RaceEntryResponseDto> MoveEntryAsync(int adminId, int raceEntryId, int targetRaceId);

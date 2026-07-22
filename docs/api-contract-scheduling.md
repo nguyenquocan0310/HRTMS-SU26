@@ -139,12 +139,11 @@ chia round-robin toàn bộ pool vào các race của vòng, sức chứa mỗi 
 `waitlist` của response (ưu tiên theo thời điểm verify lệ phí ở vòng 1, theo
 `AdvancementStatus`/`AdvancementRank` ở vòng sau).
 
-> **Giới hạn đã biết — cần nhóm chốt:** `AlsoEligible` là giá trị của
-> `RaceEntries.AdvancementStatus`, tức **chỉ tồn tại khi pairing ĐÃ có entry ở một
-> race**. Với **vòng 1**, pairing chưa vào race nào nên **không có chỗ trong schema
-> để lưu waiting-list**. Vì vậy `waitlist` ở vòng 1 hiện chỉ là **thông tin trong
-> response**, không được persist. Muốn waiting-list bền vững cho vòng 1 thì cần bổ
-> sung DB/API (vd bảng `RoundWaitlist`, hoặc cột trạng thái trên `Pairings`).
-> Backend **không tự giả lập** trạng thái này.
+> **ĐÃ CHỐT (patch 013):** waiting-list được persist vào bảng **`RoundWaitlist`**
+> (`RoundId`, `PairingId`, `Position`, `CreatedAt`). Trước đó `AlsoEligible` là giá
+> trị của `RaceEntries.AdvancementStatus` nên **chỉ tồn tại khi pairing ĐÃ có entry
+> ở một race** — vòng 1 chưa có entry nào nên không có chỗ lưu.
+> Hai khái niệm **không thay thế nhau**: `RoundWaitlist` = pairing chưa vào race nào
+> của vòng; `AlsoEligible` = entry đã đua vòng trước, đủ điều kiện dự bị cho vòng sau.
 
 **Dependency:** `FinishPosition` do Module Result/Race Officiating nhập & chốt (RaceReport → Declare Official). Progression chỉ chạy khi official result đã có finish positions — backend không tự bịa dữ liệu.

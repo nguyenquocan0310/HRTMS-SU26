@@ -7,6 +7,22 @@ public class AutoAllocateResultDto
 
     public int TournamentId { get; set; }
 
+    // true = kết quả của /preview (dry-run, KHÔNG ghi DB).
+    public bool IsPreview { get; set; }
+
+    // CHỈ có ý nghĩa ở preview: false nghĩa là "ngựa nào vào race nào" CHƯA chốt.
+    // Preview cho biết AI được vào và AI phải chờ (tất định theo thứ tự ưu tiên),
+    // nhưng việc chia vào race cụ thể dùng Fisher-Yates ở thời điểm chốt nên
+    // Races[].Entries để rỗng, chỉ có EntryCount là tất định.
+    public bool AssignmentIsFinal { get; set; } = true;
+
+    // Danh sách được chọn, theo thứ tự ưu tiên. Chỉ điền ở preview
+    // (ở kết quả thật thì đã nằm trong Races[].Entries).
+    public List<AutoAllocateSelectedDto> SelectedPool { get; set; } = new();
+
+    // Cảnh báo cho FE hiển thị trước khi Admin bấm chốt (vd vượt sức chứa).
+    public List<string> Warnings { get; set; } = new();
+
     // Tổng số pairing/entry đủ điều kiện trong pool trước khi cắt theo sức chứa.
     public int PoolSize { get; set; }
 
@@ -57,9 +73,31 @@ public class AutoAllocateEntryDto
     public string JockeyName { get; set; } = string.Empty;
 }
 
+// Pairing được chọn vào vòng, kèm thứ tự ưu tiên đã dùng để cắt pool.
+public class AutoAllocateSelectedDto
+{
+    public int Position { get; set; }
+
+    public int PairingId { get; set; }
+
+    public int HorseId { get; set; }
+
+    public string HorseName { get; set; } = string.Empty;
+
+    public int JockeyId { get; set; }
+
+    public string JockeyName { get; set; } = string.Empty;
+
+    public DateTime? FeeVerifiedAt { get; set; }
+}
+
 // Pairing đủ điều kiện nhưng vượt sức chứa của vòng.
+// Được PERSIST vào bảng RoundWaitlist khi chốt (patch 013).
 public class AutoAllocateWaitlistDto
 {
+    // Thứ tự gọi bù, 1 = gọi trước. Khớp RoundWaitlist.Position.
+    public int Position { get; set; }
+
     public int PairingId { get; set; }
 
     public int HorseId { get; set; }

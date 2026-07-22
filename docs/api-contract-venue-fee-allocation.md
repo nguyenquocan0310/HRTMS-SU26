@@ -298,6 +298,55 @@ vào**, không quyết định **vào race nào**.
 Owner tự xác nhận. Một transaction; audit; notify từng Owner sau commit:
 > "Ngựa '[Tên]' đã được phân vào Cuộc đua #[X], lúc [Y]."
 
+### 3.1b Preview (dry-run) — patch 013
+`POST /api/admin/rounds/{roundId}/auto-allocate/preview` · Role: **Admin**
+
+**KHÔNG ghi DB.** Dùng **chung** `BuildAllocationPlanAsync` với thao tác chốt thật
+nên guard, pool và sức chứa luôn khớp — khác biệt duy nhất là không có bước ghi.
+Mọi error code giống `/auto-allocate`.
+
+```json
+{
+  "roundId": 5, "tournamentId": 3,
+  "isPreview": true, "assignmentIsFinal": false,
+  "poolSize": 25, "capacityPerRace": 8, "raceCount": 3,
+  "totalCapacity": 24, "allocatedCount": 24, "waitlistedCount": 1,
+  "warnings": [
+    "Có 25 cặp đủ điều kiện nhưng tổng sức chứa của vòng chỉ 24 (8 ngựa × 3 cuộc đua). 1 cặp sẽ vào danh sách chờ."
+  ],
+  "selectedPool": [
+    { "position": 1, "pairingId": 12, "horseId": 7, "horseName": "Thunder",
+      "jockeyId": 4, "jockeyName": "Le Van A", "feeVerifiedAt": "2026-07-23T08:00:00Z" }
+  ],
+  "races": [
+    { "raceId": 11, "raceNumber": 1, "scheduledTime": "2026-08-01T02:00:00Z",
+      "entryCount": 8, "entries": [] }
+  ],
+  "waitlist": [
+    { "position": 1, "pairingId": 44, "horseId": 31, "horseName": "Lightning",
+      "feeVerifiedAt": "2026-07-25T10:00:00Z" }
+  ]
+}
+```
+
+> ⚠️ **`assignmentIsFinal: false` — đọc kỹ.** Preview cho biết **AI được vào** và
+> **AI phải chờ** (tất định theo thứ tự ưu tiên) và **số ngựa mỗi race** (tất định
+> theo round-robin). Nhưng **ngựa nào vào race nào** dùng Fisher-Yates *tại thời
+> điểm chốt* nên **không** tất định → `races[].entries` để **rỗng** ở preview.
+> FE **không** được hiển thị mapping ngựa→race ở bước preview; kết quả thật sẽ khác.
+
+### 3.1c Danh sách chờ đã lưu — patch 013
+`GET /api/admin/rounds/{roundId}/waitlist` · Role: **Admin**
+
+`200 OK` → `AutoAllocateWaitlistDto[]`, sắp theo `position` tăng dần (1 = gọi bù trước).
+
+**Bảng `RoundWaitlist`** (`RoundId`, `PairingId`, `Position`, `CreatedAt`):
+- Unique `(RoundId, PairingId)` và unique `(RoundId, Position)`.
+- Ghi trong **cùng transaction** với auto-allocate; xoá bản cũ của vòng trước khi
+  ghi lại nên chạy lại không vướng unique.
+- `Position` sinh từ **cùng thứ tự** đã dùng để cắt pool (vòng 1: thời điểm verify
+  lệ phí; vòng sau: `AdvancementStatus` rồi `AdvancementRank`).
+
 ### 3.2 Điều chỉnh thủ công
 `PUT /api/admin/race-entries/{id}/move` · Role: **Admin**
 
@@ -426,6 +475,8 @@ Mọi job dùng system user (`Role = "System"`, patch 006) làm audit actor. Thi
 | POST | `/api/admin/fee-payments/{id}/reject` | Admin |
 | GET | `/api/fee-payments/{id}/proof` | Owner (chủ pairing) hoặc Admin |
 | POST | `/api/admin/rounds/{id}/auto-allocate` | Admin |
+| POST | `/api/admin/rounds/{id}/auto-allocate/preview` | Admin |
+| GET | `/api/admin/rounds/{id}/waitlist` | Admin |
 | PUT | `/api/admin/race-entries/{id}/move` | Admin |
 | POST | `/api/admin/rounds/{id}/finalize` | Admin |
 

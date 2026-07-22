@@ -125,6 +125,43 @@ public class SchedulingController : ControllerBase
         }
     }
 
+    // Preview (dry-run) trước khi chốt — KHÔNG ghi DB.
+    // Trả danh sách được chọn, danh sách chờ, số ngựa mỗi race và cảnh báo.
+    // `assignmentIsFinal = false`: ngựa nào vào race nào chỉ chốt ở bước thật.
+    [HttpPost("admin/rounds/{roundId:int}/auto-allocate/preview")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> PreviewAutoAllocate(int roundId)
+    {
+        try
+        {
+            var result = await _service.PreviewAllocateRoundAsync(roundId);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(Err("ROUND_NOT_FOUND", "Không tìm thấy vòng đấu."));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return MapAllocateError(ex.Message);
+        }
+    }
+
+    // Danh sách chờ đã lưu của một vòng (bảng RoundWaitlist).
+    [HttpGet("admin/rounds/{roundId:int}/waitlist")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetWaitlist(int roundId)
+    {
+        try
+        {
+            return Ok(await _service.GetRoundWaitlistAsync(roundId));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(Err("ROUND_NOT_FOUND", "Không tìm thấy vòng đấu."));
+        }
+    }
+
     // Admin điều chỉnh thủ công sau auto-allocate: chuyển entry sang race khác
     // TRONG CÙNG vòng.
     [HttpPut("admin/race-entries/{id:int}/move")]

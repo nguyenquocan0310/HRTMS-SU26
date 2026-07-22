@@ -204,62 +204,15 @@ public class RaceEntryService : IRaceEntryService
     // Sức chứa mỗi race = min(Tournament.MaxHorses, Venue.LaneCount).
     public async Task<AutoAllocateResultDto> AutoAllocateRoundAsync(int actorId, int roundId)
     {
-        var round = await _context.Rounds
-            .Include(r => r.Tournament).ThenInclude(t => t.Venue)
-            .Include(r => r.Races)
-            .FirstOrDefaultAsync(r => r.RoundId == roundId)
-            ?? throw new KeyNotFoundException("ROUND_NOT_FOUND");
+        var plan = await BuildAllocationPlanAsync(roundId);
+        var round = plan.Round;
+        var races = plan.Races;
+        var pool = plan.Pool;
+        var capacityPerRace = plan.CapacityPerRace;
+        var totalCapacity = plan.TotalCapacity;
 
-        var tournament = round.Tournament;
-
-        EnsureTournamentOpenForScheduling(tournament.Status);
-
-        // Sức chứa lấy từ số làn của sân — không có sân thì không biết trần cứng.
-        if (tournament.Venue == null)
-            throw new InvalidOperationException("VENUE_REQUIRED");
-
-        var races = round.Races
-            .Where(r => r.Status != "Cancelled")
-            .OrderBy(r => r.RaceNumber)
-            .ToList();
-
-        if (races.Count == 0)
-            throw new InvalidOperationException("NO_RACES_IN_ROUND");
-
-        // Đã bốc thăm thì danh sách xuất phát đã chốt — không phân bổ lại.
-        if (races.Any(r => r.IsPostPositionDrawn))
-            throw new InvalidOperationException("ROUND_ALREADY_DRAWN");
-
-        // Idempotency: vòng đã có entry hợp lệ nghĩa là đã allocate.
-        var raceIds = races.Select(r => r.RaceId).ToList();
-        var hasEntries = await _context.RaceEntries
-            .AnyAsync(e => raceIds.Contains(e.RaceId) && ActiveEntryStatuses.Contains(e.Status));
-        if (hasEntries)
-            throw new InvalidOperationException("ROUND_ALREADY_ALLOCATED");
-
-        var previousRound = await _context.Rounds
-            .Where(r => r.TournamentId == round.TournamentId &&
-                        r.SequenceOrder < round.SequenceOrder)
-            .OrderByDescending(r => r.SequenceOrder)
-            .FirstOrDefaultAsync();
-
-        if (previousRound != null && previousRound.Status != "Completed")
-            throw new InvalidOperationException("PREVIOUS_ROUND_NOT_COMPLETED");
-
-        var pool = previousRound == null
-            ? await BuildFirstRoundPoolAsync(round.TournamentId)
-            : await BuildProgressionPoolAsync(round.TournamentId, previousRound.RoundId);
-
-        if (pool.Count == 0)
-            throw new InvalidOperationException("NO_ELIGIBLE_PAIRINGS");
-
-        var capacityPerRace = Math.Min(tournament.MaxHorses, tournament.Venue.LaneCount);
-        var totalCapacity = capacityPerRace * races.Count;
-
-        // Pool vượt sức chứa: giữ theo thứ tự ưu tiên đã sắp (fee verified sớm hơn
-        // ở vòng 1; Qualified trước AlsoEligible ở vòng sau), phần dư thành waitlist.
-        var selected = pool.Take(totalCapacity).ToList();
-        var waitlisted = pool.Skip(totalCapacity).ToList();
+        var selected = plan.Selected.ToList();
+        var waitlisted = plan.Waitlisted;
 
         // Xáo trộn Fisher-Yates để thứ tự nộp phí KHÔNG quyết định vào race nào —
         // ưu tiên chỉ dùng để chọn AI được vào, không dùng để chọn VÀO ĐÂU.
@@ -297,6 +250,25 @@ public class RaceEntryService : IRaceEntryService
 
                 _context.RaceEntries.Add(entry);
                 created.Add((entry, candidate, race));
+            }
+
+            // Danh sách chờ được PERSIST (patch 013) — trước đây chỉ trả trong
+            // response rồi mất. Position 1 = gọi bù trước.
+            // Xoá bản cũ trước khi ghi để chạy lại không vướng
+            // UQ_RoundWaitlist_RoundPairing / _RoundPosition.
+            await _context.RoundWaitlist
+                .Where(w => w.RoundId == roundId)
+                .ExecuteDeleteAsync();
+
+            for (int i = 0; i < waitlisted.Count; i++)
+            {
+                _context.RoundWaitlist.Add(new RoundWaitlist
+                {
+                    RoundId = roundId,
+                    PairingId = waitlisted[i].PairingId,
+                    Position = i + 1,
+                    CreatedAt = now
+                });
             }
 
             await _context.SaveChangesAsync();
@@ -363,14 +335,194 @@ public class RaceEntryService : IRaceEntryService
                         JockeyName = c.Candidate.JockeyName
                     }).ToList()
             }).ToList(),
-            Waitlist = waitlisted.Select(c => new AutoAllocateWaitlistDto
+            Waitlist = waitlisted.Select((c, i) => new AutoAllocateWaitlistDto
             {
+                Position = i + 1,
                 PairingId = c.PairingId,
                 HorseId = c.HorseId,
                 HorseName = c.HorseName,
                 FeeVerifiedAt = c.FeeVerifiedAt
             }).ToList()
         };
+    }
+
+    // =====================================================================
+    // Preview (dry-run) — KHÔNG ghi DB
+    // =====================================================================
+    // Dùng CHUNG BuildAllocationPlanAsync với thao tác chốt thật nên guard, pool
+    // và sức chứa luôn khớp. Khác biệt duy nhất: không có bước ghi.
+    //
+    // GIỚI HẠN CÓ CHỦ Ý: "ngựa nào vào race nào" dùng Fisher-Yates tại thời điểm
+    // chốt nên KHÔNG tất định — preview để Races[].Entries rỗng, chỉ trả EntryCount
+    // (tất định theo round-robin) và SelectedPool. AssignmentIsFinal = false báo
+    // cho FE biết điều này. Nếu preview trả mapping cụ thể thì kết quả thật sẽ
+    // khác đi, gây hiểu nhầm.
+    public async Task<AutoAllocateResultDto> PreviewAllocateRoundAsync(int roundId)
+    {
+        var plan = await BuildAllocationPlanAsync(roundId);
+
+        var warnings = new List<string>();
+        if (plan.Waitlisted.Count > 0)
+        {
+            warnings.Add(
+                $"Có {plan.Pool.Count} cặp đủ điều kiện nhưng tổng sức chứa của vòng chỉ " +
+                $"{plan.TotalCapacity} ({plan.CapacityPerRace} ngựa × {plan.Races.Count} cuộc đua). " +
+                $"{plan.Waitlisted.Count} cặp sẽ vào danh sách chờ.");
+        }
+        if (plan.Selected.Count < plan.Races.Count * 2)
+        {
+            warnings.Add(
+                $"Chỉ có {plan.Selected.Count} cặp cho {plan.Races.Count} cuộc đua — " +
+                "một số cuộc đua có thể dưới 2 ngựa và không bốc thăm được.");
+        }
+
+        // Round-robin: race thứ i nhận ceil/floor của phần chia — tất định.
+        var counts = plan.Races
+            .Select((r, idx) => new
+            {
+                Race = r,
+                Count = plan.Selected.Count / plan.Races.Count +
+                        (idx < plan.Selected.Count % plan.Races.Count ? 1 : 0)
+            })
+            .ToList();
+
+        return new AutoAllocateResultDto
+        {
+            RoundId = roundId,
+            TournamentId = plan.Round.TournamentId,
+            IsPreview = true,
+            AssignmentIsFinal = false,
+            PoolSize = plan.Pool.Count,
+            CapacityPerRace = plan.CapacityPerRace,
+            RaceCount = plan.Races.Count,
+            TotalCapacity = plan.TotalCapacity,
+            AllocatedCount = plan.Selected.Count,
+            WaitlistedCount = plan.Waitlisted.Count,
+            Warnings = warnings,
+            SelectedPool = plan.Selected.Select((c, i) => new AutoAllocateSelectedDto
+            {
+                Position = i + 1,
+                PairingId = c.PairingId,
+                HorseId = c.HorseId,
+                HorseName = c.HorseName,
+                JockeyId = c.JockeyId,
+                JockeyName = c.JockeyName,
+                FeeVerifiedAt = c.FeeVerifiedAt
+            }).ToList(),
+            Races = counts.Select(x => new AutoAllocateRaceDto
+            {
+                RaceId = x.Race.RaceId,
+                RaceNumber = x.Race.RaceNumber,
+                ScheduledTime = x.Race.ScheduledTime,
+                EntryCount = x.Count
+                // Entries để rỗng: mapping cụ thể chưa chốt (xem chú thích trên).
+            }).ToList(),
+            Waitlist = plan.Waitlisted.Select((c, i) => new AutoAllocateWaitlistDto
+            {
+                Position = i + 1,
+                PairingId = c.PairingId,
+                HorseId = c.HorseId,
+                HorseName = c.HorseName,
+                FeeVerifiedAt = c.FeeVerifiedAt
+            }).ToList()
+        };
+    }
+
+    // Danh sách chờ đã persist của một vòng.
+    public async Task<List<AutoAllocateWaitlistDto>> GetRoundWaitlistAsync(int roundId)
+    {
+        var exists = await _context.Rounds.AnyAsync(r => r.RoundId == roundId);
+        if (!exists)
+            throw new KeyNotFoundException("ROUND_NOT_FOUND");
+
+        return await _context.RoundWaitlist
+            .Where(w => w.RoundId == roundId)
+            .OrderBy(w => w.Position)
+            .Select(w => new AutoAllocateWaitlistDto
+            {
+                Position = w.Position,
+                PairingId = w.PairingId,
+                HorseId = w.Pairing.HorseId,
+                HorseName = w.Pairing.Horse.Name,
+                FeeVerifiedAt = _context.EntryFeePayments
+                    .Where(f => f.PairingId == w.PairingId && f.Status == "Verified")
+                    .Select(f => f.VerifiedAt)
+                    .FirstOrDefault()
+            })
+            .ToListAsync();
+    }
+
+    // Kế hoạch phân bổ đã qua mọi guard — dùng chung cho preview và chốt thật.
+    private sealed record AllocationPlan(
+        Round Round,
+        List<Race> Races,
+        List<PoolCandidate> Pool,
+        List<PoolCandidate> Selected,
+        List<PoolCandidate> Waitlisted,
+        int CapacityPerRace,
+        int TotalCapacity);
+
+    private async Task<AllocationPlan> BuildAllocationPlanAsync(int roundId)
+    {
+        var round = await _context.Rounds
+            .Include(r => r.Tournament).ThenInclude(t => t.Venue)
+            .Include(r => r.Races)
+            .FirstOrDefaultAsync(r => r.RoundId == roundId)
+            ?? throw new KeyNotFoundException("ROUND_NOT_FOUND");
+
+        var tournament = round.Tournament;
+
+        EnsureTournamentOpenForScheduling(tournament.Status);
+
+        // Sức chứa lấy từ số làn của sân — không có sân thì không biết trần cứng.
+        if (tournament.Venue == null)
+            throw new InvalidOperationException("VENUE_REQUIRED");
+
+        var races = round.Races
+            .Where(r => r.Status != "Cancelled")
+            .OrderBy(r => r.RaceNumber)
+            .ToList();
+
+        if (races.Count == 0)
+            throw new InvalidOperationException("NO_RACES_IN_ROUND");
+
+        // Đã bốc thăm thì danh sách xuất phát đã chốt — không phân bổ lại.
+        if (races.Any(r => r.IsPostPositionDrawn))
+            throw new InvalidOperationException("ROUND_ALREADY_DRAWN");
+
+        // Idempotency: vòng đã có entry hợp lệ nghĩa là đã allocate.
+        var raceIds = races.Select(r => r.RaceId).ToList();
+        var hasEntries = await _context.RaceEntries
+            .AnyAsync(e => raceIds.Contains(e.RaceId) && ActiveEntryStatuses.Contains(e.Status));
+        if (hasEntries)
+            throw new InvalidOperationException("ROUND_ALREADY_ALLOCATED");
+
+        var previousRound = await _context.Rounds
+            .Where(r => r.TournamentId == round.TournamentId &&
+                        r.SequenceOrder < round.SequenceOrder)
+            .OrderByDescending(r => r.SequenceOrder)
+            .FirstOrDefaultAsync();
+
+        if (previousRound != null && previousRound.Status != "Completed")
+            throw new InvalidOperationException("PREVIOUS_ROUND_NOT_COMPLETED");
+
+        var pool = previousRound == null
+            ? await BuildFirstRoundPoolAsync(round.TournamentId)
+            : await BuildProgressionPoolAsync(round.TournamentId, previousRound.RoundId);
+
+        if (pool.Count == 0)
+            throw new InvalidOperationException("NO_ELIGIBLE_PAIRINGS");
+
+        var capacityPerRace = Math.Min(tournament.MaxHorses, tournament.Venue.LaneCount);
+        var totalCapacity = capacityPerRace * races.Count;
+
+        // Pool vượt sức chứa: giữ theo thứ tự ưu tiên đã sắp (fee verified sớm hơn
+        // ở vòng 1; Qualified trước AlsoEligible ở vòng sau), phần dư thành waitlist.
+        return new AllocationPlan(
+            round, races, pool,
+            pool.Take(totalCapacity).ToList(),
+            pool.Skip(totalCapacity).ToList(),
+            capacityPerRace, totalCapacity);
     }
 
     // Ứng viên trong pool phân bổ.
