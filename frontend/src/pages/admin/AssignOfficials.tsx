@@ -182,12 +182,10 @@ const AssignOfficials = () => {
     <div className={styles.container}>
       <div className={styles.pageHeader}>
         <h1 className={styles.heading}>Admin Workspace</h1>
-        <p className={styles.subtext}>System operations and governance</p>
       </div>
 
       <div className={styles.sectionHeader}>
         <h2 className={styles.sectionTitle}>Assign Officials</h2>
-        <p className={styles.sectionDesc}>Phân công Trọng tài và Bác sĩ cho từng Race.</p>
       </div>
 
       {/* Filters */}

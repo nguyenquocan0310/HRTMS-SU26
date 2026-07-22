@@ -77,12 +77,10 @@ const AdminLayout = () => {
             <div className={styles.logoIconSmall}>H</div>
             <div className={styles.logoTextBlock}>
               <span className={styles.logo}>HRTMS</span>
-              <span className={styles.logoCaption}>Không gian quản trị</span>
             </div>
           </div>
 
           <div className={styles.workspaceLabel}>
-            <span className={styles.workspaceEyebrow}>KHÔNG GIAN LÀM VIỆC</span>
             <span className={styles.workspaceName}>Không gian quản trị</span>
           </div>
 

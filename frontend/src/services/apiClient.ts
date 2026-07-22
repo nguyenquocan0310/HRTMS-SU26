@@ -61,7 +61,7 @@ export async function apiFetch<T>(
         sessionStorage.setItem('authReason', 'expired');
         window.location.href = '/login';
       }
-      throw new ApiRequestError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'UNAUTHORIZED', 401);
+      throw new ApiRequestError('Email hoặc password sai. Vui lòng đăng nhập lại.', 'UNAUTHORIZED', 401);
     }
 
 let errorBody: ApiErrorResponse | null = null;

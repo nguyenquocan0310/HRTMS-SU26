@@ -74,7 +74,7 @@ const LiveRaceView = () => {
 
   return (
     <div className={styles.container}>
-      <div className={styles.pageHeader}><h1 className={styles.heading}>Theo dõi cuộc đua</h1><p className={styles.subtext}>Dữ liệu trạng thái và vi phạm được cập nhật từ hệ thống.</p></div>
+      <div className={styles.pageHeader}><h1 className={styles.heading}>Theo dõi cuộc đua</h1></div>
       <div className={styles.controls}>
         <select className={styles.select} value={selectedRaceId ?? ''} onChange={(event) => setSelectedRaceId(Number(event.target.value))} disabled={!races.length}>
           {races.map((race) => <option key={race.raceId} value={race.raceId}>{race.label}</option>)}

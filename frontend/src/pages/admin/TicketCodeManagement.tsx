@@ -396,10 +396,6 @@ const TicketCodeManagement = () => {
               </strong>
             </div>
           </div>
-<<<<<<< HEAD
-=======
-
->>>>>>> 789db4fc992ef18dca957663c4255f13dd249c35
         </aside>
       </div>
 

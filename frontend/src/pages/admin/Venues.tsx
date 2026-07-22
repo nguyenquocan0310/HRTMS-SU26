@@ -55,7 +55,7 @@ const Venues = () => {
   };
 
   return <div className={styles.page}>
-    <header className={styles.header}><div><h1>Quản lý trường đua</h1><p>Tạo, chỉnh sửa và bật/tắt hoạt động trường đua.</p></div><button className={styles.primary} onClick={() => document.getElementById('venue-form')?.scrollIntoView({ behavior: 'smooth' })}><FiPlus /> Tạo trường đua</button></header>
+    <header className={styles.header}><div><h1>Quản lý trường đua</h1></div><button className={styles.primary} onClick={() => document.getElementById('venue-form')?.scrollIntoView({ behavior: 'smooth' })}><FiPlus /> Tạo trường đua</button></header>
     {notice && <div className={styles.notice}>{notice}</div>}
     {error && <div className={styles.error}>{error}</div>}
 
@@ -70,7 +70,8 @@ const Venues = () => {
       {loading ? <tr><td colSpan={7} className={styles.empty}>Đang tải danh sách trường đua…</td></tr> : venues.length === 0 ? <tr><td colSpan={7} className={styles.empty}>Chưa có trường đua phù hợp.</td></tr> : venues.map((venue) => <tr key={venue.venueId}><td><strong>{venue.name}</strong><span className={styles.city}><FiMapPin /> {venue.city ?? 'Chưa cập nhật'}</span></td><td>{venue.address ?? '—'}</td><td>{adminLabel(venue.trackType)}</td><td>{venue.trackLengthMeters.toLocaleString('vi-VN')} m</td><td>{venue.laneCount}</td><td><span className={venue.isActive ? styles.active : styles.inactive}>{venue.isActive ? 'Đang hoạt động' : 'Tạm ngừng hoạt động'}</span></td><td><button className={styles.edit} onClick={() => void beginEdit(venue)}><FiEdit2 /> Chỉnh sửa</button></td></tr>)}
     </tbody></table></div></section>
 
-    <section id="venue-form" className={styles.card}><div className={styles.formHead}><div><h2>{editing ? `Chỉnh sửa: ${editing.name}` : 'Tạo trường đua mới'}</h2><p>Không xóa cứng trường đua; hãy tạm ngừng khi không còn sử dụng.</p></div>{editing && <button className={styles.textButton} onClick={resetForm}><FiX /> Đóng chỉnh sửa</button>}</div>
+    <section id="venue-form" className={styles.card}><div className={styles.formHead}><div><h2>{editing ? `Chỉnh sửa: ${editing.name}` : 'Tạo trường đua mới'}</h2>
+    </div>{editing && <button className={styles.textButton} onClick={resetForm}><FiX /> Đóng chỉnh sửa</button>}</div>
       <form className={styles.form} onSubmit={save}>
         <label>Tên trường đua<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></label><label>Tỉnh/Thành phố<input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} required /></label>
         <label className={styles.full}>Địa chỉ<input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} required /></label>

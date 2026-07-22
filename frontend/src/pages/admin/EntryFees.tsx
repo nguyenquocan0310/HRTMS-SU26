@@ -57,7 +57,7 @@ const EntryFees = () => {
   };
 
   return <div className={styles.page}>
-    <header><h1>Đối chiếu lệ phí</h1><p>Kiểm tra chứng từ do chủ ngựa nộp, xác nhận hoặc từ chối. Cặp đấu chỉ được xác nhận sau khi lệ phí được đối chiếu.</p></header>
+    <header><h1>Đối chiếu lệ phí</h1></header>
     {notice && <div className={styles.notice}>{notice}</div>}{error && <div className={styles.error}>{error}</div>}
     <section className={styles.card}><div className={styles.toolbar}><div className={styles.tabs}>{tabs.map((tab) => <button key={tab.status} className={status === tab.status ? styles.tabActive : styles.tab} onClick={() => changeStatus(tab.status)}>{tab.label}<span>{counts[tab.status]}</span></button>)}</div><label className={styles.tournamentSelect}>Giải đấu<select value={tournamentId ?? ''} onChange={(event) => { setTournamentId(event.target.value ? Number(event.target.value) : undefined); setPage(1); }}><option value="">Tất cả giải đấu</option>{tournaments.map((item) => <option value={item.tournamentId} key={item.tournamentId}>{item.name}</option>)}</select></label></div>
       {tournament && <div className={styles.tournamentInfo}><strong>{tournament.name}</strong><span>Hạn nộp lệ phí: {dateTime(tournament.paymentDeadline)}</span><span>Hạn hoàn lệ phí: {tournament.refundDeadline ? dateTime(tournament.refundDeadline) : 'Không hoàn'}</span></div>}

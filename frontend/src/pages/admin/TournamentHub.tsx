@@ -49,19 +49,16 @@ const TournamentHub = () => {
     <div className={styles.container}>
       <div className={styles.pageHeader}>
         <h1 className={styles.heading}>Admin Workspace</h1>
-        <p className={styles.subtext}>System operations and governance</p>
       </div>
 
       <div className={styles.sectionHeader}>
         <h2 className={styles.sectionTitle}>Tournament Hub</h2>
-        <p className={styles.sectionDesc}>Tournament roster, registration, rounds and public race entries shared across every workspace.</p>
       </div>
 
       {/* ── Tournament list (scroll, không navigate) ── */}
       <div className={styles.listCard}>
         <div className={styles.listHeader}>
           <h3 className={styles.listTitle}>Tournaments</h3>
-          <p className={styles.listSubtext}>Select a tournament to inspect rounds and roster.</p>
         </div>
 
         {tournaments.length === 0 && <p className={styles.empty}>Chưa có giải đấu nào.</p>}
