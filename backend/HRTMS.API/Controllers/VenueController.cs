@@ -33,6 +33,28 @@ public class VenueController : ControllerBase
         return Ok(result);
     }
 
+    // Danh sách vận hành tách route public: Admin luôn nhìn được inactive và có
+    // filter server-side. Không dùng includeInactive trên route public làm contract
+    // quản trị, để tránh FE vô tình gọi nhầm rồi mất dữ liệu inactive.
+    [HttpGet("admin/venues")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetAdminList(
+        [FromQuery] string? search,
+        [FromQuery] string? city,
+        [FromQuery] string? trackType,
+        [FromQuery] bool? isActive)
+    {
+        try
+        {
+            var result = await _service.GetAdminListAsync(search, city, trackType, isActive);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(Err("INVALID_VENUE_DATA", ex.Message));
+        }
+    }
+
     [HttpGet("venues/{id:int}")]
     [AllowAnonymous]
     public async Task<IActionResult> GetById(int id)
@@ -99,6 +121,11 @@ public class VenueController : ControllerBase
         {
             return UnprocessableEntity(Err("LANE_COUNT_BELOW_TOURNAMENT_MAX_HORSES",
                 "Không thể giảm số làn xuống dưới số ngựa tối đa của một giải đang dùng sân này."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "VENUE_TRACK_TYPE_IN_USE")
+        {
+            return UnprocessableEntity(Err("VENUE_TRACK_TYPE_IN_USE",
+                "Không thể đổi loại mặt sân khi còn giải đấu đang dùng trường đua này."));
         }
     }
 

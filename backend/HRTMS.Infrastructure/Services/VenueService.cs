@@ -35,6 +35,39 @@ namespace HRTMS.Infrastructure.Services
             return venues.Select(MapToDto).ToList();
         }
 
+        public async Task<List<VenueResponseDto>> GetAdminListAsync(
+            string? search,
+            string? city,
+            string? trackType,
+            bool? isActive)
+        {
+            var query = _context.Venues.AsNoTracking();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim();
+                query = query.Where(v => v.Name.Contains(term));
+            }
+
+            if (!string.IsNullOrWhiteSpace(city))
+            {
+                var cityTerm = city.Trim();
+                query = query.Where(v => v.City != null && v.City.Contains(cityTerm));
+            }
+
+            if (!string.IsNullOrWhiteSpace(trackType))
+            {
+                ValidateTrackType(trackType);
+                query = query.Where(v => v.TrackType == trackType);
+            }
+
+            if (isActive.HasValue)
+                query = query.Where(v => v.IsActive == isActive.Value);
+
+            var venues = await query.OrderBy(v => v.Name).ToListAsync();
+            return venues.Select(MapToDto).ToList();
+        }
+
         public async Task<VenueResponseDto?> GetByIdAsync(int venueId)
         {
             var venue = await _context.Venues
@@ -46,7 +79,10 @@ namespace HRTMS.Infrastructure.Services
 
         public async Task<VenueResponseDto> CreateAsync(CreateVenueDto dto, int adminUserId)
         {
+            ValidateRequiredName(dto.Name);
             ValidateTrackType(dto.TrackType);
+            ValidateTrackLength(dto.TrackLengthMeters);
+            ValidateLaneCount(dto.LaneCount);
 
             var name = dto.Name.Trim();
             // UQ_Venues_Name cũng chặn ở DB; check trước để trả error code ổn định
@@ -90,6 +126,7 @@ namespace HRTMS.Infrastructure.Services
 
             if (dto.Name != null)
             {
+                ValidateRequiredName(dto.Name);
                 var name = dto.Name.Trim();
                 if (await _context.Venues.AnyAsync(v => v.Name == name && v.VenueId != venueId))
                     throw new InvalidOperationException("VENUE_NAME_DUPLICATE");
@@ -99,16 +136,28 @@ namespace HRTMS.Infrastructure.Services
             if (dto.TrackType != null)
             {
                 ValidateTrackType(dto.TrackType);
+
+                // Đổi mặt sân làm sai contract TrackType đã lưu ở tournament cũ.
+                // Không sửa ngầm lịch sử/giải đang vận hành.
+                if (dto.TrackType != venue.TrackType && await _context.Tournaments.AnyAsync(t =>
+                        t.VenueId == venueId && t.Status != "Completed" && t.Status != "Cancelled"))
+                    throw new InvalidOperationException("VENUE_TRACK_TYPE_IN_USE");
+
                 venue.TrackType = dto.TrackType;
             }
 
             if (dto.Address != null) venue.Address = dto.Address.Trim();
             if (dto.City != null) venue.City = dto.City.Trim();
-            if (dto.TrackLengthMeters.HasValue) venue.TrackLengthMeters = dto.TrackLengthMeters.Value;
+            if (dto.TrackLengthMeters.HasValue)
+            {
+                ValidateTrackLength(dto.TrackLengthMeters.Value);
+                venue.TrackLengthMeters = dto.TrackLengthMeters.Value;
+            }
             if (dto.IsActive.HasValue) venue.IsActive = dto.IsActive.Value;
 
             if (dto.LaneCount.HasValue && dto.LaneCount.Value != venue.LaneCount)
             {
+                ValidateLaneCount(dto.LaneCount.Value);
                 // Giảm số làn xuống dưới MaxHorses của một giải đang dùng sân sẽ tạo
                 // ra giải không bao giờ xếp đủ ngựa. Chặn tại đây thay vì để lỗi nổ
                 // lúc auto-allocate.
@@ -142,6 +191,24 @@ namespace HRTMS.Infrastructure.Services
         {
             if (!ValidTrackTypes.Contains(trackType))
                 throw new ArgumentException($"Loại mặt sân không hợp lệ: {trackType}. Chỉ chấp nhận: {string.Join(", ", ValidTrackTypes)}.");
+        }
+
+        private static void ValidateRequiredName(string? name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentException("Tên trường đua là bắt buộc.");
+        }
+
+        private static void ValidateTrackLength(int trackLengthMeters)
+        {
+            if (trackLengthMeters <= 0)
+                throw new ArgumentException("Chiều dài đường đua phải lớn hơn 0.");
+        }
+
+        private static void ValidateLaneCount(int laneCount)
+        {
+            if (laneCount is < 2 or > 24)
+                throw new ArgumentException("Số làn xuất phát phải từ 2 đến 24.");
         }
 
         private static VenueResponseDto MapToDto(Venue v) => new()
