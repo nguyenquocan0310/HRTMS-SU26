@@ -128,8 +128,9 @@ namespace HRTMS.Infrastructure.Services
         //   PaymentDeadline : BẮT BUỘC mọi giải (giải free = hạn chốt đăng ký,
         //                     vì AutoAllocateJob lấy mốc này làm trigger).
         //                     now < PaymentDeadline <= StartDate - 24h.
-        //   RefundDeadline  : chỉ khi EntryFeeAmount > 0; optional (NULL = không
-        //                     hoàn phí). PaymentDeadline <= RefundDeadline <= StartDate.
+        //   RefundDeadline  : chỉ khi EntryFeeAmount > 0; Admin KHÔNG phải nhập —
+        //                     mặc định suy ra từ StartDate (xem DeriveRefundDeadline).
+        //                     Nhập tay được, phải nằm trong [PaymentDeadline, StartDate].
         //
         // enforceFutureDeadline = false khi Update mà Admin KHÔNG đổi PaymentDeadline:
         // giải cũ có deadline đã trôi qua vẫn phải sửa được field khác.
@@ -164,6 +165,24 @@ namespace HRTMS.Infrastructure.Services
             // hạn chót sẽ không bao giờ có cửa rút.
             if (rd < pd || rd > startDate)
                 throw new InvalidOperationException("REFUND_DEADLINE_INVALID");
+        }
+
+        // Hạn hoàn phí mặc định: neo vào NGÀY ĐUA, không phải ngày nộp tiền.
+        //
+        // Chi phí tổ chức phát sinh theo ngày đua (chốt field, bốc thăm, mở dự đoán),
+        // nên cửa sổ hoàn phí phải đóng theo mốc đó. Neo vào PaymentDeadline + N ngày
+        // thì mốc trôi theo lựa chọn hành chính: mở đóng phí sớm 30 ngày sẽ cắt quyền
+        // rút từ rất lâu trước khi giải tốn gì; chốt phí sát ngày đua lại đẩy hạn hoàn
+        // phí ra sau khi đã đua xong.
+        //
+        // StartDate - 24h trùng đúng mốc AutoDrawJob bốc thăm, nên rule phát biểu gọn:
+        // "rút trước khi bốc thăm thì được hoàn, bốc thăm xong là scratch".
+        // Clamp về PaymentDeadline cho giải mở đăng ký sát ngày đua (hạn nộp có thể
+        // muộn hơn StartDate - 24h là không hợp lệ, nhưng bằng thì hợp lệ).
+        private static DateTime DeriveRefundDeadline(DateTime paymentDeadline, DateTime startDate)
+        {
+            var derived = startDate - PaymentDeadlineBuffer;
+            return derived < paymentDeadline ? paymentDeadline : derived;
         }
 
         // Sân đua (patch 011) — nạp venue và kiểm tra mọi ràng buộc dùng chung cho
@@ -272,8 +291,15 @@ namespace HRTMS.Infrastructure.Services
             ValidateRaceDistance(dto.RaceDistance, nameof(dto.RaceDistance));
 
             // Deadline lệ phí (patch 012) — bắt buộc cho giải mới.
+            // Không gửi RefundDeadline thì giải thu phí vẫn có chính sách hoàn phí
+            // mặc định; giải miễn phí không có gì để hoàn nên để NULL.
+            var refundDeadline = dto.RefundDeadline
+                ?? (dto.EntryFeeAmount > 0
+                    ? DeriveRefundDeadline(dto.PaymentDeadline, dto.StartDate)
+                    : (DateTime?)null);
+
             ValidateDeadlines(
-                dto.PaymentDeadline, dto.RefundDeadline,
+                dto.PaymentDeadline, refundDeadline,
                 dto.StartDate, dto.EntryFeeAmount,
                 enforceFutureDeadline: true);
 
@@ -321,7 +347,7 @@ namespace HRTMS.Infrastructure.Services
                 PurseAmount = dto.PurseAmount,
                 EntryFeeAmount = dto.EntryFeeAmount,
                 PaymentDeadline = dto.PaymentDeadline,
-                RefundDeadline = dto.RefundDeadline,
+                RefundDeadline = refundDeadline,
                 PreRaceWeightThresholdKg = dto.PreRaceWeightThresholdKg,
                 PostRaceWeightDiffThresholdKg = dto.PostRaceWeightDiffThresholdKg,
                 // Khong truyen -> giu default entity (TopPerRace / 5).
@@ -496,10 +522,29 @@ namespace HRTMS.Infrastructure.Services
                 throw new InvalidOperationException("TRACK_TYPE_VENUE_MISMATCH");
 
             // ─── Deadline lệ phí (patch 012) ────────────────────────────────
+            var mergedEntryFeeAmount = dto.EntryFeeAmount ?? tournament.EntryFeeAmount;
             var mergedPaymentDeadline = dto.PaymentDeadline ?? tournament.PaymentDeadline;
             var mergedRefundDeadline = dto.ClearRefundDeadline
                 ? null
                 : dto.RefundDeadline ?? tournament.RefundDeadline;
+
+            // Giải miễn phí chuyển sang thu phí thì mới sinh hạn hoàn phí mặc định:
+            // lúc đó giải chưa từng có chính sách hoàn phí để mà tôn trọng.
+            //
+            // KHÔNG suy lại trong các trường hợp khác. RefundDeadline đã lưu là mốc
+            // Owner nhìn thấy trước khi quyết định nộp tiền — dời StartDate mà tự tính
+            // lại sẽ âm thầm rút ngắn quyền rút của người đã đóng phí. Muốn đổi thì
+            // Admin gửi RefundDeadline mới (có audit), muốn bỏ hoàn phí thì gửi
+            // ClearRefundDeadline (và giá trị NULL đó phải giữ nguyên qua các lần sửa sau).
+            if (mergedRefundDeadline == null &&
+                !dto.ClearRefundDeadline &&
+                mergedEntryFeeAmount > 0 &&
+                tournament.EntryFeeAmount <= 0 &&
+                mergedPaymentDeadline.HasValue)
+            {
+                mergedRefundDeadline = DeriveRefundDeadline(
+                    mergedPaymentDeadline.Value, mergedStartDate);
+            }
 
             var changingDeadline =
                 (dto.PaymentDeadline.HasValue && dto.PaymentDeadline != tournament.PaymentDeadline) ||
@@ -518,7 +563,6 @@ namespace HRTMS.Infrastructure.Services
 
             var mergedMinJockeyExperienceYears = dto.MinJockeyExperienceYears ?? tournament.MinJockeyExperienceYears;
             var mergedPurseAmount = dto.PurseAmount ?? tournament.PurseAmount;
-            var mergedEntryFeeAmount = dto.EntryFeeAmount ?? tournament.EntryFeeAmount;
             var mergedPreRaceWeightThresholdKg = dto.PreRaceWeightThresholdKg ?? tournament.PreRaceWeightThresholdKg;
             var mergedPostRaceWeightDiffThresholdKg = dto.PostRaceWeightDiffThresholdKg ?? tournament.PostRaceWeightDiffThresholdKg;
 

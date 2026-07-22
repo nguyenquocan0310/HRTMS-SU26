@@ -56,7 +56,9 @@ namespace HRTMS.Core.DTOs.Tournament
         public DateTime PaymentDeadline { get; set; }
 
         // Hạn hoàn phí khi rút lui. CHỈ áp dụng khi EntryFeeAmount > 0.
-        // NULL = giải không hoàn phí. Rule: PaymentDeadline <= RefundDeadline <= StartDate.
+        // KHÔNG bắt buộc: bỏ trống thì giải thu phí tự nhận mặc định
+        // StartDate - 24h (trùng mốc bốc thăm), giải miễn phí để NULL.
+        // Nhập tay thì phải nằm trong [PaymentDeadline, StartDate].
         public DateTime? RefundDeadline { get; set; }
         // Ngưỡng cân nặng
         public decimal PreRaceWeightThresholdKg { get; set; } = 2.0m;

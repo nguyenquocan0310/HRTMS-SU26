@@ -278,13 +278,28 @@ Buffer 24h là bắt buộc: sau deadline hệ thống còn phải auto-allocate
 auto-draw (`AutoDrawJob` chỉ chạy khi race còn <= 24h). Deadline sát `StartDate`
 thì draw không kịp.
 
-**`RefundDeadline` — optional, chỉ khi `EntryFeeAmount > 0`.**
-`NULL` = giải không hoàn phí.
+**`RefundDeadline` — không bắt buộc gửi, chỉ áp dụng khi `EntryFeeAmount > 0`.**
+Bỏ trống khi tạo giải thu phí thì hệ thống tự suy:
 ```
-PaymentDeadline <= RefundDeadline <= StartDate
+RefundDeadline = max(StartDate - 24h, PaymentDeadline)
+PaymentDeadline <= RefundDeadline <= StartDate     (rule khi Admin nhập tay)
 ```
+Neo vào **ngày đua**, không phải ngày nộp tiền: chi phí tổ chức phát sinh theo
+ngày đua, còn `PaymentDeadline + N ngày` sẽ trôi theo lựa chọn hành chính (mở
+đóng phí sớm 30 ngày thì cắt quyền rút quá sớm; chốt phí sát ngày đua thì đẩy
+hạn hoàn ra sau khi đã đua xong). `StartDate - 24h` trùng mốc `AutoDrawJob`, nên
+rule phát biểu gọn: *rút trước khi bốc thăm thì được hoàn, bốc thăm xong là
+scratch*.
+
 Cửa sổ hoàn phí đóng **trước** hạn đóng tiền là vô nghĩa — người nộp đúng hạn
-chót sẽ không bao giờ có cửa rút.
+chót sẽ không bao giờ có cửa rút; vì vậy giá trị suy ra được clamp về
+`PaymentDeadline`.
+
+Giá trị đã lưu **không tự tính lại** khi Admin dời `StartDate`: đó là mốc Owner
+đã nhìn thấy trước khi quyết định nộp tiền, tự dịch sẽ âm thầm rút ngắn quyền
+rút của người đã đóng phí. Muốn đổi thì gửi `RefundDeadline` mới (có audit).
+Trường hợp duy nhất suy lại ở `Update` là giải **miễn phí chuyển sang thu phí** —
+lúc đó giải chưa từng có chính sách hoàn phí nào để tôn trọng.
 
 **Update:** chỉ sửa được khi giải còn `Draft`/`Open Registration` (guard status
 sẵn có) **và** chưa qua `PaymentDeadline` hiện tại — job đã chạy thì dời mốc sẽ
