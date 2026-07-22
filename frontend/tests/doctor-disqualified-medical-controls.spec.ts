@@ -2,6 +2,42 @@ import { expect, test } from '@playwright/test'
 
 const BASE_URL = 'http://127.0.0.1:5173'
 
+test('shows GATE 6 signed weight difference in red while keeping the disqualified badge red', async ({ page }) => {
+  await page.route('**/api/**', async (route) => {
+    const path = new URL(route.request().url()).pathname
+
+    if (path === '/api/doctors/race-assignments/my') {
+      await route.fulfill({ json: [{ raceId: 10, raceNumber: 1, raceStatus: 'Upcoming', tournamentName: 'Summer Cup', roundName: 'Vòng loại', assignedAt: '2026-07-20T08:00:00Z' }] })
+      return
+    }
+    if (path === '/api/doctor/race-entries/races/10/entries') {
+      await route.fulfill({ json: [{ raceEntryId: 106, postPosition: 6, raceEntryStatus: 'Disqualified', horseName: 'Xích Thố', jockeyName: 'Dương Đức Mạnh', selfDeclaredWeight: '54,0', preRaceWeight: '50,0', horseIdentityCheckStatus: 'Mismatch' }] })
+      return
+    }
+
+    await route.fulfill({ json: [] })
+  })
+
+  await page.goto(`${BASE_URL}/doctor/paddock?raceId=10`)
+
+  const postSixRow = page.getByRole('row').filter({ hasText: 'Dương Đức Mạnh' })
+  const difference = postSixRow.getByText('-4.0', { exact: true })
+  const disqualifiedBadge = postSixRow.getByText('Đã loại', { exact: true })
+
+  await expect(page.getByRole('columnheader', { name: 'GATE', exact: true })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: 'POST', exact: true })).toHaveCount(0)
+  await expect(difference).toBeVisible()
+  await expect(difference).toHaveClass(/text-red-600/)
+  await expect(disqualifiedBadge).toBeVisible()
+  await expect(disqualifiedBadge).toHaveClass(/text-red-700/)
+
+  await page.getByRole('button', { name: 'Kiểm tra ngựa (Vet Check)' }).click()
+  const vetCheckRow = page.getByRole('row').filter({ hasText: 'Dương Đức Mạnh' })
+  const mismatchStatus = vetCheckRow.locator('td').nth(1).locator('span')
+  await expect(mismatchStatus).toHaveText('Mismatch')
+  await expect(mismatchStatus).toHaveClass(/text-red-700/)
+})
+
 test('disables identity and clinical controls immediately after weigh-in disqualification', async ({ page }) => {
   let identityRequests = 0
   let clinicalRequests = 0

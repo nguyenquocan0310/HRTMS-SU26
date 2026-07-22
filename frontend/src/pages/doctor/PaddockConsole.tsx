@@ -12,6 +12,12 @@ import {
   type DoctorRaceEntry,
   type RaceEntryHealthProfile,
 } from '../../services/doctorService'
+import {
+  calculateWeightDifference,
+  DEFAULT_ALLOWED_WEIGHT_DIFFERENCE_KG,
+  exceedsWeightDifferenceLimit,
+  parseWeightValue,
+} from '../../utils/paddockWeight'
 
 type ActiveTab = 'weigh-in' | 'vet-check' | 'weigh-out'
 type IdentityStatus = 'Matched' | 'Mismatch'
@@ -278,7 +284,7 @@ export default function PaddockConsole() {
 
   const thresholdLabel = useMemo(() => {
     const threshold = entries.find((entry) => entry.thresholdKg != null)?.thresholdKg
-    return threshold != null ? threshold.toFixed(1) : 'theo cấu hình'
+    return (threshold ?? DEFAULT_ALLOWED_WEIGHT_DIFFERENCE_KG).toFixed(1)
   }, [entries])
   const preRaceWritable = !selectedRace || ['Upcoming', 'Sắp diễn ra'].includes(selectedRace.raceStatus)
   const postRaceWritable = !selectedRace || ['Live', 'Active', 'Running', 'InProgress', 'Đang diễn ra'].includes(selectedRace.raceStatus)
@@ -291,8 +297,8 @@ export default function PaddockConsole() {
 
   const handleWeighInConfirm = async (entry: DoctorRaceEntry) => {
     const rawValue = weightInputs[entry.raceEntryId]
-    const preRaceJockeyWeight = rawValue === '' ? Number.NaN : Number(rawValue)
-    if (!Number.isFinite(preRaceJockeyWeight) || preRaceJockeyWeight < 1 || preRaceJockeyWeight > 300) {
+    const preRaceJockeyWeight = parseWeightValue(rawValue)
+    if (preRaceJockeyWeight === null || preRaceJockeyWeight < 1 || preRaceJockeyWeight > 300) {
       showToast('Cân nặng trước đua phải từ 1 đến 300 kg.')
       return
     }
@@ -304,7 +310,10 @@ export default function PaddockConsole() {
       updateEntry(entry.raceEntryId, {
         selfDeclaredWeight: res.selfDeclaredWeight ?? entry.selfDeclaredWeight,
         preRaceJockeyWeight: res.preRaceJockeyWeight ?? res.preRaceWeight ?? preRaceJockeyWeight,
-        weightDifference: res.weightDifference ?? entry.weightDifference,
+        weightDifference: calculateWeightDifference(
+          res.preRaceJockeyWeight ?? res.preRaceWeight ?? preRaceJockeyWeight,
+          res.selfDeclaredWeight ?? entry.selfDeclaredWeight
+        ),
         thresholdKg: res.thresholdKg ?? entry.thresholdKg,
         isWeightWarning: Boolean(res.isWeightWarning),
         isEmergencyDisqualified: Boolean(res.isEmergencyDisqualified),
@@ -409,8 +418,8 @@ export default function PaddockConsole() {
 
   const handleWeighOutConfirm = async (entry: DoctorRaceEntry) => {
     const rawValue = postWeightInputs[entry.raceEntryId]
-    const postRaceJockeyWeight = rawValue === '' ? Number.NaN : Number(rawValue)
-    if (!Number.isFinite(postRaceJockeyWeight) || postRaceJockeyWeight < 1 || postRaceJockeyWeight > 300) {
+    const postRaceJockeyWeight = parseWeightValue(rawValue)
+    if (postRaceJockeyWeight === null || postRaceJockeyWeight < 1 || postRaceJockeyWeight > 300) {
       showToast('Cân nặng sau đua phải từ 1 đến 300 kg.')
       return
     }
@@ -566,7 +575,7 @@ export default function PaddockConsole() {
                 <table className="w-full text-left text-sm text-gray-700">
                   <thead>
                     <tr className="border-b border-gray-100 bg-gray-50/50 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                      <th className="px-4 py-3">Post</th>
+                      <th className="px-4 py-3">GATE</th>
                       <th className="px-4 py-3">Kỵ sĩ / Ngựa</th>
                       <th className="px-4 py-3">Cân tự khai</th>
                       <th className="px-4 py-3">Cân thực tế</th>
@@ -579,15 +588,10 @@ export default function PaddockConsole() {
                     {entries.map((entry) => {
                       const key = `weight-${entry.raceEntryId}`
                       const input = weightInputs[entry.raceEntryId] ?? ''
-                      const actual = input === '' ? null : Number(input)
-                      const diff =
-                        entry.weightDifference ??
-                        (actual != null && entry.selfDeclaredWeight != null
-                          ? Number((actual - entry.selfDeclaredWeight).toFixed(1))
-                          : null)
-                      const isExceeded =
-                        entry.isWeightWarning ||
-                         (diff != null && entry.thresholdKg != null && Math.abs(diff) > entry.thresholdKg)
+                      const diff = calculateWeightDifference(input, entry.selfDeclaredWeight)
+                      const allowedDifference = entry.thresholdKg ?? DEFAULT_ALLOWED_WEIGHT_DIFFERENCE_KG
+                      const exceedsLimit = exceedsWeightDifferenceLimit(diff, allowedDifference)
+                      const isExceeded = entry.isWeightWarning ? true : exceedsLimit
                       const eligible = isEntryEligible(entry)
 
                       return (
@@ -604,10 +608,11 @@ export default function PaddockConsole() {
                           </td>
                           <td className="px-4 py-4">
                             <input
-                              type="number"
+                              type="text"
+                              inputMode="decimal"
                               step="0.1"
                               className={`w-28 rounded-lg border bg-gray-50 px-3 py-1.5 text-sm font-semibold transition-all focus:bg-white focus:outline-none focus:ring-2 ${
-                                isExceeded
+                                isExceeded === true
                                   ? 'border-red-500 bg-red-50/50 text-red-700 focus:ring-red-500/20'
                                   : 'border-gray-200 focus:border-blue-500 focus:ring-blue-500/20'
                               }`}
@@ -625,19 +630,25 @@ export default function PaddockConsole() {
                             />
                           </td>
                           <td className="px-4 py-4">
-                            {diff != null ? (
+                            {diff !== null ? (
                               <div className="flex items-center gap-2">
-                                <span className={`font-mono font-bold ${isExceeded ? 'text-red-600' : 'text-emerald-600'}`}>
-                                  {diff > 0 ? `+${diff}` : diff}
+                                <span className={`font-mono font-bold ${
+                                  isExceeded === true
+                                    ? 'text-red-600'
+                                    : isExceeded === false
+                                      ? 'text-emerald-600'
+                                      : 'text-gray-600'
+                                }`}>
+                                  {`${diff > 0 ? '+' : ''}${diff.toFixed(1)}`}
                                 </span>
-                                {isExceeded && (
+                                {isExceeded === true && (
                                   <span className="rounded border border-red-200 bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
                                     Vượt mức
                                   </span>
                                 )}
                               </div>
                             ) : (
-                              <span className="text-xs italic text-gray-400">Chưa cân</span>
+                              <span className="text-xs text-gray-400">—</span>
                             )}
                           </td>
                           <td className="px-4 py-4">
@@ -702,7 +713,7 @@ export default function PaddockConsole() {
                               {entry.jockeyName}
                               {entry.horseBreed ? ` - ${entry.horseBreed}` : ''}
                             </p>
-                            <p className="mt-0.5 text-xs text-gray-400">Post {entry.postPosition ?? '-'}</p>
+                            <p className="mt-0.5 text-xs text-gray-400">GATE {entry.postPosition ?? '-'}</p>
                           </td>
                           <td className="px-4 py-4">
                             <div className="flex items-center gap-2">
@@ -721,7 +732,13 @@ export default function PaddockConsole() {
                                 <option value="Mismatch">Mismatch</option>
                               </select>
                               {entry.horseIdentityCheckStatus && (
-                                <span className="text-xs font-semibold text-emerald-700">
+                                <span
+                                  className={`text-xs font-semibold ${
+                                    entry.horseIdentityCheckStatus === 'Mismatch'
+                                      ? 'text-red-700'
+                                      : 'text-emerald-700'
+                                  }`}
+                                >
                                   {entry.horseIdentityCheckStatus}
                                 </span>
                               )}
@@ -817,7 +834,7 @@ export default function PaddockConsole() {
                 <table className="w-full text-left text-sm text-gray-700">
                   <thead>
                     <tr className="border-b border-gray-100 bg-gray-50/50 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                      <th className="px-4 py-3">Post</th>
+                      <th className="px-4 py-3">GATE</th>
                       <th className="px-4 py-3">Kỵ sĩ / Ngựa</th>
                       <th className="px-4 py-3">Cân trước đua</th>
                       <th className="px-4 py-3">Cân sau đua</th>
@@ -830,12 +847,7 @@ export default function PaddockConsole() {
                     {entries.map((entry) => {
                       const key = `post-weight-${entry.raceEntryId}`
                       const input = postWeightInputs[entry.raceEntryId] ?? ''
-                      const enteredWeight = input === '' ? null : Number(input)
-                      const difference = entry.postRaceWeightDifference ?? (
-                        enteredWeight != null && entry.preRaceJockeyWeight != null
-                          ? Number((enteredWeight - entry.preRaceJockeyWeight).toFixed(1))
-                          : null
-                      )
+                      const difference = calculateWeightDifference(input, entry.preRaceJockeyWeight)
                       const eligible = isEntryEligible(entry)
                       return (
                       <tr key={entry.raceEntryId} className="hover:bg-gray-50/30">
@@ -851,7 +863,8 @@ export default function PaddockConsole() {
                         </td>
                         <td className="px-4 py-4">
                           <input
-                            type="number"
+                            type="text"
+                            inputMode="decimal"
                             min="1"
                             max="300"
                             step="0.1"
@@ -866,7 +879,7 @@ export default function PaddockConsole() {
                           />
                         </td>
                         <td className="px-4 py-4 font-mono font-semibold">
-                          {difference == null ? 'Chưa có' : `${difference > 0 ? '+' : ''}${difference.toFixed(1)} kg`}
+                          {difference === null ? '—' : `${difference > 0 ? '+' : ''}${difference.toFixed(1)} kg`}
                         </td>
                         <td className="px-4 py-4">
                           <WeighOutResultBadge entry={entry} />
