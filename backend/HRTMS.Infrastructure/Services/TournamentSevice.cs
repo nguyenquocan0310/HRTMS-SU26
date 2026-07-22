@@ -119,12 +119,37 @@ namespace HRTMS.Infrastructure.Services
                 throw new ArgumentException($"Tổng giải thưởng các cuộc đua ({allocatedPurse}) vượt quá tổng giải thưởng của giải ({tournament.PurseAmount}).");
         }
 
+        // Sân đua (patch 011) — nạp venue và kiểm tra mọi ràng buộc dùng chung cho
+        // Create/Update. Trả về venue để caller lấy TrackType/LaneCount.
+        // maxHorses là giá trị SAU merge (giá trị giải sẽ có sau thao tác này).
+        private async Task<Venue> LoadAndValidateVenueAsync(int venueId, int maxHorses)
+        {
+            var venue = await _context.Venues.FirstOrDefaultAsync(v => v.VenueId == venueId)
+                ?? throw new KeyNotFoundException("VENUE_NOT_FOUND");
+
+            // Sân chưa/không còn hoạt động không được gán cho giải mới.
+            if (!venue.IsActive)
+                throw new InvalidOperationException("VENUE_INACTIVE");
+
+            // Số cổng xuất phát là trần cứng: không thể xếp nhiều ngựa hơn số làn.
+            if (maxHorses > venue.LaneCount)
+                throw new InvalidOperationException("MAX_HORSES_EXCEEDS_LANES");
+
+            return venue;
+        }
+
         private static TournamentResponseDto MapToResponseDto(Tournament t)
         {
             var allocatedPurse = t.Rounds.SelectMany(r => r.Races).Sum(race => race.PurseAmount);
 
             return new TournamentResponseDto
             {
+                VenueId = t.VenueId,
+                VenueName = t.Venue?.Name,
+                VenueCity = t.Venue?.City,
+                LaneCount = t.Venue?.LaneCount,
+                TrackLengthMeters = t.Venue?.TrackLengthMeters,
+                RaceCapacity = t.Venue == null ? null : Math.Min(t.MaxHorses, t.Venue.LaneCount),
                 TournamentId = t.TournamentId,
                 Name = t.Name,
                 Description = t.Description,
@@ -167,6 +192,13 @@ namespace HRTMS.Infrastructure.Services
                         IsPostPositionDrawn = race.IsPostPositionDrawn,
                         ConfirmationCutoffHours = race.ConfirmationCutoffHours,
                         ProtestDeadlineMinutes = race.ProtestDeadlineMinutes,
+                        // Sân đua kế thừa từ giải (patch 011).
+                        VenueName = t.Venue?.Name,
+                        VenueCity = t.Venue?.City,
+                        VenueTrackType = t.Venue?.TrackType,
+                        LaneCount = t.Venue?.LaneCount,
+                        TrackLengthMeters = t.Venue?.TrackLengthMeters,
+                        RaceCapacity = t.Venue == null ? null : Math.Min(t.MaxHorses, t.Venue.LaneCount),
                     }).ToList(),
                 }).ToList(),
                 PrizeDistributions = t.PrizeDistributions
@@ -189,6 +221,15 @@ namespace HRTMS.Infrastructure.Services
             if (!ValidCategories.Contains(dto.RaceCategory))
                 throw new ArgumentException($"Hạng đua không hợp lệ: {dto.RaceCategory}");
             ValidateRaceDistance(dto.RaceDistance, nameof(dto.RaceDistance));
+
+            // Sân đua (patch 011) — bắt buộc cho giải mới, phải active, và MaxHorses
+            // không được vượt số làn của sân.
+            var venue = await LoadAndValidateVenueAsync(dto.VenueId, dto.MaxHorses);
+
+            // TrackType của giải LẤY TỪ SÂN. Nếu client gửi giá trị khác thì báo lỗi
+            // thay vì ghi đè im lặng — tránh Admin tưởng đã đặt Turf trên sân Dirt.
+            if (dto.TrackType != venue.TrackType)
+                throw new InvalidOperationException("TRACK_TYPE_VENUE_MISMATCH");
             if (dto.AdvancementRule != null && !ValidAdvancementRules.Contains(dto.AdvancementRule))
                 throw new ArgumentException($"Quy tắc đi tiếp '{dto.AdvancementRule}' chưa hỗ trợ ở phiên bản này (chỉ hỗ trợ TopPerRace).");
             if (dto.AdvancementCount.HasValue && dto.AdvancementCount.Value <= 0)
@@ -216,7 +257,9 @@ namespace HRTMS.Infrastructure.Services
                 EndDate = dto.EndDate,
                 MaxHorses = dto.MaxHorses,
                 AllowedBreed = dto.AllowedBreed,
-                TrackType = dto.TrackType,
+                // Suy ra từ sân — không nhận trực tiếp từ client (đã validate khớp ở trên).
+                TrackType = venue.TrackType,
+                VenueId = venue.VenueId,
                 RaceDistance = dto.RaceDistance,
                 RaceCategory = dto.RaceCategory,
                 MinJockeyExperienceYears = dto.MinJockeyExperienceYears,
@@ -236,6 +279,10 @@ namespace HRTMS.Infrastructure.Services
             _context.Tournaments.Add(tournament);
             await _context.SaveChangesAsync();
 
+            // Gán nav đã nạp sẵn để MapToResponseDto trả về thông tin sân ngay,
+            // không phải query lại.
+            tournament.Venue = venue;
+
             // 4. Ghi AuditLog
             await _auditLog.LogAsync(
                 actorId: createdByUserId,
@@ -254,6 +301,7 @@ namespace HRTMS.Infrastructure.Services
                 .Include(t => t.Rounds)
                     .ThenInclude(r => r.Races)
                 .Include(t => t.PrizeDistributions)
+                .Include(t => t.Venue)
                 .FirstOrDefaultAsync(t => t.TournamentId == tournamentId);
 
             return tournament == null ? null : MapToResponseDto(tournament);
@@ -265,6 +313,7 @@ namespace HRTMS.Infrastructure.Services
                 .Include(t => t.Rounds)
                     .ThenInclude(r => r.Races)
                 .Include(t => t.PrizeDistributions)
+                .Include(t => t.Venue)
                 .OrderByDescending(t => t.CreatedAt)
                 .ToListAsync();
 
@@ -276,6 +325,7 @@ namespace HRTMS.Infrastructure.Services
             var tournament = await _context.Tournaments
                 .Include(t => t.Rounds).ThenInclude(r => r.Races)
                 .Include(t => t.PrizeDistributions)
+                .Include(t => t.Venue)
                 .FirstOrDefaultAsync(t => t.TournamentId == tournamentId)
                 ?? throw new KeyNotFoundException($"Không tìm thấy giải #{tournamentId}.");
 
@@ -303,6 +353,10 @@ namespace HRTMS.Infrastructure.Services
                     lockedChanges.Add("TrackType");
                 if (dto.RaceCategory != null && dto.RaceCategory != tournament.RaceCategory)
                     lockedChanges.Add("RaceCategory");
+                // Sân quyết định số làn (sức chứa) và TrackType — enrollment đã được
+                // xét theo các giá trị này nên không cho đổi sân giữa kỳ đăng ký.
+                if (dto.VenueId.HasValue && dto.VenueId.Value != tournament.VenueId)
+                    lockedChanges.Add("VenueId");
 
                 if (lockedChanges.Count > 0)
                     throw new InvalidOperationException(
@@ -364,6 +418,23 @@ namespace HRTMS.Infrastructure.Services
             var mergedStartDate = dto.StartDate ?? tournament.StartDate;
             var mergedEndDate = dto.EndDate ?? tournament.EndDate;
             var mergedMaxHorses = dto.MaxHorses ?? tournament.MaxHorses;
+
+            // Sân đua (patch 011). Rule mới bắt buộc VenueId cho MỌI lần cập nhật:
+            // giải cũ (VenueId NULL) vẫn ĐỌC được bình thường, nhưng muốn sửa thì
+            // phải gán sân. Validate chạy khi đổi sân HOẶC khi đổi MaxHorses
+            // (MaxHorses mới có thể vượt số làn của sân hiện tại).
+            var mergedVenueId = dto.VenueId ?? tournament.VenueId
+                ?? throw new InvalidOperationException("VENUE_REQUIRED");
+
+            Venue? mergedVenue = tournament.Venue;
+            if (mergedVenueId != tournament.VenueId || dto.MaxHorses.HasValue)
+            {
+                mergedVenue = await LoadAndValidateVenueAsync(mergedVenueId, mergedMaxHorses);
+            }
+
+            // TrackType luôn suy ra từ sân; client gửi giá trị mâu thuẫn thì báo lỗi.
+            if (mergedVenue != null && dto.TrackType != null && dto.TrackType != mergedVenue.TrackType)
+                throw new InvalidOperationException("TRACK_TYPE_VENUE_MISMATCH");
             var mergedMinJockeyExperienceYears = dto.MinJockeyExperienceYears ?? tournament.MinJockeyExperienceYears;
             var mergedPurseAmount = dto.PurseAmount ?? tournament.PurseAmount;
             var mergedEntryFeeAmount = dto.EntryFeeAmount ?? tournament.EntryFeeAmount;
@@ -400,8 +471,14 @@ namespace HRTMS.Infrastructure.Services
                 () => tournament.MaxHorses = dto.MaxHorses.Value);
             if (dto.AllowedBreed != null) Apply("AllowedBreed", tournament.AllowedBreed, dto.AllowedBreed,
                 () => tournament.AllowedBreed = dto.AllowedBreed);
-            if (dto.TrackType != null) Apply("TrackType", tournament.TrackType, dto.TrackType,
-                () => tournament.TrackType = dto.TrackType);
+            // Sân + TrackType đi cùng nhau: đổi sân kéo theo TrackType của sân mới.
+            if (mergedVenue != null)
+            {
+                Apply("VenueId", tournament.VenueId, (int?)mergedVenue.VenueId,
+                    () => { tournament.VenueId = mergedVenue.VenueId; tournament.Venue = mergedVenue; });
+                Apply("TrackType", tournament.TrackType, mergedVenue.TrackType,
+                    () => tournament.TrackType = mergedVenue.TrackType);
+            }
             if (dto.RaceDistance.HasValue) Apply("RaceDistance", tournament.RaceDistance, dto.RaceDistance.Value,
                 () => tournament.RaceDistance = dto.RaceDistance.Value);
             if (dto.RaceCategory != null) Apply("RaceCategory", tournament.RaceCategory, dto.RaceCategory,

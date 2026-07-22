@@ -292,10 +292,13 @@ public class RaceEntryService : IRaceEntryService
     public async Task<RaceScheduleDto> GetRaceScheduleAsync(int raceId)
     {
         var race = await _context.Races
+            .Include(r => r.Round).ThenInclude(rd => rd.Tournament).ThenInclude(t => t.Venue)
             .Include(r => r.RaceEntries).ThenInclude(e => e.Pairing).ThenInclude(p => p.Horse)
             .Include(r => r.RaceEntries).ThenInclude(e => e.Pairing).ThenInclude(p => p.Jockey).ThenInclude(j => j.Jockey)
             .FirstOrDefaultAsync(r => r.RaceId == raceId)
             ?? throw new KeyNotFoundException("RACE_NOT_FOUND");
+
+        var venue = race.Round.Tournament.Venue;
 
         return new RaceScheduleDto
         {
@@ -307,6 +310,15 @@ public class RaceEntryService : IRaceEntryService
             IsPostPositionDrawn = race.IsPostPositionDrawn,
             ConfirmationCutoffHours = race.ConfirmationCutoffHours,
             ConfirmationCutoffTime = race.ScheduledTime.AddHours(-race.ConfirmationCutoffHours),
+            // San dua (patch 011) — ke thua tu giai.
+            VenueName = venue?.Name,
+            VenueCity = venue?.City,
+            VenueTrackType = venue?.TrackType,
+            LaneCount = venue?.LaneCount,
+            TrackLengthMeters = venue?.TrackLengthMeters,
+            RaceCapacity = venue == null
+                ? null
+                : Math.Min(race.Round.Tournament.MaxHorses, venue.LaneCount),
             Entries = race.RaceEntries
                 // Khong hien thi entry da huy tren lich cong khai.
                 .Where(e => e.Status != "Cancelled")

@@ -18,7 +18,22 @@ public class RaceScheduleDto
     public int ConfirmationCutoffHours { get; set; }
 
     // Thoi diem chot xac nhan = ScheduledTime - ConfirmationCutoffHours.
+    // DEPRECATED: Owner khong con tu confirm entry (xac nhan den tu verify le phi).
     public DateTime ConfirmationCutoffTime { get; set; }
+
+    // San dua (patch 011) — ke thua tu giai. NULL voi giai cu chua gan san.
+    public string? VenueName { get; set; }
+
+    public string? VenueCity { get; set; }
+
+    public string? VenueTrackType { get; set; }
+
+    public int? LaneCount { get; set; }
+
+    public int? TrackLengthMeters { get; set; }
+
+    // Suc chua cuoc dua = min(Tournament.MaxHorses, Venue.LaneCount).
+    public int? RaceCapacity { get; set; }
 
     public List<RaceScheduleEntryDto> Entries { get; set; } = new();
 }

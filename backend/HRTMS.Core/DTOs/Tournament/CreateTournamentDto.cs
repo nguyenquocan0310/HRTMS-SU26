@@ -22,6 +22,11 @@ namespace HRTMS.Core.DTOs.Tournament
         [Range(1, int.MaxValue, ErrorMessage ="MaxHorses must above 0")]
         public int MaxHorses { get; set; }
 
+        // Sân đua (patch 011) — BẮT BUỘC cho giải mới. Venue.LaneCount là trần cứng
+        // của MaxHorses; TrackType của giải được suy ra từ sân, không nhận tự do.
+        [Range(1, int.MaxValue, ErrorMessage = "VenueId is required")]
+        public int VenueId { get; set; }
+
         // Single-select, 4 giá trị hợp lệ
         [Required]
         public string AllowedBreed { get; set; } = string.Empty;

@@ -17,6 +17,9 @@ namespace HRTMS.Core.DTOs.Tournament
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
         public int? MaxHorses { get; set; }
+        // Sân đua (patch 011). Đổi sân bị khóa khi giải đã Open Registration —
+        // số làn của sân quyết định sức chứa mà enrollment đã được xét theo.
+        public int? VenueId { get; set; }
         public string? AllowedBreed { get; set; }
         public string? TrackType { get; set; }
         public int? RaceDistance { get; set; }

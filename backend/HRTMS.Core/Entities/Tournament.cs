@@ -37,6 +37,10 @@ public partial class Tournament
 
     public string Status { get; set; } = null!;
 
+    // Sân đua (patch 011). NULL ở DB cho giải cũ tạo trước patch; TournamentService
+    // bắt buộc giá trị này khi tạo/cập nhật giải mới.
+    public int? VenueId { get; set; }
+
     // Progression (patch 002): rule chọn ngựa đi tiếp + Top N per race.
     public string AdvancementRule { get; set; } = "TopPerRace";
 
@@ -49,6 +53,8 @@ public partial class Tournament
     public int? CreatedBy { get; set; }
 
     public virtual User? CreatedByNavigation { get; set; }
+
+    public virtual Venue? Venue { get; set; }
 
     public virtual ICollection<HorseTournamentEntry> HorseEntries { get; set; } = new List<HorseTournamentEntry>();
 

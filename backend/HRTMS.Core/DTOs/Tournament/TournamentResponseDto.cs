@@ -31,6 +31,14 @@ namespace HRTMS.Core.DTOs.Tournament
         public decimal PreRaceWeightThresholdKg { get; set; }
         public decimal PostRaceWeightDiffThresholdKg { get; set; }
         public string Status { get; set; } = string.Empty;
+        // Sân đua (patch 011). NULL với giải cũ tạo trước patch — FE phải chịu được null.
+        public int? VenueId { get; set; }
+        public string? VenueName { get; set; }
+        public string? VenueCity { get; set; }
+        public int? LaneCount { get; set; }
+        public int? TrackLengthMeters { get; set; }
+        // Sức chứa thực tế mỗi cuộc đua = min(MaxHorses, LaneCount).
+        public int? RaceCapacity { get; set; }
         // Progression (patch 002)
         public string AdvancementRule { get; set; } = "TopPerRace";
         public int AdvancementCount { get; set; } = 5;

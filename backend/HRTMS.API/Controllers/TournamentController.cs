@@ -44,11 +44,39 @@ namespace HRTMS.API.Controllers
                 var result = await _tournamentService.CreateTournamentAsync(dto, GetCurrentUserId());
                 return Ok(ApiResponse<TournamentResponseDto>.Ok(result, "Tao giai dau thanh cong"));
             }
+            catch (KeyNotFoundException ex) when (ex.Message == "VENUE_NOT_FOUND")
+            {
+                return NotFound(VenueError(ex.Message));
+            }
+            catch (InvalidOperationException ex) when (IsVenueError(ex.Message))
+            {
+                return UnprocessableEntity(VenueError(ex.Message));
+            }
             catch (ArgumentException ex)
             {
                 return BadRequest(ApiResponse<TournamentResponseDto>.Fail(ex.Message));
             }
         }
+
+        // Mã lỗi sân đua (patch 011) dùng chung cho Create/Update.
+        private static bool IsVenueError(string code) =>
+            code is "VENUE_INACTIVE" or "MAX_HORSES_EXCEEDS_LANES"
+                 or "TRACK_TYPE_VENUE_MISMATCH" or "VENUE_REQUIRED";
+
+        private static ApiResponse<TournamentResponseDto> VenueError(string code) => code switch
+        {
+            "VENUE_NOT_FOUND" => ApiResponse<TournamentResponseDto>.Fail(code,
+                "Không tìm thấy sân đua."),
+            "VENUE_INACTIVE" => ApiResponse<TournamentResponseDto>.Fail(code,
+                "Sân đua này chưa hoạt động nên không thể dùng cho giải đấu."),
+            "MAX_HORSES_EXCEEDS_LANES" => ApiResponse<TournamentResponseDto>.Fail(code,
+                "Số ngựa tối đa vượt quá số làn của sân đua đã chọn."),
+            "TRACK_TYPE_VENUE_MISMATCH" => ApiResponse<TournamentResponseDto>.Fail(code,
+                "Loại mặt sân của giải phải trùng với loại mặt sân của sân đua đã chọn."),
+            "VENUE_REQUIRED" => ApiResponse<TournamentResponseDto>.Fail(code,
+                "Giải đấu phải được gán sân đua trước khi cập nhật."),
+            _ => ApiResponse<TournamentResponseDto>.Fail(code, code)
+        };
 
         // GET/api/tournaments
         [HttpGet]
@@ -79,6 +107,14 @@ namespace HRTMS.API.Controllers
             {
                 var result = await _tournamentService.UpdateTournamentAsync(id, dto, GetCurrentUserId());
                 return Ok(ApiResponse<TournamentResponseDto>.Ok(result, "Cap nhat thanh cong"));
+            }
+            catch (KeyNotFoundException ex) when (ex.Message == "VENUE_NOT_FOUND")
+            {
+                return NotFound(VenueError(ex.Message));
+            }
+            catch (InvalidOperationException ex) when (IsVenueError(ex.Message))
+            {
+                return UnprocessableEntity(VenueError(ex.Message));
             }
             catch (KeyNotFoundException ex)
             {

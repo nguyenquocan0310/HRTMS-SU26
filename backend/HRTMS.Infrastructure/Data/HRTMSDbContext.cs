@@ -63,6 +63,8 @@ public partial class HRTMSDbContext : DbContext
 
     public virtual DbSet<User> Users { get; set; }
 
+    public virtual DbSet<Venue> Venues { get; set; }
+
     public virtual DbSet<Violation> Violations { get; set; }
 
     public virtual DbSet<VirtualPointsTransaction> VirtualPointsTransactions { get; set; }
@@ -730,6 +732,30 @@ public partial class HRTMSDbContext : DbContext
             entity.HasOne(d => d.CreatedByNavigation).WithMany(p => p.Tournaments)
                 .HasForeignKey(d => d.CreatedBy)
                 .HasConstraintName("FK_Tournaments_CreatedBy");
+
+            entity.HasOne(d => d.Venue).WithMany(p => p.Tournaments)
+                .HasForeignKey(d => d.VenueId)
+                .HasConstraintName("FK_Tournaments_Venue");
+        });
+
+        // Sân đua (patch 011).
+        modelBuilder.Entity<Venue>(entity =>
+        {
+            entity.HasKey(e => e.VenueId);
+
+            entity.HasIndex(e => e.IsActive, "IX_Venues_IsActive");
+
+            entity.HasIndex(e => e.Name, "UQ_Venues_Name").IsUnique();
+
+            entity.Property(e => e.Name).HasMaxLength(200);
+            entity.Property(e => e.Address).HasMaxLength(500);
+            entity.Property(e => e.City).HasMaxLength(100);
+            entity.Property(e => e.TrackType)
+                .HasMaxLength(20)
+                .IsUnicode(false);
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("(getutcdate())");
         });
 
         modelBuilder.Entity<TournamentParticipant>(entity =>
