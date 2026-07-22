@@ -258,6 +258,9 @@ CREATE TABLE Tournaments (
     [Status]                       VARCHAR(30)     NOT NULL DEFAULT 'Draft',
     -- patch 011: NULL ở DB để không phá giải cũ; service bắt buộc cho giải mới.
     VenueId                        INT             NULL,
+    -- patch 012: hạn nộp lệ phí / hạn hoàn phí. NULL = không áp hạn.
+    PaymentDeadline                DATETIME2       NULL,
+    RefundDeadline                 DATETIME2       NULL,
     CreatedAt                      DATETIME2       NOT NULL DEFAULT GETUTCDATE(),
     UpdatedAt                      DATETIME2       NOT NULL DEFAULT GETUTCDATE(),
     CreatedBy                      INT             NULL,
@@ -434,8 +437,45 @@ CREATE TABLE Pairings (
     CONSTRAINT FK_Pairings_Jockey FOREIGN KEY (JockeyId) REFERENCES JockeyProfiles(JockeyId),
     CONSTRAINT FK_Pairings_HorseTournament FOREIGN KEY (TournamentId, HorseId) REFERENCES Horses(TournamentId, HorseId),
     CONSTRAINT FK_Pairings_JockeyRoster FOREIGN KEY (TournamentId, JockeyId) REFERENCES TournamentParticipants(TournamentId, UserId),
-    CONSTRAINT CHK_Pairings_Status CHECK ([Status] IN ('Pending','Accepted','Declined','Confirmed','Cancelled'))
+    -- patch 012: PendingVerification = Owner đã nộp lệ phí, chờ Admin đối chiếu.
+    CONSTRAINT CHK_Pairings_Status CHECK ([Status] IN ('Pending','Accepted','PendingVerification','Confirmed','Declined','Cancelled'))
 );
+GO
+
+-- Nộp & đối chiếu lệ phí (patch 012). Pairing chỉ Confirmed khi payment Verified.
+CREATE TABLE EntryFeePayments (
+    PaymentId       INT             IDENTITY(1,1) NOT NULL,
+    PairingId       INT             NOT NULL,
+    Amount          DECIMAL(12,2)   NOT NULL,
+    Method          VARCHAR(10)     NOT NULL,
+    ReceiptNo       NVARCHAR(50)    NULL,
+    TransferRef     NVARCHAR(100)   NULL,
+    ProofFileName   NVARCHAR(255)   NULL,
+    ProofFilePath   VARCHAR(500)    NULL,
+    [Status]        VARCHAR(20)     NOT NULL DEFAULT 'PendingVerification',
+    SubmittedAt     DATETIME2       NOT NULL DEFAULT GETUTCDATE(),
+    VerifiedBy      INT             NULL,
+    VerifiedAt      DATETIME2       NULL,
+    RejectReason    NVARCHAR(500)   NULL,
+
+    CONSTRAINT PK_EntryFeePayments PRIMARY KEY (PaymentId),
+    CONSTRAINT FK_EFP_Pairing FOREIGN KEY (PairingId) REFERENCES Pairings(PairingId),
+    CONSTRAINT FK_EFP_VerifiedBy FOREIGN KEY (VerifiedBy) REFERENCES Users(UserId),
+    CONSTRAINT CHK_EFP_Amount CHECK (Amount >= 0),
+    CONSTRAINT CHK_EFP_Method CHECK (Method IN ('Cash','Transfer')),
+    CONSTRAINT CHK_EFP_Status CHECK ([Status] IN
+        ('PendingVerification','Verified','Rejected','RefundPending','Refunded'))
+);
+GO
+
+-- Một payment đang hiệu lực cho mỗi Pairing; Rejected/Refunded không tính nên
+-- Owner nộp lại được sau khi bị từ chối.
+CREATE UNIQUE INDEX UQ_EFP_ActivePerPairing
+    ON EntryFeePayments (PairingId)
+    WHERE [Status] IN ('PendingVerification','Verified');
+GO
+
+CREATE INDEX IX_EFP_Status ON EntryFeePayments ([Status], SubmittedAt);
 GO
 
 CREATE TABLE RaceEntries (
@@ -478,7 +518,9 @@ CREATE TABLE RaceEntries (
     CONSTRAINT FK_RaceEntries_FeeConfirmedBy FOREIGN KEY (EntryFeeConfirmedBy) REFERENCES Users(UserId),
     CONSTRAINT UQ_RaceEntries_RacePairing UNIQUE (RaceId, PairingId),
     CONSTRAINT CHK_RaceEntries_PostPos CHECK (PostPosition IS NULL OR PostPosition > 0),
-    CONSTRAINT CHK_RaceEntries_Status CHECK ([Status] IN ('Pending','Confirmed','Cancelled','Disqualified')),
+    -- patch 012: Scratched = rút SAU bốc thăm (giữ cổng trống, không bốc lại);
+    -- Cancelled = rút TRƯỚC bốc thăm (giải phóng cổng).
+    CONSTRAINT CHK_RaceEntries_Status CHECK ([Status] IN ('Pending','Confirmed','Cancelled','Scratched','Disqualified')),
     CONSTRAINT CHK_RaceEntries_HorseIdentity CHECK (HorseIdentityCheckStatus IS NULL OR HorseIdentityCheckStatus IN ('Matched','Mismatch')),
     CONSTRAINT CHK_RaceEntries_Clinical CHECK (ClinicalStatus IS NULL OR ClinicalStatus IN ('Fit','Unfit')),
     CONSTRAINT CHK_RaceEntries_FinishPos CHECK (FinishPosition IS NULL OR FinishPosition > 0),
