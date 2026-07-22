@@ -3,6 +3,18 @@
 Controller: `SchedulingController` · Base: `/api`
 Auth: JWT Bearer. Role lấy từ claim, ActorId lấy từ `NameIdentifier`.
 
+> ⚠️ **CẬP NHẬT (patch 011/012)** — xem **[api-contract-venue-fee-allocation.md](api-contract-venue-fee-allocation.md)**.
+> Flow đã đổi: Owner nộp lệ phí → Admin verify → Pairing `Confirmed` → Admin bấm
+> **auto-allocate cả vòng** (không click từng pairing) → entry sinh ra đã `Confirmed`.
+> Phần nào dưới đây mâu thuẫn với tài liệu đó thì **tài liệu đó thắng**.
+> Cụ thể đã thay đổi:
+> - §1 `POST /api/admin/races/{raceId}/entries` → chỉ còn là **manual override**.
+> - §2 draw có thêm guard `NOT_ENOUGH_ENTRIES`, `ENTRIES_NOT_ALL_CONFIRMED`,
+>   `MAX_LANES_REACHED`, và guard concurrency nguyên tử.
+> - §4 `PATCH /api/race-entries/{id}/confirm` → **deprecated**, entry mới đã `Confirmed`.
+> - §5 rút lui: **sau bốc thăm** giờ là `Scratched` (giữ cổng), không phải `Cancelled`.
+> - `Race.ConfirmationCutoffHours` → **deprecated, không drop cột**.
+
 > **Mô hình RaceEntry (quyết định thiết kế):** `RaceEntry` **chỉ do Admin tạo** qua SCH.1. Owner chỉ khai báo ngựa (Module C) + mời Jockey (Module D); KHÔNG còn `POST /api/race-entries` cho Owner. `RaceEntryController` chỉ còn `GET /api/race-entries/my` để Owner xem entry của mình.
 >
 > **Hệ quả:** vòng đời Entry Fee (`Unpaid → Paid → approve`) diễn ra ở **Pha 3** (sau khi Admin allocate mới có RaceEntry). Các endpoint fee/approve ở `AdminController` (`/api/admin/entries/...`) giữ nguyên.
@@ -121,6 +133,18 @@ Hệ thống **không có điểm số** — chỉ có tiền thưởng (`Earnin
 
 **Allocation round sau (SCH.1):** round trước phải `Completed`; pairing phải `Qualified`/`AlsoEligible` ở round trước. Round đầu: allocate tự do từ pairing `Confirmed`.
 
-**Overflow/split (quy ước vận hành, chưa có endpoint):** qualified > sức chứa (`MaxHorses`) → Admin allocate Top theo rank/earnings, phần dư giữ `AlsoEligible`; không chia đều → Admin tạo thêm race trong round (split), gợi ý chia cân bằng (vd 22 qualified, max 12 → 2 race × 11). Ít hơn sức chứa → race vẫn chạy (REQ-F-SCH.7). Consolation race: P2.
+**Overflow/split — ĐÃ CÓ ENDPOINT (patch 011/012):** `POST /api/admin/rounds/{id}/auto-allocate`
+chia round-robin toàn bộ pool vào các race của vòng, sức chứa mỗi race =
+`min(MaxHorses, Venue.LaneCount)`. Pool vượt tổng sức chứa → phần dư trả về trong
+`waitlist` của response (ưu tiên theo thời điểm verify lệ phí ở vòng 1, theo
+`AdvancementStatus`/`AdvancementRank` ở vòng sau).
+
+> **Giới hạn đã biết — cần nhóm chốt:** `AlsoEligible` là giá trị của
+> `RaceEntries.AdvancementStatus`, tức **chỉ tồn tại khi pairing ĐÃ có entry ở một
+> race**. Với **vòng 1**, pairing chưa vào race nào nên **không có chỗ trong schema
+> để lưu waiting-list**. Vì vậy `waitlist` ở vòng 1 hiện chỉ là **thông tin trong
+> response**, không được persist. Muốn waiting-list bền vững cho vòng 1 thì cần bổ
+> sung DB/API (vd bảng `RoundWaitlist`, hoặc cột trạng thái trên `Pairings`).
+> Backend **không tự giả lập** trạng thái này.
 
 **Dependency:** `FinishPosition` do Module Result/Race Officiating nhập & chốt (RaceReport → Declare Official). Progression chỉ chạy khi official result đã có finish positions — backend không tự bịa dữ liệu.
