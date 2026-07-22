@@ -520,6 +520,100 @@ BEGIN TRY
         WHERE e.FinishPosition<=3;
     END;
 
+    /* ============================================================ VENUE + LỆ PHÍ
+       Yêu cầu patch 011 + 012 đã chạy. Khối này idempotent như phần trên.
+       ------------------------------------------------------------------------ */
+    IF OBJECT_ID('Venues','U') IS NOT NULL AND OBJECT_ID('EntryFeePayments','U') IS NOT NULL
+    BEGIN
+        /* Sân đua — trùng dữ liệu patch 011, MERGE theo [Name] nên chạy sau patch
+           cũng không nhân bản. */
+        MERGE Venues AS target
+        USING (VALUES
+            (N'Trường đua Phú Thọ',          N'Số 2 Lê Đại Hành, Phường 15, Quận 11', N'TP. Hồ Chí Minh', 'Dirt', 1800, 12, 1),
+            (N'Trường đua Đại Nam',          N'Khu du lịch Đại Nam, Hiệp An',         N'Bình Dương',      'Dirt', 1500, 10, 1),
+            (N'Trường đua Thiên Mã Madagui', N'Khu du lịch Madagui, Đạ Huoai',        N'Lâm Đồng',        'Turf', 1200,  6, 1),
+            (N'Trường đua Sóc Sơn',          N'Xã Tân Minh, Huyện Sóc Sơn',           N'Hà Nội',          'Turf', 2000, 14, 0)
+        ) AS source ([Name],[Address],City,TrackType,TrackLengthMeters,LaneCount,IsActive)
+            ON target.[Name] = source.[Name]
+        WHEN NOT MATCHED BY TARGET THEN
+            INSERT ([Name],[Address],City,TrackType,TrackLengthMeters,LaneCount,IsActive)
+            VALUES (source.[Name],source.[Address],source.City,source.TrackType,
+                    source.TrackLengthMeters,source.LaneCount,source.IsActive);
+
+        DECLARE @VPhuTho INT=(SELECT VenueId FROM Venues WHERE [Name]=N'Trường đua Phú Thọ'),
+                @VDaiNam INT=(SELECT VenueId FROM Venues WHERE [Name]=N'Trường đua Đại Nam');
+
+        /* Gán sân cho 3 giải demo. Cả 3 đều MaxHorses=10 nên vừa Phú Thọ (12 làn)
+           và vừa cả Đại Nam (10 làn) — không vi phạm MAX_HORSES_EXCEEDS_LANES.
+           TrackType phải khớp sân: cả hai sân demo đều 'Dirt'. */
+        UPDATE Tournaments SET VenueId=@VPhuTho, TrackType='Dirt', UpdatedAt=@Now
+        WHERE [Name] IN (N'GIẢI ĐUA NGỰA MÙA HÈ 2026',N'GIẢI ĐUA NGỰA MÙA XUÂN 2026')
+          AND (VenueId IS NULL OR VenueId<>@VPhuTho);
+
+        UPDATE Tournaments SET VenueId=@VDaiNam, TrackType='Dirt', UpdatedAt=@Now
+        WHERE [Name]=N'GIẢI GIAO HỮU THÁNG 9-2026'
+          AND (VenueId IS NULL OR VenueId<>@VDaiNam);
+
+        /* Hạn nộp phí:
+           - Mùa Hè: còn hạn (14 ngày nữa) -> demo nộp/verify/reject bình thường.
+           - Giao Hữu: ĐÃ QUÁ HẠN 1 giờ -> demo FeeDeadlineJob auto reject. */
+        UPDATE Tournaments
+        SET PaymentDeadline=DATEADD(DAY,14,@Now), RefundDeadline=DATEADD(DAY,21,@Now), UpdatedAt=@Now
+        WHERE [Name]=N'GIẢI ĐUA NGỰA MÙA HÈ 2026' AND PaymentDeadline IS NULL;
+
+        UPDATE Tournaments
+        SET PaymentDeadline=DATEADD(HOUR,-1,@Now), RefundDeadline=DATEADD(DAY,7,@Now), UpdatedAt=@Now
+        WHERE [Name]=N'GIẢI GIAO HỮU THÁNG 9-2026' AND PaymentDeadline IS NULL;
+
+        /* Bất biến "Pairing Confirmed <=> có payment Verified": backfill cho mọi
+           pairing Confirmed do phần seed ở trên tạo ra, nếu chưa có payment active. */
+        INSERT EntryFeePayments (PairingId,Amount,Method,ReceiptNo,[Status],SubmittedAt,VerifiedBy,VerifiedAt)
+        SELECT p.PairingId, t.EntryFeeAmount, 'Cash',
+               CONCAT('SEED-', p.PairingId), 'Verified',
+               DATEADD(DAY,-3,@Now), @AdminId, DATEADD(DAY,-3,@Now)
+        FROM Pairings p
+        JOIN Tournaments t ON t.TournamentId=p.TournamentId
+        WHERE p.[Status]='Confirmed'
+          AND NOT EXISTS (SELECT 1 FROM EntryFeePayments e
+                          WHERE e.PairingId=p.PairingId
+                            AND e.[Status] IN ('PendingVerification','Verified'));
+
+        /* Demo đủ trạng thái Pairing ở giải Mùa Hè: lấy 3 pairing đang 'Accepted'
+           (nếu có) đưa lần lượt sang PendingVerification / Rejected-payment.
+           Pending + Accepted + Confirmed đã có sẵn từ phần seed ở trên. */
+        DECLARE @SummerTId INT=(SELECT TournamentId FROM Tournaments WHERE [Name]=N'GIẢI ĐUA NGỰA MÙA HÈ 2026');
+        DECLARE @SummerFee DECIMAL(12,2)=(SELECT EntryFeeAmount FROM Tournaments WHERE TournamentId=@SummerTId);
+
+        /* (a) Một pairing chờ Admin đối chiếu — Transfer, có mã giao dịch. */
+        DECLARE @PendVerId INT=(SELECT TOP 1 p.PairingId FROM Pairings p
+            WHERE p.TournamentId=@SummerTId AND p.[Status]='Accepted'
+              AND NOT EXISTS (SELECT 1 FROM EntryFeePayments e WHERE e.PairingId=p.PairingId)
+            ORDER BY p.PairingId);
+
+        IF @PendVerId IS NOT NULL
+        BEGIN
+            INSERT EntryFeePayments (PairingId,Amount,Method,TransferRef,[Status],SubmittedAt)
+            VALUES (@PendVerId,@SummerFee,'Transfer',N'FT260722000123','PendingVerification',DATEADD(HOUR,-2,@Now));
+
+            UPDATE Pairings SET [Status]='PendingVerification', UpdatedAt=@Now
+            WHERE PairingId=@PendVerId;
+        END;
+
+        /* (b) Một pairing từng bị từ chối lệ phí — payment 'Rejected', pairing quay
+               về 'Accepted' để demo Owner nộp lại (Rejected không nằm trong filter
+               của UQ_EFP_ActivePerPairing nên nộp lại không vướng unique). */
+        DECLARE @RejId INT=(SELECT TOP 1 p.PairingId FROM Pairings p
+            WHERE p.TournamentId=@SummerTId AND p.[Status]='Accepted'
+              AND p.PairingId<>ISNULL(@PendVerId,0)
+              AND NOT EXISTS (SELECT 1 FROM EntryFeePayments e WHERE e.PairingId=p.PairingId)
+            ORDER BY p.PairingId);
+
+        IF @RejId IS NOT NULL
+            INSERT EntryFeePayments (PairingId,Amount,Method,ReceiptNo,[Status],SubmittedAt,VerifiedBy,VerifiedAt,RejectReason)
+            VALUES (@RejId,@SummerFee,'Cash',N'BL-000199','Rejected',DATEADD(DAY,-1,@Now),
+                    @AdminId,DATEADD(HOUR,-20,@Now),N'Ảnh biên lai mờ, không đọc được số tiền.');
+    END;
+
     COMMIT TRANSACTION;
 END TRY
 BEGIN CATCH
@@ -551,5 +645,28 @@ JOIN Tournaments t ON t.TournamentId=rd.TournamentId AND t.[Name]=N'GIẢI ĐUA 
 GROUP BY rd.SequenceOrder,rd.[Name],r.RaceNumber,r.PurseAmount ORDER BY rd.SequenceOrder,r.RaceNumber;
 
 SELECT Code,PointAmount,[Status],ExpiresAt FROM TicketRewardCodes WHERE Code LIKE 'TKT-DEMO%' ORDER BY Code;
+
+/* Sân đua + hạn lệ phí + phân bố trạng thái pairing/payment (patch 011/012) */
+IF OBJECT_ID('Venues','U') IS NOT NULL
+    SELECT VenueId,[Name],City,TrackType,TrackLengthMeters,LaneCount,IsActive FROM Venues ORDER BY [Name];
+
+IF COL_LENGTH('Tournaments','VenueId') IS NOT NULL
+    SELECT t.[Name] AS Giai, v.[Name] AS San, v.LaneCount, t.MaxHorses,
+           CASE WHEN v.LaneCount IS NULL THEN NULL
+                ELSE (CASE WHEN t.MaxHorses < v.LaneCount THEN t.MaxHorses ELSE v.LaneCount END)
+           END AS SucChuaMoiRace,
+           t.EntryFeeAmount, t.PaymentDeadline, t.RefundDeadline
+    FROM Tournaments t LEFT JOIN Venues v ON v.VenueId=t.VenueId
+    WHERE t.[Name] IN (N'GIẢI ĐUA NGỰA MÙA HÈ 2026',N'GIẢI GIAO HỮU THÁNG 9-2026',N'GIẢI ĐUA NGỰA MÙA XUÂN 2026')
+    ORDER BY t.StartDate;
+
+IF OBJECT_ID('EntryFeePayments','U') IS NOT NULL
+BEGIN
+    SELECT p.[Status] AS TrangThaiPairing, COUNT(*) AS SoLuong
+    FROM Pairings p GROUP BY p.[Status] ORDER BY p.[Status];
+
+    SELECT e.[Status] AS TrangThaiPayment, COUNT(*) AS SoLuong
+    FROM EntryFeePayments e GROUP BY e.[Status] ORDER BY e.[Status];
+END;
 
 SELECT N'Seed hợp nhất hoàn tất: Admin + 2 tài khoản chính + 37 cặp hỗ trợ + staff + tournament 4/2/1 + 5 mã ticket.' AS KetQua;
