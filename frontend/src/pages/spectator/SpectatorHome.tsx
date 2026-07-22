@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import SpectatorRaceStatusBadge from '../../components/spectator/SpectatorRaceStatusBadge'
 import { getTournaments, type TournamentResponse } from '../../services/tournamentService'
 import {
   getMyPredictions,
@@ -125,7 +126,7 @@ export default function SpectatorHome() {
                         : 'Dự đoán'
               return (
                 <article key={race.raceId} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                  <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase text-amber-700">{race.tournamentName} · {race.roundName}</p><h3 className="mt-1 text-lg font-black text-gray-900">Race #{race.raceNumber}</h3></div><span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-bold text-gray-600">{race.status}</span></div>
+                  <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase text-amber-700">{race.tournamentName} · {race.roundName}</p><h3 className="mt-1 text-lg font-black text-gray-900">Race #{race.raceNumber}</h3></div><SpectatorRaceStatusBadge status={race.status} /></div>
                   <p className="mt-3 text-sm text-gray-500">{new Date(race.scheduledTime).toLocaleString('vi-VN')}</p>
                   <div className="mt-5 flex flex-wrap gap-2">
                     <button type="button" onClick={() => navigate(`/spectator/live-race?raceId=${race.raceId}`)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50">Theo dõi</button>
