@@ -18,7 +18,5 @@ namespace HRTMS.Core.DTOs.Tournament
         public string Status { get; set; } = string.Empty;
         public bool IsPostPositionDrawn { get; set; }
         public int ConfirmationCutoffHours { get; set; }
-        public int ProtestDeadlineMinutes { get; set; }
-
     }
 }

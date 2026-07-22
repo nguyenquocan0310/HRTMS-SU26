@@ -22,8 +22,5 @@ namespace HRTMS.Core.DTOs.Tournament
         [Range(1201, 2399, ErrorMessage = "RaceDistanceOverride must be greater than 1200 and less than 2400")]
         public int? RaceDistanceOverride { get; set; }
         public int ConfirmationCutoffHours { get; set; } = 24;
-        [Range(1, int.MaxValue)]
-        public int ProtestDeadlineMinutes { get; set; } = 10;
-
     }
 }

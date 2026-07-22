@@ -17,7 +17,7 @@ public static class SwaggerExtensions
         ["scheduling"] = "Module E — Scheduling & Draw",
         ["referee"] = "Module F — Referee & COI",
         ["prerace"] = "Module G — Pre-race Checks",
-        ["race"] = "Module H/I — Race Live & Protest",
+        ["race"] = "Module H — Race Live",
         ["results"] = "Module J/K — Results & Purse",
         ["leaderboard"] = "Module L/M/N — Leaderboard, Prediction & Reconciliation",
         ["notification"] = "Module O — Notification",

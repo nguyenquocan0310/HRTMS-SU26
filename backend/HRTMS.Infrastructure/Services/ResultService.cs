@@ -50,14 +50,6 @@ namespace HRTMS.Infrastructure.Services
 
             // FIX J1: load hết dữ liệu phụ trợ 1 lần (thay vì 2 query/race trong vòng lặp),
             // rồi xử lý ở memory — cùng pattern với Module L (LeaderboardService).
-            var raceIds = races.Select(r => r.RaceId).ToList();
-            var racesWithPendingProtests = await _context.Protests
-                .Where(p => raceIds.Contains(p.RaceId) && p.Status == "Pending")
-                .Select(p => p.RaceId)
-                .Distinct()
-                .ToListAsync();
-            var pendingProtestRaceIds = racesWithPendingProtests.ToHashSet();
-
             var tournamentIds = races.Select(r => r.Round.TournamentId).Distinct().ToList();
             var allDistributions = await _context.PrizeDistributions
                 .Where(pd => tournamentIds.Contains(pd.TournamentId))
@@ -70,14 +62,9 @@ namespace HRTMS.Infrastructure.Services
 
             foreach (var race in races)
             {
-                var hasPendingProtests = pendingProtestRaceIds.Contains(race.RaceId);
-
                 var prizeOk = validTournamentIds.Contains(race.Round.TournamentId);
                 var rankingOk = IsRankingIntegrityValid(race.RaceEntries);
                 var weighOutOk = IsPostRaceWeighInComplete(race.RaceEntries);
-                var protestDeadline = ProtestWindowPolicy.GetDeadline(race);
-                var protestWindowClosed = ProtestWindowPolicy.IsClosed(race, DateTime.UtcNow);
-
                 result.Add(new UnofficialRaceListItemDto
                 {
                     RaceId = race.RaceId,
@@ -88,12 +75,9 @@ namespace HRTMS.Infrastructure.Services
                     ScheduledTime = race.ScheduledTime,
                     HasRaceReport = race.RaceReport != null,
                     IsRaceReportLocked = race.RaceReport?.IsLocked ?? false,
-                    HasPendingProtests = hasPendingProtests,
                     PrizeDistributionsConfigured = prizeOk,
                     RankingIntegrityValid = rankingOk,
                     PostRaceWeighInComplete = weighOutOk,
-                    ProtestWindowClosed = protestWindowClosed,
-                    ProtestDeadlineAt = protestDeadline
                 });
             }
 
@@ -136,12 +120,6 @@ namespace HRTMS.Infrastructure.Services
             if (race.RaceReport.IsLocked)
                 throw new InvalidOperationException("Biên bản thi đấu đã bị khóa từ trước");
 
-            var hasPendingProtests = await _context.Protests
-                .AnyAsync(p => p.RaceId == raceId && p.Status == "Pending");
-            if (hasPendingProtests)
-                throw new InvalidOperationException(
-                    "Còn khiếu nại chưa xử lý xong nên chưa thể công bố kết quả chính thức.");
-
             if (!await IsPrizeDistributionsValidAsync(race.Round.TournamentId))
                 throw new InvalidOperationException(
                     "Giải chưa cấu hình đủ tỷ lệ chia thưởng (tổng phải đạt 100%).");
@@ -154,16 +132,6 @@ namespace HRTMS.Infrastructure.Services
             if (!IsPostRaceWeighInComplete(race.RaceEntries))
                 throw new InvalidOperationException(
                     "Còn cặp đấu chưa được cân sau đua.");
-
-            // Đối xứng với ProtestService.EnsureSubmissionWindowOpen: Owner/Jockey
-            // còn quyền nộp Protest tới khi hết ProtestDeadlineMinutes, nên Admin
-            // không được Declare Official sớm hơn mốc đó (tránh khóa RaceReport
-            // và tước quyền khiếu nại của họ).
-            if (!ProtestWindowPolicy.IsClosed(race, DateTime.UtcNow))
-                throw new InvalidOperationException(
-                    $"Cửa sổ khiếu nại vẫn còn hiệu lực đến " +
-                    $"{ProtestWindowPolicy.GetDeadline(race):yyyy-MM-dd HH:mm} UTC, " +
-                    "chưa thể công bố kết quả chính thức.");
 
             // ---------------------------------------------------------------
             // ACID TRANSACTION — 6 BƯỚC
