@@ -41,6 +41,12 @@ public partial class Tournament
     // bắt buộc giá trị này khi tạo/cập nhật giải mới.
     public int? VenueId { get; set; }
 
+    // Hạn nộp lệ phí (patch 012). NULL = giải không áp hạn; FeeDeadlineJob bỏ qua.
+    public DateTime? PaymentDeadline { get; set; }
+
+    // Hạn hoàn phí khi rút lui (patch 012). NULL = không hoàn.
+    public DateTime? RefundDeadline { get; set; }
+
     // Progression (patch 002): rule chọn ngựa đi tiếp + Top N per race.
     public string AdvancementRule { get; set; } = "TopPerRace";
 

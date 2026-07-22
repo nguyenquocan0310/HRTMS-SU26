@@ -18,6 +18,7 @@ public static class ApplicationServiceExtensions
         services.AddScoped<IAuditLogService, AuditLogService>();
         services.AddScoped<ITournamentServices, TournamentSevice>();
         services.AddScoped<IVenueService, VenueService>();
+        services.AddScoped<IEntryFeePaymentService, EntryFeePaymentService>();
         services.AddScoped<ITournamentParticipantService, TournamentParticipantService>();
         services.AddScoped<ITokenBlacklistService, TokenBlacklistService>();
         services.AddScoped<IJockeyService, JockeyService>();

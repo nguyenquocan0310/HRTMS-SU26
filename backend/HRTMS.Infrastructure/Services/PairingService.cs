@@ -255,6 +255,7 @@ public class PairingService : IPairingService
         var pairing = await _context.Pairings
             .Include(p => p.Horse)
             .Include(p => p.Jockey)
+            .Include(p => p.Tournament)
             .FirstOrDefaultAsync(p => p.PairingId == pairingId);
 
         if (pairing == null)
@@ -270,6 +271,16 @@ public class PairingService : IPairingService
         if (pairing.Status != "Accepted")
         {
             throw new InvalidOperationException("INVALID_STATUS");
+        }
+
+        // DEPRECATED (patch 012): Owner KHÔNG còn tự xác nhận cặp đấu ở giải có thu
+        // phí — xác nhận nay đến từ việc Admin verify lệ phí
+        // (EntryFeePaymentService.VerifyAsync). Chặn ở đây để không có hai đường
+        // cùng đưa Pairing lên Confirmed, và để Owner không bypass thanh toán.
+        // Giải miễn phí (EntryFeeAmount = 0) vẫn dùng endpoint này.
+        if (pairing.Tournament.EntryFeeAmount != 0)
+        {
+            throw new InvalidOperationException("ENTRY_FEE_REQUIRED");
         }
 
         if (pairing.Horse.AdminApprovalStatus != "Approved")
@@ -302,6 +313,27 @@ public class PairingService : IPairingService
 
         pairing.Status = "Confirmed";
         pairing.UpdatedAt = DateTime.UtcNow;
+
+        // Giải miễn phí vẫn ghi một payment Verified (Amount = 0) để giữ MỘT nguồn
+        // sự thật: "Pairing Confirmed <=> có payment Verified". Auto-allocate nhờ đó
+        // chỉ kiểm tra một điều kiện, không phải rẽ nhánh theo giải free/có phí.
+        var hasActivePayment = await _context.EntryFeePayments
+            .AnyAsync(p => p.PairingId == pairingId &&
+                           (p.Status == "PendingVerification" || p.Status == "Verified"));
+        if (!hasActivePayment)
+        {
+            _context.EntryFeePayments.Add(new EntryFeePayment
+            {
+                PairingId = pairingId,
+                Amount = 0,
+                Method = "Cash",
+                ReceiptNo = "FREE-ENTRY",
+                Status = "Verified",
+                SubmittedAt = pairing.UpdatedAt,
+                VerifiedBy = ownerId,
+                VerifiedAt = pairing.UpdatedAt
+            });
+        }
 
         var otherPairings = await _context.Pairings
             .Where(p =>

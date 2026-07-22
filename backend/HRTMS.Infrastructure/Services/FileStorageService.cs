@@ -16,6 +16,7 @@ public class FileStorageService : IFileStorageService
     private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10MB
 
     private readonly string _rootPath;
+    private readonly string _feeProofRootPath;
 
     public FileStorageService(IHostEnvironment env, IConfiguration config)
     {
@@ -25,6 +26,15 @@ public class FileStorageService : IFileStorageService
             : Path.Combine(env.ContentRootPath, "App_Data", "uploads", "certificates");
 
         Directory.CreateDirectory(_rootPath);
+
+        // Kho RIÊNG cho chứng từ lệ phí (patch 012) — tách khỏi kho chứng chỉ để
+        // một lỗi phân quyền ở endpoint proof không làm lộ hồ sơ cá nhân/CCCD.
+        var configuredProofPath = config["FileStorage:FeeProofsPath"];
+        _feeProofRootPath = !string.IsNullOrWhiteSpace(configuredProofPath)
+            ? configuredProofPath
+            : Path.Combine(env.ContentRootPath, "App_Data", "uploads", "fee-proofs");
+
+        Directory.CreateDirectory(_feeProofRootPath);
     }
 
     public async Task<SavedFileResult> SaveCertificateAsync(IFormFile file, int userId, string certificateType)
@@ -58,15 +68,67 @@ public class FileStorageService : IFileStorageService
         return new SavedFileResult(relativePath, file.FileName, file.ContentType, file.Length);
     }
 
-    public string? ResolvePhysicalPath(string storedFilePath)
+    public async Task<SavedFileResult> SaveFeeProofAsync(IFormFile file, int pairingId)
     {
-        var fullPath = Path.GetFullPath(Path.Combine(_rootPath, storedFilePath));
+        ValidateUpload(file, "chứng từ lệ phí");
 
-        // Chặn path traversal: đảm bảo path thật vẫn nằm trong _rootPath.
-        if (!fullPath.StartsWith(Path.GetFullPath(_rootPath), StringComparison.Ordinal))
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        var pairingFolder = Path.Combine(_feeProofRootPath, pairingId.ToString());
+        Directory.CreateDirectory(pairingFolder);
+
+        // Tên file sinh mới hoàn toàn từ Guid — KHÔNG dùng lại file.FileName nên
+        // không có đường cho path traversal hay ký tự lạ lọt vào filesystem.
+        var storedFileName = $"proof_{Guid.NewGuid():N}{ext}";
+        var fullPath = Path.Combine(pairingFolder, storedFileName);
+
+        await using (var stream = new FileStream(fullPath, FileMode.Create))
+        {
+            await file.CopyToAsync(stream);
+        }
+
+        var relativePath = Path.Combine(pairingId.ToString(), storedFileName);
+
+        return new SavedFileResult(relativePath, file.FileName, file.ContentType, file.Length);
+    }
+
+    public string? ResolvePhysicalPath(string storedFilePath) =>
+        ResolveWithinRoot(_rootPath, storedFilePath);
+
+    public string? ResolveFeeProofPhysicalPath(string storedFilePath) =>
+        ResolveWithinRoot(_feeProofRootPath, storedFilePath);
+
+    // Chặn path traversal: path thật phải nằm trong root tương ứng.
+    private static string? ResolveWithinRoot(string root, string storedFilePath)
+    {
+        if (string.IsNullOrWhiteSpace(storedFilePath))
+            return null;
+
+        var rootFull = Path.GetFullPath(root);
+        var fullPath = Path.GetFullPath(Path.Combine(rootFull, storedFilePath));
+
+        // So sánh có separator ở cuối để "/data/uploads-evil" không lọt qua khi
+        // root là "/data/uploads".
+        var rootPrefix = rootFull.EndsWith(Path.DirectorySeparatorChar)
+            ? rootFull
+            : rootFull + Path.DirectorySeparatorChar;
+        if (!fullPath.StartsWith(rootPrefix, StringComparison.Ordinal))
             return null;
 
         return File.Exists(fullPath) ? fullPath : null;
+    }
+
+    private static void ValidateUpload(IFormFile file, string label)
+    {
+        if (file == null || file.Length == 0)
+            throw new ArgumentException($"File {label} không hợp lệ hoặc rỗng.");
+
+        if (file.Length > MaxFileSizeBytes)
+            throw new ArgumentException($"File {label} vượt quá kích thước tối đa 10MB.");
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!AllowedExtensions.Contains(ext))
+            throw new ArgumentException(
+                $"Định dạng file không được hỗ trợ. Chỉ chấp nhận: {string.Join(", ", AllowedExtensions)}.");
     }
 
     public void DeleteIfExists(string storedFilePath)

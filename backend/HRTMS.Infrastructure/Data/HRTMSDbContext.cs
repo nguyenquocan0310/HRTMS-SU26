@@ -20,6 +20,8 @@ public partial class HRTMSDbContext : DbContext
 
     public virtual DbSet<DoctorProfile> DoctorProfiles { get; set; }
 
+    public virtual DbSet<EntryFeePayment> EntryFeePayments { get; set; }
+
 
     public virtual DbSet<Horse> Horses { get; set; }
 
@@ -736,6 +738,46 @@ public partial class HRTMSDbContext : DbContext
             entity.HasOne(d => d.Venue).WithMany(p => p.Tournaments)
                 .HasForeignKey(d => d.VenueId)
                 .HasConstraintName("FK_Tournaments_Venue");
+        });
+
+        // Nộp & đối chiếu lệ phí (patch 012).
+        modelBuilder.Entity<EntryFeePayment>(entity =>
+        {
+            entity.HasKey(e => e.PaymentId);
+
+            entity.HasIndex(e => new { e.Status, e.SubmittedAt }, "IX_EFP_Status");
+
+            // Filtered unique index: chỉ MỘT payment hiệu lực cho mỗi Pairing.
+            // Rejected/Refunded không tính -> Owner nộp lại được sau khi bị từ chối.
+            entity.HasIndex(e => e.PairingId, "UQ_EFP_ActivePerPairing")
+                .IsUnique()
+                .HasFilter("[Status] IN ('PendingVerification','Verified')");
+
+            entity.Property(e => e.Amount).HasColumnType("decimal(12, 2)");
+            entity.Property(e => e.Method)
+                .HasMaxLength(10)
+                .IsUnicode(false);
+            entity.Property(e => e.ReceiptNo).HasMaxLength(50);
+            entity.Property(e => e.TransferRef).HasMaxLength(100);
+            entity.Property(e => e.ProofFileName).HasMaxLength(255);
+            entity.Property(e => e.ProofFilePath)
+                .HasMaxLength(500)
+                .IsUnicode(false);
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .IsUnicode(false)
+                .HasDefaultValue("PendingVerification");
+            entity.Property(e => e.SubmittedAt).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.RejectReason).HasMaxLength(500);
+
+            entity.HasOne(d => d.Pairing).WithMany(p => p.EntryFeePayments)
+                .HasForeignKey(d => d.PairingId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_EFP_Pairing");
+
+            entity.HasOne(d => d.VerifiedByNavigation).WithMany()
+                .HasForeignKey(d => d.VerifiedBy)
+                .HasConstraintName("FK_EFP_VerifiedBy");
         });
 
         // Sân đua (patch 011).

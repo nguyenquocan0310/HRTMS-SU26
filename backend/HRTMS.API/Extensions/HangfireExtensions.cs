@@ -36,9 +36,18 @@ public static class HangfireExtensions
             .GetRequiredService<IRecurringJobManager>();
 
         // Chạy mỗi 15 phút: cancel các entry quá hạn chưa xác nhận.
+        // DEPRECATED cùng flow Owner tự confirm entry — giữ để không vỡ dữ liệu cũ
+        // đang chờ; entry mới do auto-allocate tạo ra đã ở trạng thái Confirmed nên
+        // job này không chạm tới.
         recurring.AddOrUpdate<IRaceEntryService>(
             "auto-cancel-overdue-entries",
             svc => svc.AutoCancelOverdueAsync(),
             "*/15 * * * *");
+
+        // Mỗi giờ: quá PaymentDeadline mà chưa hoàn tất lệ phí -> Pairing Declined.
+        recurring.AddOrUpdate<IEntryFeePaymentService>(
+            "fee-deadline-job",
+            svc => svc.RejectOverduePairingsAsync(),
+            "0 * * * *");
     }
 }
