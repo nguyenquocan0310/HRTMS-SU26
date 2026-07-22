@@ -21,6 +21,50 @@ const EntryFees = () => {
   const [detail, setDetail] = useState<FeePayment | null>(null); const [confirming, setConfirming] = useState<FeePayment | null>(null);
   const [rejecting, setRejecting] = useState<FeePayment | null>(null); const [reason, setReason] = useState('');
   const tournament = useMemo(() => tournaments.find((item) => item.tournamentId === tournamentId), [tournaments, tournamentId]);
+interface FeeEntry {
+  raceEntryId: number;
+  raceId: number;
+  horseName: string;
+  jockeyName: string;
+  status: string;
+  entryFeeStatus: string;
+  createdAt: string;
+}
+
+interface PendingFeeEntry extends Omit<FeeEntry, 'jockeyName'> {
+  jockey?: {
+    fullName?: string | null;
+  };
+}
+
+interface RejectModalState {
+  entryId: number;
+  reason: string;
+}
+
+const EntryFees = () => {
+  const [entries, setEntries] = useState<FeeEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [msg, setMsg] = useState('');
+  const [actionId, setActionId] = useState<number | null>(null);
+  const [rejectModal, setRejectModal] = useState<RejectModalState | null>(null);
+
+  const loadEntries = () => {
+    setLoading(true);
+    setError('');
+    apiFetch<{ success: boolean; data: PendingFeeEntry[] }>('/admin/entries/pending-fee')
+      .then((res) => setEntries(
+        (res.data ?? []).map((entry) => ({
+          ...entry,
+          jockeyName: entry.jockey?.fullName?.trim() ?? '',
+        }))
+      ))
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { loadEntries(); }, []);
 
   const load = async () => {
     setLoading(true); setError('');
@@ -71,4 +115,5 @@ const EntryFees = () => {
     {rejecting && <div className={styles.modalLayer}><div className={styles.modal}><h2>Từ chối lệ phí</h2><p>Nêu rõ lý do để chủ ngựa có thể nộp lại chứng từ.</p><textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Ít nhất 10 ký tự" rows={4} />{reason.length > 0 && reason.trim().length < 10 && <small className={styles.errorText}>Cần ít nhất 10 ký tự.</small>}<div><button onClick={() => setRejecting(null)}>Hủy</button><button className={styles.rejectButton} disabled={reason.trim().length < 10 || actionId === rejecting.paymentId} onClick={() => void reject()}>Từ chối lệ phí</button></div></div></div>}
   </div>;
 };
+
 export default EntryFees;

@@ -396,6 +396,7 @@ const TicketCodeManagement = () => {
               </strong>
             </div>
           </div>
+
         </aside>
       </div>
 
