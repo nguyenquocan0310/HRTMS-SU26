@@ -76,7 +76,6 @@ const NotificationCenter = () => {
     <div className={styles.container}>
       <div className={styles.pageHeader}>
         <h1 className={styles.heading}>Thông báo</h1>
-        <p className={styles.subtext}>Cập nhật vận hành và phê duyệt dành cho quản trị viên.</p>
       </div>
       <div className={styles.sectionHeader}>
         <div className={styles.sectionTop}>
