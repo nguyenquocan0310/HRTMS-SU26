@@ -23,8 +23,6 @@ public partial class Violation
 
     public virtual RaceEntry? PlaceBehindEntry { get; set; }
 
-    public virtual ICollection<Protest> Protests { get; set; } = new List<Protest>();
-
     public virtual RaceEntry RaceEntry { get; set; } = null!;
 
     public virtual RaceReport RaceReport { get; set; } = null!;

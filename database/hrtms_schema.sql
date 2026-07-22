@@ -27,12 +27,6 @@
 --                                  đã bị loại bỏ trong schema demo.
 --   008_ticket_code_plaintext.sql: đã fold — TicketRewardCodes dùng Code VARCHAR(20)
 --                                  plaintext + UQ_TicketRewardCodes_Code (bỏ CodeHash).
---   008_120_to_10_minutes.sql    : đã fold — Races.ProtestDeadlineMinutes DEFAULT 120 -> 10
---                                  (đặt tên constraint DF_Races_ProtestDeadlineMinutes).
---                                  ⚠️ Trùng số 008 với patch ticket — hai file khác nhau,
---                                  không phụ thuộc nhau nên thứ tự áp dụng tuỳ ý.
---   009_ref_can_close_early.sql  : đã fold — RaceReports.ProtestWindowClosedAt + trigger
---                                  trg_RaceReports_Immutable thêm cột này vào whitelist.
 --   010_audit_action_nvarchar.sql: đã fold — AuditLogs.Action VARCHAR(50) -> NVARCHAR(100).
 --
 -- Thời điểm cập nhật : 2026-07-16
@@ -322,8 +316,6 @@ CREATE TABLE Races (
     IsPostPositionDrawn      BIT            NOT NULL DEFAULT 0,
     IsPredictionGateClosed   BIT            NOT NULL DEFAULT 0,
     ConfirmationCutoffHours  INT            NOT NULL DEFAULT 24,
-    ProtestDeadlineMinutes   INT            NOT NULL
-        CONSTRAINT DF_Races_ProtestDeadlineMinutes DEFAULT (10),   -- patch 008: 120 -> 10 phút
     CreatedAt                DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
     UpdatedAt                DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
 
@@ -335,8 +327,7 @@ CREATE TABLE Races (
     CONSTRAINT CHK_Races_TrackOverride CHECK (TrackTypeOverride IS NULL OR TrackTypeOverride IN ('Turf','Dirt','Synthetic')),
     CONSTRAINT CHK_Races_DistOverride CHECK (RaceDistanceOverride IS NULL OR (RaceDistanceOverride > 1200 AND RaceDistanceOverride < 2400)),
     CONSTRAINT CHK_Races_Status CHECK ([Status] IN ('Upcoming','Pre-Race','Live','Unofficial','Official','Cancelled')),
-    CONSTRAINT CHK_Races_CutoffHrs CHECK (ConfirmationCutoffHours > 0),
-    CONSTRAINT CHK_Races_ProtestMins CHECK (ProtestDeadlineMinutes > 0)
+    CONSTRAINT CHK_Races_CutoffHrs CHECK (ConfirmationCutoffHours > 0)
 );
 GO
 
@@ -500,7 +491,6 @@ CREATE TABLE RaceReports (
     IsLocked       BIT            NOT NULL DEFAULT 0,
     SubmittedAt    DATETIME2      NOT NULL DEFAULT GETUTCDATE(),
     LockedAt       DATETIME2      NULL,
-    ProtestWindowClosedAt DATETIME2 NULL,   -- patch 009: Referee đóng sớm cửa sổ khiếu nại
 
     CONSTRAINT PK_RaceReports PRIMARY KEY (RaceReportId),
     CONSTRAINT FK_RaceReports_Race FOREIGN KEY (RaceId) REFERENCES Races(RaceId) ON DELETE NO ACTION,
@@ -524,29 +514,6 @@ CREATE TABLE Violations (
     CONSTRAINT FK_Violations_RaceEntry FOREIGN KEY (RaceEntryId) REFERENCES RaceEntries(RaceEntryId),
     CONSTRAINT FK_Violations_PlaceBehind FOREIGN KEY (PlaceBehindEntryId) REFERENCES RaceEntries(RaceEntryId),
     CONSTRAINT CHK_Violations_Penalty CHECK (Penalty IN ('Disqualified','PlaceBehind','Warning','Scratch'))
-);
-GO
-
-CREATE TABLE Protests (
-    ProtestId            INT             IDENTITY(1,1) NOT NULL,
-    RaceId               INT             NOT NULL,
-    SubmittedByUserId    INT             NOT NULL,
-    AccusedRaceEntryId   INT             NOT NULL,
-    ViolationId          INT             NULL,
-    [Description]        NVARCHAR(500)   NOT NULL,
-    [Status]             VARCHAR(20)     NOT NULL DEFAULT 'Pending',
-    RefereeDecision      NVARCHAR(500)   NULL,
-    PenaltyApplied       VARCHAR(20)     NULL,
-    SubmittedAt          DATETIME2       NOT NULL DEFAULT GETUTCDATE(),
-    ResolvedAt           DATETIME2       NULL,
-
-    CONSTRAINT PK_Protests PRIMARY KEY (ProtestId),
-    CONSTRAINT FK_Protests_Race FOREIGN KEY (RaceId) REFERENCES Races(RaceId),
-    CONSTRAINT FK_Protests_SubmittedBy FOREIGN KEY (SubmittedByUserId) REFERENCES Users(UserId),
-    CONSTRAINT FK_Protests_AccusedEntry FOREIGN KEY (AccusedRaceEntryId) REFERENCES RaceEntries(RaceEntryId),
-    CONSTRAINT FK_Protests_Violation FOREIGN KEY (ViolationId) REFERENCES Violations(ViolationId),
-    CONSTRAINT CHK_Protests_Status CHECK ([Status] IN ('Pending','Approved','Rejected')),
-    CONSTRAINT CHK_Protests_Penalty CHECK (PenaltyApplied IS NULL OR PenaltyApplied IN ('Disqualified','PlaceBehind','Warning','Scratch'))
 );
 GO
 
@@ -710,8 +677,7 @@ BEGIN
             Notes         = i.Notes,
             IsLocked      = i.IsLocked,
             SubmittedAt   = i.SubmittedAt,
-            LockedAt      = i.LockedAt,
-            ProtestWindowClosedAt = i.ProtestWindowClosedAt   -- patch 009: nếu thiếu, update bị bỏ âm thầm
+            LockedAt      = i.LockedAt
         FROM RaceReports rr
         INNER JOIN inserted i ON rr.RaceReportId = i.RaceReportId;
     END
@@ -791,12 +757,12 @@ GO
 
 -- =============================================================================
 -- SUMMARY
--- 26 base tables - SQL Server 2022 - 3NF
+-- 25 base tables - SQL Server 2022 - 3NF
 -- Users, JockeyProfiles, OwnerProfiles, RefereeProfiles, DoctorProfiles,
 -- SpectatorProfiles,
 -- Tournaments, TournamentParticipants, PrizeDistributions, Rounds, Races,
 -- Horses, Pairings, RaceEntries,
--- RefereeAssignments, DoctorAssignments, RaceReports, Violations, Protests,
+-- RefereeAssignments, DoctorAssignments, RaceReports, Violations,
 -- Wallets, TicketRewardCodes, VirtualPointsTransactions, Predictions,
 -- PursePayouts, AuditLogs, Notifications
 --

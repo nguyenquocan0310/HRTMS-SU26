@@ -31,8 +31,6 @@ public partial class Race
 
     public int ConfirmationCutoffHours { get; set; }
 
-    public int ProtestDeadlineMinutes { get; set; }
-
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
@@ -45,8 +43,6 @@ public partial class Race
     public virtual ICollection<DoctorAssignment> DoctorAssignments { get; set; } = new List<DoctorAssignment>();
 
     public virtual ICollection<Prediction> Predictions { get; set; } = new List<Prediction>();
-
-    public virtual ICollection<Protest> Protests { get; set; } = new List<Protest>();
 
     public virtual ICollection<RaceEntry> RaceEntries { get; set; } = new List<RaceEntry>();
 

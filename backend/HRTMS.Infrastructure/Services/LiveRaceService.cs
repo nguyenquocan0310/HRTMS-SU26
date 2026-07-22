@@ -16,8 +16,8 @@ namespace HRTMS.Infrastructure.Services;
 ///     "về đích" đúng thứ tự khi status chuyển Unofficial, (3) Violation do
 ///     Referee ghi nhận trong lúc Live (annotation layer độc lập, không ảnh
 ///     hưởng thuật toán mô phỏng).
-///   • Owner/Jockey KHÔNG báo cáo vi phạm lúc Live — giữ nguyên Protest sau
-///     Unofficial (Phương án A, BR-16/EC-20/EC-27) — không đụng tới ở đây.
+///   • Owner/Jockey không báo cáo vi phạm lúc Live; việc ghi nhận vi phạm
+///     thuộc về Referee trong quá trình điều hành cuộc đua.
 /// </summary>
 public class LiveRaceService : ILiveRaceService
 {
@@ -163,8 +163,8 @@ public class LiveRaceService : ILiveRaceService
         var referee = await EnsureRefereeAssignedAsync(raceId, refereeId);
 
         // Chỉ ghi nhận trong lúc Live — đúng nguyên tắc "vi phạm do Referee ghi
-        // nhận trong lúc đua". Sau khi race rời Live, dùng luồng Race Report /
-        // Protest thay vì API này.
+        // nhận trong lúc đua". Sau khi race rời Live, không thể thêm vi phạm
+        // qua API live này.
         if (race.Status != StatusLive)
             throw new InvalidOperationException("RACE_NOT_LIVE");
 

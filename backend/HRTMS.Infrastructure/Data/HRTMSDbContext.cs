@@ -37,8 +37,6 @@ public partial class HRTMSDbContext : DbContext
 
     public virtual DbSet<PrizeDistribution> PrizeDistributions { get; set; }
 
-    public virtual DbSet<Protest> Protests { get; set; }
-
     public virtual DbSet<PursePayout> PursePayouts { get; set; }
 
     public virtual DbSet<Race> Races { get; set; }
@@ -417,39 +415,6 @@ public partial class HRTMSDbContext : DbContext
                 .HasConstraintName("FK_PrizeDist_Tournament");
         });
 
-        modelBuilder.Entity<Protest>(entity =>
-        {
-            entity.Property(e => e.Description).HasMaxLength(500);
-            entity.Property(e => e.PenaltyApplied)
-                .HasMaxLength(20)
-                .IsUnicode(false);
-            entity.Property(e => e.RefereeDecision).HasMaxLength(500);
-            entity.Property(e => e.Status)
-                .HasMaxLength(20)
-                .IsUnicode(false)
-                .HasDefaultValue("Pending");
-            entity.Property(e => e.SubmittedAt).HasDefaultValueSql("(getutcdate())");
-
-            entity.HasOne(d => d.AccusedRaceEntry).WithMany(p => p.Protests)
-                .HasForeignKey(d => d.AccusedRaceEntryId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Protests_AccusedEntry");
-
-            entity.HasOne(d => d.Race).WithMany(p => p.Protests)
-                .HasForeignKey(d => d.RaceId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Protests_Race");
-
-            entity.HasOne(d => d.SubmittedByUser).WithMany(p => p.Protests)
-                .HasForeignKey(d => d.SubmittedByUserId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Protests_SubmittedBy");
-
-            entity.HasOne(d => d.Violation).WithMany(p => p.Protests)
-                .HasForeignKey(d => d.ViolationId)
-                .HasConstraintName("FK_Protests_Violation");
-        });
-
         modelBuilder.Entity<PursePayout>(entity =>
         {
             entity.Property(e => e.CalculatedAmount).HasColumnType("decimal(18, 2)");
@@ -486,7 +451,6 @@ public partial class HRTMSDbContext : DbContext
 
             entity.Property(e => e.ConfirmationCutoffHours).HasDefaultValue(24);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
-            entity.Property(e => e.ProtestDeadlineMinutes).HasDefaultValue(10);
             entity.Property(e => e.PurseAmount).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.Status)
                 .HasMaxLength(20)

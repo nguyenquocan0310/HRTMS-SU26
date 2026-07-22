@@ -166,7 +166,6 @@ namespace HRTMS.Infrastructure.Services
                         Status = race.Status,
                         IsPostPositionDrawn = race.IsPostPositionDrawn,
                         ConfirmationCutoffHours = race.ConfirmationCutoffHours,
-                        ProtestDeadlineMinutes = race.ProtestDeadlineMinutes,
                     }).ToList(),
                 }).ToList(),
                 PrizeDistributions = t.PrizeDistributions
@@ -948,7 +947,6 @@ namespace HRTMS.Infrastructure.Services
                 // Chỉ mở sau khi Referee chốt official starting list.
                 IsPredictionGateClosed = true,
                 ConfirmationCutoffHours = dto.ConfirmationCutoffHours,
-                ProtestDeadlineMinutes = dto.ProtestDeadlineMinutes,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
             };
@@ -975,7 +973,6 @@ namespace HRTMS.Infrastructure.Services
                 Status = race.Status,
                 IsPostPositionDrawn = race.IsPostPositionDrawn,
                 ConfirmationCutoffHours = race.ConfirmationCutoffHours,
-                ProtestDeadlineMinutes = race.ProtestDeadlineMinutes,
             };
         }
 
@@ -1041,14 +1038,11 @@ namespace HRTMS.Infrastructure.Services
             TrackRaceChange("TrackTypeOverride", race.TrackTypeOverride, dto.TrackTypeOverride);
             TrackRaceChange("RaceDistanceOverride", race.RaceDistanceOverride, dto.RaceDistanceOverride);
             TrackRaceChange("ConfirmationCutoffHours", race.ConfirmationCutoffHours, dto.ConfirmationCutoffHours);
-            TrackRaceChange("ProtestDeadlineMinutes", race.ProtestDeadlineMinutes, dto.ProtestDeadlineMinutes);
-
             race.ScheduledTime = scheduledTime;
             race.PurseAmount = purseAmount;
             race.TrackTypeOverride = dto.TrackTypeOverride;
             race.RaceDistanceOverride = dto.RaceDistanceOverride;
             race.ConfirmationCutoffHours = dto.ConfirmationCutoffHours;
-            race.ProtestDeadlineMinutes = dto.ProtestDeadlineMinutes;
             race.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -1075,7 +1069,6 @@ namespace HRTMS.Infrastructure.Services
                 Status = race.Status,
                 IsPostPositionDrawn = race.IsPostPositionDrawn,
                 ConfirmationCutoffHours = race.ConfirmationCutoffHours,
-                ProtestDeadlineMinutes = race.ProtestDeadlineMinutes,
             };
         }
     }
