@@ -9,8 +9,36 @@ public interface IRaceEntryService
     // Cưỡng chế: cửa sổ thời gian, MaxHorses, double-booking & trùng trong Race.
     Task<RaceEntryResponseDto> AllocateAsync(int adminId, int raceId, AllocateEntryDto dto);
 
+    // Tự động phân bổ TOÀN BỘ pool đủ điều kiện vào các race của một vòng.
+    // Round 1: pairing Confirmed + lệ phí Verified. Round 2+: entry Qualified/
+    // AlsoEligible ở vòng trước. Sức chứa mỗi race = min(MaxHorses, Venue.LaneCount).
+    // Một transaction; gọi lại khi vòng đã allocate -> ROUND_ALREADY_ALLOCATED.
+    Task<AutoAllocateResultDto> AutoAllocateRoundAsync(int actorId, int roundId);
+
+    // Dry-run: dùng chung guard/pool/sức chứa với AutoAllocateRoundAsync nhưng
+    // KHÔNG ghi DB. Races[].Entries để rỗng vì mapping ngựa→race chỉ chốt lúc thật
+    // (Fisher-Yates); xem AssignmentIsFinal.
+    Task<AutoAllocateResultDto> PreviewAllocateRoundAsync(int roundId);
+
+    // Danh sách chờ đã persist của một vòng (bảng RoundWaitlist, patch 014).
+    Task<List<AutoAllocateWaitlistDto>> GetRoundWaitlistAsync(int roundId);
+
+    // Manual override: chuyển entry sang race khác TRONG CÙNG vòng, race đích
+    // chưa bốc thăm và còn chỗ.
+    Task<RaceEntryResponseDto> MoveEntryAsync(int adminId, int raceEntryId, int targetRaceId);
+
+    // Chốt vòng: auto-allocate rồi bốc thăm mọi race đủ điều kiện.
+    // KHÔNG phải một transaction duy nhất — xem chú thích ở implementation.
+    Task<FinalizeRoundResultDto> FinalizeRoundAsync(int actorId, int roundId);
+
     // Bốc thăm vị trí xuất phát nguyên tử trong một transaction.
     Task<PostPositionDrawResultDto> DrawPostPositionsAsync(int adminId, int raceId);
+
+    // Job nén (Hangfire): auto-allocate vòng 1 của giải đã quá PaymentDeadline.
+    Task<int> AutoAllocateDueRoundsAsync();
+
+    // Job nén (Hangfire): bốc thăm race Upcoming sắp chạy (<= 24h) đã đủ điều kiện.
+    Task<int> AutoDrawDueRacesAsync();
 
     // Lấy lịch thi đấu công khai (không yêu cầu đăng nhập).
     Task<RaceScheduleDto> GetRaceScheduleAsync(int raceId);

@@ -28,9 +28,20 @@ namespace HRTMS.Core.DTOs.Tournament
         // Phần quỹ giải còn lại chưa phân bổ cho Race nào = PurseAmount - AllocatedPurse.
         public decimal RemainingPurse { get; set; }
         public decimal EntryFeeAmount { get; set; }
+        // Deadline lệ phí (patch 013). RefundDeadline NULL = giải không hoàn phí.
+        public DateTime? PaymentDeadline { get; set; }
+        public DateTime? RefundDeadline { get; set; }
         public decimal PreRaceWeightThresholdKg { get; set; }
         public decimal PostRaceWeightDiffThresholdKg { get; set; }
         public string Status { get; set; } = string.Empty;
+        // Sân đua (patch 012). NULL với giải cũ tạo trước patch — FE phải chịu được null.
+        public int? VenueId { get; set; }
+        public string? VenueName { get; set; }
+        public string? VenueCity { get; set; }
+        public int? LaneCount { get; set; }
+        public int? TrackLengthMeters { get; set; }
+        // Sức chứa thực tế mỗi cuộc đua = min(MaxHorses, LaneCount).
+        public int? RaceCapacity { get; set; }
         // Progression (patch 002)
         public string AdvancementRule { get; set; } = "TopPerRace";
         public int AdvancementCount { get; set; } = 5;

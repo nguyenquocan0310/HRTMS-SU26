@@ -28,9 +28,25 @@
 --   008_ticket_code_plaintext.sql: đã fold — TicketRewardCodes dùng Code VARCHAR(20)
 --                                  plaintext + UQ_TicketRewardCodes_Code (bỏ CodeHash).
 --   010_audit_action_nvarchar.sql: đã fold — AuditLogs.Action VARCHAR(50) -> NVARCHAR(100).
+--   012_venue.sql                : bảng Venues (TrackType/TrackLengthMeters/LaneCount 2..24/
+--                                  IsActive) + Tournaments.VenueId (NULL, FK, index).
+--                                  DDL đã fold; ⚠️ patch chứa SEED — 4 sân đua VN
+--                                  (Phú Thọ / Đại Nam / Thiên Mã Madagui active,
+--                                  Sóc Sơn inactive) giữ ở section Patch 012 cuối file.
+--                                  Backfill "giải cũ -> Phú Thọ" là no-op trên DB rỗng.
+--   013_entry_fee_payment.sql    : bảng EntryFeePayments + UQ_EFP_ActivePerPairing
+--                                  (filtered unique: PendingVerification/Verified) +
+--                                  IX_EFP_Status + Tournaments.PaymentDeadline/
+--                                  RefundDeadline. Đã fold cả 2 CHECK mở rộng:
+--                                  Pairings.Status += 'PendingVerification',
+--                                  RaceEntries.Status += 'Scratched'.
+--                                  Backfill payment là no-op trên DB rỗng.
+--   014_round_waitlist.sql       : bảng RoundWaitlist (RoundId, PairingId, Position,
+--                                  CreatedAt) + unique (RoundId,PairingId) và
+--                                  (RoundId,Position). Đã fold; không có seed.
 --
--- Thời điểm cập nhật : 2026-07-16
--- Cách tạo           : schema gốc + patch 001→010 theo thứ tự; thay đổi xóa của
+-- Thời điểm cập nhật : 2026-07-22
+-- Cách tạo           : schema gốc + patch 001→013 theo thứ tự; thay đổi xóa của
 --                      patch 007 (bỏ COI) và 008 (008_ticket_code_plaintext.sql —
 --                      TicketRewardCodes.Code plaintext thay CodeHash) được fold
 --                      trực tiếp vào DDL cuối.
@@ -40,8 +56,12 @@
 --      — bản cuối là bản của patch 006 (có role 'System').
 --   2. Patch 001 DROP cột/FK/INDEX của schema gốc rồi tạo bảng mới — hợp lệ vì mọi
 --      patch đều idempotent (IF EXISTS / IF NOT EXISTS).
---   3. Patch 001 (backfill) và 006 (system user) chứa INSERT — seed nằm trong patch.
+--   3. Patch 001 (backfill), 006 (system user) và 011 (4 sân đua) chứa INSERT —
+--      seed nằm trong patch.
 --   4. Không có bảng/cột/constraint/index trùng tên giữa các patch.
+--   5. Patch 013 KHÔNG dùng DROP/ADD CHECK như file patch gốc: trong snapshot thì
+--      CHK_Pairings_Status và CHK_RaceEntries_Status được viết thẳng ở CREATE TABLE
+--      với tập giá trị đã mở rộng (có 'PendingVerification' / 'Scratched').
 -- =============================================================================
 
 -- #############################################################################
@@ -51,7 +71,8 @@
 -- HRTMS - Horse Racing Tournament Management System
 -- DB Schema: SQL Server 2022 - 3NF - Phase 1 Final
 -- Project: SU26SWP03 | Version: 2.0 | Updated: 2026-06-27
--- 26 bảng nền; 28 bảng sau khi hợp nhất patches - PK/FK/CHECK/DEFAULT/UNIQUE/INDEX
+-- 26 bảng nền; 31 bảng sau khi hợp nhất patches 001-013 (thêm HorseTournamentEntries,
+-- Certificates, Venues, EntryFeePayments, RoundWaitlist) - PK/FK/CHECK/DEFAULT/UNIQUE/INDEX
 -- =============================================================================
 
 -- Không có database lifecycle trong snapshot. Runner demo không thực thi file này.
@@ -206,6 +227,33 @@ GO
 -- GROUP 2: TOURNAMENT STRUCTURE
 -- =============================================================================
 
+-- Sân đua vật lý (patch 012). LaneCount = số cổng xuất phát, là trần cứng cho
+-- sức chứa mỗi cuộc đua: Tournament.MaxHorses <= Venue.LaneCount (enforce ở service).
+CREATE TABLE Venues (
+    VenueId            INT             IDENTITY(1,1) NOT NULL,
+    [Name]             NVARCHAR(200)   NOT NULL,
+    [Address]          NVARCHAR(500)   NULL,
+    City               NVARCHAR(100)   NULL,
+    TrackType          VARCHAR(20)     NOT NULL,
+    TrackLengthMeters  INT             NOT NULL,
+    LaneCount          INT             NOT NULL,
+    IsActive           BIT             NOT NULL DEFAULT 1,
+    CreatedAt          DATETIME2       NOT NULL DEFAULT GETUTCDATE(),
+    UpdatedAt          DATETIME2       NOT NULL DEFAULT GETUTCDATE(),
+
+    CONSTRAINT PK_Venues PRIMARY KEY (VenueId),
+    CONSTRAINT CHK_Venues_TrackType CHECK (TrackType IN ('Dirt','Turf','Synthetic')),
+    CONSTRAINT CHK_Venues_TrackLength CHECK (TrackLengthMeters > 0),
+    CONSTRAINT CHK_Venues_LaneCount CHECK (LaneCount BETWEEN 2 AND 24)
+);
+GO
+
+CREATE UNIQUE INDEX UQ_Venues_Name ON Venues ([Name]);
+GO
+
+CREATE INDEX IX_Venues_IsActive ON Venues (IsActive);
+GO
+
 CREATE TABLE Tournaments (
     TournamentId                   INT             IDENTITY(1,1) NOT NULL,
     [Name]                         NVARCHAR(150)   NOT NULL,
@@ -223,12 +271,18 @@ CREATE TABLE Tournaments (
     PreRaceWeightThresholdKg       DECIMAL(4,2)    NOT NULL DEFAULT 2.00,
     PostRaceWeightDiffThresholdKg  DECIMAL(4,2)    NOT NULL DEFAULT 1.00,
     [Status]                       VARCHAR(30)     NOT NULL DEFAULT 'Draft',
+    -- patch 012: NULL ở DB để không phá giải cũ; service bắt buộc cho giải mới.
+    VenueId                        INT             NULL,
+    -- patch 013: hạn nộp lệ phí / hạn hoàn phí. NULL = không áp hạn.
+    PaymentDeadline                DATETIME2       NULL,
+    RefundDeadline                 DATETIME2       NULL,
     CreatedAt                      DATETIME2       NOT NULL DEFAULT GETUTCDATE(),
     UpdatedAt                      DATETIME2       NOT NULL DEFAULT GETUTCDATE(),
     CreatedBy                      INT             NULL,
 
     CONSTRAINT PK_Tournaments PRIMARY KEY (TournamentId),
     CONSTRAINT FK_Tournaments_CreatedBy FOREIGN KEY (CreatedBy) REFERENCES Users(UserId),
+    CONSTRAINT FK_Tournaments_Venue FOREIGN KEY (VenueId) REFERENCES Venues(VenueId),
     CONSTRAINT CHK_Tournaments_EndDate CHECK (EndDate > StartDate),
     CONSTRAINT CHK_Tournaments_MaxHorses CHECK (MaxHorses > 0),
     CONSTRAINT CHK_Tournaments_Breed CHECK (AllowedBreed IN ('Thoroughbred','Arabian','Quarter Horse','Mixed')),
@@ -242,6 +296,9 @@ CREATE TABLE Tournaments (
     CONSTRAINT CHK_Tournaments_PostWgt CHECK (PostRaceWeightDiffThresholdKg > 0),
     CONSTRAINT CHK_Tournaments_Status CHECK ([Status] IN ('Draft','Open Registration','Closed Registration','Completed','Cancelled'))
 );
+GO
+
+CREATE INDEX IX_Tournaments_VenueId ON Tournaments (VenueId) WHERE VenueId IS NOT NULL;
 GO
 
 CREATE TABLE TournamentParticipants (
@@ -392,8 +449,69 @@ CREATE TABLE Pairings (
     CONSTRAINT FK_Pairings_Jockey FOREIGN KEY (JockeyId) REFERENCES JockeyProfiles(JockeyId),
     CONSTRAINT FK_Pairings_HorseTournament FOREIGN KEY (TournamentId, HorseId) REFERENCES Horses(TournamentId, HorseId),
     CONSTRAINT FK_Pairings_JockeyRoster FOREIGN KEY (TournamentId, JockeyId) REFERENCES TournamentParticipants(TournamentId, UserId),
-    CONSTRAINT CHK_Pairings_Status CHECK ([Status] IN ('Pending','Accepted','Declined','Confirmed','Cancelled'))
+    -- patch 013: PendingVerification = Owner đã nộp lệ phí, chờ Admin đối chiếu.
+    CONSTRAINT CHK_Pairings_Status CHECK ([Status] IN ('Pending','Accepted','PendingVerification','Confirmed','Declined','Cancelled'))
 );
+GO
+
+-- Danh sách chờ theo vòng (patch 014). Lưu phần dư khi pool đủ điều kiện vượt
+-- tổng sức chứa của vòng = min(MaxHorses, Venue.LaneCount) * số race.
+-- KHÁC AlsoEligible: AlsoEligible là entry ĐÃ đua vòng trước; RoundWaitlist là
+-- pairing chưa được phân vào race nào (cần thiết cho vòng 1, nơi chưa có entry).
+CREATE TABLE RoundWaitlist (
+    WaitlistId  INT         IDENTITY(1,1) NOT NULL,
+    RoundId     INT         NOT NULL,
+    PairingId   INT         NOT NULL,
+    [Position]  INT         NOT NULL,
+    CreatedAt   DATETIME2   NOT NULL DEFAULT GETUTCDATE(),
+
+    CONSTRAINT PK_RoundWaitlist PRIMARY KEY (WaitlistId),
+    CONSTRAINT FK_RoundWaitlist_Round FOREIGN KEY (RoundId) REFERENCES Rounds(RoundId),
+    CONSTRAINT FK_RoundWaitlist_Pairing FOREIGN KEY (PairingId) REFERENCES Pairings(PairingId),
+    CONSTRAINT CHK_RoundWaitlist_Position CHECK ([Position] > 0)
+);
+GO
+
+CREATE UNIQUE INDEX UQ_RoundWaitlist_RoundPairing ON RoundWaitlist (RoundId, PairingId);
+GO
+
+CREATE UNIQUE INDEX UQ_RoundWaitlist_RoundPosition ON RoundWaitlist (RoundId, [Position]);
+GO
+
+-- Nộp & đối chiếu lệ phí (patch 013). Pairing chỉ Confirmed khi payment Verified.
+CREATE TABLE EntryFeePayments (
+    PaymentId       INT             IDENTITY(1,1) NOT NULL,
+    PairingId       INT             NOT NULL,
+    Amount          DECIMAL(12,2)   NOT NULL,
+    Method          VARCHAR(10)     NOT NULL,
+    ReceiptNo       NVARCHAR(50)    NULL,
+    TransferRef     NVARCHAR(100)   NULL,
+    ProofFileName   NVARCHAR(255)   NULL,
+    ProofFilePath   VARCHAR(500)    NULL,
+    [Status]        VARCHAR(20)     NOT NULL DEFAULT 'PendingVerification',
+    SubmittedAt     DATETIME2       NOT NULL DEFAULT GETUTCDATE(),
+    VerifiedBy      INT             NULL,
+    VerifiedAt      DATETIME2       NULL,
+    RejectReason    NVARCHAR(500)   NULL,
+
+    CONSTRAINT PK_EntryFeePayments PRIMARY KEY (PaymentId),
+    CONSTRAINT FK_EFP_Pairing FOREIGN KEY (PairingId) REFERENCES Pairings(PairingId),
+    CONSTRAINT FK_EFP_VerifiedBy FOREIGN KEY (VerifiedBy) REFERENCES Users(UserId),
+    CONSTRAINT CHK_EFP_Amount CHECK (Amount >= 0),
+    CONSTRAINT CHK_EFP_Method CHECK (Method IN ('Cash','Transfer')),
+    CONSTRAINT CHK_EFP_Status CHECK ([Status] IN
+        ('PendingVerification','Verified','Rejected','RefundPending','Refunded'))
+);
+GO
+
+-- Một payment đang hiệu lực cho mỗi Pairing; Rejected/Refunded không tính nên
+-- Owner nộp lại được sau khi bị từ chối.
+CREATE UNIQUE INDEX UQ_EFP_ActivePerPairing
+    ON EntryFeePayments (PairingId)
+    WHERE [Status] IN ('PendingVerification','Verified');
+GO
+
+CREATE INDEX IX_EFP_Status ON EntryFeePayments ([Status], SubmittedAt);
 GO
 
 CREATE TABLE RaceEntries (
@@ -436,7 +554,9 @@ CREATE TABLE RaceEntries (
     CONSTRAINT FK_RaceEntries_FeeConfirmedBy FOREIGN KEY (EntryFeeConfirmedBy) REFERENCES Users(UserId),
     CONSTRAINT UQ_RaceEntries_RacePairing UNIQUE (RaceId, PairingId),
     CONSTRAINT CHK_RaceEntries_PostPos CHECK (PostPosition IS NULL OR PostPosition > 0),
-    CONSTRAINT CHK_RaceEntries_Status CHECK ([Status] IN ('Pending','Confirmed','Cancelled','Disqualified')),
+    -- patch 013: Scratched = rút SAU bốc thăm (giữ cổng trống, không bốc lại);
+    -- Cancelled = rút TRƯỚC bốc thăm (giải phóng cổng).
+    CONSTRAINT CHK_RaceEntries_Status CHECK ([Status] IN ('Pending','Confirmed','Cancelled','Scratched','Disqualified')),
     CONSTRAINT CHK_RaceEntries_HorseIdentity CHECK (HorseIdentityCheckStatus IS NULL OR HorseIdentityCheckStatus IN ('Matched','Mismatch')),
     CONSTRAINT CHK_RaceEntries_Clinical CHECK (ClinicalStatus IS NULL OR ClinicalStatus IN ('Fit','Unfit')),
     CONSTRAINT CHK_RaceEntries_FinishPos CHECK (FinishPosition IS NULL OR FinishPosition > 0),
@@ -1265,7 +1385,63 @@ GO
 PRINT 'Patch 006 applied: role System + seed system user (actor cho job tự động).';
 GO
 
-PRINT N'HOÀN TẤT: schema HRTMS được tạo mới (schema gốc + patch 001-010).';
+/* =============================================================================
+   Patch 012 — Module B/E: Venues (sân đua)
+   -----------------------------------------------------------------------------
+   DDL (bảng Venues, Tournaments.VenueId + FK + index) đã FOLD vào phần CREATE
+   TABLE phía trên. Phần còn lại dưới đây là SEED — theo đúng convention của
+   patch 001/006: seed nằm trong patch nên phải có mặt trong snapshot.
+
+   Backfill "giải cũ -> sân Phú Thọ" của patch gốc là NO-OP trên DB mới rỗng
+   (chưa có Tournaments) nên không lặp lại ở đây.
+   ============================================================================= */
+
+MERGE Venues AS target
+USING (VALUES
+    (N'Trường đua Phú Thọ',          N'Số 2 Lê Đại Hành, Phường 15, Quận 11', N'TP. Hồ Chí Minh', 'Dirt', 1800, 12, 1),
+    (N'Trường đua Đại Nam',          N'Khu du lịch Đại Nam, Hiệp An',         N'Bình Dương',      'Dirt', 1500, 10, 1),
+    (N'Trường đua Thiên Mã Madagui', N'Khu du lịch Madagui, Đạ Huoai',        N'Lâm Đồng',        'Turf', 1200,  6, 1),
+    (N'Trường đua Sóc Sơn',          N'Xã Tân Minh, Huyện Sóc Sơn',           N'Hà Nội',          'Turf', 2000, 14, 0)
+) AS source ([Name],[Address],City,TrackType,TrackLengthMeters,LaneCount,IsActive)
+    ON target.[Name] = source.[Name]
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT ([Name],[Address],City,TrackType,TrackLengthMeters,LaneCount,IsActive)
+    VALUES (source.[Name],source.[Address],source.City,source.TrackType,
+            source.TrackLengthMeters,source.LaneCount,source.IsActive);
+GO
+
+PRINT 'Patch 012 applied: bảng Venues + Tournaments.VenueId + seed 4 sân đua VN.';
+GO
+
+/* =============================================================================
+   Patch 013 — Module E/N: Entry Fee Payment
+   -----------------------------------------------------------------------------
+   DDL đã FOLD vào phần CREATE TABLE phía trên:
+     • bảng EntryFeePayments + UQ_EFP_ActivePerPairing + IX_EFP_Status
+     • Tournaments.PaymentDeadline / RefundDeadline
+     • CHK_Pairings_Status   += 'PendingVerification'
+     • CHK_RaceEntries_Status += 'Scratched'
+
+   Backfill "payment Verified cho pairing đã Confirmed" của patch gốc là NO-OP
+   trên DB mới rỗng (chưa có Pairings) nên không lặp lại ở đây — seed thật nằm
+   trong database/seed.sql.
+   ============================================================================= */
+
+PRINT 'Patch 013 applied: bảng EntryFeePayments + deadline lệ phí + status PendingVerification/Scratched.';
+GO
+
+/* =============================================================================
+   Patch 014 — Module E: RoundWaitlist (danh sách chờ theo vòng)
+   -----------------------------------------------------------------------------
+   DDL đã FOLD vào phần CREATE TABLE phía trên (bảng RoundWaitlist +
+   UQ_RoundWaitlist_RoundPairing + UQ_RoundWaitlist_RoundPosition).
+   Patch không chứa seed.
+   ============================================================================= */
+
+PRINT 'Patch 014 applied: bảng RoundWaitlist (danh sách chờ vòng đấu).';
+GO
+
+PRINT N'HOÀN TẤT: schema HRTMS được tạo mới (schema gốc + patch 001-013).';
 GO
 
 SET NOEXEC OFF;

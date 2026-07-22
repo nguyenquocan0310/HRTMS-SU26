@@ -44,11 +44,53 @@ namespace HRTMS.API.Controllers
                 var result = await _tournamentService.CreateTournamentAsync(dto, GetCurrentUserId());
                 return Ok(ApiResponse<TournamentResponseDto>.Ok(result, "Tao giai dau thanh cong"));
             }
+            catch (KeyNotFoundException ex) when (ex.Message == "VENUE_NOT_FOUND")
+            {
+                return NotFound(VenueError(ex.Message));
+            }
+            catch (InvalidOperationException ex) when (IsVenueError(ex.Message))
+            {
+                return UnprocessableEntity(VenueError(ex.Message));
+            }
             catch (ArgumentException ex)
             {
                 return BadRequest(ApiResponse<TournamentResponseDto>.Fail(ex.Message));
             }
         }
+
+        // Mã lỗi sân đua (patch 012) + deadline lệ phí (patch 013) dùng chung cho
+        // Create/Update — cùng map sang 422.
+        private static bool IsVenueError(string code) =>
+            code is "VENUE_INACTIVE" or "MAX_HORSES_EXCEEDS_LANES"
+                 or "TRACK_TYPE_VENUE_MISMATCH" or "VENUE_REQUIRED"
+                 or "PAYMENT_DEADLINE_REQUIRED" or "PAYMENT_DEADLINE_OUT_OF_RANGE"
+                 or "REFUND_DEADLINE_INVALID" or "DEADLINE_LOCKED"
+                 or "ADVANCEMENT_CONFIGURATION_LOCKED";
+
+        private static ApiResponse<TournamentResponseDto> VenueError(string code) => code switch
+        {
+            "PAYMENT_DEADLINE_REQUIRED" => ApiResponse<TournamentResponseDto>.Fail(code,
+                "Phải đặt hạn nộp lệ phí (giải miễn phí thì đây là hạn chốt đăng ký)."),
+            "PAYMENT_DEADLINE_OUT_OF_RANGE" => ApiResponse<TournamentResponseDto>.Fail(code,
+                "Hạn nộp lệ phí phải ở tương lai và trước ngày khai mạc ít nhất 24 giờ."),
+            "REFUND_DEADLINE_INVALID" => ApiResponse<TournamentResponseDto>.Fail(code,
+                "Hạn hoàn phí chỉ áp dụng cho giải có thu phí và phải nằm trong khoảng từ hạn nộp lệ phí đến ngày khai mạc."),
+            "DEADLINE_LOCKED" => ApiResponse<TournamentResponseDto>.Fail(code,
+                "Đã qua hạn nộp lệ phí nên không thể thay đổi các mốc thời gian này nữa."),
+            "VENUE_NOT_FOUND" => ApiResponse<TournamentResponseDto>.Fail(code,
+                "Không tìm thấy sân đua."),
+            "VENUE_INACTIVE" => ApiResponse<TournamentResponseDto>.Fail(code,
+                "Sân đua này chưa hoạt động nên không thể dùng cho giải đấu."),
+            "MAX_HORSES_EXCEEDS_LANES" => ApiResponse<TournamentResponseDto>.Fail(code,
+                "Số ngựa tối đa vượt quá số làn của sân đua đã chọn."),
+            "TRACK_TYPE_VENUE_MISMATCH" => ApiResponse<TournamentResponseDto>.Fail(code,
+                "Loại mặt sân của giải phải trùng với loại mặt sân của sân đua đã chọn."),
+            "VENUE_REQUIRED" => ApiResponse<TournamentResponseDto>.Fail(code,
+                "Giải đấu phải được gán sân đua trước khi cập nhật."),
+            "ADVANCEMENT_CONFIGURATION_LOCKED" => ApiResponse<TournamentResponseDto>.Fail(code,
+                "Không thể sửa số lượng đi tiếp vì đã có kết quả xét đi tiếp hoặc cuộc đua đã công bố chính thức."),
+            _ => ApiResponse<TournamentResponseDto>.Fail(code, code)
+        };
 
         // GET/api/tournaments
         [HttpGet]
@@ -79,6 +121,14 @@ namespace HRTMS.API.Controllers
             {
                 var result = await _tournamentService.UpdateTournamentAsync(id, dto, GetCurrentUserId());
                 return Ok(ApiResponse<TournamentResponseDto>.Ok(result, "Cap nhat thanh cong"));
+            }
+            catch (KeyNotFoundException ex) when (ex.Message == "VENUE_NOT_FOUND")
+            {
+                return NotFound(VenueError(ex.Message));
+            }
+            catch (InvalidOperationException ex) when (IsVenueError(ex.Message))
+            {
+                return UnprocessableEntity(VenueError(ex.Message));
             }
             catch (KeyNotFoundException ex)
             {
