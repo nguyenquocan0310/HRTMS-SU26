@@ -212,6 +212,33 @@ GO
 -- GROUP 2: TOURNAMENT STRUCTURE
 -- =============================================================================
 
+-- Sân đua vật lý (patch 011). LaneCount = số cổng xuất phát, là trần cứng cho
+-- sức chứa mỗi cuộc đua: Tournament.MaxHorses <= Venue.LaneCount (enforce ở service).
+CREATE TABLE Venues (
+    VenueId            INT             IDENTITY(1,1) NOT NULL,
+    [Name]             NVARCHAR(200)   NOT NULL,
+    [Address]          NVARCHAR(500)   NULL,
+    City               NVARCHAR(100)   NULL,
+    TrackType          VARCHAR(20)     NOT NULL,
+    TrackLengthMeters  INT             NOT NULL,
+    LaneCount          INT             NOT NULL,
+    IsActive           BIT             NOT NULL DEFAULT 1,
+    CreatedAt          DATETIME2       NOT NULL DEFAULT GETUTCDATE(),
+    UpdatedAt          DATETIME2       NOT NULL DEFAULT GETUTCDATE(),
+
+    CONSTRAINT PK_Venues PRIMARY KEY (VenueId),
+    CONSTRAINT CHK_Venues_TrackType CHECK (TrackType IN ('Dirt','Turf','Synthetic')),
+    CONSTRAINT CHK_Venues_TrackLength CHECK (TrackLengthMeters > 0),
+    CONSTRAINT CHK_Venues_LaneCount CHECK (LaneCount BETWEEN 2 AND 24)
+);
+GO
+
+CREATE UNIQUE INDEX UQ_Venues_Name ON Venues ([Name]);
+GO
+
+CREATE INDEX IX_Venues_IsActive ON Venues (IsActive);
+GO
+
 CREATE TABLE Tournaments (
     TournamentId                   INT             IDENTITY(1,1) NOT NULL,
     [Name]                         NVARCHAR(150)   NOT NULL,
@@ -229,12 +256,15 @@ CREATE TABLE Tournaments (
     PreRaceWeightThresholdKg       DECIMAL(4,2)    NOT NULL DEFAULT 2.00,
     PostRaceWeightDiffThresholdKg  DECIMAL(4,2)    NOT NULL DEFAULT 1.00,
     [Status]                       VARCHAR(30)     NOT NULL DEFAULT 'Draft',
+    -- patch 011: NULL ở DB để không phá giải cũ; service bắt buộc cho giải mới.
+    VenueId                        INT             NULL,
     CreatedAt                      DATETIME2       NOT NULL DEFAULT GETUTCDATE(),
     UpdatedAt                      DATETIME2       NOT NULL DEFAULT GETUTCDATE(),
     CreatedBy                      INT             NULL,
 
     CONSTRAINT PK_Tournaments PRIMARY KEY (TournamentId),
     CONSTRAINT FK_Tournaments_CreatedBy FOREIGN KEY (CreatedBy) REFERENCES Users(UserId),
+    CONSTRAINT FK_Tournaments_Venue FOREIGN KEY (VenueId) REFERENCES Venues(VenueId),
     CONSTRAINT CHK_Tournaments_EndDate CHECK (EndDate > StartDate),
     CONSTRAINT CHK_Tournaments_MaxHorses CHECK (MaxHorses > 0),
     CONSTRAINT CHK_Tournaments_Breed CHECK (AllowedBreed IN ('Thoroughbred','Arabian','Quarter Horse','Mixed')),
@@ -248,6 +278,9 @@ CREATE TABLE Tournaments (
     CONSTRAINT CHK_Tournaments_PostWgt CHECK (PostRaceWeightDiffThresholdKg > 0),
     CONSTRAINT CHK_Tournaments_Status CHECK ([Status] IN ('Draft','Open Registration','Closed Registration','Completed','Cancelled'))
 );
+GO
+
+CREATE INDEX IX_Tournaments_VenueId ON Tournaments (VenueId) WHERE VenueId IS NOT NULL;
 GO
 
 CREATE TABLE TournamentParticipants (
