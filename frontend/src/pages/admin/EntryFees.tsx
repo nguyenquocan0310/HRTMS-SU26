@@ -1,166 +1,75 @@
-import { useCallback, useEffect, useState } from 'react'
-import { FiCheckCircle, FiDownload, FiRefreshCw, FiXCircle } from 'react-icons/fi'
-import {
-  downloadFeePaymentProof,
-  getAdminFeePayments,
-  rejectFeePayment,
-  verifyFeePayment,
-  type FeePaymentRecord,
-} from '../../services/entryFeePaymentService'
+import { useEffect, useMemo, useState } from 'react';
+import { FiCheck, FiChevronLeft, FiChevronRight, FiEye, FiFileText, FiX, FiXCircle } from 'react-icons/fi';
+import { getFeePayments, getFeeProof, rejectFeePayment, verifyFeePayment, type FeePayment, type FeePaymentStatus } from '../../services/feePaymentService';
+import { getTournaments, type TournamentResponse } from '../../services/tournamentService';
+import { adminError, adminLabel, currency, dateTime } from '../../utils/adminLabels';
+import styles from './EntryFees.module.scss';
 
-type PaymentFilter = '' | 'PendingVerification' | 'Verified' | 'Rejected'
+const tabs: Array<{ status: FeePaymentStatus; label: string }> = [
+  { status: 'PendingVerification', label: 'Chờ đối chiếu' }, { status: 'Verified', label: 'Đã xác nhận' }, { status: 'Rejected', label: 'Đã từ chối' },
+];
 
-const statusPresentation: Record<string, { label: string; className: string }> = {
-  PendingVerification: { label: 'Chờ đối chứng', className: 'border-amber-200 bg-amber-50 text-amber-800' },
-  Verified: { label: 'Đã xác nhận', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
-  Rejected: { label: 'Đã từ chối', className: 'border-red-200 bg-red-50 text-red-700' },
-}
+const EntryFees = () => {
+  const [status, setStatus] = useState<FeePaymentStatus>('PendingVerification');
+  const [tournaments, setTournaments] = useState<TournamentResponse[]>([]);
+  const [tournamentId, setTournamentId] = useState<number | undefined>();
+  const [items, setItems] = useState<FeePayment[]>([]);
+  const [counts, setCounts] = useState<Record<FeePaymentStatus, number>>({ PendingVerification: 0, Verified: 0, Rejected: 0 });
+  const [page, setPage] = useState(1); const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true); const [actionId, setActionId] = useState<number | null>(null);
+  const [error, setError] = useState(''); const [notice, setNotice] = useState('');
+  const [detail, setDetail] = useState<FeePayment | null>(null); const [confirming, setConfirming] = useState<FeePayment | null>(null);
+  const [rejecting, setRejecting] = useState<FeePayment | null>(null); const [reason, setReason] = useState('');
+  const tournament = useMemo(() => tournaments.find((item) => item.tournamentId === tournamentId), [tournaments, tournamentId]);
 
-const formatCurrency = (value: number) => new Intl.NumberFormat('vi-VN', {
-  style: 'currency', currency: 'VND', maximumFractionDigits: 0,
-}).format(value)
-
-const formatDateTime = (value: string) => new Date(value).toLocaleString('vi-VN', {
-  hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric',
-})
-
-export default function EntryFees() {
-  const [payments, setPayments] = useState<FeePaymentRecord[]>([])
-  const [filter, setFilter] = useState<PaymentFilter>('PendingVerification')
-  const [loading, setLoading] = useState(true)
-  const [actionId, setActionId] = useState<number | null>(null)
-  const [rejecting, setRejecting] = useState<FeePaymentRecord | null>(null)
-  const [rejectReason, setRejectReason] = useState('')
-  const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
-
-  const loadPayments = useCallback(async () => {
-    setLoading(true)
-    setError('')
+  const load = async () => {
+    setLoading(true); setError('');
     try {
-      const page = await getAdminFeePayments(filter)
-      setPayments(page.items ?? [])
-    } catch (err) {
-      setPayments([])
-      setError(err instanceof Error ? err.message : 'Không tải được hồ sơ lệ phí.')
-    } finally {
-      setLoading(false)
-    }
-  }, [filter])
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => void loadPayments(), 0)
-    return () => window.clearTimeout(timer)
-  }, [loadPayments])
-
-  const verify = async (payment: FeePaymentRecord) => {
-    if (!window.confirm(`Xác nhận chứng từ của ${payment.ownerName} và hoàn tất ghép cặp ${payment.horseName} / ${payment.jockeyName}?`)) return
-    setActionId(payment.paymentId)
-    setError('')
-    setMessage('')
-    try {
-      await verifyFeePayment(payment.paymentId)
-      setMessage('Đã đối chứng đúng lệ phí. Cặp ngựa và Jockey đã ghép thành công.')
-      await loadPayments()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Xác nhận chứng từ thất bại.')
-    } finally {
-      setActionId(null)
-    }
-  }
-
+      const [result, ...countResults] = await Promise.all([
+        getFeePayments({ status, tournamentId, page, pageSize: 20 }),
+        ...tabs.map((tab) => getFeePayments({ status: tab.status, tournamentId, page: 1, pageSize: 1 })),
+      ]);
+      setItems(result.items ?? []); setTotalPages(Math.max(result.totalPages ?? Math.ceil(result.totalCount / result.pageSize), 1));
+      setCounts({ PendingVerification: countResults[0].totalCount, Verified: countResults[1].totalCount, Rejected: countResults[2].totalCount });
+    } catch (err) { setError(adminError(err, 'Không tải được danh sách lệ phí.')); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { void getTournaments().then(setTournaments).catch((err) => setError(adminError(err))); }, []);
+  useEffect(() => { void load(); }, [status, tournamentId, page]);
+  const changeStatus = (next: FeePaymentStatus) => { setStatus(next); setPage(1); setDetail(null); };
+  const openProof = async (payment: FeePayment) => {
+    setActionId(payment.paymentId); setError('');
+    try { const blob = await getFeeProof(payment.paymentId); const url = URL.createObjectURL(blob); window.open(url, '_blank', 'noopener'); window.setTimeout(() => URL.revokeObjectURL(url), 60_000); }
+    catch (err) { setError(adminError(err, 'Không thể mở chứng từ.')); }
+    finally { setActionId(null); }
+  };
+  const verify = async () => {
+    if (!confirming) return; setActionId(confirming.paymentId); setError('');
+    try { await verifyFeePayment(confirming.paymentId); setNotice(`Đã xác nhận lệ phí của ${confirming.horseName}. Cặp đấu đã được xác nhận tham gia.`); setConfirming(null); setDetail(null); await load(); }
+    catch (err) { setError(adminError(err, 'Không thể xác nhận lệ phí.')); }
+    finally { setActionId(null); }
+  };
   const reject = async () => {
-    if (!rejecting || rejectReason.trim().length < 10) return
-    setActionId(rejecting.paymentId)
-    setError('')
-    setMessage('')
-    try {
-      await rejectFeePayment(rejecting.paymentId, rejectReason)
-      setMessage('Đã từ chối chứng từ. Owner có thể nộp lại trước hạn.')
-      setRejecting(null)
-      setRejectReason('')
-      await loadPayments()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Từ chối chứng từ thất bại.')
-    } finally {
-      setActionId(null)
-    }
-  }
+    if (!rejecting || reason.trim().length < 10) return; setActionId(rejecting.paymentId); setError('');
+    try { await rejectFeePayment(rejecting.paymentId, reason.trim()); setNotice('Đã từ chối lệ phí và gửi yêu cầu nộp lại cho chủ ngựa.'); setRejecting(null); setDetail(null); setReason(''); await load(); }
+    catch (err) { setError(adminError(err, 'Không thể từ chối lệ phí.')); }
+    finally { setActionId(null); }
+  };
 
-  const downloadProof = async (payment: FeePaymentRecord) => {
-    setActionId(payment.paymentId)
-    setError('')
-    try {
-      await downloadFeePaymentProof(payment)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không tải được chứng từ.')
-    } finally {
-      setActionId(null)
-    }
-  }
+  return <div className={styles.page}>
+    <header><h1>Đối chiếu lệ phí</h1></header>
+    {notice && <div className={styles.notice}>{notice}</div>}{error && <div className={styles.error}>{error}</div>}
+    <section className={styles.card}><div className={styles.toolbar}><div className={styles.tabs}>{tabs.map((tab) => <button key={tab.status} className={status === tab.status ? styles.tabActive : styles.tab} onClick={() => changeStatus(tab.status)}>{tab.label}<span>{counts[tab.status]}</span></button>)}</div><label className={styles.tournamentSelect}>Giải đấu<select value={tournamentId ?? ''} onChange={(event) => { setTournamentId(event.target.value ? Number(event.target.value) : undefined); setPage(1); }}><option value="">Tất cả giải đấu</option>{tournaments.map((item) => <option value={item.tournamentId} key={item.tournamentId}>{item.name}</option>)}</select></label></div>
+      {tournament && <div className={styles.tournamentInfo}><strong>{tournament.name}</strong><span>Hạn nộp lệ phí: {dateTime(tournament.paymentDeadline)}</span><span>Hạn hoàn lệ phí: {tournament.refundDeadline ? dateTime(tournament.refundDeadline) : 'Không hoàn'}</span></div>}
+      <div className={styles.tableWrap}><table><thead><tr><th>Ngựa / Nài</th><th>Giải đấu</th><th>Số tiền</th><th>Hình thức</th><th>Mã đối chiếu</th><th>Nộp lúc</th><th>Chứng từ</th><th>Thao tác</th></tr></thead><tbody>
+        {loading ? <tr><td colSpan={8} className={styles.empty}>Đang tải hồ sơ lệ phí…</td></tr> : items.length === 0 ? <tr><td colSpan={8} className={styles.empty}>Không có khoản lệ phí {status === 'PendingVerification' ? 'chờ đối chiếu' : adminLabel(status).toLocaleLowerCase()}.</td></tr> : items.map((payment) => <tr key={payment.paymentId}><td><strong>{payment.horseName}</strong><small>Nài: {payment.jockeyName} · Chủ ngựa: {payment.ownerName}</small></td><td>{payment.tournamentName}</td><td>{currency(payment.amount)}</td><td>{adminLabel(payment.method)}</td><td>{payment.method === 'Cash' ? payment.receiptNo ?? '—' : payment.transferRef ?? '—'}</td><td>{dateTime(payment.submittedAt)}</td><td>{payment.hasProof ? <button className={styles.fileButton} onClick={() => void openProof(payment)} disabled={actionId === payment.paymentId}><FiFileText /> {payment.proofFileName ?? 'Mở chứng từ'}</button> : 'Không có'}</td><td><button className={styles.detailButton} onClick={() => setDetail(payment)}><FiEye /> Chi tiết</button></td></tr>)}
+      </tbody></table></div>
+      <div className={styles.pagination}><button disabled={page === 1 || loading} onClick={() => setPage((value) => value - 1)}><FiChevronLeft /> Trước</button><span>Trang {page}/{totalPages}</span><button disabled={page === totalPages || loading} onClick={() => setPage((value) => value + 1)}>Sau <FiChevronRight /></button></div>
+    </section>
+    {detail && <><div className={styles.backdrop} onClick={() => setDetail(null)} /><aside className={styles.drawer}><div className={styles.drawerHeader}><div><h2>{detail.horseName}</h2><p>{detail.tournamentName} · Cặp đấu #{detail.pairingId}</p></div><button onClick={() => setDetail(null)} aria-label="Đóng chi tiết"><FiX /></button></div><dl><dt>Số tiền</dt><dd>{currency(detail.amount)}</dd><dt>Hình thức</dt><dd>{adminLabel(detail.method)}</dd><dt>Mã giao dịch / biên nhận</dt><dd>{detail.method === 'Cash' ? detail.receiptNo ?? '—' : detail.transferRef ?? '—'}</dd><dt>Nài ngựa</dt><dd>{detail.jockeyName}</dd><dt>Chủ ngựa</dt><dd>{detail.ownerName}</dd><dt>Nộp lúc</dt><dd>{dateTime(detail.submittedAt)}</dd><dt>Trạng thái lệ phí</dt><dd><span className={styles.status}>{adminLabel(detail.status)}</span></dd><dt>Trạng thái cặp đấu</dt><dd>{adminLabel(detail.pairingStatus)}</dd>{detail.verifiedAt && <><dt>Đã xác nhận lúc</dt><dd>{dateTime(detail.verifiedAt)}</dd></>}{detail.rejectReason && <><dt>Lý do từ chối</dt><dd>{detail.rejectReason}</dd></>}</dl>{detail.hasProof && <button className={styles.proofButton} onClick={() => void openProof(detail)}><FiFileText /> Mở chứng từ</button>}{detail.status === 'PendingVerification' && <div className={styles.drawerActions}><button className={styles.rejectButton} onClick={() => { setRejecting(detail); setReason(''); }}><FiXCircle /> Từ chối</button><button className={styles.verifyButton} onClick={() => setConfirming(detail)}><FiCheck /> Xác nhận lệ phí</button></div>}</aside></>}
+    {confirming && <div className={styles.modalLayer}><div className={styles.modal}><h2>Xác nhận lệ phí</h2><p>Xác nhận chứng từ của <strong>{confirming.horseName}</strong>? Cặp đấu sẽ chuyển sang đã xác nhận tham gia.</p><div><button onClick={() => setConfirming(null)}>Hủy</button><button className={styles.verifyButton} disabled={actionId === confirming.paymentId} onClick={() => void verify()}>Xác nhận</button></div></div></div>}
+    {rejecting && <div className={styles.modalLayer}><div className={styles.modal}><h2>Từ chối lệ phí</h2><p>Nêu rõ lý do để chủ ngựa có thể nộp lại chứng từ.</p><textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Ít nhất 10 ký tự" rows={4} />{reason.length > 0 && reason.trim().length < 10 && <small className={styles.errorText}>Cần ít nhất 10 ký tự.</small>}<div><button onClick={() => setRejecting(null)}>Hủy</button><button className={styles.rejectButton} disabled={reason.trim().length < 10 || actionId === rejecting.paymentId} onClick={() => void reject()}>Từ chối lệ phí</button></div></div></div>}
+  </div>;
+};
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[.16em] text-blue-700">Đối chứng thanh toán</p>
-          <h1 className="mt-1 text-3xl font-black text-slate-950">Lệ phí ghép cặp</h1>
-          <p className="mt-2 text-sm text-slate-500">Kiểm tra mã giao dịch và chứng từ trước khi xác nhận cặp ngựa – Jockey.</p>
-        </div>
-        <button type="button" onClick={() => void loadPayments()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 disabled:opacity-50">
-          <FiRefreshCw className={loading ? 'animate-spin' : ''} /> Làm mới
-        </button>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {([['', 'Tất cả'], ['PendingVerification', 'Chờ đối chứng'], ['Verified', 'Đã xác nhận'], ['Rejected', 'Đã từ chối']] as const).map(([value, label]) => (
-          <button key={value || 'all'} type="button" onClick={() => setFilter(value)} className={`rounded-full border px-4 py-2 text-sm font-bold ${filter === value ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {message && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">{message}</div>}
-      {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1180px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs font-bold uppercase text-slate-500">
-              <tr>
-                <th className="px-4 py-3">Owner</th><th className="px-4 py-3">Ngựa / Jockey</th>
-                <th className="px-4 py-3">Giải đấu</th><th className="px-4 py-3">Thanh toán</th>
-                <th className="px-4 py-3">Chứng từ</th><th className="px-4 py-3">Ngày nộp</th>
-                <th className="px-4 py-3">Trạng thái</th><th className="px-4 py-3 text-right">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr><td colSpan={8} className="px-6 py-16 text-center text-slate-500">Đang tải hồ sơ lệ phí...</td></tr>
-              ) : payments.length === 0 ? (
-                <tr><td colSpan={8} className="px-6 py-16 text-center text-slate-500">Không có hồ sơ phù hợp.</td></tr>
-              ) : payments.map((payment) => {
-                const status = statusPresentation[payment.status] ?? { label: payment.status, className: 'border-slate-200 bg-slate-50 text-slate-600' }
-                const busy = actionId === payment.paymentId
-                return (
-                  <tr key={payment.paymentId} className="align-top">
-                    <td className="px-4 py-4"><p className="font-bold text-slate-900">{payment.ownerName}</p><p className="mt-1 text-xs text-slate-400">Payment #{payment.paymentId}</p></td>
-                    <td className="px-4 py-4"><p className="font-bold text-slate-900">{payment.horseName}</p><p className="mt-1 text-xs text-slate-500">Jockey: {payment.jockeyName}</p></td>
-                    <td className="px-4 py-4 text-slate-600">{payment.tournamentName}</td>
-                    <td className="px-4 py-4"><p className="font-black text-slate-900">{formatCurrency(payment.amount)}</p><p className="mt-1 text-xs text-slate-500">{payment.method === 'Transfer' ? 'Chuyển khoản' : 'Tiền mặt'} · {payment.transferRef || payment.receiptNo || '—'}</p></td>
-                    <td className="px-4 py-4">{payment.hasProof ? <button type="button" onClick={() => void downloadProof(payment)} disabled={busy} className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 disabled:opacity-50"><FiDownload /> {payment.proofFileName || 'Tải chứng từ'}</button> : <span className="text-xs text-slate-400">Không có file</span>}</td>
-                    <td className="whitespace-nowrap px-4 py-4 text-slate-600">{formatDateTime(payment.submittedAt)}</td>
-                    <td className="px-4 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${status.className}`}>{status.label}</span>{payment.rejectReason && <p className="mt-2 max-w-52 text-xs text-red-600">{payment.rejectReason}</p>}</td>
-                    <td className="px-4 py-4 text-right">{payment.status === 'PendingVerification' ? <div className="flex justify-end gap-2"><button type="button" onClick={() => void verify(payment)} disabled={busy} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"><FiCheckCircle /> Xác nhận đúng</button><button type="button" onClick={() => { setRejecting(payment); setRejectReason('') }} disabled={busy} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 disabled:opacity-50"><FiXCircle /> Từ chối</button></div> : <span className="text-xs text-slate-400">Đã xử lý</span>}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {rejecting && <><button type="button" aria-label="Đóng modal từ chối" className="fixed inset-0 z-40 bg-black/45" onClick={() => setRejecting(null)} /><div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4"><div role="dialog" aria-modal="true" aria-labelledby="reject-payment-title" className="pointer-events-auto w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"><h2 id="reject-payment-title" className="text-xl font-black text-slate-950">Từ chối chứng từ</h2><p className="mt-2 text-sm text-slate-500">Owner sẽ được phép nộp lại lệ phí trước hạn.</p><textarea value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} rows={4} className="mt-4 w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-red-400" placeholder="Nhập lý do, tối thiểu 10 ký tự" />{rejectReason.length > 0 && rejectReason.trim().length < 10 && <p className="mt-2 text-xs text-red-600">Cần ít nhất 10 ký tự.</p>}<div className="mt-5 flex justify-end gap-3"><button type="button" onClick={() => setRejecting(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold">Hủy</button><button type="button" onClick={() => void reject()} disabled={rejectReason.trim().length < 10 || actionId !== null} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Xác nhận từ chối</button></div></div></div></>}
-    </div>
-  )
-}
+export default EntryFees;

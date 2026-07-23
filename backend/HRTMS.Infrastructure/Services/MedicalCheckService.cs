@@ -433,6 +433,106 @@ public class MedicalCheckService : IMedicalCheckService
                 : "Horse is fit for racing."
         };
     }
+    // =====================================================================
+    // Doctor kham lam sang lai SAU tran (ca ngua + nai) — buoc bat buoc truoc
+    // khi Admin Declare Official. Chi cho phep sau khi Referee da bam
+    // "Ket thuc tran" va submit finish results (Race.Status == "Unofficial"),
+    // dam bao trinh tu: bat dau tran -> ket thuc tran -> co ket qua so bo ->
+    // doctor kham lai -> admin xem + cong bo chinh thuc.
+    // =====================================================================
+    public async Task<PostRaceClinicalCheckResultDto> RecordPostRaceClinicalCheckAsync(
+        int doctorId,
+        int raceEntryId,
+        RecordPostRaceClinicalCheckDto dto)
+    {
+        var doctor = await ValidateDoctorAsync(doctorId);
+
+        var raceEntry = await _context.RaceEntries
+            .Include(e => e.Race)
+            .Include(e => e.Pairing)
+                .ThenInclude(p => p.Horse)
+            .Include(e => e.Pairing)
+                .ThenInclude(p => p.Jockey)
+                    .ThenInclude(j => j.Jockey)
+            .FirstOrDefaultAsync(e => e.RaceEntryId == raceEntryId);
+
+        if (raceEntry == null)
+            throw new KeyNotFoundException("RACE_ENTRY_NOT_FOUND");
+
+        var doctorAssigned = await _context.DoctorAssignments
+            .AnyAsync(a => a.RaceId == raceEntry.RaceId && a.DoctorId == doctorId);
+        if (!doctorAssigned)
+            throw new InvalidOperationException("DOCTOR_NOT_ASSIGNED_TO_RACE");
+
+        // DNF/Cancelled/Disqualified khong can kham lai sau tran — dung khong
+        // hoan tat cuoc dua hoac da bi loai truoc do.
+        if (raceEntry.Status == "Cancelled" || raceEntry.Status == "Disqualified" || raceEntry.IsWithdrawn)
+            throw new InvalidOperationException("RACE_ENTRY_NOT_ELIGIBLE");
+
+        // Chi cho kham lai SAU khi Referee da submit ket qua so bo (Live -> Unofficial).
+        // Khong cho kham khi con dang Live (chua co ket qua) hay da Official (da khoa).
+        if (raceEntry.Race.Status != "Unofficial")
+            throw new InvalidOperationException("RACE_NOT_UNOFFICIAL");
+
+        if (dto.PostRaceClinicalStatus == "Unfit" && string.IsNullOrWhiteSpace(dto.UnfitReason))
+            throw new InvalidOperationException("UNFIT_REASON_REQUIRED");
+
+        if (dto.PostRaceClinicalStatus == "Unfit" && dto.UnfitReason!.Trim().Length < 20)
+            throw new InvalidOperationException("UNFIT_REASON_TOO_SHORT");
+
+        var now = DateTime.UtcNow;
+
+        raceEntry.PostRaceClinicalStatus = dto.PostRaceClinicalStatus;
+        raceEntry.PostRaceClinicalCheckedByDoctorId = doctorId;
+        raceEntry.PostRaceClinicalCheckedAt = now;
+        raceEntry.PostRaceUnfitReason = dto.PostRaceClinicalStatus == "Unfit"
+            ? dto.UnfitReason!.Trim()
+            : null;
+        raceEntry.UpdatedAt = now;
+
+        var isUnfit = dto.PostRaceClinicalStatus == "Unfit";
+
+        await _context.SaveChangesAsync();
+
+        await _auditLog.LogAsync(
+            actorId: doctorId,
+            action: "Record_Post_Race_Clinical_Check",
+            entityName: "RaceEntry",
+            entityId: raceEntry.RaceEntryId.ToString(),
+            newValue: $"PostRaceClinicalStatus={dto.PostRaceClinicalStatus}, UnfitReason={raceEntry.PostRaceUnfitReason ?? "N/A"}");
+
+        // Unfit sau tran van kich hoat DQ khan cap giong nhu truoc tran —
+        // ket qua so bo cua entry nay se khong duoc tinh khi Admin Declare
+        // Official (SettlePredictionsAsync/AllocatePurse deu loai Disqualified).
+        if (isUnfit)
+        {
+            await _emergencyDisqualificationService.DisqualifyAsync(
+                doctorId,
+                raceEntry.RaceEntryId,
+                raceEntry.PostRaceUnfitReason ?? "Unfit after race (post-race clinical check).",
+                "MED.POST_RACE_CLINICAL_CHECK");
+        }
+
+        await _context.SaveChangesAsync();
+
+        return new PostRaceClinicalCheckResultDto
+        {
+            RaceEntryId = raceEntry.RaceEntryId,
+            RaceId = raceEntry.RaceId,
+            DoctorId = doctorId,
+            DoctorName = doctor.Doctor.FullName,
+            HorseName = raceEntry.Pairing.Horse.Name,
+            JockeyName = raceEntry.Pairing.Jockey.Jockey.FullName,
+            PostRaceClinicalStatus = dto.PostRaceClinicalStatus,
+            UnfitReason = raceEntry.PostRaceUnfitReason,
+            IsEmergencyDisqualified = isUnfit,
+            RaceEntryStatus = raceEntry.Status,
+            Message = isUnfit
+                ? "Horse/Jockey unfit after race. Race entry has been disqualified."
+                : "Horse and jockey are confirmed fit after the race."
+        };
+    }
+
     public async Task<List<MedicalCheckListDto>> GetRaceEntriesAsync(
     int doctorId,
     int raceId)
@@ -453,6 +553,7 @@ public class MedicalCheckService : IMedicalCheckService
 
         var entries = await _context.RaceEntries
             .Where(x => x.RaceId == raceId)
+            .Include(x => x.Race)
             .Include(x => x.Pairing)
                 .ThenInclude(p => p.Horse)
                     .ThenInclude(h => h.Owner)
@@ -486,7 +587,12 @@ public class MedicalCheckService : IMedicalCheckService
                     x.HorseIdentityCheckStatus ?? "Pending",
 
                 ClinicalStatus =
-                    x.ClinicalStatus ?? "Pending"
+                    x.ClinicalStatus ?? "Pending",
+
+                RaceStatus = x.Race.Status,
+
+                PostRaceClinicalStatus =
+                    x.PostRaceClinicalStatus ?? "Pending"
             })
             .ToListAsync();
 
@@ -515,6 +621,8 @@ public class MedicalCheckService : IMedicalCheckService
             .Include(e => e.HorseIdentityCheckedByDoctor)
                 .ThenInclude(d => d!.Doctor)
             .Include(e => e.ClinicalCheckedByDoctor)
+                .ThenInclude(d => d!.Doctor)
+            .Include(e => e.PostRaceClinicalCheckedByDoctor)
                 .ThenInclude(d => d!.Doctor)
             .FirstOrDefaultAsync(e => e.RaceEntryId == raceEntryId);
 
@@ -588,7 +696,13 @@ public class MedicalCheckService : IMedicalCheckService
             ClinicalCheckedByDoctorId = raceEntry.ClinicalCheckedByDoctorId,
             ClinicalCheckedByDoctorName = raceEntry.ClinicalCheckedByDoctor?.Doctor.FullName,
             ClinicalCheckedAt = raceEntry.ClinicalCheckedAt,
-            UnfitReason = raceEntry.UnfitReason
+            UnfitReason = raceEntry.UnfitReason,
+
+            PostRaceClinicalStatus = raceEntry.PostRaceClinicalStatus,
+            PostRaceClinicalCheckedByDoctorId = raceEntry.PostRaceClinicalCheckedByDoctorId,
+            PostRaceClinicalCheckedByDoctorName = raceEntry.PostRaceClinicalCheckedByDoctor?.Doctor.FullName,
+            PostRaceClinicalCheckedAt = raceEntry.PostRaceClinicalCheckedAt,
+            PostRaceUnfitReason = raceEntry.PostRaceUnfitReason
         };
     }
 }

@@ -26,7 +26,7 @@ const AdminLayout = () => {
   const [loggingOut, setLoggingOut] = useState(false);
 
   const currentUser = {
-    name: user?.fullName || 'Admin Workspace',
+    name: user?.fullName || 'Quản trị viên',
     role: user?.role || 'Admin',
   };
 
@@ -68,7 +68,7 @@ const AdminLayout = () => {
             type="button"
             className={styles.hamburgerBtn}
             onClick={() => setMobileOpen((v) => !v)}
-            aria-label="Toggle sidebar"
+            aria-label="Mở hoặc đóng thanh điều hướng"
           >
             {mobileOpen ? <FiX size={20} /> : <FiMenu size={20} />}
           </button>
@@ -77,13 +77,11 @@ const AdminLayout = () => {
             <div className={styles.logoIconSmall}>H</div>
             <div className={styles.logoTextBlock}>
               <span className={styles.logo}>HRTMS</span>
-              <span className={styles.logoCaption}>Admin Workspace</span>
             </div>
           </div>
 
           <div className={styles.workspaceLabel}>
-            <span className={styles.workspaceEyebrow}>WORKSPACE</span>
-            <span className={styles.workspaceName}>Admin Workspace</span>
+            <span className={styles.workspaceName}>Không gian quản trị</span>
           </div>
 
           <div className={styles.searchWrap}>
@@ -91,20 +89,20 @@ const AdminLayout = () => {
             <input
               type="text"
               className={styles.searchInput}
-              placeholder="Search tournaments, horses, users"
+              placeholder="Tìm giải đấu, ngựa, người dùng"
             />
           </div>
         </div>
 
         <div className={styles.topbarRight}>
-          <button type="button" className={styles.iconBtn} aria-label="Notifications" onClick={() => navigate('/admin/notifications')}>
+          <button type="button" className={styles.iconBtn} aria-label="Thông báo" onClick={() => navigate('/admin/notifications')}>
             <FiBell size={18} />
             {unreadNotifications > 0 && (
               <span className={styles.badge}>{unreadNotifications}</span>
             )}
           </button>
 
-          <button type="button" className={styles.iconBtn} aria-label="Help">
+          <button type="button" className={styles.iconBtn} aria-label="Trợ giúp">
             <FiHelpCircle size={18} />
           </button>
 
@@ -136,13 +134,13 @@ const AdminLayout = () => {
                   disabled={loggingOut}
                 >
                   <FiLogOut size={15} />
-                  {loggingOut ? 'Đang đăng xuất...' : 'Logout'}
+                  {loggingOut ? 'Đang đăng xuất...' : 'Đăng xuất'}
                 </button>
               </div>
             )}
           </div>
 
-          <button type="button" className={styles.logoutBtn} onClick={handleLogout} aria-label="Logout" disabled={loggingOut}>
+          <button type="button" className={styles.logoutBtn} onClick={handleLogout} aria-label="Đăng xuất" disabled={loggingOut}>
             <FiLogOut size={18} />
           </button>
         </div>
@@ -151,7 +149,7 @@ const AdminLayout = () => {
       {/* ═══ BODY ═════════════════════════════════════════════ */}
       <div className={styles.body}>
         <div className={styles.sidebarDesktop}>
-          <AdminSidebar collapsed={sidebarCollapsed} />
+          <AdminSidebar collapsed={sidebarCollapsed} onToggleCollapse={() => setSidebarCollapsed((value) => !value)} />
         </div>
 
         {mobileOpen && (
@@ -165,15 +163,6 @@ const AdminLayout = () => {
             </div>
           </>
         )}
-
-        <button
-          type="button"
-          className={styles.collapseToggle}
-          onClick={() => setSidebarCollapsed((v) => !v)}
-          aria-label="Toggle sidebar width"
-        >
-          {sidebarCollapsed ? '›' : '‹'}
-        </button>
 
         <main className={styles.content}>
           <Outlet />

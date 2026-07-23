@@ -23,10 +23,14 @@ namespace HRTMS.Core.DTOs.Result
         public bool RankingIntegrityValid { get; set; }
         public bool PostRaceWeighInComplete { get; set; }
 
+        // Doctor đã khám lâm sàng lại (ngựa + nài) sau trận (patch 015)
+        public bool PostRaceClinicalCheckComplete { get; set; }
+
         public bool CanDeclareOfficial =>
             HasRaceReport && !IsRaceReportLocked &&
             PrizeDistributionsConfigured &&
-            RankingIntegrityValid && PostRaceWeighInComplete;
+            RankingIntegrityValid && PostRaceWeighInComplete &&
+            PostRaceClinicalCheckComplete;
     }
 
     // ===========================================================================

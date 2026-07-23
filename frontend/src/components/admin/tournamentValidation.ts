@@ -86,6 +86,10 @@ export const validateBasicInfo = (
       'Tên giải đấu không được vượt quá 200 ký tự.';
   }
 
+  if (data.description.length > 4000) {
+    errors.description = 'Mô tả giải đấu không được vượt quá 4.000 ký tự.';
+  }
+
   if (!data.startDate) {
     errors.startDate = 'Vui lòng chọn ngày bắt đầu.';
   } else if (
@@ -100,10 +104,14 @@ export const validateBasicInfo = (
     errors.endDate = 'Vui lòng chọn ngày kết thúc.';
   } else if (
     data.startDate &&
-    data.endDate <= data.startDate
+    data.endDate < data.startDate
   ) {
     errors.endDate =
-      'Ngày kết thúc phải sau ngày bắt đầu.';
+      'Ngày kết thúc không được trước ngày bắt đầu.';
+  }
+
+  if (data.venueId === '') {
+    errors.venueId = 'Vui lòng chọn trường đua.';
   }
 
   if (!data.allowedBreed) {
@@ -161,6 +169,14 @@ export const validateBasicInfo = (
       'Số ngựa tối đa phải là số nguyên lớn hơn 0.';
   }
 
+  if (
+    typeof data.maxHorses === 'number' &&
+    data.venueLaneCount !== null &&
+    data.maxHorses > data.venueLaneCount
+  ) {
+    errors.maxHorses = `Số ngựa tối đa không được vượt quá ${data.venueLaneCount} làn xuất phát của trường đua.`;
+  }
+
   if (data.minJockeyExperienceYears === '') {
     errors.minJockeyExperienceYears =
       'Vui lòng nhập số năm kinh nghiệm tối thiểu.';
@@ -186,6 +202,34 @@ export const validateBasicInfo = (
   if (data.entryFeeAmount < 0) {
     errors.entryFeeAmount =
       'Lệ phí tham gia không được âm.';
+  }
+
+  if (!data.paymentDeadline) {
+    errors.paymentDeadline = 'Vui lòng đặt hạn nộp lệ phí.';
+  } else {
+    const payment = new Date(data.paymentDeadline);
+    const start = data.startDate ? new Date(`${data.startDate}T00:00`) : null;
+    const latest = start ? new Date(start.getTime() - 24 * 60 * 60 * 1000) : null;
+    if (Number.isNaN(payment.getTime()) || (isCreateMode && payment <= new Date()) || (latest && payment > latest)) {
+      errors.paymentDeadline = 'Hạn nộp lệ phí phải sau hiện tại và trước ngày khai mạc ít nhất 24 giờ.';
+    }
+  }
+
+  if (data.entryFeeAmount === 0 && data.refundDeadline) {
+    errors.refundDeadline = 'Giải miễn phí không có lệ phí để hoàn.';
+  } else if (data.entryFeeAmount > 0 && data.refundDeadline) {
+    const refund = new Date(data.refundDeadline);
+    const payment = data.paymentDeadline ? new Date(data.paymentDeadline) : null;
+    const start = data.startDate ? new Date(`${data.startDate}T23:59`) : null;
+    if (Number.isNaN(refund.getTime()) || (payment && refund < payment) || (start && refund > start)) {
+      errors.refundDeadline = 'Hạn hoàn lệ phí phải nằm từ hạn nộp phí đến ngày khai mạc.';
+    }
+  }
+
+  if (data.advancementCount === '') {
+    errors.advancementCount = 'Vui lòng nhập số cặp được vào vòng tiếp theo.';
+  } else if (!Number.isInteger(data.advancementCount) || data.advancementCount < 1) {
+    errors.advancementCount = 'Số cặp được vào vòng tiếp theo phải là số nguyên lớn hơn 0.';
   }
 
   if (data.preRaceWeightThresholdKg <= 0) {
@@ -353,7 +397,7 @@ export const validateRounds = (
         raceNumbers.has(race.raceNumber)
       ) {
         structureErrors.push(
-          `Race #${race.raceNumber} bị trùng trong ${roundLabel}.`
+          `Cuộc đua #${race.raceNumber} bị trùng trong ${roundLabel}.`
         );
       }
 
@@ -459,7 +503,7 @@ export const validateRounds = (
       basicInfo.purseAmount
   ) {
     structureErrors.push(
-      `Tổng quỹ thưởng các Race (${totalRacePurse.toLocaleString(
+      `Tổng quỹ thưởng các cuộc đua (${totalRacePurse.toLocaleString(
         'vi-VN'
       )} VNĐ) vượt quỹ toàn giải (${basicInfo.purseAmount.toLocaleString(
         'vi-VN'

@@ -23,6 +23,12 @@ export interface RaceResponse {
   isPostPositionDrawn: boolean;
   confirmationCutoffHours: number;
   protestDeadlineMinutes: number;
+  venueName?: string | null;
+  venueCity?: string | null;
+  venueTrackType?: string | null;
+  laneCount?: number | null;
+  trackLengthMeters?: number | null;
+  raceCapacity?: number | null;
 }
 
 export interface RoundResponse {
@@ -58,6 +64,14 @@ export interface TournamentResponse {
   preRaceWeightThresholdKg: number;
   postRaceWeightDiffThresholdKg: number;
   status: string;
+  venueId: number | null;
+  venueName: string | null;
+  venueCity: string | null;
+  laneCount: number | null;
+  trackLengthMeters: number | null;
+  raceCapacity: number | null;
+  advancementRule: string;
+  advancementCount: number;
   createdAt: string;
   rounds: RoundResponse[];
   prizeDistributions: PrizeDistributionResponse[];
@@ -71,6 +85,7 @@ export interface CreateTournamentPayload {
   startDate: string;
   endDate: string;
   maxHorses?: number;
+  venueId?: number;
   allowedBreed: string;
   trackType: string;
   raceDistance?: number;
@@ -78,8 +93,13 @@ export interface CreateTournamentPayload {
   minJockeyExperienceYears?: number;
   purseAmount?: number;
   entryFeeAmount?: number;
+  paymentDeadline?: string;
+  refundDeadline?: string | null;
+  clearRefundDeadline?: boolean;
   preRaceWeightThresholdKg?: number;
   postRaceWeightDiffThresholdKg?: number;
+  advancementRule?: string;
+  advancementCount?: number;
 }
 
 // ─── API calls ──────────────────────────────────────────────────────────────
