@@ -57,6 +57,50 @@ public class EmergencyDisqualificationService : IEmergencyDisqualificationServic
             raceEntry.Status = "Disqualified";
             raceEntry.UpdatedAt = now;
 
+            // 1b. Neu entry bi DQ ma DA CO FinishPosition (tuc bi loai SAU khi
+            // da co ket qua so bo — vd Doctor kham lai sau tran phat hien
+            // Unfit), phai xep lai thu hang cac entry con lai cho lien mach.
+            // Neu khong, ResultService.IsRankingIntegrityValid se thay thu
+            // hang bi "nhay coc" (vd con 1,3,4 do thieu hang 2) va chan Admin
+            // Declare Official vinh vien vi khong ai tu dong sua lai.
+            if (raceEntry.FinishPosition.HasValue)
+            {
+                var dnfEntryIds = await _context.Violations
+                    .Where(v => v.RaceReport.RaceId == raceEntry.RaceId &&
+                                v.ViolationCode == "DNF-001" && v.Penalty == "Scratch")
+                    .Select(v => v.RaceEntryId)
+                    .ToListAsync();
+
+                // Cac entry con lai, hop le, dang co thu hang — sap theo thu
+                // hang CU de giu dung thu tu tuong doi truoc khi dong hang.
+                var remainingRanked = await _context.RaceEntries
+                    .Where(e => e.RaceId == raceEntry.RaceId &&
+                                e.RaceEntryId != raceEntry.RaceEntryId &&
+                                e.Status != "Cancelled" && e.Status != "Disqualified" &&
+                                e.FinishPosition != null &&
+                                !dnfEntryIds.Contains(e.RaceEntryId))
+                    .OrderBy(e => e.FinishPosition)
+                    .ToListAsync();
+
+                // Entry bi DQ khong con thu hang.
+                raceEntry.FinishPosition = null;
+
+                // Dong hang theo standard competition ranking (1,1,3 — cho phep
+                // dong hang nhung khong nhay coc), giu nguyen nhom dong hang cu.
+                var newPosition = 1;
+                foreach (var group in remainingRanked
+                    .GroupBy(e => e.FinishPosition!.Value)
+                    .OrderBy(g => g.Key))
+                {
+                    foreach (var e in group)
+                    {
+                        e.FinishPosition = newPosition;
+                        e.UpdatedAt = now;
+                    }
+                    newPosition += group.Count();
+                }
+            }
+
             // 2. Refund cac prediction dang Pending cua RaceEntry nay
             var pendingPredictions = await _context.Predictions
                 .Where(p =>
