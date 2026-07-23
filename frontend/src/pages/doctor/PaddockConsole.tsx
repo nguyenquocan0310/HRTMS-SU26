@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   getDoctorRaceEntries,
   getMyDoctorRaceAssignments,
   getRaceEntryHealthProfile,
   updateClinicalCheck,
   updateHorseIdentity,
+  updatePostRaceClinicalCheck,
   updatePostRaceWeight,
   updatePreRaceWeight,
   type DoctorRaceAssignment,
@@ -19,7 +20,7 @@ import {
   parseWeightValue,
 } from '../../utils/paddockWeight'
 
-type ActiveTab = 'weigh-in' | 'vet-check' | 'weigh-out'
+type ActiveTab = 'weigh-in' | 'vet-check' | 'weigh-out' | 'post-race-clinical'
 type IdentityStatus = 'Matched' | 'Mismatch'
 type ClinicalStatus = 'Fit' | 'Unfit'
 
@@ -30,6 +31,12 @@ const getFriendlyError = (err: unknown) => {
   const raw = err instanceof Error ? err.message : 'Không thể xử lý thao tác. Vui lòng thử lại.'
   if (raw.includes('RACE_ENTRY_NOT_ELIGIBLE') || raw.toLowerCase().includes('not eligible')) {
     return 'Race entry này đã bị hủy/rút/loại nên không thể cập nhật kiểm tra.'
+  }
+  if (raw.includes('RACE_NOT_UNOFFICIAL') || raw.toLowerCase().includes('race is unofficial')) {
+    return 'Chỉ được khám lại sau khi Referee kết thúc cuộc đua và race chuyển sang Unofficial.'
+  }
+  if (raw.includes('UNFIT_REASON_REQUIRED') || raw.includes('UNFIT_REASON_TOO_SHORT')) {
+    return 'Lý do Unfit phải có ít nhất 20 ký tự.'
   }
   return raw
 }
@@ -157,8 +164,50 @@ function VetCheckResultBadges({ entry }: { entry: DoctorRaceEntry }) {
   )
 }
 
+function PostRaceClinicalBadge({ entry }: { entry: DoctorRaceEntry }) {
+  const status = entry.postRaceClinicalStatus?.trim()
+  const className = status === 'Unfit'
+    ? 'border-red-200 bg-red-50 text-red-700'
+    : status === 'Fit'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+      : 'border-gray-200 bg-gray-50 text-gray-500'
+
+  return (
+    <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${className}`}>
+      {status === 'Fit' ? 'Fit' : status === 'Unfit' ? 'Unfit · Đã loại' : 'Pending'}
+    </span>
+  )
+}
+
+function RaceStatusBadge({ status }: { status?: string | null }) {
+  const value = status?.trim() || 'Chưa xác định'
+  const normalized = value.toLowerCase()
+  const className = normalized === 'live'
+    ? 'border-red-200 bg-red-50 text-red-700'
+    : normalized === 'unofficial'
+      ? 'border-amber-200 bg-amber-50 text-amber-700'
+      : normalized === 'official'
+        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+        : normalized === 'pre-race'
+          ? 'border-blue-200 bg-blue-50 text-blue-700'
+          : normalized === 'cancelled'
+            ? 'border-red-200 bg-red-50 text-red-700'
+            : 'border-gray-200 bg-gray-50 text-gray-600'
+
+  return (
+    <span
+      data-race-status={normalized}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold ${className}`}
+    >
+      {normalized === 'live' && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />}
+      {value}
+    </span>
+  )
+}
+
 export default function PaddockConsole() {
   const location = useLocation()
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<ActiveTab>('weigh-in')
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
@@ -168,7 +217,9 @@ export default function PaddockConsole() {
   const hasValidRaceId = typeof selectedRaceId === 'number' && Number.isFinite(selectedRaceId)
 
   const [selectedRace, setSelectedRace] = useState<DoctorRaceAssignment | null>(null)
+  const [assignments, setAssignments] = useState<DoctorRaceAssignment[]>([])
   const [raceLoading, setRaceLoading] = useState(false)
+  const [raceError, setRaceError] = useState<string | null>(null)
 
   const [entries, setEntries] = useState<DoctorRaceEntry[]>([])
   const [entriesLoading, setEntriesLoading] = useState(false)
@@ -179,6 +230,8 @@ export default function PaddockConsole() {
   const [identityInputs, setIdentityInputs] = useState<Record<number, IdentityStatus>>({})
   const [clinicalInputs, setClinicalInputs] = useState<Record<number, ClinicalStatus>>({})
   const [unfitReasons, setUnfitReasons] = useState<Record<number, string>>({})
+  const [postClinicalInputs, setPostClinicalInputs] = useState<Record<number, ClinicalStatus>>({})
+  const [postRaceUnfitReasons, setPostRaceUnfitReasons] = useState<Record<number, string>>({})
   const [savingKey, setSavingKey] = useState<string | null>(null)
   const [healthEntryId, setHealthEntryId] = useState<number | null>(null)
   const [healthProfile, setHealthProfile] = useState<RaceEntryHealthProfile | null>(null)
@@ -192,20 +245,39 @@ export default function PaddockConsole() {
 
   useEffect(() => {
     const loadId = window.setTimeout(() => {
-      if (!hasValidRaceId || selectedRaceId === null) {
-        setSelectedRace(null)
-        return
-      }
-
       setRaceLoading(true)
+      setRaceError(null)
       getMyDoctorRaceAssignments()
         .then((list) => {
-          setSelectedRace(list.find((race) => race.raceId === selectedRaceId) ?? null)
+          setAssignments(list)
+          setSelectedRace(
+            hasValidRaceId && selectedRaceId !== null
+              ? list.find((race) => race.raceId === selectedRaceId) ?? null
+              : null
+          )
         })
-        .catch(() => setSelectedRace(null))
+        .catch((error) => {
+          setAssignments([])
+          setSelectedRace(null)
+          setRaceError(getFriendlyError(error))
+        })
         .finally(() => setRaceLoading(false))
     }, 0)
     return () => window.clearTimeout(loadId)
+  }, [hasValidRaceId, selectedRaceId])
+
+  useEffect(() => {
+    if (!hasValidRaceId || selectedRaceId === null) return
+    const refreshRaceStatus = () => {
+      void getMyDoctorRaceAssignments()
+        .then((list) => {
+          const current = list.find((race) => race.raceId === selectedRaceId)
+          if (current) setSelectedRace(current)
+        })
+        .catch(() => undefined)
+    }
+    const intervalId = window.setInterval(refreshRaceStatus, 5000)
+    return () => window.clearInterval(intervalId)
   }, [hasValidRaceId, selectedRaceId])
 
   useEffect(() => {
@@ -256,6 +328,19 @@ export default function PaddockConsole() {
         setUnfitReasons(
           Object.fromEntries(data.map((entry) => [entry.raceEntryId, entry.unfitReason ?? '']))
         )
+        setPostClinicalInputs(
+          Object.fromEntries(
+            data.map((entry) => [
+              entry.raceEntryId,
+              entry.postRaceClinicalStatus === 'Unfit' ? 'Unfit' : 'Fit',
+            ])
+          )
+        )
+        setPostRaceUnfitReasons(
+          Object.fromEntries(
+            data.map((entry) => [entry.raceEntryId, entry.postRaceUnfitReason ?? ''])
+          )
+        )
         })
         .catch((err) => {
           setEntries([])
@@ -288,6 +373,9 @@ export default function PaddockConsole() {
   }, [entries])
   const preRaceWritable = !selectedRace || ['Upcoming', 'Sắp diễn ra'].includes(selectedRace.raceStatus)
   const postRaceWritable = !selectedRace || ['Live', 'Active', 'Running', 'InProgress', 'Đang diễn ra'].includes(selectedRace.raceStatus)
+  const currentRaceStatus =
+    selectedRace?.raceStatus ?? entries.find((entry) => entry.raceStatus)?.raceStatus ?? null
+  const postRaceClinicalWritable = currentRaceStatus?.toLowerCase() === 'unofficial'
 
   const updateEntry = (raceEntryId: number, patch: Partial<DoctorRaceEntry>) => {
     setEntries((prev) =>
@@ -444,6 +532,56 @@ export default function PaddockConsole() {
     }
   }
 
+  const handlePostRaceClinicalConfirm = async (entry: DoctorRaceEntry) => {
+    if (!postRaceClinicalWritable) {
+      showToast('Chỉ được khám lại sau trận khi race đang ở trạng thái Unofficial.')
+      return
+    }
+    if (!isEntryEligible(entry)) {
+      showToast('Race entry này đã bị loại nên không thuộc diện khám lại sau trận.')
+      return
+    }
+
+    const postRaceClinicalStatus = postClinicalInputs[entry.raceEntryId] ?? 'Fit'
+    const unfitReason = postRaceUnfitReasons[entry.raceEntryId]?.trim() ?? ''
+    if (postRaceClinicalStatus === 'Unfit' && unfitReason.length < 20) {
+      showToast('Lý do Unfit phải có ít nhất 20 ký tự.')
+      return
+    }
+    if (
+      postRaceClinicalStatus === 'Unfit' &&
+      !window.confirm('Kết quả Unfit sẽ khiến backend loại race entry này. Bạn muốn tiếp tục?')
+    ) {
+      return
+    }
+
+    const key = `post-clinical-${entry.raceEntryId}`
+    setSavingKey(key)
+    try {
+      const response = await updatePostRaceClinicalCheck(
+        entry.raceEntryId,
+        postRaceClinicalStatus,
+        postRaceClinicalStatus === 'Unfit' ? unfitReason : null
+      )
+      updateEntry(entry.raceEntryId, {
+        postRaceClinicalStatus: response.postRaceClinicalStatus,
+        postRaceUnfitReason: response.unfitReason,
+        isEmergencyDisqualified: response.isEmergencyDisqualified,
+        raceEntryStatus: response.raceEntryStatus,
+        message: response.message,
+      })
+      setPostRaceUnfitReasons((current) => ({
+        ...current,
+        [entry.raceEntryId]: response.unfitReason ?? '',
+      }))
+      showToast(response.message || `Đã lưu kết quả khám sau đua cho ${entry.horseName}.`)
+    } catch (error) {
+      showToast(getFriendlyError(error))
+    } finally {
+      setSavingKey(null)
+    }
+  }
+
   const renderEntriesState = () => {
     if (entriesLoading) {
       return (
@@ -476,6 +614,82 @@ export default function PaddockConsole() {
 
   const stateBlock = renderEntriesState()
 
+  if (!hasValidRaceId) {
+    return (
+      <div className="mx-auto max-w-6xl space-y-6">
+        <div className="flex flex-col gap-4 border-b border-gray-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Bàn điều khiển Paddock</h1>
+            <p className="mt-1 text-sm text-gray-500">Chọn một cuộc đua được phân công để thực hiện kiểm tra y tế.</p>
+          </div>
+          <div className="self-start rounded-md border border-blue-100 bg-blue-50 px-3 py-1.5 sm:self-center">
+            <span className="text-xs font-bold uppercase tracking-wider text-blue-700">Doctor Paddock</span>
+          </div>
+        </div>
+
+        <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="border-b border-gray-100 px-5 py-4">
+            <h2 className="font-bold text-gray-900">Cuộc đua được phân công</h2>
+            <p className="mt-1 text-xs text-gray-500">Trạng thái được lấy từ backend và tự cập nhật khi mở bàn điều khiển.</p>
+          </div>
+          {raceLoading ? (
+            <div className="flex items-center justify-center px-5 py-14 text-sm text-gray-500">
+              <span className="mr-3 h-5 w-5 animate-spin rounded-full border-b-2 border-blue-600" />
+              Đang tải danh sách cuộc đua...
+            </div>
+          ) : raceError ? (
+            <div className="px-5 py-8">
+              <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{raceError}</p>
+            </div>
+          ) : assignments.length === 0 ? (
+            <div className="px-5 py-14 text-center">
+              <p className="font-bold text-gray-700">Chưa có cuộc đua được phân công.</p>
+              <p className="mt-1 text-sm text-gray-500">Khi Admin phân công, cuộc đua sẽ xuất hiện tại đây.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-left text-sm">
+                <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                  <tr>
+                    <th className="px-5 py-3">Giải đấu / vòng</th>
+                    <th className="px-5 py-3">Race</th>
+                    <th className="px-5 py-3">Thời gian</th>
+                    <th className="px-5 py-3">Trạng thái</th>
+                    <th className="px-5 py-3 text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {assignments.map((race) => (
+                    <tr key={`${race.raceId}-${race.assignedAt}`}>
+                      <td className="px-5 py-4">
+                        <p className="font-bold text-gray-900">{race.tournamentName}</p>
+                        <p className="mt-1 text-xs text-gray-500">{race.roundName}</p>
+                      </td>
+                      <td className="px-5 py-4 font-mono font-bold">#{race.raceNumber}</td>
+                      <td className="whitespace-nowrap px-5 py-4 text-gray-600">
+                        {new Date(race.scheduledTime).toLocaleString('vi-VN')}
+                      </td>
+                      <td className="px-5 py-4"><RaceStatusBadge status={race.raceStatus} /></td>
+                      <td className="px-5 py-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/doctor/paddock?raceId=${race.raceId}`)}
+                          className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
+                        >
+                          Mở Race #{race.raceNumber}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       {toastMessage && (
@@ -498,6 +712,9 @@ export default function PaddockConsole() {
                 {selectedRace.roundName}
                 {' — '}
                 <span className="font-mono font-bold text-blue-700">Race #{selectedRace.raceNumber}</span>
+                <span className="ml-2 inline-flex align-middle">
+                  <RaceStatusBadge status={currentRaceStatus} />
+                </span>
               </p>
               <p className="text-xs text-gray-400">
                 {new Date(selectedRace.scheduledTime).toLocaleString('vi-VN', {
@@ -554,6 +771,21 @@ export default function PaddockConsole() {
           }`}
         >
           Cân nặng sau đua (Weigh-Out)
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('post-race-clinical')}
+          disabled={!postRaceClinicalWritable}
+          title={postRaceClinicalWritable ? 'Mở khám lâm sàng sau trận' : 'Chỉ mở khi race chuyển sang Unofficial'}
+          className={`min-w-56 flex-1 rounded-lg px-3 py-2.5 text-center text-sm font-semibold transition-all ${
+            activeTab === 'post-race-clinical'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : postRaceClinicalWritable
+                ? 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                : 'cursor-not-allowed bg-gray-50 text-gray-400'
+          }`}
+        >
+          {postRaceClinicalWritable ? 'Khám lại sau trận' : 'Khám lại sau trận · Chờ Unofficial'}
         </button>
       </div>
 
@@ -822,7 +1054,10 @@ export default function PaddockConsole() {
           <div className="space-y-4 p-4 sm:p-6">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h2 className="text-sm font-bold text-gray-900">Cân nặng sau đua (Weigh-Out)</h2>
-              <span className="text-xs text-gray-400">Chỉ ghi nhận khi cuộc đua đang Live</span>
+              <div className="text-right text-xs">
+                <p className="text-gray-500">Chỉ ghi nhận khi cuộc đua đang Live</p>
+                <p className="mt-1 font-semibold text-blue-700">Cân đủ entry → Referee kết thúc race → mở khám lại sau trận</p>
+              </div>
             </div>
             {!postRaceWritable && (
               <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -896,6 +1131,124 @@ export default function PaddockConsole() {
                         </td>
                       </tr>
                     )})}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'post-race-clinical' && (
+          <div className="space-y-4 p-4 sm:p-6">
+            <div className="flex flex-col gap-2 border-b border-gray-100 pb-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-gray-900">Khám lâm sàng lại sau trận</h2>
+                <p className="mt-1 text-xs text-gray-500">Doctor xác nhận tình trạng của cả ngựa và nài trước khi Admin công bố Official.</p>
+              </div>
+              <span className="text-xs font-bold text-gray-500">Race: {currentRaceStatus ?? 'Chưa xác định'}</span>
+            </div>
+
+            {!postRaceClinicalWritable && (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Form chỉ được mở để lưu khi Referee đã kết thúc cuộc đua và race ở trạng thái Unofficial.
+              </p>
+            )}
+
+            {stateBlock ?? (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px] text-left text-sm text-gray-700">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/50 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                      <th className="px-4 py-3">GATE</th>
+                      <th className="px-4 py-3">Ngựa / Nài</th>
+                      <th className="px-4 py-3">Kết luận sau trận</th>
+                      <th className="px-4 py-3">Lý do Unfit</th>
+                      <th className="px-4 py-3">Đã ghi nhận</th>
+                      <th className="px-4 py-3 text-right">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {entries.map((entry) => {
+                      const key = `post-clinical-${entry.raceEntryId}`
+                      const status = postClinicalInputs[entry.raceEntryId] ?? 'Fit'
+                      const reason = postRaceUnfitReasons[entry.raceEntryId] ?? ''
+                      const eligible = isEntryEligible(entry)
+                      return (
+                        <tr key={entry.raceEntryId} className={eligible ? 'hover:bg-gray-50/30' : 'bg-gray-50/60'}>
+                          <td className="px-4 py-4 font-mono text-xs font-bold text-gray-500">{entry.postPosition ?? '—'}</td>
+                          <td className="px-4 py-4">
+                            <p className="font-semibold text-gray-900">{entry.horseName}</p>
+                            <p className="mt-0.5 text-xs text-gray-500">{entry.jockeyName}</p>
+                          </td>
+                          <td className="px-4 py-4">
+                            <select
+                              aria-label={`Kết luận sau trận ${entry.horseName}`}
+                              value={status}
+                              disabled={!postRaceClinicalWritable || !eligible || savingKey !== null}
+                              onChange={(event) =>
+                                setPostClinicalInputs((current) => ({
+                                  ...current,
+                                  [entry.raceEntryId]: event.target.value as ClinicalStatus,
+                                }))
+                              }
+                              className={`rounded-lg border px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+                                status === 'Unfit'
+                                  ? 'border-red-200 bg-red-50 text-red-700 focus:ring-red-500/20'
+                                  : 'border-emerald-200 bg-emerald-50 text-emerald-700 focus:ring-emerald-500/20'
+                              }`}
+                            >
+                              <option value="Fit">Fit</option>
+                              <option value="Unfit">Unfit</option>
+                            </select>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div>
+                              <input
+                                type="text"
+                                value={reason}
+                                disabled={status !== 'Unfit' || !postRaceClinicalWritable || !eligible || savingKey !== null}
+                                onChange={(event) =>
+                                  setPostRaceUnfitReasons((current) => ({
+                                    ...current,
+                                    [entry.raceEntryId]: event.target.value,
+                                  }))
+                                }
+                                placeholder={status === 'Unfit' ? 'Tối thiểu 20 ký tự' : 'Không cần khi Fit'}
+                                className="w-64 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                              />
+                              {status === 'Unfit' && reason.length > 0 && reason.trim().length < 20 && (
+                                <p className="mt-1 text-xs font-semibold text-red-600">Cần thêm {20 - reason.trim().length} ký tự.</p>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <PostRaceClinicalBadge entry={entry} />
+                            {!eligible && entry.postRaceClinicalStatus !== 'Unfit' && (
+                              <p className="mt-1 text-xs text-gray-500">Không áp dụng vì entry đã bị loại/rút/hủy.</p>
+                            )}
+                          </td>
+                          <td className="px-4 py-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => void handlePostRaceClinicalConfirm(entry)}
+                              disabled={
+                                !postRaceClinicalWritable ||
+                                !eligible ||
+                                savingKey !== null ||
+                                (status === 'Unfit' && reason.trim().length < 20)
+                              }
+                              className="rounded-md bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-30"
+                            >
+                              {savingKey === key
+                                ? 'Đang lưu...'
+                                : entry.postRaceClinicalStatus === 'Fit'
+                                  ? 'Cập nhật kết quả'
+                                  : 'Lưu khám sau trận'}
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -987,6 +1340,10 @@ export default function PaddockConsole() {
                         ['Danh tính ngựa', healthProfile.horseIdentityCheckStatus || 'Chưa kiểm tra'],
                         ['Khám lâm sàng', healthProfile.clinicalStatus || 'Chưa kiểm tra'],
                         ['Lý do Unfit', healthProfile.unfitReason || 'Không có'],
+                        ['Khám sau trận', healthProfile.postRaceClinicalStatus || 'Chưa kiểm tra'],
+                        ['Bác sĩ khám sau trận', healthProfile.postRaceClinicalCheckedByDoctorName || 'Chưa có'],
+                        ['Thời điểm khám sau trận', healthProfile.postRaceClinicalCheckedAt ? new Date(healthProfile.postRaceClinicalCheckedAt).toLocaleString('vi-VN') : 'Chưa có'],
+                        ['Lý do Unfit sau trận', healthProfile.postRaceUnfitReason || 'Không có'],
                       ].map(([label, value]) => (
                         <div key={label} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
                           <dt className="text-xs font-medium text-gray-500">{label}</dt>

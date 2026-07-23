@@ -40,6 +40,7 @@ export interface DoctorRaceEntry {
   raceEntryId: number;
   postPosition: number | null;
   status: string;
+  raceStatus: string | null;
   entryFeeStatus: string | null;
   horseName: string;
   horseBreed: string | null;
@@ -55,6 +56,8 @@ export interface DoctorRaceEntry {
   horseIdentityCheckStatus: string | null;
   clinicalStatus: string | null;
   unfitReason: string | null;
+  postRaceClinicalStatus: string | null;
+  postRaceUnfitReason: string | null;
   isEmergencyDisqualified: boolean;
   raceEntryStatus: string | null;
   message?: string;
@@ -101,6 +104,20 @@ export interface PostRaceWeightResponse {
   message: string;
 }
 
+export interface PostRaceClinicalCheckResponse {
+  raceEntryId: number;
+  raceId: number;
+  doctorId: number;
+  doctorName: string;
+  horseName: string;
+  jockeyName: string;
+  postRaceClinicalStatus: 'Fit' | 'Unfit';
+  unfitReason: string | null;
+  isEmergencyDisqualified: boolean;
+  raceEntryStatus: string;
+  message: string;
+}
+
 export interface RaceEntryHealthProfile {
   raceEntryId: number;
   raceId: number;
@@ -129,6 +146,11 @@ export interface RaceEntryHealthProfile {
   horseIdentityCheckStatus: string | null;
   clinicalStatus: string | null;
   unfitReason: string | null;
+  postRaceClinicalStatus: string | null;
+  postRaceClinicalCheckedByDoctorId: number | null;
+  postRaceClinicalCheckedByDoctorName: string | null;
+  postRaceClinicalCheckedAt: string | null;
+  postRaceUnfitReason: string | null;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -159,6 +181,7 @@ const normalizeRaceEntry = (value: unknown): DoctorRaceEntry | null => {
     raceEntryId,
     postPosition: nullableNumber(item.postPosition),
     status,
+    raceStatus: nullableString(item.raceStatus),
     entryFeeStatus: nullableString(item.entryFeeStatus),
     horseName: nullableString(horse?.name ?? item.horseName) ?? 'Chưa có tên',
     horseBreed: nullableString(horse?.breed ?? item.horseBreed),
@@ -174,6 +197,8 @@ const normalizeRaceEntry = (value: unknown): DoctorRaceEntry | null => {
     horseIdentityCheckStatus: nullableString(item.horseIdentityCheckStatus ?? item.horseIdentityStatus),
     clinicalStatus: nullableString(item.clinicalStatus),
     unfitReason: nullableString(item.unfitReason),
+    postRaceClinicalStatus: nullableString(item.postRaceClinicalStatus),
+    postRaceUnfitReason: nullableString(item.postRaceUnfitReason),
     isEmergencyDisqualified: Boolean(item.isEmergencyDisqualified),
     raceEntryStatus: nullableString(item.raceEntryStatus) ?? status,
   };
@@ -260,6 +285,19 @@ export const updatePostRaceWeight = async (
     method: 'PATCH',
     body: JSON.stringify({ postRaceJockeyWeight }),
   });
+
+export const updatePostRaceClinicalCheck = async (
+  raceEntryId: number,
+  postRaceClinicalStatus: 'Fit' | 'Unfit',
+  unfitReason: string | null
+): Promise<PostRaceClinicalCheckResponse> =>
+  apiFetch<PostRaceClinicalCheckResponse>(
+    `/doctor/race-entries/${raceEntryId}/post-race-clinical-check`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ postRaceClinicalStatus, unfitReason }),
+    }
+  );
 
 export const getRaceEntryHealthProfile = async (
   raceEntryId: number
