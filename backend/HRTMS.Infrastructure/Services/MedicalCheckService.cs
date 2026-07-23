@@ -170,10 +170,13 @@ public class MedicalCheckService : IMedicalCheckService
         if (!doctorAssigned)
             throw new InvalidOperationException("DOCTOR_NOT_ASSIGNED_TO_RACE");
 
-        // Weigh-out must happen while the race is still Live, before the referee
-        // can finalize the Unofficial report.
-        if (raceEntry.Race.Status != "Live")
-            throw new InvalidOperationException("RACE_NOT_LIVE");
+        // Can sau dua la mot phan cua buoc "kiem tra lai sau tran" cung voi
+        // kham lam sang sau tran (RecordPostRaceClinicalCheckAsync) — ca hai
+        // deu chi thuc hien SAU khi Referee da bam ket thuc tran va co ket
+        // qua so bo (Race.Status == "Unofficial"), khong con chan buoc
+        // Referee ket thuc tran nhu truoc.
+        if (raceEntry.Race.Status != "Unofficial")
+            throw new InvalidOperationException("RACE_NOT_UNOFFICIAL");
         if (!raceEntry.PreRaceJockeyWeight.HasValue)
             throw new InvalidOperationException("PRE_RACE_WEIGHT_REQUIRED");
 

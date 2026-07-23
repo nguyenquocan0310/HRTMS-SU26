@@ -293,10 +293,6 @@ public class LiveRaceController : ControllerBase
         {
             return Conflict(ApiResponse<SubmitFinishResultsResultDto>.Fail("Chỉ có thể chốt kết quả khi cuộc đua đang Live."));
         }
-        catch (InvalidOperationException ex) when (ex.Message == "POST_RACE_WEIGH_IN_INCOMPLETE")
-        {
-            return Conflict(ApiResponse<SubmitFinishResultsResultDto>.Fail("Post-race weigh-out is incomplete."));
-        }
         catch (InvalidOperationException ex) when (ex.Message == "RACE_REPORT_LOCKED")
         {
             return Conflict(ApiResponse<SubmitFinishResultsResultDto>.Fail("Biên bản thi đấu của cuộc đua này đã bị khóa."));
