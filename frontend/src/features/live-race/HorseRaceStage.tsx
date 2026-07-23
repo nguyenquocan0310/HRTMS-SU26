@@ -10,6 +10,28 @@ import type {
 } from 'pixi.js'
 import type { LiveRaceEntry, RaceLiveStatus } from '../../services/spectatorService'
 import {
+  DETERMINISTIC_FINISH_THRESHOLD,
+  DETERMINISTIC_FIXED_STEP_MS,
+  DETERMINISTIC_MAXIMUM_CATCH_UP_STEPS,
+  DETERMINISTIC_STOP_PROGRESS,
+  DETERMINISTIC_CURVE_SEGMENT_END,
+  DETERMINISTIC_CURVE_SEGMENT_START,
+  advanceDeterministicMotionState,
+  createDeterministicMotionState,
+  createDeterministicPaceProfile,
+  deterministicUnitFromTag,
+  deterministicTargetSpeed,
+  effectiveDeterministicMotionSpeed,
+  formatDeterministicRaceTime,
+  isDeterministicRaceEntryEligible,
+  normalizeDeterministicPaceProfiles,
+  parseRaceActualStartTimestamp,
+  rankDeterministicFinishResults,
+  resetDeterministicMotionState,
+  type DeterministicMotionState,
+  type DeterministicPaceProfile,
+} from './deterministicRaceSimulation'
+import {
   acquirePixelHorseAssets,
   type PixelHorseAnimationName,
   type PixelHorseAssetBundle,
@@ -27,15 +49,16 @@ const laneColors = [0x2563eb, 0x059669, 0xd97706, 0xe11d48, 0x7c3aed, 0x0891b2]
 const laneHeight = 96
 const stagePadding = 18
 const trackHeaderHeight = 48
-const finishThreshold = 1
+const finishThreshold = DETERMINISTIC_FINISH_THRESHOLD
 // Halfway through the finish zone keeps the full 64px sprite beyond the line.
-const stopProgress = 1.5
+const stopProgress = DETERMINISTIC_STOP_PROGRESS
 const finishApproachStart = 0.97
-const fixedSimulationStepMs = 100
-const maximumCatchUpSteps = 3000
+const fixedSimulationStepMs = DETERMINISTIC_FIXED_STEP_MS
+const maximumCatchUpSteps = DETERMINISTIC_MAXIMUM_CATCH_UP_STEPS
+const curveSegmentStart = DETERMINISTIC_CURVE_SEGMENT_START
+const curveSegmentEnd = DETERMINISTIC_CURVE_SEGMENT_END
+const effectiveMotionSpeed = effectiveDeterministicMotionSpeed
 const wallClockCorrectionIntervalMs = 1000
-const minimumSpeed = 0.012
-const maximumSpeed = 0.022
 const maximumDeltaMs = 250
 const visualSafePadding = 6
 const finishTweenDurationMs = 900
@@ -54,23 +77,6 @@ const mobileCurveAmplitudeRange = { minimum: 4, maximum: 8 }
 const mobileTrackBreakpoint = 600
 const desktopPathSampleCount = 48
 const mobilePathSampleCount = 32
-const curveSegmentStart = 0.15
-const curveSegmentEnd = 0.62
-const finishingKickStart = 0.68
-const finishingKickEnd = 0.95
-const minimumPaceBias = -0.04
-const maximumPaceBias = 0.04
-const minimumWaveAmplitude = 0.01
-const maximumWaveAmplitude = 0.025
-const minimumWavePeriodSteps = 90
-const maximumWavePeriodSteps = 160
-const minimumCurveSurge = -0.03
-const maximumCurveSurge = 0.03
-const minimumFinalKick = 0.02
-const maximumFinalKick = 0.06
-const minimumPaceModifier = 0.94
-const maximumPaceModifier = 1.06
-const maximumEffectiveSpeed = maximumSpeed * maximumPaceModifier
 const countdownDurationMs = 3000
 const goEffectDurationMs = 650
 const desktopParticleCount = 22
@@ -107,13 +113,6 @@ const clamp = (value: number, minimum: number, maximum: number) =>
 const smoothstep = (progress: number) => {
   const boundedProgress = clamp(progress, 0, 1)
   return boundedProgress * boundedProgress * (3 - 2 * boundedProgress)
-}
-
-const segmentEnvelope = (progress: number, start: number, end: number) => {
-  if (progress <= start || progress >= end) return 0
-  const localProgress = (progress - start) / (end - start)
-  const smoothedProgress = smoothstep(localProgress)
-  return 4 * smoothedProgress * (1 - smoothedProgress)
 }
 
 const curveAmplitudeForLayout = (width: number, currentLaneHeight: number) => {
@@ -237,26 +236,7 @@ interface TemporaryStandingsState {
   ranks: Map<number, number>
 }
 
-interface VisualPaceProfile {
-  curveSurge: number
-  finalKick: number
-  holdScore: number
-  paceBias: number
-  rawPaceBias: number
-  waveAmplitude: number
-  waveFrequency: number
-  wavePhase: number
-}
-
-interface HorseMotionState {
-  finished: boolean
-  finishElapsedMs: number | null
-  paceProfile: VisualPaceProfile | null
-  raceEntryId: number
-  previousProgress: number
-  progress: number
-  speed: number
-  targetSpeed: number
+interface HorseMotionState extends DeterministicMotionState {
   visualHoldProgress: number
 }
 
@@ -380,124 +360,8 @@ const createMasterAnimation = (): MasterAnimationController => ({
   reducedMotion: false,
 })
 
-const mixUint32 = (value: number) => {
-  let mixed = value >>> 0
-  mixed = Math.imul(mixed ^ (mixed >>> 16), 0x7feb352d)
-  mixed = Math.imul(mixed ^ (mixed >>> 15), 0x846ca68b)
-  return (mixed ^ (mixed >>> 16)) >>> 0
-}
-
-const stableTagHash = (tag: string) => {
-  let hash = 0x811c9dc5
-  for (let index = 0; index < tag.length; index += 1) {
-    hash = Math.imul(hash ^ tag.charCodeAt(index), 0x01000193)
-  }
-  return hash >>> 0
-}
-
-const deterministicAbility = (raceId: number, raceEntryId: number, tag: string) => {
-  const seed = (
-    Math.imul(Math.trunc(raceId), 0x9e3779b1)
-    ^ Math.imul(Math.trunc(raceEntryId), 0x85ebca6b)
-    ^ stableTagHash(tag)
-  ) >>> 0
-  return mixUint32(seed) / 0x100000000
-}
-
-const valueInRange = (unitValue: number, minimum: number, maximum: number) =>
-  minimum + unitValue * (maximum - minimum)
-
-const createVisualPaceProfile = (
-  raceId: number,
-  raceEntryId: number
-): VisualPaceProfile => {
-  const rawPaceBias = valueInRange(
-    deterministicAbility(raceId, raceEntryId, 'visual-pace-v1'),
-    minimumPaceBias,
-    maximumPaceBias
-  )
-  const wavePeriodSteps = valueInRange(
-    deterministicAbility(raceId, raceEntryId, 'visual-wave-frequency-v1'),
-    minimumWavePeriodSteps,
-    maximumWavePeriodSteps
-  )
-  const holdHigh = deterministicAbility(raceId, raceEntryId, 'visual-hold-v1')
-  const holdLow = deterministicAbility(raceId, raceEntryId, 'visual-hold-detail-v1')
-  return {
-    curveSurge: valueInRange(
-      deterministicAbility(raceId, raceEntryId, 'visual-curve-v1'),
-      minimumCurveSurge,
-      maximumCurveSurge
-    ),
-    finalKick: valueInRange(
-      deterministicAbility(raceId, raceEntryId, 'visual-kick-v1'),
-      minimumFinalKick,
-      maximumFinalKick
-    ),
-    holdScore: holdHigh + holdLow / 0x100000000,
-    paceBias: rawPaceBias,
-    rawPaceBias,
-    waveAmplitude: valueInRange(
-      deterministicAbility(raceId, raceEntryId, 'visual-wave-amplitude-v1'),
-      minimumWaveAmplitude,
-      maximumWaveAmplitude
-    ),
-    waveFrequency: Math.PI * 2 / wavePeriodSteps,
-    wavePhase: deterministicAbility(
-      raceId,
-      raceEntryId,
-      'visual-wave-phase-v1'
-    ) * Math.PI * 2,
-  }
-}
-
-const deterministicTargetSpeed = (raceId: number, raceEntryId: number, simulationStep: number) => {
-  const seed = (
-    Math.imul(Math.trunc(raceId), 0x9e3779b1)
-    ^ Math.imul(Math.trunc(raceEntryId), 0x85ebca6b)
-    ^ Math.imul(simulationStep, 0xc2b2ae35)
-  ) >>> 0
-  const unitValue = mixUint32(seed) / 0x100000000
-  return minimumSpeed + unitValue * (maximumSpeed - minimumSpeed)
-}
-
-const speedModifierForProgress = (
-  progress: number,
-  profile: VisualPaceProfile | null,
-  simulationStep: number
-) => {
-  if (!profile) return 1
-  const wave = profile.waveAmplitude * Math.sin(
-    simulationStep * profile.waveFrequency + profile.wavePhase
-  )
-  const curveModifier = profile.curveSurge
-    * segmentEnvelope(progress, curveSegmentStart, curveSegmentEnd)
-  const finalKickModifier = profile.finalKick
-    * segmentEnvelope(progress, finishingKickStart, finishingKickEnd)
-  return clamp(
-    1 + profile.paceBias + wave + curveModifier + finalKickModifier,
-    minimumPaceModifier,
-    maximumPaceModifier
-  )
-}
-
-const effectiveMotionSpeed = (state: HorseMotionState, simulationStep: number) =>
-  Math.min(
-    maximumEffectiveSpeed,
-    state.speed * speedModifierForProgress(
-      state.progress,
-      state.paceProfile,
-      simulationStep
-    )
-  )
-
-const parseActualStartTimestamp = (value: string | null | undefined) => {
-  if (!value?.trim()) return null
-  const trimmed = value.trim()
-  const hasTimezone = /(?:z|[+-]\d{2}:?\d{2})$/i.test(trimmed)
-  const timestamp = Date.parse(hasTimezone ? trimmed : `${trimmed}Z`)
-  return Number.isFinite(timestamp) ? timestamp : null
-}
+const createVisualPaceProfile = createDeterministicPaceProfile
+const parseActualStartTimestamp = parseRaceActualStartTimestamp
 
 const countdownStartSignature = (raceId: number, actualStartTimestamp: number) =>
   `${raceId}:${actualStartTimestamp}`
@@ -608,70 +472,18 @@ const handleCountdownHidden = (
 }
 
 const createMotionState = (raceId: number, raceEntryId: number): HorseMotionState => {
-  const initialSpeed = deterministicTargetSpeed(raceId, raceEntryId, 0)
   return {
-    finished: false,
-    finishElapsedMs: null,
-    paceProfile: null,
-    raceEntryId,
-    previousProgress: 0,
-    progress: 0,
-    speed: initialSpeed,
-    targetSpeed: initialSpeed,
+    ...createDeterministicMotionState(raceId, raceEntryId),
     visualHoldProgress: stopProgress,
   }
 }
 
 const resetMotionState = (state: HorseMotionState, raceId: number) => {
-  const initialSpeed = deterministicTargetSpeed(raceId, state.raceEntryId, 0)
-  state.finished = false
-  state.finishElapsedMs = null
-  state.previousProgress = 0
-  state.progress = 0
-  state.speed = initialSpeed
-  state.targetSpeed = initialSpeed
+  resetDeterministicMotionState(state, raceId)
   state.visualHoldProgress = stopProgress
 }
 
-const advanceMotionState = (
-  state: HorseMotionState,
-  raceId: number,
-  simulationStep: number
-) => {
-  if (state.finished) return
-
-  state.previousProgress = state.progress
-  state.targetSpeed = deterministicTargetSpeed(raceId, state.raceEntryId, simulationStep)
-  const smoothing = Math.min(1, fixedSimulationStepMs / 1000 * 2.5)
-  state.speed += (state.targetSpeed - state.speed) * smoothing
-  const effectiveSpeed = effectiveMotionSpeed(state, simulationStep)
-  const progressBeforeStep = state.progress
-  state.progress = Math.min(
-    stopProgress,
-    state.progress + effectiveSpeed * (fixedSimulationStepMs / 1000)
-  )
-
-  if (
-    state.finishElapsedMs == null
-    && progressBeforeStep < finishThreshold
-    && state.progress >= finishThreshold
-  ) {
-    const stepProgress = state.progress - progressBeforeStep
-    const crossingFraction = stepProgress <= 0
-      ? 1
-      : clamp((finishThreshold - progressBeforeStep) / stepProgress, 0, 1)
-    state.finishElapsedMs = simulationStep * fixedSimulationStepMs
-      + crossingFraction * fixedSimulationStepMs
-  }
-
-  if (state.progress >= stopProgress) {
-    state.previousProgress = stopProgress
-    state.progress = stopProgress
-    state.speed = 0
-    state.targetSpeed = 0
-    state.finished = true
-  }
-}
+const advanceMotionState = advanceDeterministicMotionState
 
 const catchUpMotion = (
   master: MasterAnimationController,
@@ -728,16 +540,15 @@ const activeMotionEntries = (race: RaceLiveStatus) =>
 const temporaryFinishResults = (
   master: MasterAnimationController,
   race: RaceLiveStatus
-): TemporaryFinishResult[] => activeMotionEntries(race)
-  .flatMap((entry) => {
-    const finishElapsedMs = master.motionStates.get(entry.raceEntryId)?.finishElapsedMs
-    return finishElapsedMs == null
-      ? []
-      : [{ raceEntryId: entry.raceEntryId, finishElapsedMs }]
-  })
-  .sort((left, right) => left.finishElapsedMs - right.finishElapsedMs
-    || left.raceEntryId - right.raceEntryId)
-  .map((result, index) => ({ ...result, finishPosition: index + 1 }))
+): TemporaryFinishResult[] => rankDeterministicFinishResults(
+  activeMotionEntries(race)
+    .map((entry) => master.motionStates.get(entry.raceEntryId))
+    .filter((state): state is HorseMotionState => state != null)
+).map(({ raceEntryId, finishElapsedMs, finishPosition }) => ({
+  raceEntryId,
+  finishElapsedMs,
+  finishPosition,
+}))
 
 const raceTimingSnapshot = (
   master: MasterAnimationController,
@@ -782,13 +593,7 @@ const sameTimingSnapshot = (left: RaceTimingSnapshot, right: RaceTimingSnapshot)
       && result.finishElapsedMs === other.finishElapsedMs
   })
 
-const formatRaceClock = (elapsedMs: number) => {
-  const totalMilliseconds = Math.max(0, Math.floor(elapsedMs))
-  const minutes = Math.floor(totalMilliseconds / 60_000)
-  const seconds = Math.floor(totalMilliseconds / 1_000) % 60
-  const milliseconds = totalMilliseconds % 1_000
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`
-}
+const formatRaceClock = formatDeterministicRaceTime
 
 const displayedFixedStepProgress = (state: HorseMotionState) =>
   Math.min(state.progress, state.visualHoldProgress)
@@ -921,18 +726,8 @@ const syncMotionStates = (master: MasterAnimationController, race: RaceLiveStatu
   const activeProfiles = race.entries
     .filter((entry) => !isInactive(entry))
     .map((entry) => master.motionStates.get(entry.raceEntryId)?.paceProfile)
-    .filter((profile): profile is VisualPaceProfile => profile != null)
-  const averageRawPaceBias = activeProfiles.length === 0
-    ? 0
-    : activeProfiles.reduce((sum, profile) => sum + profile.rawPaceBias, 0)
-      / activeProfiles.length
-  for (const profile of activeProfiles) {
-    profile.paceBias = clamp(
-      profile.rawPaceBias - averageRawPaceBias,
-      minimumPaceBias,
-      maximumPaceBias
-    )
-  }
+    .filter((profile): profile is DeterministicPaceProfile => profile != null)
+  normalizeDeterministicPaceProfiles(activeProfiles)
 
   if (status === 'upcoming' || status === 'pre-race') {
     master.motionStartTimestamp = actualStartTimestamp
@@ -1230,8 +1025,7 @@ const visualSignature = (race: RaceLiveStatus) => [
 ].join('|')
 
 const isInactive = (entry: LiveRaceEntry) => {
-  const status = entry.status.toLowerCase()
-  return entry.isWithdrawn || status === 'cancelled' || status === 'disqualified'
+  return !isDeterministicRaceEntryEligible(entry)
 }
 
 const temporaryRankColor = (rank: number) => {
@@ -1618,9 +1412,7 @@ const countdownParticleUnit = (
   signature: string,
   particleIndex: number,
   channel: number
-) => mixUint32(
-  stableTagHash(`${signature}:particle:${particleIndex}:${channel}`)
-) / 0x100000000
+) => deterministicUnitFromTag(`${signature}:particle:${particleIndex}:${channel}`)
 
 const createCountdownParticles = (
   pixi: PixiModule,
