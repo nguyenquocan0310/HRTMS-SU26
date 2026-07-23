@@ -13,7 +13,6 @@ import {
   FiLogOut,
   FiMenu,
   FiPlusCircle,
-  FiShield,
   FiUser,
   FiX,
 } from 'react-icons/fi'
@@ -52,7 +51,6 @@ const navGroups: Array<{ title: string; icon: IconType; items: NavItem[] }> = [
     items: [
       { to: '/owner/jockey-invite', label: 'Ghép cặp với Jockey', icon: FiLink2 },
       { to: '/owner/race-entries', label: 'Lịch & xác nhận thi đấu', icon: FiCalendar },
-      { to: '/owner/protest', label: 'Khiếu nại', icon: FiShield },
     ],
   },
   {

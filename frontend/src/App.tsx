@@ -43,7 +43,6 @@ import JockeyTournamentList from './pages/jockey/JockeyTournamentList'
 import JockeyDashboard from './pages/jockey/JockeyDashboard'
 
 // ── Import các trang shared ──
-import Protest from './pages/shared/Protest'
 import SharedNotificationCenter from './pages/shared/NotificationCenter'
 
 // ── Import các trang Doctor ──
@@ -130,7 +129,6 @@ export default function App() {
           <Route path="tournaments" element={<TournamentList />} />
           <Route path="schedule-confirm" element={<Navigate to="/owner/race-entries" replace />} />
           <Route path="jockey-invite" element={<JockeyInvite />} />
-          <Route path="protest" element={<Protest userRole="HorseOwner" />} />
           <Route path="profile" element={<OwnerProfile />} />
           <Route path="earnings" element={<OwnerEarningsPage />} />
           <Route path="notifications" element={<SharedNotificationCenter />} />
@@ -149,7 +147,6 @@ export default function App() {
           <Route path="history" element={<RaceHistory />} />
           <Route path="profile-declaration" element={<ProfileDeclaration />} />
           <Route path="tournaments" element={<JockeyTournamentList />} />
-          <Route path="protest" element={<Protest userRole="Jockey" iconless />} />
           <Route path="notifications" element={<SharedNotificationCenter iconless />} />
         </Route>
 
