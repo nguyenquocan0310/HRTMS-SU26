@@ -373,6 +373,17 @@ là điểm dễ khiếu nại nhất của luồng rút lui.
 | Vòng đã có entry hợp lệ | `ROUND_ALREADY_ALLOCATED` | 409 |
 | Vòng trước chưa `Completed` | `PREVIOUS_ROUND_NOT_COMPLETED` | 422 |
 | Pool rỗng | `NO_ELIGIBLE_PAIRINGS` | 422 |
+| `capacityPerRace < 2` | `RACE_CAPACITY_TOO_SMALL` | 422 |
+| `pool < số race × 2` | `INSUFFICIENT_PAIRINGS_FOR_RACES` | 422 |
+
+**Hai guard cuối chặn cấu hình chắc chắn không bốc thăm được.** Bốc thăm đòi tối
+thiểu 2 ngựa mỗi cuộc đua (`NOT_ENOUGH_ENTRIES`), và phân bổ chia round-robin nên
+cuộc đua ít nhất nhận `floor(pool / số race)`. Ví dụ **2 cặp / 4 cuộc đua**: hai
+cuộc đua đầu mỗi cuộc 1 ngựa, hai cuộc còn lại rỗng — không cuộc nào bốc thăm
+được, mà `ROUND_ALREADY_ALLOCATED` lại khoá lối gọi lại nên Admin phải xoá từng
+entry mới gỡ ra. Vì vậy chặn **trước khi ghi**, thay vì cảnh báo rồi vẫn cho ghi.
+
+Cả hai lỗi đều trả trước khi chạm DB, nên gọi lại sau khi sửa cấu hình là an toàn.
 
 **Pool:**
 - **Vòng 1:** pairing `Confirmed` + lệ phí `Verified` + ngựa còn `Enrolled/Approved`
@@ -390,6 +401,9 @@ vào**, không quyết định **vào race nào**.
 **Entry tạo ra:** `Status = "Confirmed"`, `EntryFeeStatus = "Paid"` — không còn bước
 Owner tự xác nhận. Một transaction; audit; notify từng Owner sau commit:
 > "Ngựa '[Tên]' đã được phân vào Cuộc đua #[X], lúc [Y]."
+
+**`warnings`** cũng có trong response của lần chốt thật, cùng nội dung với preview.
+Client bỏ qua bước preview vẫn nhận được lý do, không chỉ nhận con số.
 
 ### 3.1b Preview (dry-run) — patch 014
 `POST /api/admin/rounds/{roundId}/auto-allocate/preview` · Role: **Admin**
@@ -617,6 +631,8 @@ Mọi job dùng system user (`Role = "System"`, patch 006) làm audit actor. Thi
 | `ROUND_ALREADY_DRAWN` | 409 | Allocate |
 | `NO_RACES_IN_ROUND` | 422 | Allocate |
 | `NO_ELIGIBLE_PAIRINGS` | 422 | Allocate |
+| `INSUFFICIENT_PAIRINGS_FOR_RACES` | 422 | Allocate |
+| `RACE_CAPACITY_TOO_SMALL` | 422 | Allocate |
 | `PREVIOUS_ROUND_NOT_COMPLETED` | 422 | Allocate |
 | `RACE_NOT_IN_SAME_ROUND` | 422 | Move |
 | `MAX_LANES_REACHED` | 409 | Move, Draw |

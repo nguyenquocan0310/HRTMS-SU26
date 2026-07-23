@@ -15,6 +15,11 @@ public class RaceEntryService : IRaceEntryService
     // Cac trang thai entry duoc tinh la "hop le" (chiem 1 suat trong Race / 1 cong).
     private static readonly string[] ActiveEntryStatuses = { "Pending", "Confirmed" };
 
+    // Một cuộc đua chỉ có nghĩa khi có ít nhất 2 ngựa tranh nhau — dùng chung cho
+    // guard bốc thăm và guard phân bổ (phân bổ chặn trước cấu hình chắc chắn
+    // không bốc thăm được).
+    private const int MinEntriesPerRace = 2;
+
     private readonly HRTMSDbContext _context;
     private readonly INotificationService _notification;
     private readonly IAuditLogService _audit;
@@ -317,6 +322,7 @@ public class RaceEntryService : IRaceEntryService
             TotalCapacity = totalCapacity,
             AllocatedCount = created.Count,
             WaitlistedCount = waitlisted.Count,
+            Warnings = BuildWarnings(plan),
             Races = races.Select(r => new AutoAllocateRaceDto
             {
                 RaceId = r.RaceId,
@@ -361,20 +367,7 @@ public class RaceEntryService : IRaceEntryService
     {
         var plan = await BuildAllocationPlanAsync(roundId);
 
-        var warnings = new List<string>();
-        if (plan.Waitlisted.Count > 0)
-        {
-            warnings.Add(
-                $"Có {plan.Pool.Count} cặp đủ điều kiện nhưng tổng sức chứa của vòng chỉ " +
-                $"{plan.TotalCapacity} ({plan.CapacityPerRace} ngựa × {plan.Races.Count} cuộc đua). " +
-                $"{plan.Waitlisted.Count} cặp sẽ vào danh sách chờ.");
-        }
-        if (plan.Selected.Count < plan.Races.Count * 2)
-        {
-            warnings.Add(
-                $"Chỉ có {plan.Selected.Count} cặp cho {plan.Races.Count} cuộc đua — " +
-                "một số cuộc đua có thể dưới 2 ngựa và không bốc thăm được.");
-        }
+        var warnings = BuildWarnings(plan);
 
         // Round-robin: race thứ i nhận ceil/floor của phần chia — tất định.
         var counts = plan.Races
@@ -516,6 +509,21 @@ public class RaceEntryService : IRaceEntryService
         var capacityPerRace = Math.Min(tournament.MaxHorses, tournament.Venue.LaneCount);
         var totalCapacity = capacityPerRace * races.Count;
 
+        // Bốc thăm cần tối thiểu 2 ngựa mỗi cuộc đua (DrawPostPositionsAsync ->
+        // NOT_ENOUGH_ENTRIES). Hai cấu hình dưới đây bảo đảm KHÔNG cuộc đua nào
+        // đạt được mức đó, nên chặn từ đầu thay vì ghi entry rồi để cả vòng kẹt:
+        // đã allocate thì ROUND_ALREADY_ALLOCATED khoá lối gọi lại, Admin phải xoá
+        // từng entry một mới gỡ ra được.
+
+        // Sức chứa 1 ngựa/cuộc đua: mọi cuộc đua đều dưới ngưỡng, bất kể pool lớn cỡ nào.
+        if (capacityPerRace < MinEntriesPerRace)
+            throw new InvalidOperationException("RACE_CAPACITY_TOO_SMALL");
+
+        // Chia round-robin nên cuộc đua ít nhất nhận floor(pool / races). Dưới
+        // 2 x số cuộc đua thì chắc chắn có cuộc đua không đủ ngựa.
+        if (pool.Count < races.Count * MinEntriesPerRace)
+            throw new InvalidOperationException("INSUFFICIENT_PAIRINGS_FOR_RACES");
+
         // Pool vượt sức chứa: giữ theo thứ tự ưu tiên đã sắp (fee verified sớm hơn
         // ở vòng 1; Qualified trước AlsoEligible ở vòng sau), phần dư thành waitlist.
         return new AllocationPlan(
@@ -523,6 +531,27 @@ public class RaceEntryService : IRaceEntryService
             pool.Take(totalCapacity).ToList(),
             pool.Skip(totalCapacity).ToList(),
             capacityPerRace, totalCapacity);
+    }
+
+    // Cảnh báo về kết quả phân bổ — dùng CHUNG cho bản xem trước và lần chốt thật
+    // để Admin bỏ qua bước xem trước vẫn thấy được lý do, không chỉ thấy con số.
+    //
+    // Cấu hình chắc chắn hỏng (sức chứa < 2, hoặc quá ít cặp so với số cuộc đua)
+    // đã bị BuildAllocationPlanAsync chặn nên không cần cảnh báo ở đây; còn lại
+    // chỉ là các tình huống hợp lệ nhưng Admin nên biết.
+    private static List<string> BuildWarnings(AllocationPlan plan)
+    {
+        var warnings = new List<string>();
+
+        if (plan.Waitlisted.Count > 0)
+        {
+            warnings.Add(
+                $"Có {plan.Pool.Count} cặp đủ điều kiện nhưng tổng sức chứa của vòng chỉ " +
+                $"{plan.TotalCapacity} ({plan.CapacityPerRace} ngựa × {plan.Races.Count} cuộc đua). " +
+                $"{plan.Waitlisted.Count} cặp sẽ vào danh sách chờ.");
+        }
+
+        return warnings;
     }
 
     // Ứng viên trong pool phân bổ.
@@ -787,7 +816,7 @@ public class RaceEntryService : IRaceEntryService
 
         // Mot minh mot ngua thi khong thanh cuoc dua — chan boc tham som thay vi
         // tao mot starting list vo nghia.
-        if (entries.Count < 2)
+        if (entries.Count < MinEntriesPerRace)
             throw new InvalidOperationException("NOT_ENOUGH_ENTRIES");
 
         // Sau auto-allocate moi entry deu Confirmed. Con entry Pending nghia la
