@@ -27,5 +27,7 @@ public partial class DoctorProfile
 
     public virtual ICollection<RaceEntry> RaceEntryPostRaceWeightByDoctors { get; set; } = new List<RaceEntry>();
 
+    public virtual ICollection<RaceEntry> RaceEntryPostRaceClinicalCheckedByDoctors { get; set; } = new List<RaceEntry>();
+
     public virtual ICollection<RaceEntry> RaceEntryPreRaceWeightByDoctors { get; set; } = new List<RaceEntry>();
 }

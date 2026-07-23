@@ -29,4 +29,12 @@ public interface IMedicalCheckService
     Task<RaceEntryHealthProfileDto> GetRaceEntryHealthProfileAsync(
         int doctorId,
         int raceEntryId);
+
+    // Buoc moi: Doctor kham lam sang lai cho CA ngua va nai SAU khi tran dau
+    // ket thuc (Race o trang thai Unofficial, sau khi Referee submit finish
+    // results). Bat buoc truoc khi Admin duoc Declare Official.
+    Task<PostRaceClinicalCheckResultDto> RecordPostRaceClinicalCheckAsync(
+        int doctorId,
+        int raceEntryId,
+        RecordPostRaceClinicalCheckDto dto);
 }

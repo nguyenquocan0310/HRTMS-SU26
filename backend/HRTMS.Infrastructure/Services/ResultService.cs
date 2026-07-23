@@ -65,6 +65,7 @@ namespace HRTMS.Infrastructure.Services
                 var prizeOk = validTournamentIds.Contains(race.Round.TournamentId);
                 var rankingOk = IsRankingIntegrityValid(race.RaceEntries);
                 var weighOutOk = IsPostRaceWeighInComplete(race.RaceEntries);
+                var postRaceClinicalOk = IsPostRaceClinicalCheckComplete(race.RaceEntries);
                 result.Add(new UnofficialRaceListItemDto
                 {
                     RaceId = race.RaceId,
@@ -78,6 +79,7 @@ namespace HRTMS.Infrastructure.Services
                     PrizeDistributionsConfigured = prizeOk,
                     RankingIntegrityValid = rankingOk,
                     PostRaceWeighInComplete = weighOutOk,
+                    PostRaceClinicalCheckComplete = postRaceClinicalOk,
                 });
             }
 
@@ -132,6 +134,11 @@ namespace HRTMS.Infrastructure.Services
             if (!IsPostRaceWeighInComplete(race.RaceEntries))
                 throw new InvalidOperationException(
                     "Còn cặp đấu chưa được cân sau đua.");
+
+            if (!IsPostRaceClinicalCheckComplete(race.RaceEntries))
+                throw new InvalidOperationException(
+                    "Còn cặp đấu (ngựa/nài) chưa được bác sĩ khám lâm sàng lại sau trận. " +
+                    "Vui lòng chờ Doctor hoàn tất kiểm tra sau trận trước khi công bố kết quả chính thức.");
 
             // ---------------------------------------------------------------
             // ACID TRANSACTION — 6 BƯỚC
@@ -609,6 +616,19 @@ namespace HRTMS.Infrastructure.Services
             return entries
                 .Where(re => re.Status != "Cancelled" && re.Status != "Disqualified" && !re.ViolationRaceEntries.Any(v => v.ViolationCode == "DNF-001" && v.Penalty == "Scratch"))
                 .All(re => re.PostRaceJockeyWeight != null);
+        }
+
+        /// <summary>
+        /// Mọi entry hợp lệ phải được Doctor khám lâm sàng lại SAU trận
+        /// (cả ngựa + nài, patch 015) trước khi Admin được Declare Official.
+        /// Entry bị Unfit sau khám lại đã tự chuyển Disqualified nên bị loại
+        /// khỏi tập "hợp lệ" ở đây — không chặn Declare vì đã được xử lý.
+        /// </summary>
+        private static bool IsPostRaceClinicalCheckComplete(IEnumerable<RaceEntry> entries)
+        {
+            return entries
+                .Where(re => re.Status != "Cancelled" && re.Status != "Disqualified" && !re.ViolationRaceEntries.Any(v => v.ViolationCode == "DNF-001" && v.Penalty == "Scratch"))
+                .All(re => re.PostRaceClinicalStatus == "Fit");
         }
     }
 }

@@ -80,4 +80,15 @@ public class RaceEntryHealthProfileDto
     public DateTime? ClinicalCheckedAt { get; set; }
 
     public string? UnfitReason { get; set; }
+
+    // --- Khám lâm sàng SAU trận (patch 015) ---
+    public string? PostRaceClinicalStatus { get; set; }
+
+    public int? PostRaceClinicalCheckedByDoctorId { get; set; }
+
+    public string? PostRaceClinicalCheckedByDoctorName { get; set; }
+
+    public DateTime? PostRaceClinicalCheckedAt { get; set; }
+
+    public string? PostRaceUnfitReason { get; set; }
 }
