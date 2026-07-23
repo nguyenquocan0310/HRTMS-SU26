@@ -419,12 +419,12 @@ public class LiveRaceService : ILiveRaceService
         if (submittedIds.Count != eligibleEntryIds.Count || !eligibleEntryIds.SetEquals(submittedIds))
             throw new ArgumentException("RESULTS_MUST_INCLUDE_ALL_ELIGIBLE_ENTRIES");
 
-        if (race.RaceEntries
-            .Where(e => eligibleEntryIds.Contains(e.RaceEntryId))
-            .Any(e => e.PostRaceJockeyWeight == null))
-        {
-            throw new InvalidOperationException("POST_RACE_WEIGH_IN_INCOMPLETE");
-        }
+        // LUU Y: KHONG chan Referee ket thuc tran bang dieu kien can/kham sau
+        // dua o day nua. Dung theo luong: Referee bam ket thuc tran -> co ket
+        // qua so bo (Unofficial) -> Doctor moi can + kham lai sau tran -> Admin
+        // Declare Official. Rang buoc "da can sau dua" / "da kham lam sang sau
+        // tran" chi duoc kiem tra o ResultService.DeclareOfficialAsync (buoc
+        // Admin), khong duoc chan buoc nay cua Referee.
 
         foreach (var r in dto.Results)
         {

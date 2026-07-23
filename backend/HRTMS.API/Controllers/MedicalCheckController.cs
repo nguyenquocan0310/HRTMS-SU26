@@ -79,8 +79,8 @@ public class MedicalCheckController : ControllerBase
         { return Forbid(); }
         catch (InvalidOperationException ex) when (ex.Message == "RACE_ENTRY_NOT_ELIGIBLE")
         { return Conflict(new { error = "RACE_ENTRY_NOT_ELIGIBLE", message = "Race entry is cancelled, withdrawn, or disqualified." }); }
-        catch (InvalidOperationException ex) when (ex.Message == "RACE_NOT_LIVE")
-        { return Conflict(new { error = "RACE_NOT_LIVE", message = "Post-race weight can only be recorded while the race is Live." }); }
+        catch (InvalidOperationException ex) when (ex.Message == "RACE_NOT_UNOFFICIAL")
+        { return Conflict(new { error = "RACE_NOT_UNOFFICIAL", message = "Post-race weight can only be recorded after the referee has submitted finish results (race is Unofficial)." }); }
         catch (InvalidOperationException ex) when (ex.Message == "PRE_RACE_WEIGHT_REQUIRED")
         { return Conflict(new { error = "PRE_RACE_WEIGHT_REQUIRED", message = "Pre-race weight must exist before recording weigh-out." }); }
     }
