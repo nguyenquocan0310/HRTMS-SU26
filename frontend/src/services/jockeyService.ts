@@ -37,6 +37,12 @@ interface JockeyInvitationResponse {
   respondedAt: string | null
 }
 
+export interface PairingActionResponse {
+  pairingId: number
+  status: RaceInvitation['status']
+  message: string
+}
+
 const unwrapPaged = <T>(response: PagedResult<T> | ApiResponse<PagedResult<T>>): PagedResult<T> => {
   if ('success' in response) {
     if (!response.success || !response.data) {
@@ -87,12 +93,21 @@ export const getMyInvitations = async (
   }
 }
 
-export const acceptPairing = async (pairingId: number): Promise<unknown> => {
-  const response = await apiFetch<ApiResponse<unknown>>(`/pairings/${pairingId}/accept`, {
+export const acceptPairing = async (pairingId: number): Promise<PairingActionResponse> => {
+  const response = await apiFetch<
+    PairingActionResponse | ApiResponse<PairingActionResponse>
+  >(`/pairings/${pairingId}/accept`, {
     method: 'PATCH',
   })
-  if (!response.success) throw new Error(response.message || 'Chấp nhận lời mời thất bại.')
-  return response.data
+
+  if ('success' in response) {
+    if (!response.success || !response.data) {
+      throw new Error(response.message || 'Chấp nhận lời mời thất bại.')
+    }
+    return response.data
+  }
+
+  return response
 }
 
 export const declinePairing = async (
