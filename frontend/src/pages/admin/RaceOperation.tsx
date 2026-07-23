@@ -35,6 +35,7 @@ import { adminError, adminLabel, dateTime } from "../../utils/adminLabels";
 import styles from "./RaceOperation.module.scss";
 
 const RaceOperations = () => {
+  const navigate = useNavigate();
   const [search, setSearch] = useSearchParams();
   const [tournaments, setTournaments] = useState<TournamentResponse[]>([]);
   const [schedules, setSchedules] = useState<RaceSchedule[]>([]);
