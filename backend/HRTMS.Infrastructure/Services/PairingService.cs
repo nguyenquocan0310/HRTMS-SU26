@@ -249,11 +249,11 @@ public class PairingService : IPairingService
             };
         }
 
-        // Gui thong bao cho Owner de vao xac nhan cuoi cung (email + in-app)
+        // Gui thong bao cho Owner de xac nhan pairing, sau do nop le phi (email + in-app)
         await _notification.SendAsync(
             pairing.Horse.OwnerId,
             "Nài ngựa đã chấp nhận lời mời",
-            $"Nài ngựa đã chấp nhận ghép cặp cùng ngựa '{pairing.Horse.Name}'. Vui lòng nộp lệ phí để Ban tổ chức đối chiếu.",
+            $"Nài ngựa đã chấp nhận ghép cặp cùng ngựa '{pairing.Horse.Name}'. Vui lòng xác nhận ghép cặp, rồi nộp lệ phí để Ban tổ chức đối chiếu.",
             type: "Both",
             relatedEntityType: "Pairing",
             relatedEntityId: pairing.PairingId);
@@ -263,7 +263,7 @@ public class PairingService : IPairingService
             PairingId = pairing.PairingId,
             Status = pairing.Status,
             Message =
-                "Đã chấp nhận lời mời ghép cặp. Đang chờ chủ ngựa nộp lệ phí."
+                "Đã chấp nhận lời mời ghép cặp. Đang chờ chủ ngựa xác nhận ghép cặp và nộp lệ phí."
         };
     }
 
@@ -293,16 +293,6 @@ public class PairingService : IPairingService
         if (pairing.Status != "Accepted")
         {
             throw new InvalidOperationException("INVALID_STATUS");
-        }
-
-        // DEPRECATED (patch 013): Owner KHÔNG còn tự xác nhận cặp đấu ở giải có thu
-        // phí — xác nhận nay đến từ việc Admin verify lệ phí
-        // (EntryFeePaymentService.VerifyAsync). Chặn ở đây để không có hai đường
-        // cùng đưa Pairing lên Confirmed, và để Owner không bypass thanh toán.
-        // Giải miễn phí (EntryFeeAmount = 0) vẫn dùng endpoint này.
-        if (pairing.Tournament.EntryFeeAmount != 0)
-        {
-            throw new InvalidOperationException("ENTRY_FEE_REQUIRED");
         }
 
         if (pairing.Horse.AdminApprovalStatus != "Approved")
@@ -336,13 +326,12 @@ public class PairingService : IPairingService
         pairing.Status = "Confirmed";
         pairing.UpdatedAt = DateTime.UtcNow;
 
-        // Giải miễn phí vẫn ghi một payment Verified (Amount = 0) để giữ MỘT nguồn
-        // sự thật: "Pairing Confirmed <=> có payment Verified". Auto-allocate nhờ đó
-        // chỉ kiểm tra một điều kiện, không phải rẽ nhánh theo giải free/có phí.
+        // Giải miễn phí ghi payment Verified (Amount = 0). Giải có phí chỉ chốt
+        // pairing ở đây; Owner vẫn phải nộp phí và Admin xác minh trước khi allocate.
         var hasActivePayment = await _context.EntryFeePayments
             .AnyAsync(p => p.PairingId == pairingId &&
                            (p.Status == "PendingVerification" || p.Status == "Verified"));
-        if (!hasActivePayment)
+        if (pairing.Tournament.EntryFeeAmount == 0 && !hasActivePayment)
         {
             _context.EntryFeePayments.Add(new EntryFeePayment
             {

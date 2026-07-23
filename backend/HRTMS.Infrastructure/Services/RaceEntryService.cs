@@ -299,17 +299,20 @@ public class RaceEntryService : IRaceEntryService
             throw;
         }
 
-        // Notification sau khi commit — thất bại gửi tin không được rollback phân bổ.
-        foreach (var (entry, candidate, race) in created)
+        // Gửi SAU khi commit để SMTP lỗi không rollback dữ liệu. Không gửi từng
+        // entry: 38 cặp sẽ thành 38 lần SaveChanges + 38 kết nối SMTP nối tiếp,
+        // khiến thao tác chốt bị treo hàng phút khi SMTP chậm. SendBulkAsync vẫn
+        // tạo notification in-app cho từng Owner, nhưng chỉ dùng một email Bcc.
+        if (created.Count > 0)
         {
-            await _notification.SendAsync(
-                candidate.OwnerId,
-                "Ngựa đã được phân vào cuộc đua",
-                $"Ngựa '{candidate.HorseName}' đã được phân vào Cuộc đua #{race.RaceNumber}, " +
-                $"lúc {race.ScheduledTime:dd/MM/yyyy HH:mm} (giờ UTC).",
+            await _notification.SendBulkAsync(
+                created.Select(item => item.Candidate.OwnerId),
+                "Danh sách phân cuộc đua đã được chốt",
+                $"Cặp đấu của bạn đã được phân vào một cuộc đua thuộc vòng '{round.Name}'. " +
+                "Vui lòng xem danh sách cuộc đua để biết thời gian xuất phát.",
                 type: "Both",
-                relatedEntityType: "RaceEntry",
-                relatedEntityId: entry.RaceEntryId);
+                relatedEntityType: "Round",
+                relatedEntityId: roundId);
         }
 
         return new AutoAllocateResultDto

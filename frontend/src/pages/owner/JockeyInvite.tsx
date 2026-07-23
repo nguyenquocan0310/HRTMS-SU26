@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AvailableJockey, JockeyInvitation, Horse } from '../../types/owner.types';
-import { cancelPairing, getAvailableJockeys, getMyHorses, getMyTournamentHorseEnrollments, getOwnerPairings, inviteJockey } from '../../services/ownerService';
+import { cancelPairing, confirmPairing, getAvailableJockeys, getMyHorses, getMyTournamentHorseEnrollments, getOwnerPairings, inviteJockey } from '../../services/ownerService';
 import { getMyTournamentParticipations, getTournamentById, type ParticipationResponse, type TournamentResponse } from '../../services/tournamentService';
 import { submitPairingFeePayment, type FeePaymentMethod } from '../../services/entryFeePaymentService';
 import { getJockeyInviteState, type JockeyInviteAction } from './jockeyInviteState';
 
 const PAIRING_STATUS: Record<string, { label: string; cls: string; dot: string }> = {
   Pending:   { label: 'Chờ Jockey phản hồi',   cls: 'bg-yellow-50 text-yellow-700 border-yellow-200', dot: 'bg-yellow-500' },
-  Accepted:  { label: 'Chờ nộp lệ phí',        cls: 'bg-amber-50 text-amber-700 border-amber-200',     dot: 'bg-amber-500' },
+  Accepted:  { label: 'Chờ Owner xác nhận',    cls: 'bg-amber-50 text-amber-700 border-amber-200',     dot: 'bg-amber-500' },
   PendingVerification: { label: 'Chờ Admin đối chứng', cls: 'bg-violet-50 text-violet-700 border-violet-200', dot: 'bg-violet-500' },
-  Confirmed: { label: 'Đã xác nhận ghép cặp',  cls: 'bg-green-50 text-green-700 border-green-200',    dot: 'bg-green-500' },
+  Confirmed: { label: 'Đã ghép cặp — chờ nộp phí', cls: 'bg-green-50 text-green-700 border-green-200', dot: 'bg-green-500' },
   Declined:  { label: 'Bị từ chối',            cls: 'bg-red-50 text-red-700 border-red-200',          dot: 'bg-red-500' },
   Cancelled: { label: 'Đã hủy',                cls: 'bg-gray-50 text-gray-500 border-gray-200',       dot: 'bg-gray-400' },
   Rejected:  { label: 'Bị từ chối',            cls: 'bg-red-50 text-red-700 border-red-200',          dot: 'bg-red-500' },
@@ -56,6 +56,7 @@ const remainingDays = (value: string | null) => value
 const ACTION_PRESENTATION: Record<JockeyInviteAction, { label: string; disabled: boolean; cls: string }> = {
   invite: { label: 'Mời tham gia', disabled: false, cls: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' },
   invited: { label: 'Đã gửi lời mời', disabled: true, cls: 'border-amber-200 bg-amber-50 text-amber-700' },
+  confirm: { label: 'Xác nhận ghép cặp', disabled: false, cls: 'border-emerald-500 bg-emerald-500 text-white hover:bg-emerald-600' },
   pay: { label: 'Nộp lệ phí', disabled: false, cls: 'border-amber-500 bg-amber-500 text-white hover:bg-amber-600' },
   verifying: { label: 'Chờ đối chứng', disabled: true, cls: 'border-violet-200 bg-violet-50 text-violet-700' },
   paired: { label: 'Đã ghép cặp', disabled: true, cls: 'border-gray-200 bg-gray-100 text-gray-500' },
@@ -82,6 +83,7 @@ export default function JockeyInvite() {
   const [sending, setSending] = useState(false);
   const [activeTab, setActiveTab] = useState<'available' | 'history'>('available');
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [confirmSuccess, setConfirmSuccess] = useState<string | null>(null);
 
@@ -326,8 +328,12 @@ export default function JockeyInvite() {
       setError('Lời mời cho Jockey và ngựa này đã được gửi trước đó.');
       return;
     }
+    if (currentState.action === 'confirm') {
+      setError('Jockey đã chấp nhận. Vui lòng xác nhận ghép cặp trước khi gửi lời mời mới.');
+      return;
+    }
     if (currentState.action === 'pay') {
-      setError('Jockey đã chấp nhận. Vui lòng nộp lệ phí thay vì gửi lời mời mới.');
+      setError('Cặp đấu đã được xác nhận. Vui lòng nộp lệ phí thay vì gửi lời mời mới.');
       return;
     }
     if (currentState.action === 'verifying') {
@@ -403,7 +409,7 @@ export default function JockeyInvite() {
         invitation.invitationID === paymentPairing.invitationID
           ? { ...invitation, status: 'PendingVerification' }
           : invitation));
-      setConfirmSuccess('Đã nộp lệ phí. Ban tổ chức sẽ đối chiếu chứng từ và xác nhận cặp đấu.');
+      setConfirmSuccess('Đã nộp lệ phí. Ban tổ chức sẽ đối chiếu chứng từ trước khi cho phép phân bổ vào cuộc đua.');
       setPaymentPairing(null);
       setPaymentTournament(null);
       setPaymentReference('');
@@ -442,11 +448,37 @@ export default function JockeyInvite() {
     }
   };
 
+  const handleConfirmPairing = async (pairing: JockeyInvitation) => {
+    if (confirmingId === pairing.invitationID) return;
+    if (!window.confirm('Xác nhận ghép cặp này? Sau đó bạn có thể nộp lệ phí tham gia.')) return;
+
+    setConfirmError(null);
+    setConfirmSuccess(null);
+    setConfirmingId(pairing.invitationID);
+    try {
+      await confirmPairing(pairing.invitationID);
+      setInvitations((previous) => previous.map((item) =>
+        item.invitationID === pairing.invitationID ? { ...item, status: 'Confirmed' } : item));
+      setConfirmSuccess('Đã xác nhận ghép cặp. Bạn có thể nộp lệ phí để Ban tổ chức đối chiếu.');
+      setRefreshTrigger((previous) => previous + 1);
+      setActiveTab('history');
+    } catch (err) {
+      setConfirmError(err instanceof Error ? err.message : 'Xác nhận ghép cặp thất bại. Vui lòng thử lại.');
+    } finally {
+      setConfirmingId(null);
+    }
+  };
+
   const handleAvailableAction = (
     action: JockeyInviteAction,
     jockey: AvailableJockey,
     pairing?: JockeyInvitation,
   ) => {
+    if (action === 'confirm' && pairing) {
+      void handleConfirmPairing(pairing);
+      return;
+    }
+
     if (action === 'pay' && pairing) {
       void openPaymentModal(pairing);
       return;
@@ -731,10 +763,11 @@ export default function JockeyInvite() {
                             {invitation.status === 'Confirmed' ? (
                               <button
                                 type="button"
-                                disabled
-                                className="inline-flex cursor-not-allowed items-center whitespace-nowrap rounded-full border border-gray-200 bg-gray-100 px-3.5 py-2 text-xs font-bold text-gray-500"
+                                onClick={() => void openPaymentModal(invitation)}
+                                disabled={paymentLoading || isCancelling}
+                                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-amber-500 px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
                               >
-                                Đã ghép cặp
+                                Nộp lệ phí
                               </button>
                             ) : invitation.status === 'PendingVerification' ? (
                               <button
@@ -760,11 +793,11 @@ export default function JockeyInvite() {
                               <div className="flex flex-wrap items-center gap-2">
                                 {invitation.status === 'Accepted' && (
                                   <button
-                                    onClick={() => void openPaymentModal(invitation)}
-                                    disabled={paymentLoading || isCancelling}
-                                    className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-amber-500 px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+                                    onClick={() => void handleConfirmPairing(invitation)}
+                                    disabled={confirmingId === invitation.invitationID || isCancelling}
+                                    className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-emerald-500 px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
                                   >
-                                    Nộp lệ phí
+                                    {confirmingId === invitation.invitationID ? 'Đang xác nhận...' : 'Xác nhận ghép cặp'}
                                   </button>
                                 )}
                                 {canCancel && (
@@ -1053,7 +1086,7 @@ export default function JockeyInvite() {
                     </div>
 
                     <p className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-                      Nộp lệ phí đồng nghĩa Owner xác nhận ghép cặp. Cặp đấu chỉ thành công sau khi Admin đối chứng đúng chứng từ.
+                      Cặp đấu đã được Owner xác nhận. Ban tổ chức sẽ đối chiếu lệ phí trước khi cặp được phân bổ vào cuộc đua.
                     </p>
                   </>
                 ) : null}
