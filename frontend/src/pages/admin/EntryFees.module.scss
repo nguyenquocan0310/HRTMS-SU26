@@ -1,1 +1,49 @@
-.page{display:grid;gap:1.25rem;color:#172033}.page h1,.page h2,.page p{margin:0}.page h1{font-size:1.6rem}.page p{color:#64748b;font-size:.88rem;margin-top:.35rem}.card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden}.toolbar{display:flex;gap:1rem;justify-content:space-between;align-items:center;padding:1rem 1.1rem;border-bottom:1px solid #e2e8f0}.tabs{display:flex;gap:.3rem;flex-wrap:wrap}.tab,.tabActive,.pagination button,.detailButton,.fileButton,.drawer button,.modal button{border:0;background:transparent;color:#475569;border-radius:7px;padding:.5rem .65rem;font:inherit;font-size:.82rem;cursor:pointer}.tabActive{background:#eff6ff;color:#1d4ed8;font-weight:700}.tabs span{display:inline-flex;align-items:center;justify-content:center;min-width:1.25rem;margin-left:.35rem;padding:0 .28rem;border-radius:999px;background:#e2e8f0;font-size:.7rem}.tabActive span{background:#bfdbfe}.tournamentSelect{display:grid;grid-template-columns:auto minmax(170px,1fr);gap:.5rem;align-items:center;color:#475569;font-size:.8rem;font-weight:650}.tournamentSelect select,textarea{box-sizing:border-box;width:100%;border:1px solid #cbd5e1;border-radius:7px;padding:.56rem .65rem;background:#fff;color:#172033;font:inherit}.tournamentInfo{display:flex;gap:1rem;flex-wrap:wrap;padding:.75rem 1.1rem;background:#f8fafc;color:#475569;font-size:.82rem}.tournamentInfo strong{color:#172033}.tableWrap{overflow:auto}table{width:100%;min-width:1000px;border-collapse:collapse;font-size:.84rem}th{text-align:left;padding:.72rem;background:#f8fafc;color:#64748b;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em}td{padding:.78rem .72rem;border-top:1px solid #eef2f7;vertical-align:middle}td strong,td small{display:block}td small{margin-top:.25rem;color:#64748b;font-size:.75rem}.empty{text-align:center!important;padding:2.75rem!important;color:#64748b}.fileButton{display:inline-flex;align-items:center;gap:.35rem;color:#2563eb;padding:0}.detailButton{border:1px solid #cbd5e1;color:#334155;display:inline-flex;gap:.35rem;align-items:center}.pagination{display:flex;align-items:center;justify-content:flex-end;gap:.7rem;padding:.8rem 1.1rem;border-top:1px solid #e2e8f0;color:#64748b;font-size:.8rem}.pagination button{border:1px solid #cbd5e1;display:flex;align-items:center;gap:.2rem}.pagination button:disabled{opacity:.45;cursor:not-allowed}.notice,.error{padding:.75rem .9rem;border-radius:8px;font-size:.85rem}.notice{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}.error{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}.backdrop{position:fixed;inset:0;background:rgba(15,23,42,.36);z-index:30}.drawer{position:fixed;z-index:31;right:0;top:0;bottom:0;width:min(440px,100vw);background:#fff;padding:1.25rem;box-sizing:border-box;box-shadow:-12px 0 30px rgba(15,23,42,.12);overflow:auto}.drawerHeader{display:flex;justify-content:space-between;gap:1rem;border-bottom:1px solid #e2e8f0;padding-bottom:1rem}.drawerHeader h2{font-size:1.2rem}.drawerHeader button{font-size:1.25rem}.drawer dl{display:grid;grid-template-columns:45% 55%;gap:.8rem 1rem;margin:1.25rem 0;font-size:.86rem}.drawer dt{color:#64748b}.drawer dd{margin:0;color:#172033;word-break:break-word}.status{padding:.25rem .55rem;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-size:.75rem;font-weight:700}.proofButton{border:1px solid #bfdbfe!important;color:#2563eb!important;display:flex;align-items:center;gap:.4rem}.drawerActions{display:flex;gap:.65rem;margin-top:1.5rem;padding-top:1rem;border-top:1px solid #e2e8f0}.verifyButton{background:#16a34a!important;color:#fff!important}.rejectButton{background:#dc2626!important;color:#fff!important}.modalLayer{position:fixed;z-index:40;inset:0;display:grid;place-items:center;background:rgba(15,23,42,.45);padding:1rem}.modal{width:min(460px,100%);background:#fff;border-radius:12px;padding:1.25rem;box-shadow:0 20px 40px rgba(15,23,42,.18)}.modal h2{font-size:1.1rem}.modal>div{display:flex;justify-content:flex-end;gap:.6rem;margin-top:1rem}.modal>div button:first-child{border:1px solid #cbd5e1}.errorText{display:block;color:#b91c1c;margin-top:.35rem;font-size:.78rem}@media(max-width:700px){.toolbar{align-items:stretch;flex-direction:column}.tournamentSelect{grid-template-columns:1fr}.pagination{justify-content:center}}
+.page{display:grid;gap:1.25rem;color:#172033}
+.page h1,.page h2,.page p{margin:0}
+.page h1{font-size:1.6rem}
+.page p{color:#64748b;font-size:.88rem;margin-top:.35rem}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden}
+.toolbar{display:flex;gap:1rem;justify-content:space-between;align-items:center;padding:1rem 1.1rem;border-bottom:1px solid #e2e8f0}
+.tabs{display:flex;gap:.3rem;flex-wrap:wrap}
+.tab,.tabActive,.pagination button,.detailButton,.fileButton,.drawer button,.modal button{
+    border:0;background:transparent;color:#475569;border-radius:7px;padding:.5rem .65rem;
+    font:inherit;font-size:.82rem;
+    cursor:pointer}
+.tabActive{
+    background:#eff6ff;
+    color:#1d4ed8;
+    font-weight:700
+}
+.tabs span{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:1.25rem;
+    margin-left:.35rem;
+    padding:0 .28rem;
+    border-radius:999px;
+    background:#e2e8f0;
+    font-size:.7rem
+}
+    
+.tabActive span{
+    background:#bfdbfe
+}
+.tournamentSelect{
+    display:grid;grid-template-columns:auto minmax(170px,1fr);gap:.5rem;align-items:center;color:#475569;font-size:.8rem;font-weight:650
+}
+.tournamentSelect select,textarea{
+    box-sizing:border-box;width:100%;border:1px solid #cbd5e1;border-radius:7px;padding:.56rem .65rem;background:#fff;color:#172033;font:inherit
+}
+.tournamentInfo{display:flex;gap:1rem;flex-wrap:wrap;padding:.75rem 1.1rem;background:#f8fafc;color:#475569;font-size:.82rem}
+.tournamentInfo strong{color:#172033}
+.tableWrap{overflow:auto}
+table{width:100%;min-width:1000px;border-collapse:collapse;font-size:.84rem}
+th{text-align:left;padding:.72rem;background:#f8fafc;color:#64748b;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em}
+td{padding:.78rem .72rem;border-top:1px solid #eef2f7;vertical-align:middle}
+td strong,td small{display:block}td small{margin-top:.25rem;color:#64748b;font-size:.75rem}.empty{text-align:center!important;padding:2.75rem!important;color:#64748b}.fileButton{display:inline-flex;align-items:center;gap:.35rem;color:#2563eb;padding:0}.detailButton{border:1px solid #cbd5e1;color:#334155;display:inline-flex;gap:.35rem;align-items:center}.pagination{display:flex;align-items:center;justify-content:flex-end;gap:.7rem;padding:.8rem 1.1rem;border-top:1px solid #e2e8f0;color:#64748b;font-size:.8rem}.pagination button{border:1px solid #cbd5e1;display:flex;align-items:center;gap:.2rem}.pagination button:disabled{opacity:.45;cursor:not-allowed}.notice,.error{padding:.75rem .9rem;border-radius:8px;font-size:.85rem}.notice{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}.error{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}.backdrop{position:fixed;inset:0;background:rgba(15,23,42,.36);z-index:30}.drawer{position:fixed;z-index:31;right:0;top:0;bottom:0;width:min(440px,100vw);background:#fff;padding:1.25rem;box-sizing:border-box;box-shadow:-12px 0 30px rgba(15,23,42,.12);overflow:auto}.drawerHeader{display:flex;justify-content:space-between;gap:1rem;border-bottom:1px solid #e2e8f0;padding-bottom:1rem}.drawerHeader h2{font-size:1.2rem}.drawerHeader button{font-size:1.25rem}.drawer dl{display:grid;grid-template-columns:45% 55%;gap:.8rem 1rem;margin:1.25rem 0;font-size:.86rem}.drawer dt{color:#64748b}.drawer dd{margin:0;color:#172033;word-break:break-word}.status{padding:.25rem .55rem;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-size:.75rem;font-weight:700}.proofButton{border:1px solid #bfdbfe!important;color:#2563eb!important;display:flex;align-items:center;gap:.4rem}.drawerActions{display:flex;gap:.65rem;margin-top:1.5rem;padding-top:1rem;border-top:1px solid #e2e8f0}.verifyButton{background:#16a34a!important;color:#fff!important}.rejectButton{background:#dc2626!important;color:#fff!important}.modalLayer{position:fixed;z-index:40;inset:0;display:grid;place-items:center;background:rgba(15,23,42,.45);padding:1rem}.modal{width:min(460px,100%);background:#fff;border-radius:12px;padding:1.25rem;box-shadow:0 20px 40px rgba(15,23,42,.18)}.modal h2{font-size:1.1rem}.modal>div{display:flex;justify-content:flex-end;gap:.6rem;margin-top:1rem}.modal>div button:first-child{border:1px solid #cbd5e1}.errorText{display:block;color:#b91c1c;margin-top:.35rem;font-size:.78rem}@media(max-width:700px){.toolbar{align-items:stretch;flex-direction:column}.tournamentSelect{grid-template-columns:1fr}.pagination{justify-content:center}}
+/* Giữ panel chi tiết nằm bên dưới thanh navbar của trang Admin */
+.drawer {
+  top: 64px;
+  bottom: 0;
+}
