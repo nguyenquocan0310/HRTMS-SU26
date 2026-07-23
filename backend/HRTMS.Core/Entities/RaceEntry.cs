@@ -35,6 +35,16 @@ public partial class RaceEntry
 
     public int? PostRaceWeightByDoctorId { get; set; }
 
+    // Khám lâm sàng SAU trận (cả ngựa + nài, patch 015) — bắt buộc trước khi
+    // Admin được Declare Official, đối xứng với ClinicalStatus (khám trước trận).
+    public string? PostRaceClinicalStatus { get; set; }
+
+    public string? PostRaceUnfitReason { get; set; }
+
+    public int? PostRaceClinicalCheckedByDoctorId { get; set; }
+
+    public DateTime? PostRaceClinicalCheckedAt { get; set; }
+
     public int? FinishPosition { get; set; }
 
     public decimal? FinishTime { get; set; }
@@ -82,6 +92,8 @@ public partial class RaceEntry
     public virtual Pairing Pairing { get; set; } = null!;
 
     public virtual DoctorProfile? PostRaceWeightByDoctor { get; set; }
+
+    public virtual DoctorProfile? PostRaceClinicalCheckedByDoctor { get; set; }
 
     public virtual DoctorProfile? PreRaceWeightByDoctor { get; set; }
 

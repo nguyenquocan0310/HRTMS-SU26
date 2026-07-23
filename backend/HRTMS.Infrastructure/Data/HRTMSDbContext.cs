@@ -507,6 +507,10 @@ public partial class HRTMSDbContext : DbContext
                 .IsUnicode(false);
             entity.Property(e => e.PostRaceJockeyWeight).HasColumnType("decimal(5, 2)");
             entity.Property(e => e.PreRaceJockeyWeight).HasColumnType("decimal(5, 2)");
+            entity.Property(e => e.PostRaceClinicalStatus)
+                .HasMaxLength(20)
+                .IsUnicode(false);
+            entity.Property(e => e.PostRaceUnfitReason).HasMaxLength(255);
             entity.Property(e => e.Status)
                 .HasMaxLength(30)
                 .IsUnicode(false)
@@ -537,6 +541,10 @@ public partial class HRTMSDbContext : DbContext
             entity.HasOne(d => d.PostRaceWeightByDoctor).WithMany(p => p.RaceEntryPostRaceWeightByDoctors)
                 .HasForeignKey(d => d.PostRaceWeightByDoctorId)
                 .HasConstraintName("FK_RaceEntries_PostDoctor");
+
+            entity.HasOne(d => d.PostRaceClinicalCheckedByDoctor).WithMany(p => p.RaceEntryPostRaceClinicalCheckedByDoctors)
+                .HasForeignKey(d => d.PostRaceClinicalCheckedByDoctorId)
+                .HasConstraintName("FK_RaceEntries_PostRaceClinicalDoctor");
 
             entity.HasOne(d => d.PreRaceWeightByDoctor).WithMany(p => p.RaceEntryPreRaceWeightByDoctors)
                 .HasForeignKey(d => d.PreRaceWeightByDoctorId)
