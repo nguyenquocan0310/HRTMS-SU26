@@ -37,12 +37,12 @@ export default function InvitationList() {
 
     setActionLoadingId(pairingId); setError(''); setSuccess('')
     try {
-      await acceptPairing(pairingId)
+      const response = await acceptPairing(pairingId)
       setInvitations((current) => current.map((item) => item.pairingId === pairingId
-        ? { ...item, status: 'Accepted', respondedAt: new Date().toISOString() }
+        ? { ...item, status: response.status, respondedAt: new Date().toISOString() }
         : item
       ))
-      setSuccess('Đã chấp nhận lời mời. Chủ ngựa sẽ thực hiện bước xác nhận tiếp theo.')
+      setSuccess(response.message || 'Đã chấp nhận lời mời. Chủ ngựa sẽ thực hiện bước xác nhận tiếp theo.')
     } catch (actionError) {
       setError(getErrorMessage(actionError, 'Chấp nhận lời mời thất bại.'))
     } finally { setActionLoadingId(null) }
