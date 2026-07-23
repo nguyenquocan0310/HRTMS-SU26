@@ -2454,7 +2454,7 @@ export default function HorseRaceStage({ race, fallback }: HorseRaceStageProps) 
           </p>
         </div>
         <div className="shrink-0 rounded-xl border border-slate-200 bg-slate-950 px-4 py-2 text-right text-white shadow-sm">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-300">Đồng hồ cuộc đua</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-300">Thời gian đua</p>
           <p className="font-mono text-xl font-black tabular-nums" aria-live="off">
             {formatRaceClock(timingSnapshot.elapsedMs)}
           </p>
