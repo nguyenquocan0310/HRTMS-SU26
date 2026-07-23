@@ -162,6 +162,41 @@ public class SchedulingController : ControllerBase
         }
     }
 
+    // Gỡ phân bổ cả vòng để phân lại — undo cho auto-allocate.
+    // Xoá entry + danh sách chờ, đưa vòng về trạng thái chưa phân bổ.
+    // Chỉ dùng được khi chưa bốc thăm và chưa cuộc đua nào chạy.
+    [HttpDelete("admin/rounds/{roundId:int}/allocation")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> ClearAllocation(int roundId)
+    {
+        if (!TryGetUserId(out var adminId))
+            return UnauthorizedResult();
+
+        try
+        {
+            return Ok(await _service.ClearRoundAllocationAsync(adminId, roundId));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(Err("ROUND_NOT_FOUND", "Không tìm thấy vòng đấu."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "ROUND_IN_PROGRESS")
+        {
+            return UnprocessableEntity(Err(ex.Message,
+                "Vòng đấu đã có cuộc đua bắt đầu hoặc kết thúc nên không thể gỡ phân bổ."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "ENTRIES_HAVE_DEPENDENT_DATA")
+        {
+            return Conflict(Err(ex.Message,
+                "Các đăng ký của vòng đã phát sinh dữ liệu liên quan (dự đoán, chi thưởng " +
+                "hoặc vi phạm) nên không thể gỡ phân bổ."));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return MapAllocateError(ex.Message);
+        }
+    }
+
     // Admin điều chỉnh thủ công sau auto-allocate: chuyển entry sang race khác
     // TRONG CÙNG vòng.
     [HttpPut("admin/race-entries/{id:int}/move")]

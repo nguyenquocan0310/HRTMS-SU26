@@ -23,6 +23,11 @@ public interface IRaceEntryService
     // Danh sách chờ đã persist của một vòng (bảng RoundWaitlist, patch 014).
     Task<List<AutoAllocateWaitlistDto>> GetRoundWaitlistAsync(int roundId);
 
+    // Gỡ toàn bộ phân bổ của một vòng để phân lại: xoá entry + danh sách chờ,
+    // trả vòng về đúng trạng thái trước khi allocate chạy.
+    // Chỉ dùng được khi CHƯA bốc thăm và chưa cuộc đua nào chạy.
+    Task<ClearAllocationResultDto> ClearRoundAllocationAsync(int actorId, int roundId);
+
     // Manual override: chuyển entry sang race khác TRONG CÙNG vòng, race đích
     // chưa bốc thăm và còn chỗ.
     Task<RaceEntryResponseDto> MoveEntryAsync(int adminId, int raceEntryId, int targetRaceId);

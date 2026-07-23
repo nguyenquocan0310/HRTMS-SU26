@@ -445,6 +445,123 @@ public class RaceEntryService : IRaceEntryService
             .ToListAsync();
     }
 
+    // =====================================================================
+    // Gỡ phân bổ cả vòng (undo cho AutoAllocateRoundAsync)
+    // =====================================================================
+    // ROUND_ALREADY_ALLOCATED chặn việc phân lại, nên không có lối này thì Admin
+    // phân nhầm phải xoá từng entry một. Xoá HẲN entry thay vì chuyển 'Cancelled':
+    // entry 'Cancelled' vẫn nằm ngoài ActiveEntryStatuses nhưng để lại rác trong
+    // starting list, còn entry ở đây do máy sinh ra và chưa hề thi đấu.
+    public async Task<ClearAllocationResultDto> ClearRoundAllocationAsync(int actorId, int roundId)
+    {
+        var round = await _context.Rounds
+            .Include(r => r.Tournament)
+            .Include(r => r.Races)
+            .FirstOrDefaultAsync(r => r.RoundId == roundId)
+            ?? throw new KeyNotFoundException("ROUND_NOT_FOUND");
+
+        EnsureTournamentOpenForScheduling(round.Tournament.Status);
+
+        var races = round.Races.Where(r => r.Status != "Cancelled").ToList();
+
+        // Đã bốc thăm nghĩa là cổng xuất phát đã công bố — gỡ phân bổ lúc này sẽ
+        // rút lại một starting list người ngoài đã thấy.
+        if (races.Any(r => r.IsPostPositionDrawn))
+            throw new InvalidOperationException("ROUND_ALREADY_DRAWN");
+
+        // Cuộc đua đã chạy/đã có kết quả thì entry là dữ liệu thi đấu, không phải
+        // phân bổ nữa.
+        if (races.Any(r => r.Status is not ("Upcoming" or "Cancelled")))
+            throw new InvalidOperationException("ROUND_IN_PROGRESS");
+
+        var raceIds = races.Select(r => r.RaceId).ToList();
+
+        var entries = await _context.RaceEntries
+            .Include(e => e.Race)
+            .Include(e => e.Pairing).ThenInclude(p => p.Horse)
+            .Include(e => e.Pairing).ThenInclude(p => p.Jockey).ThenInclude(j => j.Jockey)
+            .Where(e => raceIds.Contains(e.RaceId))
+            .ToListAsync();
+
+        var entryIds = entries.Select(e => e.RaceEntryId).ToList();
+
+        // Bảng con trỏ tới RaceEntry: xoá entry khi còn tham chiếu sẽ vỡ FK.
+        // Dự đoán chỉ mở sau bốc thăm nên guard trên đã chặn phần lớn, nhưng vẫn
+        // kiểm tra để không xoá mất dữ liệu người dùng.
+        var hasDependents =
+            await _context.Predictions.AnyAsync(p => entryIds.Contains(p.RaceEntryId)) ||
+            await _context.PursePayouts.AnyAsync(p => entryIds.Contains(p.RaceEntryId)) ||
+            await _context.Violations.AnyAsync(v => entryIds.Contains(v.RaceEntryId) ||
+                                                   (v.PlaceBehindEntryId != null &&
+                                                    entryIds.Contains(v.PlaceBehindEntryId.Value)));
+        if (hasDependents)
+            throw new InvalidOperationException("ENTRIES_HAVE_DEPENDENT_DATA");
+
+        var released = entries
+            .OrderBy(e => e.Race.RaceNumber)
+            .Select(e => new ClearedPairingDto
+            {
+                PairingId = e.PairingId,
+                RaceId = e.RaceId,
+                RaceNumber = e.Race.RaceNumber,
+                HorseId = e.Pairing.HorseId,
+                HorseName = e.Pairing.Horse.Name,
+                JockeyName = e.Pairing.Jockey.Jockey.FullName
+            })
+            .ToList();
+
+        int removedWaitlist;
+
+        await using var tx = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            _context.RaceEntries.RemoveRange(entries);
+
+            // Danh sách chờ được tính lại từ đầu ở lần phân bổ sau, giữ lại chỉ gây
+            // lệch với entry vừa xoá.
+            removedWaitlist = await _context.RoundWaitlist
+                .Where(w => w.RoundId == roundId)
+                .ExecuteDeleteAsync();
+
+            await _context.SaveChangesAsync();
+
+            await _audit.LogAsync(actorId, "Gỡ phân bổ vòng đấu", "Round",
+                roundId.ToString(), null,
+                $"RemovedEntries={entries.Count};RemovedWaitlist={removedWaitlist}");
+
+            await tx.CommitAsync();
+        }
+        catch
+        {
+            await tx.RollbackAsync();
+            throw;
+        }
+
+        // Owner đã nhận thông báo "ngựa được phân vào cuộc đua #X" lúc allocate —
+        // không báo lại thì họ vẫn tin lịch cũ còn hiệu lực.
+        foreach (var entry in entries)
+        {
+            await _notification.SendAsync(
+                entry.Pairing.Horse.OwnerId,
+                "Phân bổ cuộc đua đã được gỡ",
+                $"Ngựa '{entry.Pairing.Horse.Name}' tạm thời không còn trong Cuộc đua " +
+                $"#{entry.Race.RaceNumber}. Ban tổ chức đang sắp xếp lại vòng đấu và sẽ " +
+                "thông báo cuộc đua mới.",
+                type: "Both",
+                relatedEntityType: "Round",
+                relatedEntityId: roundId);
+        }
+
+        return new ClearAllocationResultDto
+        {
+            RoundId = roundId,
+            TournamentId = round.TournamentId,
+            RemovedEntryCount = entries.Count,
+            RemovedWaitlistCount = removedWaitlist,
+            ReleasedPairings = released
+        };
+    }
+
     // Kế hoạch phân bổ đã qua mọi guard — dùng chung cho preview và chốt thật.
     private sealed record AllocationPlan(
         Round Round,

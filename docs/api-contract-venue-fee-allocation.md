@@ -454,6 +454,48 @@ Mọi error code giống `/auto-allocate`.
 - `Position` sinh từ **cùng thứ tự** đã dùng để cắt pool (vòng 1: thời điểm verify
   lệ phí; vòng sau: `AdvancementStatus` rồi `AdvancementRank`).
 
+### 3.1d Gỡ phân bổ cả vòng (undo)
+`DELETE /api/admin/rounds/{roundId}/allocation` · Role: **Admin**
+
+`ROUND_ALREADY_ALLOCATED` chặn việc phân lại, nên nếu phân nhầm mà không có lối
+này thì Admin phải xoá **từng entry một**. Endpoint đưa vòng về đúng trạng thái
+trước khi allocate chạy, rồi `/auto-allocate` gọi lại được bình thường.
+
+`200 OK`:
+```json
+{
+  "roundId": 5, "tournamentId": 3,
+  "removedEntryCount": 24, "removedWaitlistCount": 1,
+  "releasedPairings": [
+    { "pairingId": 12, "raceId": 11, "raceNumber": 1,
+      "horseId": 7, "horseName": "Thunder", "jockeyName": "Le Van A" }
+  ]
+}
+```
+
+**Xoá HẲN entry**, không chuyển `Cancelled`: entry ở đây do máy sinh ra và chưa hề
+thi đấu, giữ lại chỉ để rác trong starting list. `RoundWaitlist` của vòng cũng bị
+xoá vì lần phân bổ sau tính lại từ đầu. Tất cả trong một transaction.
+
+Owner đã nhận thông báo *"ngựa được phân vào Cuộc đua #X"* lúc allocate, nên sau
+khi gỡ mỗi Owner nhận tiếp thông báo lịch cũ không còn hiệu lực.
+
+| Điều kiện | Error | HTTP |
+|---|---|---|
+| Round không tồn tại | `ROUND_NOT_FOUND` | 404 |
+| Giải không ở Open/Closed Registration | `TOURNAMENT_NOT_OPEN_FOR_SCHEDULING` | 422 |
+| Có cuộc đua đã bốc thăm | `ROUND_ALREADY_DRAWN` | 409 |
+| Có cuộc đua không còn `Upcoming` | `ROUND_IN_PROGRESS` | 422 |
+| Entry đã có dự đoán / chi thưởng / vi phạm | `ENTRIES_HAVE_DEPENDENT_DATA` | 409 |
+
+Chặn khi đã bốc thăm vì cổng xuất phát đã công bố — gỡ lúc đó là rút lại một
+starting list người ngoài đã thấy. Guard `ENTRIES_HAVE_DEPENDENT_DATA` là lưới an
+toàn cho FK: dự đoán chỉ mở sau bốc thăm nên bình thường không chạm tới, nhưng thà
+từ chối còn hơn xoá mất dữ liệu người dùng.
+
+Vòng chưa allocate gọi endpoint này vẫn `200` với `removedEntryCount = 0` —
+idempotent, gọi lại không hại.
+
 ### 3.2 Điều chỉnh thủ công
 `PUT /api/admin/race-entries/{id}/move` · Role: **Admin**
 
@@ -584,6 +626,7 @@ Mọi job dùng system user (`Role = "System"`, patch 006) làm audit actor. Thi
 | POST | `/api/admin/rounds/{id}/auto-allocate` | Admin |
 | POST | `/api/admin/rounds/{id}/auto-allocate/preview` | Admin |
 | GET | `/api/admin/rounds/{id}/waitlist` | Admin |
+| DELETE | `/api/admin/rounds/{id}/allocation` | Admin |
 | PUT | `/api/admin/race-entries/{id}/move` | Admin |
 | POST | `/api/admin/rounds/{id}/finalize` | Admin |
 
@@ -634,6 +677,8 @@ Mọi job dùng system user (`Role = "System"`, patch 006) làm audit actor. Thi
 | `INSUFFICIENT_PAIRINGS_FOR_RACES` | 422 | Allocate |
 | `RACE_CAPACITY_TOO_SMALL` | 422 | Allocate |
 | `PREVIOUS_ROUND_NOT_COMPLETED` | 422 | Allocate |
+| `ROUND_IN_PROGRESS` | 422 | Clear allocation |
+| `ENTRIES_HAVE_DEPENDENT_DATA` | 409 | Clear allocation |
 | `RACE_NOT_IN_SAME_ROUND` | 422 | Move |
 | `MAX_LANES_REACHED` | 409 | Move, Draw |
 | `PAIRING_FEE_NOT_PAID` | 422 | Move |
