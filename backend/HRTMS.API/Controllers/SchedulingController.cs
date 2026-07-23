@@ -162,6 +162,41 @@ public class SchedulingController : ControllerBase
         }
     }
 
+    // Gỡ phân bổ cả vòng để phân lại — undo cho auto-allocate.
+    // Xoá entry + danh sách chờ, đưa vòng về trạng thái chưa phân bổ.
+    // Chỉ dùng được khi chưa bốc thăm và chưa cuộc đua nào chạy.
+    [HttpDelete("admin/rounds/{roundId:int}/allocation")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> ClearAllocation(int roundId)
+    {
+        if (!TryGetUserId(out var adminId))
+            return UnauthorizedResult();
+
+        try
+        {
+            return Ok(await _service.ClearRoundAllocationAsync(adminId, roundId));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(Err("ROUND_NOT_FOUND", "Không tìm thấy vòng đấu."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "ROUND_IN_PROGRESS")
+        {
+            return UnprocessableEntity(Err(ex.Message,
+                "Vòng đấu đã có cuộc đua bắt đầu hoặc kết thúc nên không thể gỡ phân bổ."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "ENTRIES_HAVE_DEPENDENT_DATA")
+        {
+            return Conflict(Err(ex.Message,
+                "Các đăng ký của vòng đã phát sinh dữ liệu liên quan (dự đoán, chi thưởng " +
+                "hoặc vi phạm) nên không thể gỡ phân bổ."));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return MapAllocateError(ex.Message);
+        }
+    }
+
     // Admin điều chỉnh thủ công sau auto-allocate: chuyển entry sang race khác
     // TRONG CÙNG vòng.
     [HttpPut("admin/race-entries/{id:int}/move")]
@@ -462,6 +497,13 @@ public class SchedulingController : ControllerBase
             "Vòng đấu chưa có cuộc đua nào để phân ngựa.")),
         "NO_ELIGIBLE_PAIRINGS" => UnprocessableEntity(Err(code,
             "Chưa có cặp đấu nào đủ điều kiện (đã xác nhận lệ phí) để phân vào cuộc đua.")),
+        "INSUFFICIENT_PAIRINGS_FOR_RACES" => UnprocessableEntity(Err(code,
+            "Số cặp đủ điều kiện không đủ cho số cuộc đua của vòng — mỗi cuộc đua cần ít nhất " +
+            "2 ngựa mới bốc thăm được. Hãy giảm bớt số cuộc đua của vòng, hoặc chờ thêm cặp " +
+            "hoàn tất lệ phí rồi phân lại.")),
+        "RACE_CAPACITY_TOO_SMALL" => UnprocessableEntity(Err(code,
+            "Số ngựa tối đa mỗi cuộc đua đang là 1 nên không cuộc đua nào bốc thăm được. " +
+            "Hãy tăng số ngựa tối đa của giải lên ít nhất 2.")),
         "PREVIOUS_ROUND_NOT_COMPLETED" => UnprocessableEntity(Err(code,
             "Vòng đấu trước chưa hoàn tất nên chưa thể phân ngựa vào vòng này.")),
         "VENUE_REQUIRED" => UnprocessableEntity(Err(code,

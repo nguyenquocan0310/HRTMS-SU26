@@ -53,9 +53,9 @@ public class EntryFeePaymentService : IEntryFeePaymentService
         if (pairing.Horse.OwnerId != ownerId)
             throw new UnauthorizedAccessException("FORBIDDEN");
 
-        // Nộp phí là bước SAU khi jockey đã accept. 'PendingVerification' cũng được
-        // phép: payment cũ đã bị reject, Owner nộp lại (pairing giữ nguyên trạng thái).
-        if (pairing.Status is not ("Accepted" or "PendingVerification"))
+        // Owner có thể nộp phí sau khi Jockey accept hoặc sau khi Owner đã chốt
+        // pairing. 'PendingVerification' cũng được phép khi payment cũ bị reject.
+        if (pairing.Status is not ("Accepted" or "Confirmed" or "PendingVerification"))
             throw new InvalidOperationException("PAIRING_NOT_ACCEPTED");
 
         var tournament = pairing.Tournament;

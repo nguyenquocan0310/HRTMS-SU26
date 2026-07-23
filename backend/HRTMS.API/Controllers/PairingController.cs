@@ -361,10 +361,8 @@ public class PairingController : ControllerBase
         }
     }
 
-    // DEPRECATED (patch 013) với giải CÓ THU PHÍ: Owner không còn tự xác nhận cặp
-    // đấu — xác nhận đến từ POST /api/pairings/{id}/fee-payment rồi Admin verify.
-    // Gọi endpoint này trên giải thu phí trả 422 ENTRY_FEE_REQUIRED.
-    // Giải miễn phí (EntryFeeAmount = 0) vẫn dùng endpoint này bình thường.
+    // Owner chốt pairing sau khi Jockey accept. Với giải có thu phí, Owner tiếp tục
+    // nộp phí và chờ Admin xác minh trước khi pairing đủ điều kiện được allocate.
     [HttpPatch("pairings/{id:int}/confirm")]
     [Authorize(Roles = "Owner")]
     public async Task<IActionResult> Confirm(int id)
@@ -409,16 +407,6 @@ public class PairingController : ControllerBase
                     error = "HORSE_NOT_OWNED",
                     message = "Ngựa này không thuộc quyền sở hữu của bạn."
                 });
-        }
-        catch (InvalidOperationException ex)
-            when (ex.Message == "ENTRY_FEE_REQUIRED")
-        {
-            return UnprocessableEntity(new
-            {
-                error = "ENTRY_FEE_REQUIRED",
-                message = "Giải đấu này có thu lệ phí. Vui lòng nộp lệ phí; " +
-                          "cặp đấu sẽ được xác nhận sau khi Ban tổ chức đối chiếu."
-            });
         }
         catch (InvalidOperationException ex)
             when (ex.Message == "INVALID_STATUS")

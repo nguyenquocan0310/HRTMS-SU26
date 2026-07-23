@@ -1,6 +1,6 @@
 import type { JockeyInvitation } from '../../types/owner.types';
 
-export type JockeyInviteAction = 'invite' | 'invited' | 'pay' | 'verifying' | 'paired' | 'reinvite';
+export type JockeyInviteAction = 'invite' | 'invited' | 'confirm' | 'pay' | 'verifying' | 'paired' | 'reinvite';
 
 export interface JockeyInviteState {
   action: JockeyInviteAction;
@@ -19,9 +19,9 @@ const statusPriority: Record<JockeyInvitation['status'], number> = {
 };
 
 const actionByStatus: Record<JockeyInvitation['status'], JockeyInviteAction> = {
-  Confirmed: 'paired',
+  Confirmed: 'pay',
   PendingVerification: 'verifying',
-  Accepted: 'pay',
+  Accepted: 'confirm',
   Pending: 'invited',
   Declined: 'reinvite',
   Rejected: 'reinvite',
