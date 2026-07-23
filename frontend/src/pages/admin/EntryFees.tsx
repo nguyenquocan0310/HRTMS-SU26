@@ -21,50 +21,6 @@ const EntryFees = () => {
   const [detail, setDetail] = useState<FeePayment | null>(null); const [confirming, setConfirming] = useState<FeePayment | null>(null);
   const [rejecting, setRejecting] = useState<FeePayment | null>(null); const [reason, setReason] = useState('');
   const tournament = useMemo(() => tournaments.find((item) => item.tournamentId === tournamentId), [tournaments, tournamentId]);
-interface FeeEntry {
-  raceEntryId: number;
-  raceId: number;
-  horseName: string;
-  jockeyName: string;
-  status: string;
-  entryFeeStatus: string;
-  createdAt: string;
-}
-
-interface PendingFeeEntry extends Omit<FeeEntry, 'jockeyName'> {
-  jockey?: {
-    fullName?: string | null;
-  };
-}
-
-interface RejectModalState {
-  entryId: number;
-  reason: string;
-}
-
-const EntryFees = () => {
-  const [entries, setEntries] = useState<FeeEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [msg, setMsg] = useState('');
-  const [actionId, setActionId] = useState<number | null>(null);
-  const [rejectModal, setRejectModal] = useState<RejectModalState | null>(null);
-
-  const loadEntries = () => {
-    setLoading(true);
-    setError('');
-    apiFetch<{ success: boolean; data: PendingFeeEntry[] }>('/admin/entries/pending-fee')
-      .then((res) => setEntries(
-        (res.data ?? []).map((entry) => ({
-          ...entry,
-          jockeyName: entry.jockey?.fullName?.trim() ?? '',
-        }))
-      ))
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => { loadEntries(); }, []);
 
   const load = async () => {
     setLoading(true); setError('');
