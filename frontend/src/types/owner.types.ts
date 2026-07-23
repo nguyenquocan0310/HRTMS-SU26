@@ -55,7 +55,7 @@ export interface JockeyInvitation {
   ownerID: string;
   jockeyID: string;
   jockeyName?: string;
-  status: 'Pending' | 'Accepted' | 'Confirmed' | 'Declined' | 'Rejected' | 'Expired' | 'Cancelled';
+  status: 'Pending' | 'Accepted' | 'PendingVerification' | 'Confirmed' | 'Declined' | 'Rejected' | 'Expired' | 'Cancelled';
   invitedAt: Date;
   respondedAt?: Date;
   horseID?: string;

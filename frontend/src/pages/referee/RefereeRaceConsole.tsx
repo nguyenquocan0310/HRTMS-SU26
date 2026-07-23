@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { closeProtestWindow, getProtestsByRace, ruleProtest } from '../../services/protestService'
-import type { Penalty, Protest, ProtestDecision } from '../../types/protest.types'
 import {
   confirmStartingList,
   createRaceViolation,
@@ -101,14 +99,6 @@ export default function RefereeRaceConsole() {
   const [violationForm, setViolationForm] = useState<CreateViolationPayload>({ raceEntryId: 0, violationCode: '', penalty: '', description: '' })
   const [finishNotes, setFinishNotes] = useState('')
   const [finishValues, setFinishValues] = useState<Record<number, { position: string; time: string }>>({})
-  const [protests, setProtests] = useState<Protest[]>([])
-  const [rulingProtestId, setRulingProtestId] = useState<number | null>(null)
-  const [rulingRaceId, setRulingRaceId] = useState<number | null>(null)
-  const [rulingDecision, setRulingDecision] = useState<ProtestDecision>('Approved')
-  const [rulingPenalty, setRulingPenalty] = useState<Penalty | ''>('')
-  const [rulingPlaceBehindId, setRulingPlaceBehindId] = useState<number | null>(null)
-  const [rulingNotes, setRulingNotes] = useState('')
-  const [closedProtestRaceId, setClosedProtestRaceId] = useState<number | null>(null)
 
   const loadConsole = useCallback(async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true); else setLoading(true)
@@ -116,25 +106,24 @@ export default function RefereeRaceConsole() {
     try {
       const assigned = await getMyRefereeRaceAssignments()
       setAssignments(assigned)
-      if (!raceId) { setAssignment(null); setEntries([]); setLiveStatus(null); setViolations([]); setProtests([]); return }
+      if (!raceId) { setAssignment(null); setEntries([]); setLiveStatus(null); setViolations([]); return }
       const matched = assigned.find((item) => item.raceId === raceId) ?? null
       setAssignment(matched)
       if (!matched) {
-        setEntries([]); setLiveStatus(null); setViolations([]); setProtests([])
+        setEntries([]); setLiveStatus(null); setViolations([])
         setError('Cuộc đua này không thuộc phạm vi được phân công của bạn.')
         return
       }
-      const [entryList, statusResult, violationList, codeList, protestList] = await Promise.all([
-        getRefereeRaceEntries(raceId), getRaceLiveStatus(raceId), getRaceViolations(raceId), getViolationCodes(), getProtestsByRace(raceId),
+      const [entryList, statusResult, violationList, codeList] = await Promise.all([
+        getRefereeRaceEntries(raceId), getRaceLiveStatus(raceId), getRaceViolations(raceId), getViolationCodes(),
       ])
-      setEntries(entryList); setLiveStatus(statusResult); setViolations(violationList); setViolationCodes(codeList); setProtests(protestList)
+      setEntries(entryList); setLiveStatus(statusResult); setViolations(violationList); setViolationCodes(codeList)
     } catch (loadError) { setError(errorMessage(loadError, 'Không tải được dữ liệu bàn điều hành.')) }
     finally { setLoading(false); setRefreshing(false) }
   }, [raceId])
 
   useEffect(() => { const id = window.setTimeout(() => void loadConsole(), 0); return () => window.clearTimeout(id) }, [loadConsole])
   useEffect(() => { if (!raceId || liveStatus?.status !== 'Live' || !assignment) return; const id = window.setInterval(() => { void Promise.all([getRaceLiveStatus(raceId), getRaceViolations(raceId)]).then(([status, items]) => { setLiveStatus(status); setViolations(items) }).catch(() => undefined) }, 5000); return () => window.clearInterval(id) }, [assignment, liveStatus?.status, raceId])
-  useEffect(() => { if (!raceId || liveStatus?.status !== 'Unofficial' || !assignment) return; const id = window.setInterval(() => { void getProtestsByRace(raceId).then(setProtests).catch(() => undefined) }, 5000); return () => window.clearInterval(id) }, [assignment, liveStatus?.status, raceId])
 
   const raceStatus = liveStatus?.status ?? assignment?.raceStatus ?? ''
   const eligibleLiveEntries = useMemo(() => liveStatus?.entries.filter((entry) => !inactiveEntry(entry)) ?? [], [liveStatus])
@@ -198,31 +187,6 @@ export default function RefereeRaceConsole() {
     finally { setSavingKey(null) }
   }
 
-  const openRulingForm = (protest: Protest) => {
-    setRulingProtestId(protest.protestId); setRulingRaceId(protest.raceId); setRulingDecision('Approved'); setRulingPenalty(''); setRulingPlaceBehindId(null); setRulingNotes('')
-  }
-  const closeRulingForm = () => { setRulingProtestId(null); setRulingRaceId(null); setRulingPenalty(''); setRulingPlaceBehindId(null); setRulingNotes('') }
-  const handleRuleProtest = async () => {
-    if (!raceId || !rulingProtestId || raceStatus !== 'Unofficial') return
-    if (rulingNotes.trim().length < 10) { notify('Ghi chú phán quyết phải có ít nhất 10 ký tự.'); return }
-    if (rulingDecision === 'Approved' && !rulingPenalty) { notify('Khi chấp thuận khiếu nại, vui lòng chọn hình phạt.'); return }
-    if (rulingDecision === 'Approved' && rulingPenalty === 'PlaceBehind' && !rulingPlaceBehindId) { notify('Vui lòng chọn entry mục tiêu cho hình phạt PlaceBehind.'); return }
-    setSavingKey(`ruling-${rulingProtestId}`)
-    try {
-      await ruleProtest(rulingProtestId, { decision: rulingDecision, penalty: rulingDecision === 'Approved' ? rulingPenalty as Penalty : null, placeBehindEntryId: rulingDecision === 'Approved' && rulingPenalty === 'PlaceBehind' ? rulingPlaceBehindId : null, notes: rulingNotes.trim() })
-      const [protestList, statusResult] = await Promise.all([getProtestsByRace(raceId), getRaceLiveStatus(raceId)])
-      setProtests(protestList); setLiveStatus(statusResult); closeRulingForm(); notify('Đã ghi nhận phán quyết khiếu nại.')
-    } catch (actionError) { notify(errorMessage(actionError, 'Không thể xử lý khiếu nại.')) }
-    finally { setSavingKey(null) }
-  }
-  const handleCloseProtestWindow = async () => {
-    if (!raceId || raceStatus !== 'Unofficial' || !window.confirm('Đóng cửa sổ khiếu nại sớm? Thao tác này chỉ hợp lệ sau tối thiểu 5 phút kể từ khi chốt kết quả sơ bộ.')) return
-    setSavingKey('close-protest-window')
-    try { await closeProtestWindow(raceId); setClosedProtestRaceId(raceId); notify('Đã đóng cửa sổ khiếu nại. Admin có thể công bố Official khi đủ các điều kiện còn lại.') }
-    catch (actionError) { notify(errorMessage(actionError, 'Không thể đóng cửa sổ khiếu nại.')) }
-    finally { setSavingKey(null) }
-  }
-
   if (loading) return <div className="space-y-5" aria-busy="true"><div className="h-24 animate-pulse rounded-xl bg-white" /><div className="h-80 animate-pulse rounded-xl border border-slate-200 bg-white" /></div>
 
   return <div className="space-y-6">
@@ -232,18 +196,6 @@ export default function RefereeRaceConsole() {
 
     {!raceId ? <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-100 px-5 py-4"><h2 className="font-bold text-slate-900">Cuộc đua được phân công</h2><p className="mt-1 text-xs text-slate-500">Chọn một race để mở bàn điều hành.</p></div>{assignments.length === 0 ? <div className="px-6 py-14 text-center"><p className="font-bold text-slate-700">Chưa có cuộc đua được phân công.</p><p className="mt-1 text-sm text-slate-500">Admin sẽ phân công sau khi bạn được duyệt vào roster.</p></div> : <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-5 py-3">Giải đấu / vòng</th><th className="px-5 py-3">Race</th><th className="px-5 py-3">Thời gian</th><th className="px-5 py-3">Vai trò</th><th className="px-5 py-3">Trạng thái</th><th className="px-5 py-3 text-right">Thao tác</th></tr></thead><tbody className="divide-y divide-slate-100">{assignments.map((item) => <tr key={`${item.raceId}-${item.assignedAt}`}><td className="px-5 py-4"><p className="font-bold text-slate-900">{item.tournamentName ?? '—'}</p><p className="mt-1 text-xs text-slate-500">{item.roundName ?? '—'}</p></td><td className="px-5 py-4 font-bold">#{item.raceNumber ?? item.raceId}</td><td className="whitespace-nowrap px-5 py-4">{formatDateTime(item.scheduledTime)}</td><td className="px-5 py-4">{item.assignmentRole ?? item.role ?? 'Referee'}</td><td className="px-5 py-4"><StatusBadge status={item.raceStatus} /></td><td className="px-5 py-4 text-right"><button type="button" onClick={() => navigate(`/referee/race-console?raceId=${item.raceId}`)} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold">Mở bàn điều hành</button></td></tr>)}</tbody></table></div>}</section> : error || !assignment ? <section className="rounded-xl border border-red-200 bg-white p-6 shadow-sm"><h2 className="font-bold text-slate-900">Không thể mở cuộc đua</h2><p role="alert" className="mt-2 text-sm text-red-700">{error || 'Không tìm thấy phân công phù hợp.'}</p><button type="button" onClick={() => navigate('/referee/race-console')} className="mt-4 rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold">Về danh sách phân công</button></section> : <>
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div><div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-black text-slate-950">{assignment.tournamentName ?? 'Giải đấu'} · Race #{assignment.raceNumber ?? assignment.raceId}</h2><StatusBadge status={raceStatus} /></div><p className="mt-2 text-sm text-slate-500">{assignment.roundName ?? '—'} · {formatDateTime(assignment.scheduledTime)} · {assignment.assignmentRole ?? assignment.role ?? 'Referee'}</p></div><div className="flex flex-wrap gap-2"><button type="button" onClick={() => void loadConsole(true)} disabled={refreshing} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 disabled:opacity-50">{refreshing ? 'Đang tải...' : 'Làm mới'}</button>{raceStatus === 'Upcoming' && <button type="button" onClick={() => void handleConfirmStartingList()} disabled={savingKey === 'starting-list' || entries.length === 0} className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold disabled:opacity-50">{savingKey === 'starting-list' ? 'Đang xác nhận...' : 'Xác nhận starting list'}</button>}{raceStatus === 'Pre-Race' && <button type="button" onClick={() => void handleStartRace()} disabled={savingKey === 'start-race'} className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold disabled:opacity-50">{savingKey === 'start-race' ? 'Đang bắt đầu...' : 'Bắt đầu cuộc đua'}</button>}{raceStatus === 'Live' && <><button type="button" onClick={() => { resetViolationForm(); setShowViolationForm(true) }} className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-900">Ghi nhận vi phạm</button><button type="button" onClick={() => setShowFinishForm((value) => !value)} className="rounded-lg bg-slate-950 px-4 py-2 text-xs font-bold text-white">Chốt kết quả sơ bộ</button></>}</div></div>{raceStatus === 'Unofficial' && <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">Kết quả đang ở trạng thái Unofficial và chờ Admin công bố chính thức.</p>}{raceStatus === 'Official' && <p className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">Kết quả đã được Admin công bố Official. Referee chỉ có quyền xem.</p>}</section>
-
-      {(raceStatus === 'Unofficial' || raceStatus === 'Official') && <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-slate-900">Xử lý khiếu nại</h2><span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-800">{protests.filter((item) => item.status.toLowerCase() === 'pending').length} đang chờ</span></div><p className="mt-1 text-xs text-slate-500">Khiếu nại mới được tự động cập nhật mỗi 5 giây trong giai đoạn Unofficial.</p></div>{raceStatus === 'Unofficial' && <button type="button" onClick={() => void handleCloseProtestWindow()} disabled={savingKey === 'close-protest-window' || closedProtestRaceId === raceId} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-800 disabled:cursor-not-allowed disabled:opacity-50">{closedProtestRaceId === raceId ? 'Cửa sổ đã đóng' : savingKey === 'close-protest-window' ? 'Đang đóng...' : 'Đóng cửa sổ khiếu nại sớm'}</button>}</div>
-        {protests.length === 0 ? <div className="px-5 py-12 text-center"><p className="font-bold text-slate-700">Chưa có khiếu nại.</p><p className="mt-1 text-sm text-slate-500">Owner/Jockey có tối đa 10 phút sau khi kết quả chuyển sang Unofficial để gửi khiếu nại.</p></div> : <div className="divide-y divide-slate-100">{protests.map((protest) => {
-          const accused = liveStatus?.entries.find((entry) => entry.raceEntryId === protest.accusedRaceEntryId)
-          const pending = protest.status.toLowerCase() === 'pending'
-          const isEditing = rulingRaceId === raceId && rulingProtestId === protest.protestId
-          return <article key={protest.protestId} className="p-5"><div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-black text-slate-900">Khiếu nại #{protest.protestId}</h3><StatusBadge status={protest.status} />{protest.penaltyApplied && <StatusBadge status={protest.penaltyApplied} />}</div><p className="mt-2 text-sm font-bold text-slate-700">Bị khiếu nại: {accused ? `${accused.horseName} / ${accused.jockeyName}` : `Entry #${protest.accusedRaceEntryId}`}</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{protest.description}</p><div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400"><span>Người gửi #{protest.submittedByUserId}</span><span>Gửi lúc {formatDateTime(protest.submittedAt)}</span>{protest.violationId && <span>Vi phạm liên quan #{protest.violationId}</span>}</div>{!pending && <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700"><strong>Phán quyết:</strong> {protest.refereeDecision ?? protest.status}{protest.penaltyApplied ? ` · ${protest.penaltyApplied}` : ''}{protest.resolvedAt ? ` · ${formatDateTime(protest.resolvedAt)}` : ''}</div>}</div>{raceStatus === 'Unofficial' && pending && !isEditing && <button type="button" onClick={() => openRulingForm(protest)} className="shrink-0 rounded-lg bg-slate-950 px-4 py-2 text-xs font-bold text-white">Ra phán quyết</button>}</div>
-          {isEditing && <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4"><div className="grid gap-4 md:grid-cols-2"><label className="text-sm font-bold text-slate-700">Quyết định<select value={rulingDecision} onChange={(event) => { setRulingDecision(event.target.value as ProtestDecision); setRulingPenalty(''); setRulingPlaceBehindId(null) }} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal"><option value="Approved">Chấp thuận</option><option value="Rejected">Từ chối</option></select></label>{rulingDecision === 'Approved' && <label className="text-sm font-bold text-slate-700">Hình phạt<select value={rulingPenalty} onChange={(event) => { setRulingPenalty(event.target.value as Penalty | ''); setRulingPlaceBehindId(null) }} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal"><option value="">Chọn hình phạt</option>{PENALTIES.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>}{rulingDecision === 'Approved' && rulingPenalty === 'PlaceBehind' && <label className="text-sm font-bold text-slate-700 md:col-span-2">Xếp sau entry<select value={rulingPlaceBehindId ?? ''} onChange={(event) => setRulingPlaceBehindId(event.target.value ? Number(event.target.value) : null)} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal"><option value="">Chọn entry mục tiêu</option>{liveStatus?.entries.filter((entry) => entry.raceEntryId !== protest.accusedRaceEntryId && !inactiveEntry(entry)).map((entry) => <option key={entry.raceEntryId} value={entry.raceEntryId}>Hạng {entry.finishPosition ?? '—'} · {entry.horseName} / {entry.jockeyName}</option>)}</select></label>}<label className="text-sm font-bold text-slate-700 md:col-span-2">Ghi chú phán quyết<textarea rows={3} minLength={10} maxLength={500} value={rulingNotes} onChange={(event) => setRulingNotes(event.target.value)} placeholder="Nêu căn cứ ra phán quyết (10–500 ký tự)" className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal" /></label></div><div className="mt-4 flex justify-end gap-2"><button type="button" onClick={closeRulingForm} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold">Hủy</button><button type="button" onClick={() => void handleRuleProtest()} disabled={savingKey === `ruling-${protest.protestId}`} className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{savingKey === `ruling-${protest.protestId}` ? 'Đang xử lý...' : 'Xác nhận phán quyết'}</button></div></div>}
-          </article>
-        })}</div>}
-      </section>}
 
       {showViolationForm && raceStatus === 'Live' && <section className="rounded-xl border border-amber-200 bg-amber-50 p-5"><h2 className="font-bold text-amber-950">{editingViolationId ? 'Cập nhật vi phạm' : 'Ghi nhận vi phạm'}</h2><div className="mt-4 grid gap-4 md:grid-cols-2"><label className="text-sm font-bold text-slate-700">Race entry<select value={violationForm.raceEntryId} onChange={(event) => setViolationForm((prev) => ({ ...prev, raceEntryId: Number(event.target.value) }))} disabled={editingViolationId !== null} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal"><option value={0}>Chọn entry hợp lệ</option>{eligibleLiveEntries.map((entry) => <option key={entry.raceEntryId} value={entry.raceEntryId}>GATE {entry.postPosition ?? '—'} · {entry.horseName} / {entry.jockeyName}</option>)}</select></label><label className="text-sm font-bold text-slate-700">Mã vi phạm<select value={violationForm.violationCode} onChange={(event) => setViolationForm((prev) => ({ ...prev, violationCode: event.target.value }))} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal"><option value="">Chọn mã backend hỗ trợ</option>{violationCodes.map((item) => <option key={item.code} value={item.code}>{item.code} · {item.name}</option>)}</select></label><label className="text-sm font-bold text-slate-700">Hình phạt<select value={violationForm.penalty} onChange={(event) => setViolationForm((prev) => ({ ...prev, penalty: event.target.value, placeBehindEntryId: undefined }))} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal"><option value="">Chọn hình phạt</option>{PENALTIES.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>{violationForm.penalty === 'PlaceBehind' && <label className="text-sm font-bold text-slate-700">Xếp sau entry<select value={violationForm.placeBehindEntryId ?? ''} onChange={(event) => setViolationForm((prev) => ({ ...prev, placeBehindEntryId: event.target.value ? Number(event.target.value) : undefined }))} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal"><option value="">Chọn entry</option>{eligibleLiveEntries.filter((entry) => entry.raceEntryId !== violationForm.raceEntryId).map((entry) => <option key={entry.raceEntryId} value={entry.raceEntryId}>{entry.horseName} / {entry.jockeyName}</option>)}</select></label>}<label className="text-sm font-bold text-slate-700 md:col-span-2">Mô tả<textarea rows={3} value={violationForm.description} onChange={(event) => setViolationForm((prev) => ({ ...prev, description: event.target.value }))} className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-normal" /></label></div><div className="mt-4 flex justify-end gap-2"><button type="button" onClick={resetViolationForm} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold">Hủy</button><button type="button" onClick={() => void handleSaveViolation()} disabled={savingKey === 'violation'} className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{savingKey === 'violation' ? 'Đang lưu...' : 'Lưu vi phạm'}</button></div></section>}
 

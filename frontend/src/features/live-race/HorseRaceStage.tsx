@@ -27,7 +27,10 @@ const laneColors = [0x2563eb, 0x059669, 0xd97706, 0xe11d48, 0x7c3aed, 0x0891b2]
 const laneHeight = 96
 const stagePadding = 18
 const trackHeaderHeight = 48
-const maximumProgress = 0.97
+const finishThreshold = 1
+// Halfway through the finish zone keeps the full 64px sprite beyond the line.
+const stopProgress = 1.5
+const finishApproachStart = 0.97
 const fixedSimulationStepMs = 100
 const maximumCatchUpSteps = 3000
 const wallClockCorrectionIntervalMs = 1000
@@ -68,8 +71,6 @@ const maximumFinalKick = 0.06
 const minimumPaceModifier = 0.94
 const maximumPaceModifier = 1.06
 const maximumEffectiveSpeed = maximumSpeed * maximumPaceModifier
-const minimumVisualHoldProgress = 0.94
-const visualHoldProgressSpan = maximumProgress - minimumVisualHoldProgress
 const countdownDurationMs = 3000
 const goEffectDurationMs = 650
 const desktopParticleCount = 22
@@ -130,14 +131,14 @@ const getRacePathPoint = (
 ) => {
   const trackProgress = clamp(progress, 0, 1)
   const finishZoneProgress = clamp(progress - 1, 0, 1)
-  const cappedLiveProgress = clamp(trackProgress / maximumProgress, 0, 1)
+  const cappedLiveProgress = clamp(trackProgress / finishApproachStart, 0, 1)
   const finishApproachProgress = smoothstep(
-    (trackProgress - maximumProgress) / (1 - maximumProgress)
+    (trackProgress - finishApproachStart) / (finishThreshold - finishApproachStart)
   )
-  const x = progress <= maximumProgress
+  const x = progress <= finishApproachStart
     ? geometry.startX
       + (geometry.liveSafeEndX - geometry.startX) * cappedLiveProgress
-    : progress <= 1
+    : progress <= finishThreshold
       ? geometry.liveSafeEndX
         + (geometry.finishLineX - geometry.liveSafeEndX) * finishApproachProgress
       : geometry.finishLineX
@@ -154,7 +155,7 @@ const getRacePathPoint = (
     : 0
   return {
     x,
-    y: progress <= 1 ? laneBaseY + curveOffset : laneBaseY,
+    y: progress <= finishThreshold ? laneBaseY + curveOffset : laneBaseY,
   }
 }
 
@@ -167,7 +168,7 @@ const sampleRacePath = (
 )
 
 const motionProgressToPathProgress = (progress: number) =>
-  clamp(progress, 0, maximumProgress)
+  clamp(progress, 0, stopProgress)
 
 type FinishPhase = 'none' | 'tweening' | 'complete'
 type CountdownPhase = 'idle' | 'running' | 'completed' | 'cancelled' | 'skipped'
@@ -248,6 +249,8 @@ interface VisualPaceProfile {
 }
 
 interface HorseMotionState {
+  finished: boolean
+  finishElapsedMs: number | null
   paceProfile: VisualPaceProfile | null
   raceEntryId: number
   previousProgress: number
@@ -297,6 +300,7 @@ interface LayeredHorseVisual {
   resultBadgeOffsetX: number
   settledFrameIndex: number
   stopFrameCount: number
+  stopStartedAt: number | null
   stopTextures: [PixiTexture[], PixiTexture[], PixiTexture[]]
   temporaryRankBackground: PixiGraphics | null
   temporaryRankBadge: PixiContainer | null
@@ -305,6 +309,17 @@ interface LayeredHorseVisual {
   temporaryRankWidth: number
   usingStopTextures: boolean
   winnerHighlight: PixiContainer | null
+}
+
+interface TemporaryFinishResult {
+  finishElapsedMs: number
+  finishPosition: number
+  raceEntryId: number
+}
+
+interface RaceTimingSnapshot {
+  elapsedMs: number
+  results: TemporaryFinishResult[]
 }
 
 interface MasterAnimationController {
@@ -595,23 +610,27 @@ const handleCountdownHidden = (
 const createMotionState = (raceId: number, raceEntryId: number): HorseMotionState => {
   const initialSpeed = deterministicTargetSpeed(raceId, raceEntryId, 0)
   return {
+    finished: false,
+    finishElapsedMs: null,
     paceProfile: null,
     raceEntryId,
     previousProgress: 0,
     progress: 0,
     speed: initialSpeed,
     targetSpeed: initialSpeed,
-    visualHoldProgress: maximumProgress,
+    visualHoldProgress: stopProgress,
   }
 }
 
 const resetMotionState = (state: HorseMotionState, raceId: number) => {
   const initialSpeed = deterministicTargetSpeed(raceId, state.raceEntryId, 0)
+  state.finished = false
+  state.finishElapsedMs = null
   state.previousProgress = 0
   state.progress = 0
   state.speed = initialSpeed
   state.targetSpeed = initialSpeed
-  state.visualHoldProgress = maximumProgress
+  state.visualHoldProgress = stopProgress
 }
 
 const advanceMotionState = (
@@ -619,22 +638,38 @@ const advanceMotionState = (
   raceId: number,
   simulationStep: number
 ) => {
-  if (state.progress >= maximumProgress) return
+  if (state.finished) return
 
   state.previousProgress = state.progress
   state.targetSpeed = deterministicTargetSpeed(raceId, state.raceEntryId, simulationStep)
   const smoothing = Math.min(1, fixedSimulationStepMs / 1000 * 2.5)
   state.speed += (state.targetSpeed - state.speed) * smoothing
   const effectiveSpeed = effectiveMotionSpeed(state, simulationStep)
+  const progressBeforeStep = state.progress
   state.progress = Math.min(
-    maximumProgress,
+    stopProgress,
     state.progress + effectiveSpeed * (fixedSimulationStepMs / 1000)
   )
 
-  if (state.progress >= maximumProgress) {
-    state.previousProgress = maximumProgress
+  if (
+    state.finishElapsedMs == null
+    && progressBeforeStep < finishThreshold
+    && state.progress >= finishThreshold
+  ) {
+    const stepProgress = state.progress - progressBeforeStep
+    const crossingFraction = stepProgress <= 0
+      ? 1
+      : clamp((finishThreshold - progressBeforeStep) / stepProgress, 0, 1)
+    state.finishElapsedMs = simulationStep * fixedSimulationStepMs
+      + crossingFraction * fixedSimulationStepMs
+  }
+
+  if (state.progress >= stopProgress) {
+    state.previousProgress = stopProgress
+    state.progress = stopProgress
     state.speed = 0
     state.targetSpeed = 0
+    state.finished = true
   }
 }
 
@@ -660,7 +695,7 @@ const catchUpMotion = (
     if (
       activeEntries.length > 0
       && activeEntries.every((entry) =>
-        master.motionStates.get(entry.raceEntryId)?.progress === maximumProgress
+        master.motionStates.get(entry.raceEntryId)?.finished === true
       )
     ) {
       completedSteps = elapsedSteps
@@ -681,6 +716,8 @@ const catchUpMotion = (
       state.progress = 0
       state.speed = 0
       state.targetSpeed = 0
+      state.finished = false
+      state.finishElapsedMs = null
     }
   }
 }
@@ -688,56 +725,85 @@ const catchUpMotion = (
 const activeMotionEntries = (race: RaceLiveStatus) =>
   race.entries.filter((entry) => !isInactive(entry))
 
+const temporaryFinishResults = (
+  master: MasterAnimationController,
+  race: RaceLiveStatus
+): TemporaryFinishResult[] => activeMotionEntries(race)
+  .flatMap((entry) => {
+    const finishElapsedMs = master.motionStates.get(entry.raceEntryId)?.finishElapsedMs
+    return finishElapsedMs == null
+      ? []
+      : [{ raceEntryId: entry.raceEntryId, finishElapsedMs }]
+  })
+  .sort((left, right) => left.finishElapsedMs - right.finishElapsedMs
+    || left.raceEntryId - right.raceEntryId)
+  .map((result, index) => ({ ...result, finishPosition: index + 1 }))
+
+const raceTimingSnapshot = (
+  master: MasterAnimationController,
+  race: RaceLiveStatus,
+  previous: RaceTimingSnapshot,
+  now = Date.now()
+): RaceTimingSnapshot => {
+  const status = race.status.toLowerCase()
+  if (status === 'upcoming' || status === 'pre-race') {
+    return { elapsedMs: 0, results: [] }
+  }
+
+  const results = temporaryFinishResults(master, race)
+  if (status === 'live') {
+    const activeEntryCount = activeMotionEntries(race).length
+    const allEntriesCrossed = activeEntryCount > 0 && results.length === activeEntryCount
+    const actualStartTimestamp = parseActualStartTimestamp(race.actualStartTime)
+    const elapsedMs = allEntriesCrossed
+      ? Math.max(...results.map((result) => result.finishElapsedMs))
+      : actualStartTimestamp == null
+        ? 0
+        : Math.max(0, now - actualStartTimestamp)
+    return { elapsedMs, results }
+  }
+
+  return results.length > 0
+    ? {
+        elapsedMs: Math.max(...results.map((result) => result.finishElapsedMs)),
+        results,
+      }
+    : previous
+}
+
+const sameTimingSnapshot = (left: RaceTimingSnapshot, right: RaceTimingSnapshot) =>
+  Math.floor(left.elapsedMs) === Math.floor(right.elapsedMs)
+  && left.results.length === right.results.length
+  && left.results.every((result, index) => {
+    const other = right.results[index]
+    return other != null
+      && result.raceEntryId === other.raceEntryId
+      && result.finishPosition === other.finishPosition
+      && result.finishElapsedMs === other.finishElapsedMs
+  })
+
+const formatRaceClock = (elapsedMs: number) => {
+  const totalMilliseconds = Math.max(0, Math.floor(elapsedMs))
+  const minutes = Math.floor(totalMilliseconds / 60_000)
+  const seconds = Math.floor(totalMilliseconds / 1_000) % 60
+  const milliseconds = totalMilliseconds % 1_000
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`
+}
+
 const displayedFixedStepProgress = (state: HorseMotionState) =>
   Math.min(state.progress, state.visualHoldProgress)
 
-const syncVisualHoldProgress = (
-  master: MasterAnimationController,
-  race: RaceLiveStatus,
-  geometry: TrackGeometry,
-  spriteWidth: number
-) => {
+const syncVisualHoldProgress = (master: MasterAnimationController) => {
   for (const state of master.motionStates.values()) {
-    state.visualHoldProgress = maximumProgress
+    state.visualHoldProgress = stopProgress
   }
-  if (race.status.toLowerCase() !== 'live') return
-
-  const activeStates = activeMotionEntries(race)
-    .map((entry) => master.motionStates.get(entry.raceEntryId))
-    .filter((state): state is HorseMotionState => state?.paceProfile != null)
-    .sort((left, right) => (
-      right.paceProfile?.holdScore ?? 0
-    ) - (
-      left.paceProfile?.holdScore ?? 0
-    ))
-  if (activeStates.length === 0) return
-
-  const liveTravelWidth = Math.max(1, geometry.liveSafeEndX - geometry.startX)
-  const mobile = geometry.finishZoneEndX < mobileTrackBreakpoint
-  const desiredGapPixels = mobile
-    ? clamp(spriteWidth * 0.09, 4, 7)
-    : clamp(spriteWidth * 0.16, 6, 12)
-  const gapProgress = activeStates.length === 1
-    ? 0
-    : Math.min(
-        desiredGapPixels * maximumProgress / liveTravelWidth,
-        visualHoldProgressSpan / (activeStates.length - 1)
-      )
-
-  activeStates.forEach((state, slotIndex) => {
-    state.visualHoldProgress = clamp(
-      maximumProgress - slotIndex * gapProgress,
-      minimumVisualHoldProgress,
-      maximumProgress
-    )
-  })
 }
 
 const allActiveEntriesAtLimit = (
   master: MasterAnimationController,
   entries: LiveRaceEntry[]
 ) => entries.length === 0 || entries.every((entry) =>
-  master.motionStates.get(entry.raceEntryId)?.progress === maximumProgress
+  master.motionStates.get(entry.raceEntryId)?.finished === true
 )
 
 const catchUpMissingSteps = (
@@ -828,7 +894,7 @@ const syncMotionStates = (master: MasterAnimationController, race: RaceLiveStatu
     const inactive = isInactive(entry)
     if (inactive) {
       state.paceProfile = null
-      state.visualHoldProgress = maximumProgress
+      state.visualHoldProgress = stopProgress
     } else if (!state.paceProfile) {
       state.paceProfile = createVisualPaceProfile(race.raceId, entry.raceEntryId)
     }
@@ -844,9 +910,9 @@ const syncMotionStates = (master: MasterAnimationController, race: RaceLiveStatu
         simulationStep += 1
       ) {
         advanceMotionState(state, race.raceId, simulationStep)
-        if (state.progress >= maximumProgress) break
+        if (state.finished) break
       }
-    } else if (state.speed === 0 && state.progress < maximumProgress) {
+    } else if (state.speed === 0 && !state.finished) {
       state.speed = deterministicTargetSpeed(race.raceId, state.raceEntryId, master.simulationStep)
       state.targetSpeed = state.speed
     }
@@ -1009,12 +1075,47 @@ const applyStopPose = (visual: LayeredHorseVisual, frame: number) => {
     visual.usingStopTextures = true
   }
   visual.playback = 'manual'
+  visual.stopStartedAt = null
   const boundedFrame = Math.min(
     Math.max(0, frame),
     visual.stopFrameCount - 1,
     visual.settledFrameIndex
   )
   for (const layer of visual.layers) layer.gotoAndStop(boundedFrame)
+}
+
+const startIndependentStopAnimation = (
+  visual: LayeredHorseVisual,
+  reducedMotion: boolean
+) => {
+  if (!visual.usingStopTextures) {
+    visual.layers.forEach((layer, index) => {
+      layer.textures = visual.stopTextures[index]
+    })
+    visual.usingStopTextures = true
+  }
+  visual.playback = 'manual'
+  visual.stopStartedAt = reducedMotion ? null : performance.now()
+  const initialFrame = reducedMotion ? visual.settledFrameIndex : 0
+  for (const layer of visual.layers) layer.gotoAndStop(initialFrame)
+}
+
+const updateIndependentStopAnimations = (master: MasterAnimationController) => {
+  const now = performance.now()
+  for (const visual of master.visuals) {
+    const state = master.motionStates.get(visual.raceEntryId)
+    if (!state?.finished || visual.inactive) continue
+    if (!visual.usingStopTextures) {
+      startIndependentStopAnimation(visual, master.reducedMotion)
+    }
+    if (visual.stopStartedAt == null) continue
+    const frame = Math.min(
+      visual.settledFrameIndex,
+      Math.floor((now - visual.stopStartedAt) / stopFrameDurationMs)
+    )
+    for (const layer of visual.layers) layer.gotoAndStop(frame)
+    if (frame >= visual.settledFrameIndex) visual.stopStartedAt = null
+  }
 }
 
 const finishStopFrame = (
@@ -1096,6 +1197,7 @@ const updateMotion = (
     correctMotionToWallClock(master, race, now)
   }
 
+  updateIndependentStopAnimations(master)
   renderMotionPositions(master)
 }
 
@@ -1788,7 +1890,7 @@ const drawStage = (
   master.temporaryStandings.label = null
   destroyStageChildren(app)
   syncMotionStates(master, race)
-  syncVisualHoldProgress(master, race, geometry, assets.frameWidth)
+  syncVisualHoldProgress(master)
   const finishValidation = validateFinishResults(race)
   syncFinishSequence(
     master,
@@ -1824,6 +1926,9 @@ const drawStage = (
     const laneY = stagePadding + trackHeaderHeight + index * laneHeight
     const centerY = laneY + laneHeight / 2
     const inactive = isInactive(entry)
+    const motionState = master.motionStates.get(entry.raceEntryId)
+    const liveFinished = race.status.toLowerCase() === 'live'
+      && motionState?.finished === true
     const finishPosition = finishValidation.kind === 'valid'
       ? finishValidation.positions.get(entry.raceEntryId) ?? null
       : null
@@ -1835,7 +1940,9 @@ const drawStage = (
       stopFrames.frameCount - 1
     )
     const finishTarget = master.finish.entries.get(entry.raceEntryId)
-    const initialStopFrame = settledResult
+    const initialStopFrame = liveFinished
+      ? visualSettledFrameIndex
+      : settledResult
       ? visualSettledFrameIndex
       : master.finish.phase === 'tweening' && finishTarget
         ? finishStopFrame(
@@ -1909,7 +2016,6 @@ const drawStage = (
       layer.gotoAndStop(initialStopFrame ?? 0)
     }
     horseVisual.addChild(horse, leash, rider)
-    const motionState = master.motionStates.get(entry.raceEntryId)
     const finishProgress = currentFinishProgress(master, entry.raceEntryId)
     const motionProgress = motionState ? motionDisplayProgress(master, motionState, inactive) : 0
     const progress = finishProgress ?? motionProgressToPathProgress(motionProgress)
@@ -2039,6 +2145,7 @@ const drawStage = (
       resultBadgeOffsetX,
       settledFrameIndex: visualSettledFrameIndex,
       stopFrameCount: stopFrames.frameCount,
+      stopStartedAt: null,
       stopTextures: [
         index % 2 === 0 ? stopFrames.horseI : stopFrames.horseII,
         stopFrames.leash,
@@ -2239,6 +2346,12 @@ export default function HorseRaceStage({ race, fallback }: HorseRaceStageProps) 
   const cleanupRef = useRef<(() => void) | null>(null)
   const failRef = useRef<(() => void) | null>(null)
   const [failed, setFailed] = useState(false)
+  const [timingSnapshot, setTimingSnapshot] = useState<RaceTimingSnapshot>({
+    elapsedMs: 0,
+    results: [],
+  })
+  const timingSnapshotRef = useRef(timingSnapshot)
+  const timingRaceIdRef = useRef(race.raceId)
   const stageHeight = Math.max(
     220,
     stagePadding * 2 + trackHeaderHeight + race.entries.length * laneHeight
@@ -2255,6 +2368,27 @@ export default function HorseRaceStage({ race, fallback }: HorseRaceStageProps) 
     let visibilityCallback: (() => void) | null = null
     let pageShowCallback: ((event: PageTransitionEvent) => void) | null = null
     let resyncVisibleStage: (() => void) | null = null
+    let lastTimingPublishedAt = 0
+
+    const publishTimingSnapshot = (force = false) => {
+      const now = Date.now()
+      if (!force && now - lastTimingPublishedAt < 33) return
+      lastTimingPublishedAt = now
+
+      if (timingRaceIdRef.current !== raceRef.current.raceId) {
+        timingRaceIdRef.current = raceRef.current.raceId
+        timingSnapshotRef.current = { elapsedMs: 0, results: [] }
+      }
+      const nextSnapshot = raceTimingSnapshot(
+        masterRef.current,
+        raceRef.current,
+        timingSnapshotRef.current,
+        now
+      )
+      if (sameTimingSnapshot(timingSnapshotRef.current, nextSnapshot)) return
+      timingSnapshotRef.current = nextSnapshot
+      setTimingSnapshot(nextSnapshot)
+    }
 
     visibilityCallback = () => {
       if (document.visibilityState !== 'visible') {
@@ -2334,6 +2468,7 @@ export default function HorseRaceStage({ race, fallback }: HorseRaceStageProps) 
             if (!reducedMotion.matches) updateMasterAnimation(masterRef.current, ticker)
             updateMotion(masterRef.current, ticker, raceRef.current)
             updateFinishSequence(masterRef.current, reducedMotion.matches)
+            publishTimingSnapshot()
             if (app && pixi) {
               updateCountdown(
                 masterRef.current,
@@ -2425,6 +2560,7 @@ export default function HorseRaceStage({ race, fallback }: HorseRaceStageProps) 
           try {
             correctMotionToWallClock(masterRef.current, raceRef.current)
             updateFinishSequence(masterRef.current, masterRef.current.reducedMotion)
+            publishTimingSnapshot(true)
             updateTemporaryStandingVisuals(
               masterRef.current,
               raceRef.current,
@@ -2510,15 +2646,27 @@ export default function HorseRaceStage({ race, fallback }: HorseRaceStageProps) 
 
   if (failed) return fallback ?? null
 
+  const status = race.status.toLowerCase()
+  const showTemporaryFinishResults = ['live', 'completed', 'official'].includes(status)
+  const entryById = new Map(race.entries.map((entry) => [entry.raceEntryId, entry]))
+
   return (
     <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-      <div className="border-b border-gray-100 px-5 py-4">
-        <h2 className="font-bold text-gray-900">Đường đua trực tiếp</h2>
-        <p className="mt-1 text-xs text-gray-500">
-          {race.status.toLowerCase() === 'live'
-            ? 'Mô phỏng phía client được khôi phục theo thời điểm bắt đầu; kết quả thật vẫn do hệ thống ghi nhận.'
-            : 'PixelHorse hiển thị theo trạng thái cuộc đua; vị trí mô phỏng không tạo kết quả.'}
-        </p>
+      <div className="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="font-bold text-gray-900">Đường đua trực tiếp</h2>
+          <p className="mt-1 text-xs text-gray-500">
+            {status === 'live'
+              ? 'Mô phỏng phía client được khôi phục theo thời điểm bắt đầu; kết quả thật vẫn do hệ thống ghi nhận.'
+              : 'PixelHorse hiển thị theo trạng thái cuộc đua; vị trí mô phỏng không tạo kết quả.'}
+          </p>
+        </div>
+        <div className="shrink-0 rounded-xl border border-slate-200 bg-slate-950 px-4 py-2 text-right text-white shadow-sm">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-300">Đồng hồ cuộc đua</p>
+          <p className="font-mono text-xl font-black tabular-nums" aria-live="off">
+            {formatRaceClock(timingSnapshot.elapsedMs)}
+          </p>
+        </div>
       </div>
       {finishValidation.kind === 'invalid' && (
         <div className="border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800" role="alert">
@@ -2534,6 +2682,49 @@ export default function HorseRaceStage({ race, fallback }: HorseRaceStageProps) 
       >
         <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-500">Đang chuẩn bị đường đua...</div>
       </div>
+      {showTemporaryFinishResults && (
+        <div className="border-t border-slate-200 bg-white">
+          <div className="flex flex-col gap-1 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h3 className="text-sm font-black tracking-wide text-slate-950">{status === 'official' ? 'KẾT QUẢ CHÍNH THỨC' : 'KẾT QUẢ CÁN ĐÍCH TẠM THỜI'}</h3>
+              <p className={`mt-1 text-xs font-semibold ${status === 'official' ? 'text-blue-700' : 'text-amber-700'}`}>{status === 'live' ? 'Chờ Referee kết thúc cuộc đua' : status === 'completed' ? 'Chờ kiểm tra hậu đua' : 'Đã được Admin công bố'}</p>
+            </div>
+            <p className="text-xs text-slate-500">Không thay thế kết quả do trọng tài xác nhận.</p>
+          </div>
+          {timingSnapshot.results.length === 0 ? (
+            <p className="px-5 py-8 text-center text-sm text-slate-500">Đang chờ ngựa đầu tiên cán đích.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[680px] text-left text-sm">
+                <thead className="bg-slate-50 text-xs font-bold uppercase text-slate-500">
+                  <tr>
+                    <th className="px-5 py-3">Hạng</th>
+                    <th className="px-5 py-3">GATE</th>
+                    <th className="px-5 py-3">Tên ngựa</th>
+                    <th className="px-5 py-3">Jockey</th>
+                    <th className="px-5 py-3">Thời gian</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {timingSnapshot.results.map((result) => {
+                    const entry = entryById.get(result.raceEntryId)
+                    if (!entry) return null
+                    return (
+                      <tr key={result.raceEntryId}>
+                        <td className="px-5 py-3 font-black text-slate-950">{result.finishPosition}</td>
+                        <td className="px-5 py-3 font-bold text-slate-600">{entry.postPosition ?? '—'}</td>
+                        <td className="px-5 py-3 font-bold text-slate-900">{entry.horseName}</td>
+                        <td className="px-5 py-3 text-slate-600">{entry.jockeyName}</td>
+                        <td className="px-5 py-3 font-mono font-bold tabular-nums text-slate-900">{formatRaceClock(result.finishElapsedMs)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </section>
   )
 }

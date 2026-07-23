@@ -82,9 +82,9 @@ test.describe('Owner jockey invitation modal', () => {
   });
 });
 
-test('Accepted pairing is confirmed from the available jockey list without creating a new invitation', async ({ page }) => {
-  let pairingStatus: 'Accepted' | 'Confirmed' = 'Accepted';
-  let confirmRequests = 0;
+test('Accepted pairing opens fee payment and waits for Admin verification', async ({ page }) => {
+  let pairingStatus: 'Accepted' | 'PendingVerification' = 'Accepted';
+  let paymentRequests = 0;
   let createRequests = 0;
   const consoleErrors: string[] = [];
   page.on('console', (message) => {
@@ -100,13 +100,13 @@ test('Accepted pairing is confirmed from the available jockey list without creat
       await route.fulfill({ status: 201, contentType: 'application/json', body: '{}' });
       return;
     }
-    if (request.method() === 'PATCH' && pathname.endsWith('/pairings/41/confirm')) {
-      confirmRequests += 1;
-      pairingStatus = 'Confirmed';
+    if (request.method() === 'POST' && pathname.endsWith('/pairings/41/fee-payment')) {
+      paymentRequests += 1;
+      pairingStatus = 'PendingVerification';
       await route.fulfill({
-        status: 200,
+        status: 201,
         contentType: 'application/json',
-        body: JSON.stringify({ pairingId: 41, status: 'Confirmed', message: 'Đã xác nhận.' }),
+        body: JSON.stringify({ paymentId: 81, pairingId: 41, status: 'PendingVerification', pairingStatus }),
       });
       return;
     }
@@ -118,6 +118,12 @@ test('Accepted pairing is confirmed from the available jockey list without creat
       body = { success: true, message: '', data: { count: 0 } };
     } else if (pathname.endsWith('/my/tournament-participations')) {
       body = { success: true, message: '', data: [{ tournamentId: 7, tournamentName: 'Giải Test', status: 'Approved' }] };
+    } else if (pathname.endsWith('/tournament/7')) {
+      body = { success: true, message: '', data: {
+        tournamentId: 7, name: 'Giải Test', entryFeeAmount: 500000,
+        paymentDeadline: '2026-08-05T14:13:00Z', refundDeadline: '2026-08-12T14:13:00Z',
+        rounds: [], prizeDistributions: [],
+      } };
     } else if (pathname.endsWith('/horses/my')) {
       body = [{ horseID: '11', name: 'Hoài Phong' }];
     } else if (pathname.endsWith('/horses/my/enrollments')) {
@@ -142,15 +148,23 @@ test('Accepted pairing is confirmed from the available jockey list without creat
   });
 
   await page.goto(PAGE_URL);
-  const confirmButton = page.getByRole('button', { name: 'Xác nhận ghép cặp', exact: true });
-  await expect(confirmButton).toBeVisible();
-  await confirmButton.click();
+  const paymentButton = page.getByRole('button', { name: 'Nộp lệ phí', exact: true });
+  await expect(paymentButton).toBeVisible();
+  await paymentButton.click();
 
-  await expect(page.getByRole('button', { name: 'Đã ghép cặp', exact: true })).toBeVisible();
-  expect(confirmRequests).toBe(1);
+  const dialog = page.getByRole('dialog', { name: 'Nộp lệ phí tham gia' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel('Mã giao dịch *').fill('BANK-TEST-001');
+  await dialog.getByLabel('Ảnh/file chứng từ *').setInputFiles({
+    name: 'proof.png', mimeType: 'image/png', buffer: Buffer.from('proof'),
+  });
+  await dialog.getByRole('button', { name: 'Nộp lệ phí', exact: true }).click();
+
+  await expect(page.getByRole('button', { name: 'Chờ đối chứng', exact: true })).toBeVisible();
+  expect(paymentRequests).toBe(1);
   expect(createRequests).toBe(0);
 
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Đã ghép cặp', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Chờ đối chứng', exact: true })).toBeVisible();
   expect(consoleErrors).toEqual([]);
 });

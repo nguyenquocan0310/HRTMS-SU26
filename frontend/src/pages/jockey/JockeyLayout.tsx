@@ -22,7 +22,6 @@ const navGroups: Array<{ title: string; items: NavItem[] }> = [
     { to: '/jockey/invitations', label: 'Lời mời ghép cặp' },
     { to: '/jockey/races', label: 'Cuộc đua của tôi' },
     { to: '/jockey/history', label: 'Lịch sử thi đấu' },
-    { to: '/jockey/protest', label: 'Khiếu nại' },
   ] },
   { title: 'Hồ sơ', items: [
     { to: '/jockey/profile-declaration', label: 'Hồ sơ Jockey' },

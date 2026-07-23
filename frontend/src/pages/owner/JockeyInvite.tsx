@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AvailableJockey, JockeyInvitation, Horse } from '../../types/owner.types';
-import { cancelPairing, getAvailableJockeys, getMyHorses, getMyTournamentHorseEnrollments, getOwnerPairings, inviteJockey, confirmPairing } from '../../services/ownerService';
-import { getMyTournamentParticipations, type ParticipationResponse } from '../../services/tournamentService';
+import { cancelPairing, getAvailableJockeys, getMyHorses, getMyTournamentHorseEnrollments, getOwnerPairings, inviteJockey } from '../../services/ownerService';
+import { getMyTournamentParticipations, getTournamentById, type ParticipationResponse, type TournamentResponse } from '../../services/tournamentService';
+import { submitPairingFeePayment, type FeePaymentMethod } from '../../services/entryFeePaymentService';
 import { getJockeyInviteState, type JockeyInviteAction } from './jockeyInviteState';
 
 const PAIRING_STATUS: Record<string, { label: string; cls: string; dot: string }> = {
   Pending:   { label: 'Chờ Jockey phản hồi',   cls: 'bg-yellow-50 text-yellow-700 border-yellow-200', dot: 'bg-yellow-500' },
-  Accepted:  { label: 'Chờ Owner xác nhận',    cls: 'bg-blue-50 text-blue-700 border-blue-200',       dot: 'bg-blue-500' },
+  Accepted:  { label: 'Chờ nộp lệ phí',        cls: 'bg-amber-50 text-amber-700 border-amber-200',     dot: 'bg-amber-500' },
+  PendingVerification: { label: 'Chờ Admin đối chứng', cls: 'bg-violet-50 text-violet-700 border-violet-200', dot: 'bg-violet-500' },
   Confirmed: { label: 'Đã xác nhận ghép cặp',  cls: 'bg-green-50 text-green-700 border-green-200',    dot: 'bg-green-500' },
   Declined:  { label: 'Bị từ chối',            cls: 'bg-red-50 text-red-700 border-red-200',          dot: 'bg-red-500' },
   Cancelled: { label: 'Đã hủy',                cls: 'bg-gray-50 text-gray-500 border-gray-200',       dot: 'bg-gray-400' },
@@ -17,6 +19,7 @@ const PAIRING_STATUS: Record<string, { label: string; cls: string; dot: string }
 const JOCKEY_RESPONSE: Record<string, { label: string; cls: string; dot: string }> = {
   Pending:   { label: 'Chờ phản hồi',   cls: 'bg-yellow-50 text-yellow-700 border-yellow-200', dot: 'bg-yellow-500' },
   Accepted:  { label: 'Đã chấp nhận',   cls: 'bg-blue-50 text-blue-700 border-blue-200',       dot: 'bg-blue-500' },
+  PendingVerification: { label: 'Đã chấp nhận', cls: 'bg-blue-50 text-blue-700 border-blue-200', dot: 'bg-blue-500' },
   Confirmed: { label: 'Đã chấp nhận',   cls: 'bg-green-50 text-green-700 border-green-200',    dot: 'bg-green-500' },
   Declined:  { label: 'Đã từ chối',     cls: 'bg-red-50 text-red-700 border-red-200',          dot: 'bg-red-500' },
   Cancelled: { label: 'Đã hủy',         cls: 'bg-gray-50 text-gray-500 border-gray-200',       dot: 'bg-gray-400' },
@@ -38,10 +41,23 @@ function StatusBadge({ status, kind }: { status: JockeyInvitation['status']; kin
 // Shared input class
 const inputCls = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all bg-white';
 
+const formatCurrency = (value: number) => new Intl.NumberFormat('vi-VN', {
+  style: 'currency', currency: 'VND', maximumFractionDigits: 0,
+}).format(value);
+
+const formatDeadline = (value: string | null) => value
+  ? new Date(value).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })
+  : 'Không có';
+
+const remainingDays = (value: string | null) => value
+  ? Math.max(0, Math.ceil((new Date(value).getTime() - Date.now()) / 86_400_000))
+  : null;
+
 const ACTION_PRESENTATION: Record<JockeyInviteAction, { label: string; disabled: boolean; cls: string }> = {
   invite: { label: 'Mời tham gia', disabled: false, cls: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' },
   invited: { label: 'Đã gửi lời mời', disabled: true, cls: 'border-amber-200 bg-amber-50 text-amber-700' },
-  confirm: { label: 'Xác nhận ghép cặp', disabled: false, cls: 'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700' },
+  pay: { label: 'Nộp lệ phí', disabled: false, cls: 'border-amber-500 bg-amber-500 text-white hover:bg-amber-600' },
+  verifying: { label: 'Chờ đối chứng', disabled: true, cls: 'border-violet-200 bg-violet-50 text-violet-700' },
   paired: { label: 'Đã ghép cặp', disabled: true, cls: 'border-gray-200 bg-gray-100 text-gray-500' },
   reinvite: { label: 'Mời lại', disabled: false, cls: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' },
 };
@@ -65,8 +81,6 @@ export default function JockeyInvite() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [sending, setSending] = useState(false);
   const [activeTab, setActiveTab] = useState<'available' | 'history'>('available');
-  // Track which pairing is being confirmed (shows spinner on that row only)
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [confirmSuccess, setConfirmSuccess] = useState<string | null>(null);
@@ -76,6 +90,14 @@ export default function JockeyInvite() {
   const [loadingTournaments, setLoadingTournaments] = useState(false);
   const [selectedTournamentId, setSelectedTournamentId] = useState<number | null>(null);
   const [selectedContextHorseId, setSelectedContextHorseId] = useState('');
+  const [paymentPairing, setPaymentPairing] = useState<JockeyInvitation | null>(null);
+  const [paymentTournament, setPaymentTournament] = useState<TournamentResponse | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<FeePaymentMethod>('Transfer');
+  const [paymentReference, setPaymentReference] = useState('');
+  const [paymentProof, setPaymentProof] = useState<File | null>(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
 
   const closeInviteModal = useCallback(() => {
     setShowModal(false);
@@ -95,12 +117,42 @@ export default function JockeyInvite() {
     setShowModal(true);
   }, [selectedContextHorseId]);
 
+  const closePaymentModal = useCallback(() => {
+    if (paymentSubmitting) return;
+    setPaymentPairing(null);
+    setPaymentTournament(null);
+    setPaymentMethod('Transfer');
+    setPaymentReference('');
+    setPaymentProof(null);
+    setPaymentError('');
+  }, [paymentSubmitting]);
+
+  const openPaymentModal = useCallback(async (pairing: JockeyInvitation) => {
+    setPaymentPairing(pairing);
+    setPaymentTournament(null);
+    setPaymentMethod('Transfer');
+    setPaymentReference('');
+    setPaymentProof(null);
+    setPaymentError('');
+    setPaymentLoading(true);
+    try {
+      setPaymentTournament(await getTournamentById(pairing.tournamentID));
+    } catch (err) {
+      setPaymentError(err instanceof Error ? err.message : 'Không tải được thông tin lệ phí của giải đấu.');
+    } finally {
+      setPaymentLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    if (!showModal) return;
+    if (!showModal && !paymentPairing) return;
 
     const previousOverflow = document.body.style.overflow;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeInviteModal();
+      if (event.key === 'Escape') {
+        if (paymentPairing) closePaymentModal();
+        else closeInviteModal();
+      }
     };
 
     document.body.style.overflow = 'hidden';
@@ -110,7 +162,7 @@ export default function JockeyInvite() {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [closeInviteModal, showModal]);
+  }, [closeInviteModal, closePaymentModal, paymentPairing, showModal]);
 
   const getHorseNameById = (horseID?: string, horseName?: string) => {
     if (!horseID) return 'Chưa gán ngựa';
@@ -274,8 +326,12 @@ export default function JockeyInvite() {
       setError('Lời mời cho Jockey và ngựa này đã được gửi trước đó.');
       return;
     }
-    if (currentState.action === 'confirm') {
-      setError('Jockey đã chấp nhận. Vui lòng xác nhận ghép cặp thay vì gửi lời mời mới.');
+    if (currentState.action === 'pay') {
+      setError('Jockey đã chấp nhận. Vui lòng nộp lệ phí thay vì gửi lời mời mới.');
+      return;
+    }
+    if (currentState.action === 'verifying') {
+      setError('Lệ phí của cặp này đang chờ Admin đối chứng.');
       return;
     }
     if (currentState.action === 'paired') {
@@ -318,30 +374,48 @@ export default function JockeyInvite() {
     }
   };
 
-  const handleConfirmPairing = async (invitationID: string) => {
-    setConfirmError(null);
-    setConfirmSuccess(null);
-    setConfirmingId(invitationID);
+  const handleSubmitFeePayment = async () => {
+    if (!paymentPairing || !paymentTournament || paymentSubmitting) return;
+
+    const reference = paymentReference.trim();
+    if (!reference) {
+      setPaymentError(paymentMethod === 'Transfer' ? 'Vui lòng nhập mã giao dịch.' : 'Vui lòng nhập số biên lai.');
+      return;
+    }
+    if (paymentMethod === 'Transfer' && !paymentProof) {
+      setPaymentError('Vui lòng đính kèm ảnh hoặc file chứng từ chuyển khoản.');
+      return;
+    }
+    if (paymentProof && paymentProof.size > 10 * 1024 * 1024) {
+      setPaymentError('File chứng từ không được vượt quá 10MB.');
+      return;
+    }
+
+    setPaymentError('');
+    setPaymentSubmitting(true);
     try {
-      await confirmPairing(invitationID);
-      setConfirmSuccess('Xác nhận ghép cặp thành công!');
-      // Optimistically update local state so UI responds immediately
-      setInvitations((prev) =>
-        prev.map((inv) =>
-          inv.invitationID === invitationID ? { ...inv, status: 'Confirmed' as const } : inv
-        )
-      );
-      // Also trigger a full refetch to sync with backend
-      setRefreshTrigger((prev) => prev + 1);
-    } catch (err: unknown) {
-      console.error('Failed to confirm pairing:', err);
-      setConfirmError(
-        err instanceof Error
-          ? err.message
-          : 'Đã xảy ra lỗi khi xác nhận ghép cặp. Vui lòng thử lại.'
-      );
+      const result = await submitPairingFeePayment(paymentPairing.invitationID, {
+        method: paymentMethod,
+        reference,
+        proofFile: paymentProof,
+      });
+      setInvitations((previous) => previous.map((invitation) =>
+        invitation.invitationID === paymentPairing.invitationID
+          ? { ...invitation, status: 'PendingVerification' }
+          : invitation));
+      setConfirmSuccess('Đã nộp lệ phí. Ban tổ chức sẽ đối chiếu chứng từ và xác nhận cặp đấu.');
+      setPaymentPairing(null);
+      setPaymentTournament(null);
+      setPaymentReference('');
+      setPaymentProof(null);
+      if (result.pairingStatus === 'Confirmed') {
+        setConfirmSuccess('Lệ phí đã được xác nhận và ghép cặp thành công.');
+      }
+      setRefreshTrigger((previous) => previous + 1);
+    } catch (err) {
+      setPaymentError(err instanceof Error ? err.message : 'Nộp lệ phí thất bại. Vui lòng thử lại.');
     } finally {
-      setConfirmingId(null);
+      setPaymentSubmitting(false);
     }
   };
 
@@ -373,8 +447,8 @@ export default function JockeyInvite() {
     jockey: AvailableJockey,
     pairing?: JockeyInvitation,
   ) => {
-    if (action === 'confirm' && pairing) {
-      void handleConfirmPairing(pairing.invitationID);
+    if (action === 'pay' && pairing) {
+      void openPaymentModal(pairing);
       return;
     }
 
@@ -507,8 +581,8 @@ export default function JockeyInvite() {
                       invitations,
                     );
                     const presentation = ACTION_PRESENTATION[inviteState.action];
-                    const isConfirmingThisPairing = inviteState.pairing?.invitationID === confirmingId;
-                    const disabled = presentation.disabled || isConfirmingThisPairing || !selectedContextHorseId;
+                    const isOpeningPayment = inviteState.pairing?.invitationID === paymentPairing?.invitationID && paymentLoading;
+                    const disabled = presentation.disabled || isOpeningPayment || !selectedContextHorseId;
                     return (
                       <tr key={jId} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3 font-medium text-gray-800">{j.fullName || 'N/A'}</td>
@@ -536,8 +610,8 @@ export default function JockeyInvite() {
                             disabled={disabled}
                             className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${presentation.cls}`}
                           >
-                            {isConfirmingThisPairing && <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />}
-                            {isConfirmingThisPairing ? 'Đang xác nhận...' : presentation.label}
+                            {isOpeningPayment && <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />}
+                            {isOpeningPayment ? 'Đang tải...' : presentation.label}
                           </button>
                         </td>
                       </tr>
@@ -583,6 +657,7 @@ export default function JockeyInvite() {
                 <option value="">Tất cả</option>
                 <option value="Pending">Chờ phản hồi</option>
                 <option value="Accepted">Jockey đã chấp nhận</option>
+                <option value="PendingVerification">Chờ Admin đối chứng</option>
                 <option value="Confirmed">Đã xác nhận ghép cặp</option>
                 <option value="Declined">Jockey từ chối</option>
                 <option value="Cancelled">Đã hủy</option>
@@ -630,7 +705,6 @@ export default function JockeyInvite() {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {filteredInvitations.map((invitation) => {
-                      const isConfirming = confirmingId === invitation.invitationID;
                       const isCancelling = cancellingId === invitation.invitationID;
                       const canCancel = invitation.status === 'Pending' || invitation.status === 'Accepted';
                       return (
@@ -662,6 +736,14 @@ export default function JockeyInvite() {
                               >
                                 Đã ghép cặp
                               </button>
+                            ) : invitation.status === 'PendingVerification' ? (
+                              <button
+                                type="button"
+                                disabled
+                                className="inline-flex cursor-not-allowed items-center whitespace-nowrap rounded-full border border-violet-200 bg-violet-50 px-3.5 py-2 text-xs font-bold text-violet-700"
+                              >
+                                Đã nộp lệ phí — chờ đối chiếu
+                              </button>
                             ) : invitation.status === 'Cancelled' || invitation.status === 'Declined' || invitation.status === 'Rejected' || invitation.status === 'Expired' ? (
                               <button
                                 type="button"
@@ -678,20 +760,17 @@ export default function JockeyInvite() {
                               <div className="flex flex-wrap items-center gap-2">
                                 {invitation.status === 'Accepted' && (
                                   <button
-                                    onClick={() => handleConfirmPairing(invitation.invitationID)}
-                                    disabled={isConfirming || isCancelling}
-                                    className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                    onClick={() => void openPaymentModal(invitation)}
+                                    disabled={paymentLoading || isCancelling}
+                                    className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-amber-500 px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
                                   >
-                                    {isConfirming && (
-                                      <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                                    )}
-                                    {isConfirming ? 'Đang xác nhận...' : 'Xác nhận ghép cặp'}
+                                    Nộp lệ phí
                                   </button>
                                 )}
                                 {canCancel && (
                                   <button
                                     onClick={() => handleCancelPairing(invitation.invitationID)}
-                                    disabled={isConfirming || isCancelling}
+                                    disabled={paymentLoading || isCancelling}
                                     className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-bold text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
                                   >
                                     {isCancelling && (
@@ -879,6 +958,121 @@ export default function JockeyInvite() {
                 {sending ? 'Đang gửi...' : 'Gửi lời mời'}
               </button>
             </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {paymentPairing && (
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-40 cursor-default bg-black/50"
+            onClick={closePaymentModal}
+            aria-label="Đóng modal nộp lệ phí"
+          />
+          <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="fee-payment-title"
+              className="pointer-events-auto max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-2xl bg-white shadow-2xl"
+            >
+              <div className="border-b border-slate-100 px-6 py-5">
+                <h2 id="fee-payment-title" className="text-xl font-black text-slate-950">Nộp lệ phí tham gia</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  {getHorseNameById(paymentPairing.horseID, paymentPairing.horseName)} · {paymentPairing.jockeyName}
+                </p>
+              </div>
+
+              <div className="space-y-5 px-6 py-5">
+                {paymentLoading ? (
+                  <div className="flex min-h-48 items-center justify-center text-sm text-slate-500">Đang tải thông tin lệ phí...</div>
+                ) : paymentTournament ? (
+                  <>
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="font-bold text-amber-950">Hạn nộp lệ phí</p>
+                          <p className="mt-1 text-amber-800">{formatDeadline(paymentTournament.paymentDeadline)}</p>
+                        </div>
+                        {remainingDays(paymentTournament.paymentDeadline) !== null && (
+                          <span className="shrink-0 font-black text-amber-800">còn {remainingDays(paymentTournament.paymentDeadline)} ngày</span>
+                        )}
+                      </div>
+                      <div className="mt-3 border-t border-amber-200 pt-3 text-amber-800">
+                        <p>Hạn hoàn phí khi rút lui: {formatDeadline(paymentTournament.refundDeadline)}</p>
+                        <p className="mt-1 font-bold">Số tiền: {formatCurrency(paymentTournament.entryFeeAmount)}</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="mb-2 text-sm font-bold text-slate-700">Hình thức thanh toán</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {(['Transfer', 'Cash'] as const).map((method) => (
+                          <button
+                            key={method}
+                            type="button"
+                            onClick={() => { setPaymentMethod(method); setPaymentReference(''); setPaymentError(''); }}
+                            className={`rounded-xl border px-4 py-3 text-sm font-bold ${paymentMethod === method ? 'border-amber-400 bg-amber-50 text-amber-800' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                          >
+                            {method === 'Transfer' ? 'Chuyển khoản' : 'Tiền mặt'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <label className="block text-sm font-bold text-slate-700">
+                      {paymentMethod === 'Transfer' ? 'Mã giao dịch' : 'Số biên lai'} <span className="text-red-500">*</span>
+                      <input
+                        aria-label={`${paymentMethod === 'Transfer' ? 'Mã giao dịch' : 'Số biên lai'} *`}
+                        value={paymentReference}
+                        onChange={(event) => setPaymentReference(event.target.value)}
+                        maxLength={paymentMethod === 'Transfer' ? 100 : 50}
+                        placeholder={paymentMethod === 'Transfer' ? 'Ví dụ: MOMO-6128-20260717' : 'Nhập số biên lai tiền mặt'}
+                        className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-normal outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                      />
+                    </label>
+
+                    <div>
+                      <label htmlFor="fee-proof" className="block text-sm font-bold text-slate-700">
+                        Ảnh/file chứng từ {paymentMethod === 'Transfer' && <span className="text-red-500">*</span>}
+                      </label>
+                      <input
+                        id="fee-proof"
+                        aria-label="Ảnh/file chứng từ *"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.webp"
+                        onChange={(event) => {
+                          setPaymentProof(event.target.files?.[0] ?? null);
+                          setPaymentError('');
+                        }}
+                        className="mt-2 block w-full rounded-xl border border-slate-200 p-2 text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:font-bold file:text-blue-700"
+                      />
+                      <p className="mt-2 text-xs text-slate-400">Chấp nhận PDF, JPG, PNG, WEBP. Tối đa 10MB.</p>
+                    </div>
+
+                    <p className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                      Nộp lệ phí đồng nghĩa Owner xác nhận ghép cặp. Cặp đấu chỉ thành công sau khi Admin đối chứng đúng chứng từ.
+                    </p>
+                  </>
+                ) : null}
+
+                {paymentError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{paymentError}</p>}
+              </div>
+
+              <div className="flex justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+                <button type="button" onClick={closePaymentModal} disabled={paymentSubmitting} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 disabled:opacity-50">Hủy</button>
+                <button
+                  type="button"
+                  onClick={() => void handleSubmitFeePayment()}
+                  disabled={paymentLoading || paymentSubmitting || !paymentTournament}
+                  className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-black text-white hover:bg-amber-600 disabled:opacity-50"
+                >
+                  {paymentSubmitting && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />}
+                  {paymentSubmitting ? 'Đang nộp...' : 'Nộp lệ phí'}
+                </button>
+              </div>
             </div>
           </div>
         </>
