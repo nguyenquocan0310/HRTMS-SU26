@@ -30,7 +30,7 @@ test.describe('getJockeyInviteState', () => {
     ];
 
     expect(getJockeyInviteState(21, 7, 11, invitations)).toEqual({
-      action: 'confirm',
+      action: 'pay',
       pairing: invitations[2],
     });
   });
@@ -44,6 +44,18 @@ test.describe('getJockeyInviteState', () => {
     ];
 
     expect(getJockeyInviteState(21, 7, 11, invitations).action).toBe('paired');
+  });
+
+  test('keeps a submitted payment waiting for Admin verification', () => {
+    const invitations = [
+      pairing('accepted', 'Accepted', '2026-07-21T12:00:00Z'),
+      pairing('submitted', 'PendingVerification', '2026-07-21T11:00:00Z'),
+    ];
+
+    expect(getJockeyInviteState(21, 7, 11, invitations)).toEqual({
+      action: 'verifying',
+      pairing: invitations[1],
+    });
   });
 
   test('uses the newest record when statuses have equal priority', () => {

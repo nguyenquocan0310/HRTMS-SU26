@@ -124,7 +124,7 @@ export interface OwnerPairingRecord {
   horse: { horseId: number; name: string; breed?: string };
   jockey: { jockeyId: number; fullName: string; licenseCertificate?: string; experienceYears?: number };
   requestMessage?: string;
-  status: 'Pending' | 'Accepted' | 'Confirmed' | 'Declined' | 'Rejected' | 'Expired' | 'Cancelled';
+  status: 'Pending' | 'Accepted' | 'PendingVerification' | 'Confirmed' | 'Declined' | 'Rejected' | 'Expired' | 'Cancelled';
   createdAt: string;
 }
 

@@ -53,6 +53,8 @@ export interface TournamentResponse {
   minJockeyExperienceYears: number;
   purseAmount: number;
   entryFeeAmount: number;
+  paymentDeadline: string | null;
+  refundDeadline: string | null;
   preRaceWeightThresholdKg: number;
   postRaceWeightDiffThresholdKg: number;
   status: string;
