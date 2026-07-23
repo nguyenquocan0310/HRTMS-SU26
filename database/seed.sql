@@ -548,16 +548,25 @@ BEGIN TRY
         WHERE [Name]=N'GIẢI GIAO HỮU THÁNG 9-2026'
           AND (VenueId IS NULL OR VenueId<>@VDaiNam);
 
-        /* Hạn nộp phí:
-           - Mùa Hè: còn hạn (14 ngày nữa) -> demo nộp/verify/reject bình thường.
-           - Giao Hữu: ĐÃ QUÁ HẠN 1 giờ -> demo FeeDeadlineJob auto reject. */
+        /* Hạn nộp phí + hạn hoàn phí — NEO theo StartDate của TỪNG giải, KHÔNG theo
+           @Now (thời điểm chạy seed), để mốc luôn hợp lệ dù seed chạy ngày nào:
+             PaymentDeadline = StartDate - 2 ngày   (nằm trong (now, StartDate-24h])
+             RefundDeadline  = StartDate - 24 giờ   (= giá trị BE auto-derive:
+                               max(StartDate-24h, PaymentDeadline); trùng mốc bốc thăm,
+                               nên "rút trước bốc thăm được hoàn, sau đó là scratch")
+           Cả hai đều TRƯỚC ngày khai mạc và trước mọi race của giải, và ở TƯƠNG LAI
+           so với lịch demo (khai mạc Mùa Hè 01/09, Giao Hữu 05/09) — fee flow còn sống,
+           KHÔNG giải nào bị FeeDeadlineJob auto-reject ngay khi seed (kể cả pairing hỗ
+           trợ do seed2 tạo cho Giao Hữu). Đổi từ mốc @Now cũ vốn khiến Giao Hữu quá hạn
+           sẵn và mass-reject pairing.
+             Mùa Hè  : StartDate 2026-09-01 -> Payment 2026-08-30, Refund 2026-08-31.
+             Giao Hữu: StartDate 2026-09-05 -> Payment 2026-09-03, Refund 2026-09-04. */
         UPDATE Tournaments
-        SET PaymentDeadline=DATEADD(DAY,14,@Now), RefundDeadline=DATEADD(DAY,21,@Now), UpdatedAt=@Now
-        WHERE [Name]=N'GIẢI ĐUA NGỰA MÙA HÈ 2026' AND PaymentDeadline IS NULL;
-
-        UPDATE Tournaments
-        SET PaymentDeadline=DATEADD(HOUR,-1,@Now), RefundDeadline=DATEADD(DAY,7,@Now), UpdatedAt=@Now
-        WHERE [Name]=N'GIẢI GIAO HỮU THÁNG 9-2026' AND PaymentDeadline IS NULL;
+        SET PaymentDeadline=DATEADD(DAY,-2,StartDate),
+            RefundDeadline=DATEADD(HOUR,-24,StartDate),
+            UpdatedAt=@Now
+        WHERE [Name] IN (N'GIẢI ĐUA NGỰA MÙA HÈ 2026',N'GIẢI GIAO HỮU THÁNG 9-2026')
+          AND PaymentDeadline IS NULL;
 
         /* Bất biến "Pairing Confirmed <=> có payment Verified": backfill cho mọi
            pairing Confirmed do phần seed ở trên tạo ra, nếu chưa có payment active. */
