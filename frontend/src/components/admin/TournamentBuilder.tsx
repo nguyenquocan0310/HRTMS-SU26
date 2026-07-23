@@ -404,7 +404,7 @@ const TournamentBuilder = () => {
   // Tournament đã tồn tại trên BE có id là số nguyên thật — dùng để phân biệt
   // giữa "tạo mới" (POST) và "cập nhật" (PUT).
   const isNewDraft = draft.id.startsWith("t-");
-  const isReadOnly = !isNewDraft && draft.status !== "Draft" && draft.status !== "Open Registration" && draft.status !== "OpenRegistration";
+  const isReadOnly = !isNewDraft && draft.status !== "Draft";
 
   const basicValidation = validateBasicInfo(draft.basicInfo, isNewDraft);
   const prizeValidation = validatePrizeDistribution(draft.prizeDistribution);
