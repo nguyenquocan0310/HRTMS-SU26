@@ -28,6 +28,8 @@
 --   008_ticket_code_plaintext.sql: đã fold — TicketRewardCodes dùng Code VARCHAR(20)
 --                                  plaintext + UQ_TicketRewardCodes_Code (bỏ CodeHash).
 --   010_audit_action_nvarchar.sql: đã fold — AuditLogs.Action VARCHAR(50) -> NVARCHAR(100).
+--   011_remove_protest_module.sql: đã fold — bỏ bảng Protests và mọi tham chiếu
+--                                  (module protest đã gỡ khỏi hệ thống).
 --   012_venue.sql                : bảng Venues (TrackType/TrackLengthMeters/LaneCount 2..24/
 --                                  IsActive) + Tournaments.VenueId (NULL, FK, index).
 --                                  DDL đã fold; ⚠️ patch chứa SEED — 4 sân đua VN
@@ -44,8 +46,14 @@
 --   014_round_waitlist.sql       : bảng RoundWaitlist (RoundId, PairingId, Position,
 --                                  CreatedAt) + unique (RoundId,PairingId) và
 --                                  (RoundId,Position). Đã fold; không có seed.
+--   015_post_race_clinical_check.sql: đã fold — RaceEntries thêm 4 cột khám lâm sàng
+--                                  sau trận (PostRaceClinicalStatus / PostRaceUnfitReason /
+--                                  PostRaceClinicalCheckedByDoctorId / PostRaceClinicalCheckedAt)
+--                                  + FK_RaceEntries_PostRaceClinicalDoctor -> DoctorProfiles +
+--                                  CHECK ('Fit'/'Unfit'/NULL). Không có seed. Nguồn đặt tên
+--                                  CHECK là CK_...; schema dùng CHK_... theo convention snapshot.
 --
--- Thời điểm cập nhật : 2026-07-22
+-- Thời điểm cập nhật : 2026-07-24
 -- Cách tạo           : schema gốc + patch 001→013 theo thứ tự; thay đổi xóa của
 --                      patch 007 (bỏ COI) và 008 (008_ticket_code_plaintext.sql —
 --                      TicketRewardCodes.Code plaintext thay CodeHash) được fold
@@ -530,6 +538,12 @@ CREATE TABLE RaceEntries (
     ClinicalCheckedAt                 DATETIME2       NULL,
     PostRaceJockeyWeight              DECIMAL(5,2)    NULL,
     PostRaceWeightByDoctorId          INT             NULL,
+    -- patch 015: bác sĩ khám lâm sàng lại (ngựa + nài) SAU trận, bắt buộc trước
+    -- khi Admin Declare Official. Một cột chung cho cặp Horse+Jockey như ClinicalStatus.
+    PostRaceClinicalStatus            VARCHAR(20)     NULL,
+    PostRaceUnfitReason               VARCHAR(255)    NULL,
+    PostRaceClinicalCheckedByDoctorId INT             NULL,
+    PostRaceClinicalCheckedAt         DATETIME2       NULL,
     FinishPosition                    INT             NULL,
     FinishTime                        DECIMAL(8,3)    NULL,
     PointsAwarded                     INT             NULL,
@@ -551,6 +565,8 @@ CREATE TABLE RaceEntries (
     CONSTRAINT FK_RaceEntries_HorseIdentityDoctor FOREIGN KEY (HorseIdentityCheckedByDoctorId) REFERENCES DoctorProfiles(DoctorId),
     CONSTRAINT FK_RaceEntries_ClinicalDoctor FOREIGN KEY (ClinicalCheckedByDoctorId) REFERENCES DoctorProfiles(DoctorId),
     CONSTRAINT FK_RaceEntries_PostDoctor FOREIGN KEY (PostRaceWeightByDoctorId) REFERENCES DoctorProfiles(DoctorId),
+    -- patch 015 (nguồn đặt tên FK_RaceEntries_PostRaceClinicalDoctor).
+    CONSTRAINT FK_RaceEntries_PostRaceClinicalDoctor FOREIGN KEY (PostRaceClinicalCheckedByDoctorId) REFERENCES DoctorProfiles(DoctorId),
     CONSTRAINT FK_RaceEntries_FeeConfirmedBy FOREIGN KEY (EntryFeeConfirmedBy) REFERENCES Users(UserId),
     CONSTRAINT UQ_RaceEntries_RacePairing UNIQUE (RaceId, PairingId),
     CONSTRAINT CHK_RaceEntries_PostPos CHECK (PostPosition IS NULL OR PostPosition > 0),
@@ -559,6 +575,9 @@ CREATE TABLE RaceEntries (
     CONSTRAINT CHK_RaceEntries_Status CHECK ([Status] IN ('Pending','Confirmed','Cancelled','Scratched','Disqualified')),
     CONSTRAINT CHK_RaceEntries_HorseIdentity CHECK (HorseIdentityCheckStatus IS NULL OR HorseIdentityCheckStatus IN ('Matched','Mismatch')),
     CONSTRAINT CHK_RaceEntries_Clinical CHECK (ClinicalStatus IS NULL OR ClinicalStatus IN ('Fit','Unfit')),
+    -- patch 015: khám lâm sàng sau trận. Nguồn đặt tên CK_RaceEntries_PostRaceClinicalStatus;
+    -- schema dùng tiền tố CHK_ cho toàn bộ CHECK nên đồng bộ theo convention snapshot.
+    CONSTRAINT CHK_RaceEntries_PostRaceClinicalStatus CHECK (PostRaceClinicalStatus IS NULL OR PostRaceClinicalStatus IN ('Fit','Unfit')),
     CONSTRAINT CHK_RaceEntries_FinishPos CHECK (FinishPosition IS NULL OR FinishPosition > 0),
     CONSTRAINT CHK_RaceEntries_FeeStatus CHECK (EntryFeeStatus IN ('Unpaid','Paid','Refund Pending','Refunded'))
 );
