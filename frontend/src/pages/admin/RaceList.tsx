@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FiCheckCircle, FiChevronDown, FiEye, FiMapPin } from 'react-icons/fi';
+import { declareRaceOfficial, getUnofficialRaces, type UnofficialRace } from '../../services/raceOperationService';
 import { getTournaments, type TournamentResponse } from '../../services/tournamentService';
 import { getRaceSchedule } from '../../services/schedulingService';
 import { adminError, dateTime } from '../../utils/adminLabels';
+import styles from './RaceList.module.scss';
 
 type RaceRow = UnofficialRace & { entryCount: number; venueName?: string | null; venueCity?: string | null };
 const RaceList = () => {
