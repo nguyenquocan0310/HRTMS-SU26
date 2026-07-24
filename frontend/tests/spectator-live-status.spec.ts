@@ -25,10 +25,38 @@ test('uses the spectator color scheme for race statuses', async ({ page }) => {
       return
     }
 
+    if (path === '/api/tournament') {
+      await route.fulfill({
+        json: {
+          success: true,
+          data: [{
+            tournamentId: 1,
+            name: 'Giải mùa hè',
+            venueName: 'Trường đua Phú Thọ',
+            venueCity: 'TP. Hồ Chí Minh',
+            rounds: [{
+              roundId: 1,
+              name: 'Vòng loại',
+              races: [{
+                raceId: 10,
+                raceNumber: 1,
+                scheduledTime: '2026-07-22T08:00:00Z',
+                status: raceStatus,
+              }],
+            }],
+          }],
+        },
+      })
+      return
+    }
+
     await route.fulfill({ json: { success: true, data: [] } })
   })
 
   await page.goto(`${BASE_URL}/spectator/live-race?raceId=10`)
+  await expect(page.getByText(/Ngày giờ dự kiến:/)).toBeVisible()
+  await expect(page.getByText(/Bắt đầu thực tế:/)).toBeVisible()
+  await expect(page.getByText('Địa điểm: Trường đua Phú Thọ · TP. Hồ Chí Minh')).toBeVisible()
 
   const cases = [
     { status: 'Live', label: 'Đang phát trực tiếp', background: /bg-emerald-100/, text: /text-emerald-700/ },
