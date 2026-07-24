@@ -1,6 +1,9 @@
 // The list API does not expose the tournament threshold. Keep one frontend
 // fallback aligned with the backend's default PreRaceWeightThresholdKg (2 kg).
 export const DEFAULT_ALLOWED_WEIGHT_DIFFERENCE_KG = 2
+// Weigh-Out uses a different tournament rule. Keep this fallback aligned with
+// the backend's default PostRaceWeightDiffThresholdKg (1 kg).
+export const DEFAULT_POST_RACE_WEIGHT_DIFFERENCE_KG = 1
 
 export const parseWeightValue = (value: unknown): number | null => {
   if (typeof value === 'number') {

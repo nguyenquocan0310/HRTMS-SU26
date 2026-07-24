@@ -7,19 +7,22 @@ import {
   updateClinicalCheck,
   updateHorseIdentity,
   updatePostRaceClinicalCheck,
+  updatePostRaceWeight,
   updatePreRaceWeight,
   type DoctorRaceAssignment,
   type DoctorRaceEntry,
   type RaceEntryHealthProfile,
 } from '../../services/doctorService'
+import { getTournamentById } from '../../services/tournamentService'
 import {
   calculateWeightDifference,
   DEFAULT_ALLOWED_WEIGHT_DIFFERENCE_KG,
+  DEFAULT_POST_RACE_WEIGHT_DIFFERENCE_KG,
   exceedsWeightDifferenceLimit,
   parseWeightValue,
 } from '../../utils/paddockWeight'
 
-type ActiveTab = 'weigh-in' | 'vet-check' | 'post-race-clinical'
+type ActiveTab = 'weigh-in' | 'vet-check' | 'weigh-out' | 'post-race-clinical'
 type IdentityStatus = 'Matched' | 'Mismatch'
 type ClinicalStatus = 'Fit' | 'Unfit'
 
@@ -81,6 +84,35 @@ function WeighInResultBadge({ entry }: { entry: DoctorRaceEntry }) {
   return (
     <span className="inline-flex rounded-full border border-gray-100 bg-gray-50 px-2 py-0.5 text-xs font-semibold text-gray-500">
       Chưa cân
+    </span>
+  )
+}
+
+function WeighOutResultBadge({ entry }: { entry: DoctorRaceEntry }) {
+  const status = entry.raceEntryStatus ?? entry.status
+  if (status === 'Disqualified' || entry.isEmergencyDisqualified) {
+    return (
+      <span className="inline-flex rounded-full border border-red-100 bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">
+        Không áp dụng · Đã loại
+      </span>
+    )
+  }
+
+  if (entry.postRaceJockeyWeight == null) {
+    return (
+      <span className="inline-flex rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-semibold text-gray-600">
+        Chưa ghi nhận
+      </span>
+    )
+  }
+
+  return (
+    <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${
+      entry.postRaceWeightFlagged
+        ? 'border-red-200 bg-red-50 text-red-700'
+        : 'border-emerald-100 bg-emerald-50 text-emerald-700'
+    }`}>
+      {entry.postRaceWeightFlagged ? 'Cảnh báo vượt ngưỡng' : 'Đã ghi nhận'}
     </span>
   )
 }
@@ -152,6 +184,7 @@ function PostRaceClinicalBadge({ entry }: { entry: DoctorRaceEntry }) {
 function RaceStatusBadge({ status }: { status?: string | null }) {
   const value = status?.trim() || 'Chưa xác định'
   const normalized = value.toLowerCase()
+  const label = normalized === 'upcoming' ? 'Sắp diễn ra' : value
   const className = normalized === 'live'
     ? 'border-red-200 bg-red-50 text-red-700'
     : normalized === 'unofficial'
@@ -170,7 +203,7 @@ function RaceStatusBadge({ status }: { status?: string | null }) {
       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold ${className}`}
     >
       {normalized === 'live' && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />}
-      {value}
+      {label}
     </span>
   )
 }
@@ -187,6 +220,10 @@ export default function PaddockConsole() {
   const hasValidRaceId = typeof selectedRaceId === 'number' && Number.isFinite(selectedRaceId)
 
   const [selectedRace, setSelectedRace] = useState<DoctorRaceAssignment | null>(null)
+  const [postRaceThreshold, setPostRaceThreshold] = useState<{
+    tournamentId: number
+    value: number
+  } | null>(null)
   const [assignments, setAssignments] = useState<DoctorRaceAssignment[]>([])
   const [raceLoading, setRaceLoading] = useState(false)
   const [raceError, setRaceError] = useState<string | null>(null)
@@ -196,6 +233,7 @@ export default function PaddockConsole() {
   const [entriesError, setEntriesError] = useState<string | null>(null)
 
   const [weightInputs, setWeightInputs] = useState<Record<number, string>>({})
+  const [postWeightInputs, setPostWeightInputs] = useState<Record<number, string>>({})
   const [identityInputs, setIdentityInputs] = useState<Record<number, IdentityStatus>>({})
   const [clinicalInputs, setClinicalInputs] = useState<Record<number, ClinicalStatus>>({})
   const [unfitReasons, setUnfitReasons] = useState<Record<number, string>>({})
@@ -236,6 +274,37 @@ export default function PaddockConsole() {
   }, [hasValidRaceId, selectedRaceId])
 
   useEffect(() => {
+    const tournamentId = selectedRace?.tournamentId
+    if (!tournamentId) return
+
+    let cancelled = false
+    void getTournamentById(tournamentId)
+      .then((tournament) => {
+        if (cancelled) return
+        const value = parseWeightValue(tournament.postRaceWeightDiffThresholdKg)
+        setPostRaceThreshold({
+          tournamentId,
+          value:
+            value !== null && value > 0
+              ? value
+              : DEFAULT_POST_RACE_WEIGHT_DIFFERENCE_KG,
+        })
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPostRaceThreshold({
+            tournamentId,
+            value: DEFAULT_POST_RACE_WEIGHT_DIFFERENCE_KG,
+          })
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedRace?.tournamentId])
+
+  useEffect(() => {
     if (!hasValidRaceId || selectedRaceId === null) return
     const refreshRaceStatus = () => {
       void getMyDoctorRaceAssignments()
@@ -267,6 +336,14 @@ export default function PaddockConsole() {
             data.map((entry) => [
               entry.raceEntryId,
               entry.preRaceJockeyWeight != null ? String(entry.preRaceJockeyWeight) : '',
+            ])
+          )
+        )
+        setPostWeightInputs(
+          Object.fromEntries(
+            data.map((entry) => [
+              entry.raceEntryId,
+              entry.postRaceJockeyWeight != null ? String(entry.postRaceJockeyWeight) : '',
             ])
           )
         )
@@ -335,6 +412,7 @@ export default function PaddockConsole() {
   const preRaceWritable = !selectedRace || ['Upcoming', 'Sắp diễn ra'].includes(selectedRace.raceStatus)
   const currentRaceStatus =
     selectedRace?.raceStatus ?? entries.find((entry) => entry.raceStatus)?.raceStatus ?? null
+  const postRaceWritable = currentRaceStatus?.toLowerCase() === 'unofficial'
   const postRaceClinicalWritable = currentRaceStatus?.toLowerCase() === 'unofficial'
 
   const updateEntry = (raceEntryId: number, patch: Partial<DoctorRaceEntry>) => {
@@ -462,6 +540,34 @@ export default function PaddockConsole() {
     setHealthEntryId(null)
     setHealthProfile(null)
     setHealthError(null)
+  }
+
+  const handleWeighOutConfirm = async (entry: DoctorRaceEntry) => {
+    const rawValue = postWeightInputs[entry.raceEntryId]
+    const postRaceJockeyWeight = parseWeightValue(rawValue)
+    if (postRaceJockeyWeight === null || postRaceJockeyWeight < 1 || postRaceJockeyWeight > 300) {
+      showToast('Cân nặng sau đua phải từ 1 đến 300 kg.')
+      return
+    }
+
+    const key = `post-weight-${entry.raceEntryId}`
+    setSavingKey(key)
+    try {
+      const response = await updatePostRaceWeight(entry.raceEntryId, postRaceJockeyWeight)
+      updateEntry(entry.raceEntryId, {
+        preRaceJockeyWeight: response.preRaceJockeyWeight ?? entry.preRaceJockeyWeight,
+        postRaceJockeyWeight: response.postRaceJockeyWeight,
+        postRaceWeightDifference: response.weightDifference,
+        postRaceThresholdKg: response.thresholdKg ?? entry.postRaceThresholdKg,
+        postRaceWeightFlagged: response.isWeightFlagged,
+        message: response.message,
+      })
+      showToast(response.message || `Đã ghi nhận Weigh-Out cho ${entry.jockeyName}.`)
+    } catch (error) {
+      showToast(getFriendlyError(error))
+    } finally {
+      setSavingKey(null)
+    }
   }
 
   const handlePostRaceClinicalConfirm = async (entry: DoctorRaceEntry) => {
@@ -693,6 +799,16 @@ export default function PaddockConsole() {
           }`}
         >
           Kiểm tra ngựa (Vet Check)
+        </button>
+        <button
+          onClick={() => setActiveTab('weigh-out')}
+          className={`min-w-48 flex-1 rounded-lg px-3 py-2.5 text-center text-sm font-semibold transition-all ${
+            activeTab === 'weigh-out'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+          }`}
+        >
+          Cân nặng sau đua (Weigh-Out)
         </button>
         <button
           type="button"
@@ -972,6 +1088,112 @@ export default function PaddockConsole() {
           </div>
         )}
 
+        {activeTab === 'weigh-out' && (
+          <div className="space-y-4 p-4 sm:p-6">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h2 className="text-sm font-bold text-gray-900">Cân nặng sau đua (Weigh-Out)</h2>
+              <div className="text-right text-xs">
+                <p className="text-gray-500">Chỉ ghi nhận khi cuộc đua ở trạng thái Unofficial</p>
+                <p className="mt-1 font-semibold text-blue-700">Referee kết thúc race → Cân sau đua và khám lại → Admin công bố kết quả</p>
+              </div>
+            </div>
+            {!postRaceWritable && (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Chỉ được ghi nhận cân nặng sau đua khi race ở trạng thái Unofficial.
+              </p>
+            )}
+            {stateBlock ?? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-gray-700">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/50 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                      <th className="px-4 py-3">GATE</th>
+                      <th className="px-4 py-3">Kỵ sĩ / Ngựa</th>
+                      <th className="px-4 py-3">Cân trước đua</th>
+                      <th className="px-4 py-3">Cân sau đua</th>
+                      <th className="px-4 py-3">Chênh lệch</th>
+                      <th className="px-4 py-3">Kết quả</th>
+                      <th className="px-4 py-3 text-right">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {entries.map((entry) => {
+                      const key = `post-weight-${entry.raceEntryId}`
+                      const input = postWeightInputs[entry.raceEntryId] ?? ''
+                      const difference = calculateWeightDifference(input, entry.preRaceJockeyWeight)
+                      const allowedDifference =
+                        entry.postRaceThresholdKg
+                        ?? (
+                          selectedRace
+                          && postRaceThreshold?.tournamentId === selectedRace.tournamentId
+                            ? postRaceThreshold.value
+                            : DEFAULT_POST_RACE_WEIGHT_DIFFERENCE_KG
+                        )
+                      const exceedsLimit =
+                        difference === null
+                          ? null
+                          : exceedsWeightDifferenceLimit(difference, allowedDifference)
+                      const eligible = isEntryEligible(entry)
+                      return (
+                      <tr key={entry.raceEntryId} className="hover:bg-gray-50/30">
+                        <td className="px-4 py-4 font-mono text-xs font-bold text-gray-500">
+                          {entry.postPosition ?? '-'}
+                        </td>
+                        <td className="px-4 py-4">
+                          <p className="font-semibold text-gray-900">{entry.jockeyName}</p>
+                          <p className="mt-0.5 text-xs text-gray-400">{entry.horseName}</p>
+                        </td>
+                        <td className="px-4 py-4 font-mono font-medium">
+                          {formatWeight(entry.preRaceJockeyWeight)}
+                        </td>
+                        <td className="px-4 py-4">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            min="1"
+                            max="300"
+                            step="0.1"
+                            value={input}
+                            onChange={(event) => setPostWeightInputs((current) => ({
+                              ...current,
+                              [entry.raceEntryId]: event.target.value,
+                            }))}
+                            disabled={!postRaceWritable || !eligible || savingKey !== null}
+                            placeholder="Nhập cân"
+                            className="w-28 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-semibold focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                          />
+                        </td>
+                        <td className={`px-4 py-4 font-mono font-semibold ${
+                          difference === null
+                            ? 'text-gray-500'
+                            : exceedsLimit
+                              ? 'text-red-700'
+                              : 'text-emerald-700'
+                        }`}>
+                          {difference === null ? '—' : `${difference > 0 ? '+' : ''}${difference.toFixed(1)} kg`}
+                        </td>
+                        <td className="px-4 py-4">
+                          <WeighOutResultBadge entry={entry} />
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => void handleWeighOutConfirm(entry)}
+                            disabled={input === '' || !postRaceWritable || !eligible || savingKey !== null}
+                            className="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-30"
+                          >
+                            {savingKey === key ? 'Đang lưu...' : entry.postRaceJockeyWeight != null ? 'Cập nhật Weigh-Out' : 'Xác nhận Weigh-Out'}
+                          </button>
+                        </td>
+                      </tr>
+                    )})}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === 'post-race-clinical' && (
           <div className="space-y-4 p-4 sm:p-6">
             <div className="flex flex-col gap-2 border-b border-gray-100 pb-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1170,6 +1392,7 @@ export default function PaddockConsole() {
                     <dl className="mt-3 grid gap-3 sm:grid-cols-2">
                       {[
                         ['Cân trước đua', healthProfile.preRaceJockeyWeight == null ? 'Chưa ghi nhận' : `${healthProfile.preRaceJockeyWeight} kg`],
+                        ['Cân sau đua', healthProfile.postRaceJockeyWeight == null ? 'Chưa ghi nhận' : `${healthProfile.postRaceJockeyWeight} kg`],
                         ['Danh tính ngựa', healthProfile.horseIdentityCheckStatus || 'Chưa kiểm tra'],
                         ['Khám lâm sàng', healthProfile.clinicalStatus || 'Chưa kiểm tra'],
                         ['Lý do Unfit', healthProfile.unfitReason || 'Không có'],

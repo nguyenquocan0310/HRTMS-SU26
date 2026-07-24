@@ -47,6 +47,10 @@ export interface DoctorRaceEntry {
   jockeyName: string;
   selfDeclaredWeight: number | null;
   preRaceJockeyWeight: number | null;
+  postRaceJockeyWeight: number | null;
+  postRaceWeightDifference: number | null;
+  postRaceWeightFlagged: boolean;
+  postRaceThresholdKg: number | null;
   weightDifference: number | null;
   thresholdKg: number | null;
   isWeightWarning: boolean;
@@ -91,6 +95,16 @@ export interface ClinicalCheckResponse {
   message?: string;
 }
 
+export interface PostRaceWeightResponse {
+  raceEntryId: number;
+  preRaceJockeyWeight: number;
+  postRaceJockeyWeight: number;
+  weightDifference: number;
+  thresholdKg: number;
+  isWeightFlagged: boolean;
+  message: string;
+}
+
 export interface PostRaceClinicalCheckResponse {
   raceEntryId: number;
   raceId: number;
@@ -119,6 +133,8 @@ export interface RaceEntryHealthProfile {
   preRaceJockeyWeight: number | null;
   preRaceWeightDifference: number | null;
   isPreRaceWeightWarning: boolean | null;
+  postRaceJockeyWeight: number | null;
+  postRaceWeightFlagged: boolean;
   horseName: string;
   breed: string;
   color: string;
@@ -173,6 +189,12 @@ const normalizeRaceEntry = (value: unknown): DoctorRaceEntry | null => {
     jockeyName: nullableString(jockey?.fullName ?? item.jockeyName) ?? 'Chưa có tên',
     selfDeclaredWeight,
     preRaceJockeyWeight,
+    postRaceJockeyWeight: nullableNumber(item.postRaceJockeyWeight ?? item.postRaceWeight),
+    postRaceWeightDifference: nullableNumber(item.postRaceWeightDifference),
+    postRaceWeightFlagged: Boolean(item.postRaceWeightFlagged ?? item.isWeightFlagged),
+    postRaceThresholdKg: nullableNumber(
+      item.postRaceThresholdKg ?? item.postRaceWeightDiffThresholdKg
+    ),
     weightDifference: computedWeightDifference,
     thresholdKg: nullableNumber(item.thresholdKg),
     isWeightWarning: Boolean(item.isWeightWarning),
@@ -258,6 +280,15 @@ export const updateClinicalCheck = async (
     body: JSON.stringify({ clinicalStatus, unfitReason }),
   });
 };
+
+export const updatePostRaceWeight = async (
+  raceEntryId: number,
+  postRaceJockeyWeight: number
+): Promise<PostRaceWeightResponse> =>
+  apiFetch<PostRaceWeightResponse>(`/doctor/race-entries/${raceEntryId}/post-race-weight`, {
+    method: 'PATCH',
+    body: JSON.stringify({ postRaceJockeyWeight }),
+  });
 
 export const updatePostRaceClinicalCheck = async (
   raceEntryId: number,

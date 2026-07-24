@@ -22,6 +22,13 @@ test.describe('Paddock weight difference', () => {
     })
   }
 
+  test('uses the configured 1 kg post-race limit', () => {
+    expect(exceedsWeightDifferenceLimit(1, 1)).toBe(false)
+    expect(exceedsWeightDifferenceLimit(-1, 1)).toBe(false)
+    expect(exceedsWeightDifferenceLimit(2, 1)).toBe(true)
+    expect(exceedsWeightDifferenceLimit(-2, 1)).toBe(true)
+  })
+
   test('calculates signed difference from numeric weights', () => {
     expect(calculateWeightDifference(50, 54)).toBe(-4)
   })
