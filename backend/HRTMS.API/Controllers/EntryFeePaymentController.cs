@@ -72,6 +72,26 @@ public class EntryFeePaymentController : ControllerBase
         return Ok(result);
     }
 
+    // Admin: theo dõi toàn bộ pairing và trạng thái lệ phí gần nhất, kể cả chưa nộp.
+    [HttpGet("admin/pairing-fee-statuses")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetPairingsForAdmin(
+        [FromQuery] string? paymentStatus,
+        [FromQuery] int? tournamentId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        try
+        {
+            return Ok(await _service.GetPairingsForAdminAsync(
+                paymentStatus, tournamentId, page, pageSize));
+        }
+        catch (ArgumentException ex) when (ex.Message == "INVALID_PAYMENT_STATUS")
+        {
+            return BadRequest(Err("INVALID_PAYMENT_STATUS", "Trạng thái lệ phí lọc không hợp lệ."));
+        }
+    }
+
     [HttpPost("admin/fee-payments/{id:int}/verify")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Verify(int id)
@@ -121,6 +141,42 @@ public class EntryFeePaymentController : ControllerBase
         catch (InvalidOperationException ex) when (ex.Message == "PAYMENT_NOT_PENDING")
         {
             return Conflict(Err("PAYMENT_NOT_PENDING", "Hồ sơ lệ phí không còn ở trạng thái chờ đối chiếu."));
+        }
+    }
+
+    [HttpPost("admin/pairings/{id:int}/reject-unpaid")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> RejectUnpaidPairing(
+        int id, [FromBody] RejectUnpaidPairingDto dto)
+    {
+        if (!TryGetUserId(out var adminId))
+            return UnauthorizedResult();
+
+        try
+        {
+            return Ok(await _service.RejectUnpaidPairingAsync(adminId, id, dto.Reason));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(Err("PAIRING_NOT_FOUND", "Không tìm thấy cặp đấu."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "REJECT_REASON_REQUIRED")
+        {
+            return BadRequest(Err(ex.Message, "Phải nêu lý do từ chối, ít nhất 10 ký tự."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "PAIRING_NOT_AWAITING_PAYMENT")
+        {
+            return Conflict(Err(ex.Message,
+                "Chỉ có thể từ chối cặp đã được chấp nhận/xác nhận nhưng chưa nộp lệ phí."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "PAIRING_HAS_FEE_PAYMENT")
+        {
+            return Conflict(Err(ex.Message,
+                "Cặp đấu đã có hồ sơ lệ phí; hãy dùng thao tác từ chối lệ phí thay vì từ chối cặp."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "TOURNAMENT_IS_FREE")
+        {
+            return Conflict(Err(ex.Message, "Giải đấu miễn lệ phí nên không thể từ chối với lý do chưa đóng phí."));
         }
     }
 

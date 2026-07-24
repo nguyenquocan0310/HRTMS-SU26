@@ -10,6 +10,7 @@ export interface AutoAllocateResult { roundId: number; tournamentId: number; isP
 export interface DrawAssignment { raceEntryId: number; pairingId: number; horseId: number; horseName: string; postPosition: number; }
 export interface DrawResult { raceId: number; isPostPositionDrawn: boolean; totalEntries: number; assignments: DrawAssignment[]; }
 export interface FinalizeResult { roundId: number; allocation: AutoAllocateResult; draws: DrawResult[]; skippedDraws: Array<{ raceId: number; raceNumber: number; reason: string }>; }
+export interface ClearAllocationResult { roundId: number; tournamentId: number; removedEntryCount: number; removedWaitlistCount: number; }
 
 interface ApiEnvelope<T> { success: boolean; message?: string; data: T | null; }
 export const getRaceSchedule = (raceId: number) => apiFetch<ApiEnvelope<RaceSchedule>>(`/races/${raceId}/entries`).then((response) => {
@@ -18,6 +19,7 @@ export const getRaceSchedule = (raceId: number) => apiFetch<ApiEnvelope<RaceSche
 });
 export const previewAutoAllocate = (roundId: number) => apiFetch<AutoAllocateResult>(`/admin/rounds/${roundId}/auto-allocate/preview`, { method: 'POST' });
 export const autoAllocate = (roundId: number) => apiFetch<AutoAllocateResult>(`/admin/rounds/${roundId}/auto-allocate`, { method: 'POST' });
+export const clearRoundAllocation = (roundId: number) => apiFetch<ClearAllocationResult>(`/admin/rounds/${roundId}/allocation`, { method: 'DELETE' });
 export const getRoundWaitlist = (roundId: number) => apiFetch<WaitlistEntry[]>(`/admin/rounds/${roundId}/waitlist`);
 export const moveRaceEntry = (entryId: number, targetRaceId: number) => apiFetch<ScheduledEntry>(`/admin/race-entries/${entryId}/move`, { method: 'PUT', body: JSON.stringify({ targetRaceId }) });
 export const drawPostPositions = (raceId: number) => apiFetch<DrawResult>(`/admin/races/${raceId}/draw`, { method: 'POST' });

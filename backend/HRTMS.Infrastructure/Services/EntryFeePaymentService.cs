@@ -192,6 +192,65 @@ public class EntryFeePaymentService : IEntryFeePaymentService
     }
 
     // =====================================================================
+    // Admin: theo dõi toàn bộ pairing, không chỉ những cặp đã nộp payment
+    // =====================================================================
+    public async Task<PagedResult<AdminFeePairingDto>> GetPairingsForAdminAsync(
+        string? paymentStatus, int? tournamentId, int page, int pageSize)
+    {
+        page = Math.Max(page, 1);
+        pageSize = pageSize is < 1 or > 100 ? 20 : pageSize;
+
+        var effectiveStatus = string.IsNullOrWhiteSpace(paymentStatus)
+            ? "All"
+            : paymentStatus;
+        var validStatuses = new[]
+        {
+            "All", "NoPayment", "PendingVerification", "Verified", "Rejected"
+        };
+        if (!validStatuses.Contains(effectiveStatus))
+            throw new ArgumentException("INVALID_PAYMENT_STATUS");
+
+        var query = _context.Pairings
+            .Include(p => p.Horse).ThenInclude(h => h.Owner).ThenInclude(o => o.Owner)
+            .Include(p => p.Jockey).ThenInclude(j => j.Jockey)
+            .Include(p => p.Tournament)
+            .Include(p => p.EntryFeePayments)
+            .AsNoTracking()
+            .AsQueryable();
+
+        if (tournamentId.HasValue)
+            query = query.Where(p => p.TournamentId == tournamentId.Value);
+
+        if (effectiveStatus == "NoPayment")
+        {
+            query = query.Where(p => !p.EntryFeePayments.Any());
+        }
+        else if (effectiveStatus != "All")
+        {
+            query = query.Where(p => p.EntryFeePayments
+                .OrderByDescending(payment => payment.SubmittedAt)
+                .Select(payment => payment.Status)
+                .FirstOrDefault() == effectiveStatus);
+        }
+
+        var total = await query.CountAsync();
+        var pairings = await query
+            .OrderByDescending(p => p.UpdatedAt)
+            .ThenByDescending(p => p.PairingId)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return new PagedResult<AdminFeePairingDto>
+        {
+            Items = pairings.Select(MapToAdminFeePairingDto).ToList(),
+            TotalCount = total,
+            Page = page,
+            PageSize = pageSize
+        };
+    }
+
+    // =====================================================================
     // Admin verify -> Pairing Confirmed
     // =====================================================================
     public async Task<FeePaymentResponseDto> VerifyAsync(int adminId, int paymentId)
@@ -338,6 +397,52 @@ public class EntryFeePaymentService : IEntryFeePaymentService
             relatedEntityId: pairing.PairingId);
 
         return MapToDto(payment, pairing);
+    }
+
+    // =====================================================================
+    // Admin: từ chối pairing chưa từng nộp lệ phí
+    // =====================================================================
+    public async Task<AdminFeePairingDto> RejectUnpaidPairingAsync(
+        int adminId, int pairingId, string reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason) || reason.Trim().Length < 10)
+            throw new InvalidOperationException("REJECT_REASON_REQUIRED");
+
+        var pairing = await LoadPairingGraphAsync(pairingId)
+            ?? throw new KeyNotFoundException("PAIRING_NOT_FOUND");
+
+        if (pairing.Tournament.EntryFeeAmount == 0)
+            throw new InvalidOperationException("TOURNAMENT_IS_FREE");
+
+        // Pending chưa phải cặp có thể nộp phí; PendingVerification/Verified thì
+        // phải xử lý qua hồ sơ payment để không làm mất dấu vết đối chiếu.
+        if (pairing.Status is not ("Accepted" or "Confirmed"))
+            throw new InvalidOperationException("PAIRING_NOT_AWAITING_PAYMENT");
+
+        if (await _context.EntryFeePayments.AnyAsync(payment => payment.PairingId == pairingId))
+            throw new InvalidOperationException("PAIRING_HAS_FEE_PAYMENT");
+
+        var now = DateTime.UtcNow;
+        var trimmedReason = reason.Trim();
+        var oldStatus = pairing.Status;
+        pairing.Status = "Declined";
+        pairing.ResponseReason = trimmedReason;
+        pairing.UpdatedAt = now;
+        await _context.SaveChangesAsync();
+
+        await _audit.LogAsync(adminId, "Từ chối cặp chưa nộp lệ phí", "Pairing",
+            pairingId.ToString(), oldStatus, $"Declined;Reason={trimmedReason}");
+
+        await _notification.SendBulkAsync(
+            new[] { pairing.Horse.OwnerId, pairing.JockeyId },
+            "Cặp đấu bị từ chối",
+            $"Cặp đấu với ngựa '{pairing.Horse.Name}' ở giải '{pairing.Tournament.Name}' " +
+            $"đã bị Ban tổ chức từ chối vì chưa hoàn tất lệ phí. Lý do: {trimmedReason}.",
+            type: "Both",
+            relatedEntityType: "Pairing",
+            relatedEntityId: pairingId);
+
+        return MapToAdminFeePairingDto(pairing);
     }
 
     // =====================================================================
@@ -572,4 +677,42 @@ public class EntryFeePaymentService : IEntryFeePaymentService
         RejectReason = p.RejectReason,
         PairingStatus = pairing.Status
     };
+
+    private static AdminFeePairingDto MapToAdminFeePairingDto(Pairing pairing)
+    {
+        var payment = pairing.EntryFeePayments
+            .OrderByDescending(item => item.SubmittedAt)
+            .ThenByDescending(item => item.PaymentId)
+            .FirstOrDefault();
+
+        return new AdminFeePairingDto
+        {
+            PairingId = pairing.PairingId,
+            TournamentId = pairing.TournamentId,
+            TournamentName = pairing.Tournament?.Name ?? string.Empty,
+            HorseId = pairing.HorseId,
+            HorseName = pairing.Horse?.Name ?? string.Empty,
+            JockeyId = pairing.JockeyId,
+            JockeyName = pairing.Jockey?.Jockey?.FullName ?? string.Empty,
+            OwnerId = pairing.Horse?.OwnerId ?? 0,
+            OwnerName = pairing.Horse?.Owner?.Owner?.FullName ?? string.Empty,
+            PairingStatus = pairing.Status,
+            PairingResponseReason = pairing.ResponseReason,
+            PairingCreatedAt = pairing.CreatedAt,
+            PaymentId = payment?.PaymentId,
+            Amount = payment?.Amount,
+            Method = payment?.Method,
+            ReceiptNo = payment?.ReceiptNo,
+            TransferRef = payment?.TransferRef,
+            ProofFileName = payment?.ProofFileName,
+            HasProof = !string.IsNullOrWhiteSpace(payment?.ProofFilePath),
+            PaymentStatus = payment?.Status,
+            SubmittedAt = payment?.SubmittedAt,
+            VerifiedAt = payment?.VerifiedAt,
+            RejectReason = payment?.RejectReason,
+            CanRejectUnpaid = payment == null &&
+                pairing.Tournament?.EntryFeeAmount > 0 &&
+                pairing.Status is "Accepted" or "Confirmed"
+        };
+    }
 }
