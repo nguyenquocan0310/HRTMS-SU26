@@ -103,7 +103,9 @@ export default function SpectatorHome() {
         ) : (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {races.map((race) => {
-              const isPredictionPhase = race.status.toLowerCase() === 'pre-race'
+              const normalizedStatus = race.status.toLowerCase()
+              const isPredictionPhase = normalizedStatus === 'pre-race'
+              const isPublished = ['official', 'completed'].includes(normalizedStatus)
               const gate = predictionGates[race.raceId]
               const gateFailed = gateErrors[race.raceId]
               const canPredict = isPredictionPhase
@@ -111,8 +113,12 @@ export default function SpectatorHome() {
                 && gate.isPostPositionDrawn === true
                 && gate.isPredictionGateClosed === false
                 && gate.raceStatus.toLowerCase() === 'pre-race'
-              const predictionLabel = !['upcoming', 'pre-race'].includes(race.status.toLowerCase())
-                ? 'Không khả dụng'
+              const predictionLabel = isPublished
+                ? 'Đã công bố kết quả'
+                : normalizedStatus === 'cancelled'
+                  ? 'Cuộc đua đã hủy'
+                  : !['upcoming', 'pre-race'].includes(normalizedStatus)
+                    ? 'Đã đóng dự đoán'
                 : gateFailed
                   ? 'Không tải được cổng'
                   : !gate
