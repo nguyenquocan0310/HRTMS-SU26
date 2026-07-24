@@ -20,6 +20,7 @@ import {
 } from "../../services/tournamentService";
 import {
   autoAllocate,
+  clearRoundAllocation,
   finalizeRound,
   getRaceSchedule,
   getRoundWaitlist,
@@ -49,6 +50,7 @@ const RaceOperations = () => {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [allocateConfirm, setAllocateConfirm] = useState(false);
+  const [clearAllocationConfirm, setClearAllocationConfirm] = useState(false);
   const [finalizeConfirm, setFinalizeConfirm] = useState(false);
   const [move, setMove] = useState<{
     entry: ScheduledEntry;
@@ -187,6 +189,26 @@ const RaceOperations = () => {
       setPreview(result.allocation);
       setNotice(
         "Đã hoàn tất xử lý vòng đấu. Xem chi tiết các cuộc đua được bốc thăm và bị bỏ qua bên dưới.",
+      );
+      await refreshRound();
+    } catch (err) {
+      setError(adminError(err));
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const clearAllocation = async () => {
+    if (!round) return;
+    setWorking(true);
+    setClearAllocationConfirm(false);
+    setError("");
+    try {
+      const result = await clearRoundAllocation(round.roundId);
+      setPreview(null);
+      setExpandedRaceIds(new Set());
+      setNotice(
+        `Đã gỡ ${result.removedEntryCount} cặp khỏi phân bổ. Danh sách đủ điều kiện sẽ được tải lại để bạn tự phân bổ.`,
       );
       await refreshRound();
     } catch (err) {
@@ -453,6 +475,16 @@ const RaceOperations = () => {
               </div>
             ) : (
               <div className={styles.actionButtons}>
+                {hasAllocation && !allDrawn && (
+                  <button
+                    type="button"
+                    className={styles.secondary}
+                    disabled={working}
+                    onClick={() => setClearAllocationConfirm(true)}
+                  >
+                    Gỡ phân bổ
+                  </button>
+                )}
                 <button
                   type="button"
                   className={styles.primary}
@@ -721,6 +753,18 @@ const RaceOperations = () => {
         >
           Hệ thống sẽ lưu phân bổ cho toàn bộ vòng đấu và danh sách chờ. Bạn có
           chắc chắn muốn tiếp tục?
+        </Modal>
+      )}
+      {clearAllocationConfirm && (
+        <Modal
+          title="Gỡ phân bổ của vòng"
+          onCancel={() => setClearAllocationConfirm(false)}
+          onConfirm={() => void clearAllocation()}
+          confirm="Gỡ phân bổ"
+          loading={working}
+        >
+          Tất cả cặp đã xếp vào race và danh sách chờ của vòng này sẽ được gỡ.
+          Chỉ thực hiện được khi chưa bốc thăm và chưa có race nào bắt đầu.
         </Modal>
       )}
       {finalizeConfirm && (

@@ -540,16 +540,16 @@ public class RaceEntryService : IRaceEntryService
             throw;
         }
 
-        // Owner đã nhận thông báo "ngựa được phân vào cuộc đua #X" lúc allocate —
-        // không báo lại thì họ vẫn tin lịch cũ còn hiệu lực.
-        foreach (var entry in entries)
+        // Owner đã nhận thông báo "ngựa được phân vào cuộc đua" lúc allocate —
+        // không báo lại thì họ vẫn tin lịch cũ còn hiệu lực. Gửi bulk để thao tác
+        // gỡ phân bổ không phải chờ một kết nối SMTP cho từng cặp.
+        if (entries.Count > 0)
         {
-            await _notification.SendAsync(
-                entry.Pairing.Horse.OwnerId,
+            await _notification.SendBulkAsync(
+                entries.Select(entry => entry.Pairing.Horse.OwnerId),
                 "Phân bổ cuộc đua đã được gỡ",
-                $"Ngựa '{entry.Pairing.Horse.Name}' tạm thời không còn trong Cuộc đua " +
-                $"#{entry.Race.RaceNumber}. Ban tổ chức đang sắp xếp lại vòng đấu và sẽ " +
-                "thông báo cuộc đua mới.",
+                $"Cặp đấu của bạn tạm thời chưa được xếp vào cuộc đua của vòng " +
+                $"'{round.Name}'. Ban tổ chức đang sắp xếp lại và sẽ thông báo lịch mới.",
                 type: "Both",
                 relatedEntityType: "Round",
                 relatedEntityId: roundId);

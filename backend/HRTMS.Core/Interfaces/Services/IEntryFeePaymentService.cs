@@ -13,9 +13,17 @@ namespace HRTMS.Core.Interfaces.Services
         Task<PagedResult<FeePaymentResponseDto>> GetForAdminAsync(
             string? status, int? tournamentId, int page, int pageSize);
 
+        // Admin theo dõi TẤT CẢ pairing, gồm cả cặp chưa từng nộp lệ phí.
+        Task<PagedResult<AdminFeePairingDto>> GetPairingsForAdminAsync(
+            string? paymentStatus, int? tournamentId, int page, int pageSize);
+
         Task<FeePaymentResponseDto> VerifyAsync(int adminId, int paymentId);
 
         Task<FeePaymentResponseDto> RejectAsync(int adminId, int paymentId, string reason);
+
+        // Admin loại pairing chưa nộp phí để không còn nằm trong danh sách chờ.
+        Task<AdminFeePairingDto> RejectUnpaidPairingAsync(
+            int adminId, int pairingId, string reason);
 
         // Trả về (physicalPath, downloadFileName). Ném UnauthorizedAccessException
         // nếu actor không phải Owner của pairing và cũng không phải Admin.
