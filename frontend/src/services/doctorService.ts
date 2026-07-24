@@ -50,6 +50,7 @@ export interface DoctorRaceEntry {
   postRaceJockeyWeight: number | null;
   postRaceWeightDifference: number | null;
   postRaceWeightFlagged: boolean;
+  postRaceThresholdKg: number | null;
   weightDifference: number | null;
   thresholdKg: number | null;
   isWeightWarning: boolean;
@@ -191,6 +192,9 @@ const normalizeRaceEntry = (value: unknown): DoctorRaceEntry | null => {
     postRaceJockeyWeight: nullableNumber(item.postRaceJockeyWeight ?? item.postRaceWeight),
     postRaceWeightDifference: nullableNumber(item.postRaceWeightDifference),
     postRaceWeightFlagged: Boolean(item.postRaceWeightFlagged ?? item.isWeightFlagged),
+    postRaceThresholdKg: nullableNumber(
+      item.postRaceThresholdKg ?? item.postRaceWeightDiffThresholdKg
+    ),
     weightDifference: computedWeightDifference,
     thresholdKg: nullableNumber(item.thresholdKg),
     isWeightWarning: Boolean(item.isWeightWarning),

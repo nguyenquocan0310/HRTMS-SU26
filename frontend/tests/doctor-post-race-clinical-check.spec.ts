@@ -105,6 +105,15 @@ test('Doctor records an Unfit post-race clinical check only for an Unofficial ra
 
   await page.goto(`${BASE_URL}/doctor/paddock?raceId=10`)
   await expect(page.locator('[data-race-status="unofficial"]')).toContainText('Unofficial')
+  await page.getByRole('button', { name: 'Cân nặng sau đua (Weigh-Out)' }).click()
+  const weighOutInput = page.getByPlaceholder('Nhập cân')
+  await weighOutInput.fill('54')
+  await expect(page.getByText('0.0 kg', { exact: true })).toHaveClass(/text-emerald-700/)
+  await weighOutInput.fill('55')
+  await expect(page.getByText('+1.0 kg', { exact: true })).toHaveClass(/text-emerald-700/)
+  await weighOutInput.fill('56')
+  await expect(page.getByText('+2.0 kg', { exact: true })).toHaveClass(/text-red-700/)
+  await expect(page.getByRole('button', { name: 'Xác nhận Weigh-Out' })).toBeEnabled()
   await page.getByRole('button', { name: 'Khám lại sau trận' }).click()
 
   await expect(page.getByText('Race: Unofficial')).toBeVisible()
@@ -171,6 +180,9 @@ test('post-race clinical action stays locked before Unofficial', async ({ page }
 
   await expect(page.locator('[data-race-status="live"]')).toContainText('Live')
   await expect(page.locator('[data-race-status="live"] .animate-pulse')).toBeVisible()
+  await page.getByRole('button', { name: 'Cân nặng sau đua (Weigh-Out)' }).click()
+  await expect(page.getByPlaceholder('Nhập cân')).toBeDisabled()
+  await expect(page.getByText('Chỉ được ghi nhận cân nặng sau đua khi race ở trạng thái Unofficial.')).toBeVisible()
   const postRaceClinicalButton = page.getByRole('button', { name: 'Khám lại sau trận · Chờ Unofficial' })
   await expect(postRaceClinicalButton).toBeVisible()
   await expect(postRaceClinicalButton).toBeDisabled()
