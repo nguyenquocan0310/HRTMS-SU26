@@ -89,9 +89,16 @@ public class EmailService : IEmailService
         return message;
     }
 
+    // Timeout mac dinh cua MailKit la 120s, ap cho TUNG thao tac socket. Khi cong
+    // SMTP bi chan (firewall mang truong/cong ty), ConnectAsync treo du 2 phut ngay
+    // TRONG HTTP request — auto-allocate mot vong bi keo tu ~1s len 2-3 phut du du
+    // lieu da commit xong. Ha xuong 10s: du cho Gmail StartTls + AUTH khi mang binh
+    // thuong (~2-3s), nhung khong con treo hang phut khi mang chan.
+    private const int SmtpTimeoutMs = 10_000;
+
     private async Task SendMessageAsync(MimeMessage message)
     {
-        using var client = new SmtpClient();
+        using var client = new SmtpClient { Timeout = SmtpTimeoutMs };
 
         var secureOption = _smtp.UseSsl
             ? SecureSocketOptions.StartTls
