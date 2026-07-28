@@ -176,6 +176,9 @@ public class LiveRaceService : ILiveRaceService
         if (entry.Status is "Cancelled" or "Disqualified" || entry.IsWithdrawn)
             throw new InvalidOperationException("RACE_ENTRY_NOT_ELIGIBLE");
 
+        if (dto.Penalty == "PlaceBehind" && dto.PlaceBehindEntryId == entry.RaceEntryId)
+            throw new ArgumentException("PLACE_BEHIND_ENTRY_CANNOT_MATCH_OFFENDER");
+
         if (dto.PlaceBehindEntryId.HasValue)
         {
             var placeBehindExists = await _context.RaceEntries
@@ -184,6 +187,12 @@ public class LiveRaceService : ILiveRaceService
             if (!placeBehindExists)
                 throw new KeyNotFoundException("PLACE_BEHIND_ENTRY_NOT_FOUND");
         }
+
+        if (dto.Penalty == "PlaceBehind" && await _context.Violations.AnyAsync(v =>
+                v.RaceReport.RaceId == raceId &&
+                v.RaceEntryId == entry.RaceEntryId &&
+                v.Penalty == "PlaceBehind"))
+            throw new InvalidOperationException("RACE_ENTRY_ALREADY_PLACE_BEHIND");
 
         // RaceReport chính thức chỉ được submit khi Live -> Unofficial
         // (SubmitFinishResultsAsync). Trong lúc Live chưa có RaceReport, nên ở
@@ -220,6 +229,14 @@ public class LiveRaceService : ILiveRaceService
             LoggedAt = DateTime.UtcNow
         };
         _context.Violations.Add(violation);
+
+        // Keep the result-eligibility status in sync with the referee's penalty.
+        // Result calculation and advancement both use RaceEntry.Status.
+        if (violation.Penalty == "Disqualified")
+            MarkEntryDisqualified(entry, violation.LoggedAt);
+        else if (violation.Penalty == "Scratch")
+            MarkEntryScratched(entry, violation.Description, violation.LoggedAt);
+
         await _context.SaveChangesAsync();
 
         return new ViolationDto
@@ -347,6 +364,9 @@ public class LiveRaceService : ILiveRaceService
             .FirstOrDefaultAsync(v => v.ViolationId == violationId && v.RaceReport.RaceId == raceId)
             ?? throw new KeyNotFoundException("VIOLATION_NOT_FOUND");
 
+        if (dto.Penalty == "PlaceBehind" && dto.PlaceBehindEntryId == violation.RaceEntryId)
+            throw new ArgumentException("PLACE_BEHIND_ENTRY_CANNOT_MATCH_OFFENDER");
+
         if (dto.PlaceBehindEntryId.HasValue)
         {
             var placeBehindExists = await _context.RaceEntries
@@ -356,10 +376,45 @@ public class LiveRaceService : ILiveRaceService
                 throw new KeyNotFoundException("PLACE_BEHIND_ENTRY_NOT_FOUND");
         }
 
+        if (dto.Penalty == "PlaceBehind" && await _context.Violations.AnyAsync(v =>
+                v.RaceReport.RaceId == raceId &&
+                v.RaceEntryId == violation.RaceEntryId &&
+                v.ViolationId != violation.ViolationId &&
+                v.Penalty == "PlaceBehind"))
+            throw new InvalidOperationException("RACE_ENTRY_ALREADY_PLACE_BEHIND");
+
+        var wasDisqualified = violation.Penalty == "Disqualified";
+        var wasScratched = violation.Penalty == "Scratch";
+        var isExclusionPenalty = dto.Penalty is "Disqualified" or "Scratch";
+
+        if (isExclusionPenalty && !wasDisqualified && !wasScratched &&
+            (violation.RaceEntry.Status is "Disqualified" or "Scratched" ||
+             violation.RaceEntry.IsWithdrawn ||
+             await HasOtherExclusionPenaltyAsync(violation.RaceEntryId, violation.ViolationId)))
+            throw new InvalidOperationException("RACE_ENTRY_ALREADY_EXCLUDED");
+
         violation.ViolationCode = dto.ViolationCode.Trim().ToUpperInvariant();
         violation.Penalty = dto.Penalty;
         violation.PlaceBehindEntryId = dto.PlaceBehindEntryId;
         violation.Description = dto.Description.Trim();
+
+        if (violation.Penalty == "Disqualified")
+        {
+            MarkEntryDisqualified(violation.RaceEntry, DateTime.UtcNow);
+        }
+        else if (violation.Penalty == "Scratch")
+        {
+            MarkEntryScratched(violation.RaceEntry, violation.Description, DateTime.UtcNow);
+        }
+        else if (wasDisqualified && await CanRestoreEntryAfterPenaltyAsync(violation.RaceEntryId, violation.ViolationId))
+        {
+            RestoreEntryAfterRacePenalty(violation.RaceEntry, DateTime.UtcNow);
+        }
+        else if (wasScratched && await CanRestoreEntryAfterPenaltyAsync(violation.RaceEntryId, violation.ViolationId))
+        {
+            RestoreEntryAfterRacePenalty(violation.RaceEntry, DateTime.UtcNow);
+        }
+
         await _context.SaveChangesAsync();
 
         return ToViolationDto(violation);
@@ -373,10 +428,17 @@ public class LiveRaceService : ILiveRaceService
         EnsureViolationsEditable(race);
 
         var violation = await _context.Violations
+            .Include(v => v.RaceEntry)
             .FirstOrDefaultAsync(v => v.ViolationId == violationId && v.RaceReport.RaceId == raceId)
             ?? throw new KeyNotFoundException("VIOLATION_NOT_FOUND");
 
+        var shouldRestoreEntry = (violation.Penalty == "Disqualified" || violation.Penalty == "Scratch") &&
+            await CanRestoreEntryAfterPenaltyAsync(violation.RaceEntryId, violation.ViolationId);
+
         _context.Violations.Remove(violation);
+        if (shouldRestoreEntry)
+            RestoreEntryAfterRacePenalty(violation.RaceEntry, DateTime.UtcNow);
+
         await _context.SaveChangesAsync();
     }
 
@@ -401,14 +463,16 @@ public class LiveRaceService : ILiveRaceService
         // Disqualified đã bị loại khỏi cuộc đua — không cần FinishPosition lẫn
         // cân sau đua, khớp với quy tắc DeclareOfficialAsync (IsRankingIntegrityValid /
         // IsPostRaceWeighInComplete) vốn cũng loại trừ Disqualified.
-        var dnfEntryIds = await _context.Violations
-            .Where(v => v.RaceReport.RaceId == raceId && v.ViolationCode == "DNF-001" && v.Penalty == "Scratch")
+        var excludedEntryIds = await _context.Violations
+            .Where(v => v.RaceReport.RaceId == raceId &&
+                ((v.ViolationCode == "DNF-001" && v.Penalty == "Scratch") ||
+                 v.Penalty == "Disqualified" || v.Penalty == "Scratch"))
             .Select(v => v.RaceEntryId)
             .ToListAsync();
 
         var eligibleEntryIds = race.RaceEntries
             .Where(e => e.Status != "Cancelled" && e.Status != "Disqualified" && !e.IsWithdrawn)
-            .Where(e => !dnfEntryIds.Contains(e.RaceEntryId))
+            .Where(e => !excludedEntryIds.Contains(e.RaceEntryId))
             .Select(e => e.RaceEntryId)
             .ToHashSet();
 
@@ -447,6 +511,10 @@ public class LiveRaceService : ILiveRaceService
             entry.FinishTime = r.FinishTime;
             entry.UpdatedAt = now;
         }
+
+        // PlaceBehind is a final-result penalty: keep every other finisher's
+        // relative order, then put the offending entry behind the selected one.
+        await ApplyPlaceBehindPenaltiesAsync(raceId, race.RaceEntries, eligibleEntryIds, now);
 
         // Tái sử dụng RaceReport đã tạo lúc ghi violation trong Live (nếu có),
         // tránh vi phạm UNIQUE(RaceId) trên RaceReports.
@@ -539,6 +607,151 @@ public class LiveRaceService : ILiveRaceService
         Description = violation.Description,
         LoggedAt = violation.LoggedAt
     };
+
+    private async Task<bool> CanRestoreEntryAfterPenaltyAsync(int raceEntryId, int currentViolationId)
+    {
+        if (await HasOtherExclusionPenaltyAsync(raceEntryId, currentViolationId))
+            return false;
+
+        // Emergency DQ has no referee undo flow. A referee editing/deleting an
+        // ordinary violation must therefore never reactivate that entry.
+        var entityId = raceEntryId.ToString();
+        return !await _context.AuditLogs.AnyAsync(log =>
+            log.Action == "EmergencyDisqualification" &&
+            log.EntityName == "RaceEntry" &&
+            log.EntityId == entityId);
+    }
+
+    private Task<bool> HasOtherExclusionPenaltyAsync(int raceEntryId, int currentViolationId) =>
+        _context.Violations.AnyAsync(v =>
+            v.RaceEntryId == raceEntryId &&
+            v.ViolationId != currentViolationId &&
+            (v.Penalty == "Disqualified" || v.Penalty == "Scratch"));
+
+    private static void MarkEntryDisqualified(RaceEntry entry, DateTime now)
+    {
+        entry.Status = "Disqualified";
+        entry.IsWithdrawn = false;
+        entry.WithdrawalReason = null;
+        entry.FinishPosition = null;
+        entry.FinishTime = null;
+        entry.UpdatedAt = now;
+    }
+
+    private static void MarkEntryScratched(RaceEntry entry, string reason, DateTime now)
+    {
+        entry.Status = "Scratched";
+        entry.IsWithdrawn = true;
+        entry.WithdrawalReason = reason;
+        entry.FinishPosition = null;
+        entry.FinishTime = null;
+        entry.UpdatedAt = now;
+    }
+
+    private static void RestoreEntryAfterRacePenalty(RaceEntry entry, DateTime now)
+    {
+        entry.Status = "Confirmed";
+        entry.IsWithdrawn = false;
+        entry.WithdrawalReason = null;
+        entry.UpdatedAt = now;
+    }
+
+    private async Task ApplyPlaceBehindPenaltiesAsync(
+        int raceId,
+        IEnumerable<RaceEntry> raceEntries,
+        IReadOnlySet<int> eligibleEntryIds,
+        DateTime now)
+    {
+        var penalties = await _context.Violations
+            .Where(v => v.RaceReport.RaceId == raceId &&
+                v.Penalty == "PlaceBehind" && v.PlaceBehindEntryId != null)
+            .OrderBy(v => v.LoggedAt)
+            .ThenBy(v => v.ViolationId)
+            .Select(v => new PlaceBehindPenalty(v.RaceEntryId, v.PlaceBehindEntryId!.Value))
+            .ToListAsync();
+
+        // A DQ/Scratch takes precedence, so an older PlaceBehind involving that
+        // entry becomes informational only.
+        penalties = penalties
+            .Where(p => eligibleEntryIds.Contains(p.RaceEntryId) && eligibleEntryIds.Contains(p.PlaceBehindEntryId))
+            .ToList();
+
+        if (penalties.Count == 0)
+            return;
+
+        if (penalties.GroupBy(p => p.RaceEntryId).Any(g => g.Count() > 1) || HasPlaceBehindCycle(penalties))
+            throw new ArgumentException("CONFLICTING_PLACE_BEHIND_PENALTIES");
+
+        var groups = raceEntries
+            .Where(e => eligibleEntryIds.Contains(e.RaceEntryId))
+            .OrderBy(e => e.FinishPosition)
+            .ThenBy(e => e.RaceEntryId)
+            .GroupBy(e => e.FinishPosition!.Value)
+            .Select(g => g.ToList())
+            .ToList();
+
+        // A chain is valid (A behind B, B behind C). Repeat the stable moves
+        // until every constraint is satisfied; a cycle was rejected above.
+        var maxPasses = penalties.Count * Math.Max(groups.Count, 1);
+        var pass = 0;
+        bool changed;
+        do
+        {
+            changed = false;
+            foreach (var penalty in penalties)
+            {
+                var offenderGroup = groups.First(g => g.Any(e => e.RaceEntryId == penalty.RaceEntryId));
+                var offenderGroupIndex = groups.IndexOf(offenderGroup);
+                var targetGroupIndex = groups.FindIndex(g => g.Any(e => e.RaceEntryId == penalty.PlaceBehindEntryId));
+                if (offenderGroupIndex > targetGroupIndex)
+                    continue;
+
+                var offender = offenderGroup.Single(e => e.RaceEntryId == penalty.RaceEntryId);
+                offenderGroup.Remove(offender);
+                if (offenderGroup.Count == 0)
+                    groups.Remove(offenderGroup);
+
+                targetGroupIndex = groups.FindIndex(g => g.Any(e => e.RaceEntryId == penalty.PlaceBehindEntryId));
+                groups.Insert(targetGroupIndex + 1, new List<RaceEntry> { offender });
+                changed = true;
+            }
+
+            if (changed && ++pass > maxPasses)
+                throw new ArgumentException("CONFLICTING_PLACE_BEHIND_PENALTIES");
+        } while (changed);
+
+        var position = 1;
+        foreach (var group in groups)
+        {
+            foreach (var entry in group)
+            {
+                entry.FinishPosition = position;
+                entry.UpdatedAt = now;
+            }
+
+            position += group.Count;
+        }
+    }
+
+    private static bool HasPlaceBehindCycle(IEnumerable<PlaceBehindPenalty> penalties)
+    {
+        var targetByEntryId = penalties.ToDictionary(p => p.RaceEntryId, p => p.PlaceBehindEntryId);
+        foreach (var entryId in targetByEntryId.Keys)
+        {
+            var visited = new HashSet<int>();
+            var current = entryId;
+            while (targetByEntryId.TryGetValue(current, out var target))
+            {
+                if (!visited.Add(current))
+                    return true;
+                current = target;
+            }
+        }
+
+        return false;
+    }
+
+    private sealed record PlaceBehindPenalty(int RaceEntryId, int PlaceBehindEntryId);
 
     private static void ValidateStandardCompetitionRanking(IEnumerable<int> positions)
     {

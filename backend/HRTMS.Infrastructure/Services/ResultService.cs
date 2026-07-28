@@ -227,15 +227,24 @@ namespace HRTMS.Infrastructure.Services
                 r.TournamentId == tournament.TournamentId &&
                 r.SequenceOrder > race.Round.SequenceOrder);
 
+            // DQ must always be eliminated, including a final round or a
+            // tournament that does not use the TopPerRace advancement rule.
+            foreach (var entry in race.RaceEntries.Where(re =>
+                re.Status == "Disqualified" ||
+                re.ViolationRaceEntries.Any(v => v.Penalty == "Disqualified")))
+            {
+                entry.AdvancementStatus = "Eliminated";
+                entry.AdvancementReason = "Bị loại khỏi cuộc đua (Disqualified)";
+                entry.UpdatedAt = now;
+            }
+
             if (hasNextRound && tournament.AdvancementRule == "TopPerRace")
             {
                 var topN = tournament.AdvancementCount;
 
                 // Entry hợp lệ để xét: có FinishPosition, không Cancelled/Disqualified.
                 var finishers = race.RaceEntries
-                    .Where(re => re.Status != "Cancelled" &&
-                                 re.Status != "Disqualified" &&
-                                 !re.ViolationRaceEntries.Any(v => v.ViolationCode == "DNF-001" && v.Penalty == "Scratch") &&
+                    .Where(re => !IsExcludedFromResults(re) &&
                                  re.FinishPosition != null)
                     .ToList();
 
@@ -264,14 +273,6 @@ namespace HRTMS.Infrastructure.Services
                         entry.AdvancementStatus = "Eliminated";
                         entry.AdvancementReason = $"Ngoài Top {topN} của cuộc đua";
                     }
-                    entry.UpdatedAt = now;
-                }
-
-                // Disqualified → loại thẳng; Cancelled/không chạy → giữ NULL (không xét).
-                foreach (var entry in race.RaceEntries.Where(re => re.Status == "Disqualified"))
-                {
-                    entry.AdvancementStatus = "Eliminated";
-                    entry.AdvancementReason = "Bị loại khỏi cuộc đua (Disqualified)";
                     entry.UpdatedAt = now;
                 }
             }
@@ -303,11 +304,11 @@ namespace HRTMS.Infrastructure.Services
 
             // Tập ngựa về Nhất chính thức — cho phép đồng hạng
             var winningEntryIds = race.RaceEntries
-                .Where(re => re.FinishPosition == 1 && re.Status != "Cancelled" && re.Status != "Disqualified")
+                .Where(re => re.FinishPosition == 1 && !IsExcludedFromResults(re))
                 .Select(re => re.RaceEntryId)
                 .ToHashSet();
 
-            // Map RaceEntryId -> Status để biết Disqualified/Cancelled
+            // Map RaceEntryId -> Status để biết entry nào phải hoàn dự đoán.
             var entryStatusById = race.RaceEntries.ToDictionary(re => re.RaceEntryId, re => re.Status);
 
             // Gộp theo Spectator để ghi 1 dòng VPT/Spectator (tránh update phi tất định)
@@ -318,7 +319,7 @@ namespace HRTMS.Infrastructure.Services
             {
                 var entryStatus = entryStatusById.GetValueOrDefault(pred.RaceEntryId, "Unknown");
 
-                if (entryStatus == "Cancelled" || entryStatus == "Disqualified")
+                if (entryStatus is "Cancelled" or "Disqualified" or "Scratched")
                 {
                     pred.Status = "Refunded";
                     refundBySpectator[pred.SpectatorId] =
@@ -446,7 +447,7 @@ namespace HRTMS.Infrastructure.Services
         {
             foreach (var entry in entries)
             {
-                if (entry.Status == "Cancelled" || entry.Status == "Disqualified" || entry.ViolationRaceEntries.Any(v => v.ViolationCode == "DNF-001" && v.Penalty == "Scratch") || entry.FinishPosition == null)
+                if (IsExcludedFromResults(entry) || entry.FinishPosition == null)
                     continue;
 
                 entry.PointsAwarded = entry.FinishPosition switch
@@ -473,7 +474,7 @@ namespace HRTMS.Infrastructure.Services
 
             // Nhóm theo FinishPosition để xử lý đồng hạng
             var finishersByPosition = race.RaceEntries
-                .Where(re => re.Status != "Cancelled" && re.Status != "Disqualified" && !re.ViolationRaceEntries.Any(v => v.ViolationCode == "DNF-001" && v.Penalty == "Scratch") && re.FinishPosition != null)
+                .Where(re => !IsExcludedFromResults(re) && re.FinishPosition != null)
                 .GroupBy(re => re.FinishPosition!.Value)
                 .OrderBy(g => g.Key)
                 .ToList();
@@ -587,7 +588,7 @@ namespace HRTMS.Infrastructure.Services
         private static bool IsRankingIntegrityValid(IEnumerable<RaceEntry> entries)
         {
             var positions = entries
-                .Where(re => re.Status != "Cancelled" && re.Status != "Disqualified" && !re.ViolationRaceEntries.Any(v => v.ViolationCode == "DNF-001" && v.Penalty == "Scratch"))
+                .Where(re => !IsExcludedFromResults(re))
                 .Select(re => re.FinishPosition)
                 .ToList();
 
@@ -614,7 +615,7 @@ namespace HRTMS.Infrastructure.Services
         private static bool IsPostRaceWeighInComplete(IEnumerable<RaceEntry> entries)
         {
             return entries
-                .Where(re => re.Status != "Cancelled" && re.Status != "Disqualified" && !re.ViolationRaceEntries.Any(v => v.ViolationCode == "DNF-001" && v.Penalty == "Scratch"))
+                .Where(re => !IsExcludedFromResults(re))
                 .All(re => re.PostRaceJockeyWeight != null);
         }
 
@@ -627,8 +628,15 @@ namespace HRTMS.Infrastructure.Services
         private static bool IsPostRaceClinicalCheckComplete(IEnumerable<RaceEntry> entries)
         {
             return entries
-                .Where(re => re.Status != "Cancelled" && re.Status != "Disqualified" && !re.ViolationRaceEntries.Any(v => v.ViolationCode == "DNF-001" && v.Penalty == "Scratch"))
+                .Where(re => !IsExcludedFromResults(re))
                 .All(re => re.PostRaceClinicalStatus == "Fit");
         }
+
+        private static bool IsExcludedFromResults(RaceEntry entry) =>
+            entry.Status is "Cancelled" or "Disqualified" or "Scratched" ||
+            entry.IsWithdrawn ||
+            entry.ViolationRaceEntries.Any(v =>
+                (v.ViolationCode == "DNF-001" && v.Penalty == "Scratch") ||
+                v.Penalty is "Disqualified" or "Scratch");
     }
 }

@@ -51,7 +51,8 @@ public class ReconciliationService : IReconciliationService
             .AsNoTracking()
             .Where(re => raceIds.Contains(re.RaceId)
                          && re.FinishPosition == 1
-                         && re.Status != "Cancelled" && re.Status != "Disqualified")
+                         && re.Status != "Cancelled" && re.Status != "Disqualified" && re.Status != "Scratched"
+                         && !re.IsWithdrawn)
             .Select(re => new { re.RaceId, HorseName = re.Pairing.Horse.Name })
             .ToListAsync();
 

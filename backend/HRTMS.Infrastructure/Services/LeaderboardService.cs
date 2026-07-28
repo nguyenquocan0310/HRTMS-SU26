@@ -16,7 +16,7 @@ namespace HRTMS.Infrastructure.Services;
 // ta lấy dữ liệu thô qua ToListAsync() trước, rồi GroupBy/Sum bằng LINQ to Objects.
 public class LeaderboardService : ILeaderboardService
 {
-	private static readonly string[] ExcludedEntryStatuses = { "Cancelled", "Disqualified" };
+	private static readonly string[] ExcludedEntryStatuses = { "Cancelled", "Disqualified", "Scratched" };
 
 	private readonly HRTMSDbContext _context;
 
@@ -40,6 +40,7 @@ public class LeaderboardService : ILeaderboardService
 			where pairing.TournamentId == tournamentId
 				  && race.Status == "Official"
 				  && !ExcludedEntryStatuses.Contains(re.Status)
+				  && !re.IsWithdrawn
 			select new HorseRow(horse.HorseId, horse.Name, re.FinishPosition, re.PointsAwarded, re.EarningsAwarded)
 		).ToListAsync();
 
@@ -74,6 +75,7 @@ public class LeaderboardService : ILeaderboardService
 			where pairing.TournamentId == tournamentId
 				  && race.Status == "Official"
 				  && !ExcludedEntryStatuses.Contains(re.Status)
+				  && !re.IsWithdrawn
 			select new JockeyRow(jockey.UserId, jockey.FullName, re.FinishPosition, re.PointsAwarded, re.EarningsAwarded)
 		).ToListAsync();
 
