@@ -22,16 +22,16 @@ function pairing(
 }
 
 test.describe('getJockeyInviteState', () => {
-  test('matches by jockey, tournament, and horse IDs', () => {
+  test('matches by jockey and tournament regardless of the selected horse', () => {
     const invitations = [
-      pairing('wrong-horse', 'Accepted', '2026-07-21T08:00:00Z', { horseID: '12' }),
+      pairing('paired-other-horse', 'Confirmed', '2026-07-21T08:00:00Z', { horseID: '12' }),
       pairing('wrong-tournament', 'Confirmed', '2026-07-21T09:00:00Z', { tournamentID: 8 }),
       pairing('accepted-current', 'Accepted', '2026-07-21T10:00:00Z'),
     ];
 
-    expect(getJockeyInviteState(21, 7, 11, invitations)).toEqual({
-      action: 'pay',
-      pairing: invitations[2],
+    expect(getJockeyInviteState(21, 7, invitations)).toEqual({
+      action: 'paired',
+      pairing: invitations[0],
     });
   });
 
@@ -43,7 +43,16 @@ test.describe('getJockeyInviteState', () => {
       pairing('confirmed', 'Confirmed', '2026-07-18T12:00:00Z'),
     ];
 
-    expect(getJockeyInviteState(21, 7, 11, invitations).action).toBe('paired');
+    expect(getJockeyInviteState(21, 7, invitations).action).toBe('paired');
+  });
+
+  test('treats a confirmed pairing as fully paid and paired', () => {
+    const confirmed = pairing('confirmed', 'Confirmed', '2026-07-21T11:00:00Z');
+
+    expect(getJockeyInviteState(21, 7, [confirmed])).toEqual({
+      action: 'paired',
+      pairing: confirmed,
+    });
   });
 
   test('keeps a submitted payment waiting for Admin verification', () => {
@@ -52,7 +61,7 @@ test.describe('getJockeyInviteState', () => {
       pairing('submitted', 'PendingVerification', '2026-07-21T11:00:00Z'),
     ];
 
-    expect(getJockeyInviteState(21, 7, 11, invitations)).toEqual({
+    expect(getJockeyInviteState(21, 7, invitations)).toEqual({
       action: 'verifying',
       pairing: invitations[1],
     });
@@ -64,13 +73,13 @@ test.describe('getJockeyInviteState', () => {
       pairing('newer', 'Declined', '2026-07-21T12:00:00Z'),
     ];
 
-    expect(getJockeyInviteState(21, 7, 11, invitations)).toEqual({
+    expect(getJockeyInviteState(21, 7, invitations)).toEqual({
       action: 'reinvite',
       pairing: invitations[1],
     });
   });
 
   test('returns invite when no matching pairing exists', () => {
-    expect(getJockeyInviteState(99, 7, 11, [])).toEqual({ action: 'invite' });
+    expect(getJockeyInviteState(99, 7, [])).toEqual({ action: 'invite' });
   });
 });

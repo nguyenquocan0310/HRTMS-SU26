@@ -1,6 +1,6 @@
 import type { JockeyInvitation } from '../../types/owner.types';
 
-export type JockeyInviteAction = 'invite' | 'invited' | 'confirm' | 'pay' | 'verifying' | 'paired' | 'reinvite';
+export type JockeyInviteAction = 'invite' | 'invited' | 'pay' | 'verifying' | 'paired' | 'reinvite';
 
 export interface JockeyInviteState {
   action: JockeyInviteAction;
@@ -19,9 +19,9 @@ const statusPriority: Record<JockeyInvitation['status'], number> = {
 };
 
 const actionByStatus: Record<JockeyInvitation['status'], JockeyInviteAction> = {
-  Confirmed: 'pay',
+  Confirmed: 'paired',
   PendingVerification: 'verifying',
-  Accepted: 'confirm',
+  Accepted: 'pay',
   Pending: 'invited',
   Declined: 'reinvite',
   Rejected: 'reinvite',
@@ -29,19 +29,20 @@ const actionByStatus: Record<JockeyInvitation['status'], JockeyInviteAction> = {
   Cancelled: 'reinvite',
 };
 
+export const getJockeyInviteAction = (pairing: JockeyInvitation): JockeyInviteAction =>
+  actionByStatus[pairing.status];
+
 export function getJockeyInviteState(
   jockeyId: string | number,
   tournamentId: string | number | null,
-  horseId: string | number | null,
   invitations: JockeyInvitation[],
 ): JockeyInviteState {
-  if (!tournamentId || !horseId) return { action: 'invite' };
+  if (!tournamentId) return { action: 'invite' };
 
   const matchingPairings = invitations
     .filter((invitation) =>
       String(invitation.jockeyID) === String(jockeyId)
-      && String(invitation.tournamentID) === String(tournamentId)
-      && String(invitation.horseID) === String(horseId))
+      && String(invitation.tournamentID) === String(tournamentId))
     .sort((left, right) => {
       const priorityDifference = statusPriority[right.status] - statusPriority[left.status];
       if (priorityDifference !== 0) return priorityDifference;
@@ -49,5 +50,5 @@ export function getJockeyInviteState(
     });
 
   const pairing = matchingPairings[0];
-  return pairing ? { action: actionByStatus[pairing.status], pairing } : { action: 'invite' };
+  return pairing ? { action: getJockeyInviteAction(pairing), pairing } : { action: 'invite' };
 }

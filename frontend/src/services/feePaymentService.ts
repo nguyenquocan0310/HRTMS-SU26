@@ -25,6 +25,37 @@ export const getAdminFeePairings = (filters: { status: AdminFeePairingStatus; to
   if (filters.tournamentId) params.set('tournamentId', String(filters.tournamentId));
   return apiFetch<AdminFeePairingPage>(`/admin/pairing-fee-statuses?${params}`);
 };
+export const getAllVerifiedFeePairings = async (tournamentId: number) => {
+  const pageSize = 100;
+  const firstPage = await getAdminFeePairings({
+    status: 'Verified',
+    tournamentId,
+    page: 1,
+    pageSize,
+  });
+  const effectivePageSize = firstPage.pageSize || pageSize;
+  const totalPages = Math.max(
+    firstPage.totalPages ?? 0,
+    Math.ceil(firstPage.totalCount / effectivePageSize),
+    1,
+  );
+  if (totalPages === 1) return firstPage.items ?? [];
+
+  const remainingPages = await Promise.all(
+    Array.from({ length: totalPages - 1 }, (_, index) =>
+      getAdminFeePairings({
+        status: 'Verified',
+        tournamentId,
+        page: index + 2,
+        pageSize,
+      }),
+    ),
+  );
+  return [
+    ...(firstPage.items ?? []),
+    ...remainingPages.flatMap((page) => page.items ?? []),
+  ];
+};
 export const verifyFeePayment = (paymentId: number) => apiFetch<FeePayment>(`/admin/fee-payments/${paymentId}/verify`, { method: 'POST' });
 export const rejectFeePayment = (paymentId: number, reason: string) => apiFetch<FeePayment>(`/admin/fee-payments/${paymentId}/reject`, { method: 'POST', body: JSON.stringify({ reason }) });
 export const completeFeeRefund = (paymentId: number) => apiFetch<FeePayment>(`/admin/fee-payments/${paymentId}/refund-complete`, { method: 'POST' });
