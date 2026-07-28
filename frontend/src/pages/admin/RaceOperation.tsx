@@ -19,6 +19,10 @@ import {
   type TournamentResponse,
 } from "../../services/tournamentService";
 import {
+  getAllVerifiedFeePairings,
+  type AdminFeePairing,
+} from "../../services/feePaymentService";
+import {
   autoAllocate,
   clearRoundAllocation,
   finalizeRound,
@@ -35,12 +39,25 @@ import {
 import { adminError, adminLabel, dateTime } from "../../utils/adminLabels";
 import styles from "./RaceOperation.module.scss";
 
+interface PairingCandidate {
+  pairingId: number;
+  horseName: string;
+  jockeyName: string;
+  ownerName?: string;
+  verifiedAt?: string | null;
+}
+
 const RaceOperations = () => {
   const [search, setSearch] = useSearchParams();
   const [tournaments, setTournaments] = useState<TournamentResponse[]>([]);
   const [schedules, setSchedules] = useState<RaceSchedule[]>([]);
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [preview, setPreview] = useState<AutoAllocateResult | null>(null);
+  const [verifiedPairings, setVerifiedPairings] = useState<AdminFeePairing[]>(
+    [],
+  );
+  const [pairingListError, setPairingListError] = useState("");
+  const [previewError, setPreviewError] = useState("");
   const [finalizeResult, setFinalizeResult] = useState<FinalizeResult | null>(
     null,
   );
@@ -128,31 +145,58 @@ const RaceOperations = () => {
       setSchedules([]);
       setWaitlist([]);
       setPreview(null);
+      setVerifiedPairings([]);
+      setPairingListError("");
+      setPreviewError("");
       return;
     }
     setLoadingRound(true);
     setError("");
     try {
-      const [races, waiting] = await Promise.all([
+      const verifiedPairingsRequest = tournament
+        ? getAllVerifiedFeePairings(tournament.tournamentId)
+            .then((items) => ({ items, error: "" }))
+            .catch((err) => ({
+              items: [] as AdminFeePairing[],
+              error: adminError(
+                err,
+                "Không tải được danh sách pairing đã xác nhận lệ phí.",
+              ),
+            }))
+        : Promise.resolve({ items: [] as AdminFeePairing[], error: "" });
+      const [races, waiting, verifiedResult] = await Promise.all([
         Promise.all(round.races.map((race) => getRaceSchedule(race.raceId))),
         getRoundWaitlist(round.roundId),
+        verifiedPairingsRequest,
       ]);
       setSchedules(races.sort((a, b) => a.raceNumber - b.raceNumber));
       setWaitlist(waiting);
+      setVerifiedPairings(verifiedResult.items);
+      setPairingListError(verifiedResult.error);
       // Preview chỉ hợp lệ trước khi chốt phân bổ. Sau khi phân xong API trả
       // ROUND_ALREADY_ALLOCATED; đó là trạng thái bình thường, không được làm mất
       // lịch race đã tải thành công.
       try {
         setPreview(await previewAutoAllocate(round.roundId));
-      } catch {
+        setPreviewError("");
+      } catch (err) {
         setPreview(null);
+        const alreadyAllocated = races.some((race) => race.entries.length > 0);
+        setPreviewError(
+          alreadyAllocated
+            ? ""
+            : adminError(
+                err,
+                "Không tải được danh sách pairing đủ điều kiện của vòng đấu.",
+              ),
+        );
       }
     } catch (err) {
       setError(adminError(err, "Không tải được thông tin vòng đấu."));
     } finally {
       setLoadingRound(false);
     }
-  }, [round]);
+  }, [round, tournament]);
 
   useEffect(() => {
     const requestId = window.setTimeout(() => void refreshRound(), 0);
@@ -243,7 +287,51 @@ const RaceOperations = () => {
   const hasAllocation = allocatedTotal > 0;
   const allDrawn =
     schedules.length > 0 && schedules.every((race) => race.isPostPositionDrawn);
-  const poolSize = preview?.poolSize ?? allocatedTotal + waitlist.length;
+  const isFirstRound = Boolean(
+    round &&
+      tournament &&
+      round.sequenceOrder ===
+        Math.min(...tournament.rounds.map((item) => item.sequenceOrder)),
+  );
+  const pairingCandidates = useMemo<PairingCandidate[]>(() => {
+    if (!round) return [];
+    if (isFirstRound) {
+      return verifiedPairings.map((pairing) => ({
+        pairingId: pairing.pairingId,
+        horseName: pairing.horseName,
+        jockeyName: pairing.jockeyName,
+        ownerName: pairing.ownerName,
+        verifiedAt: pairing.verifiedAt,
+      }));
+    }
+
+    const verifiedByPairingId = new Map(
+      verifiedPairings.map((pairing) => [pairing.pairingId, pairing]),
+    );
+    if (preview) {
+      return preview.selectedPool.map((pairing) => {
+        const verifiedPairing = verifiedByPairingId.get(pairing.pairingId);
+        return {
+          pairingId: pairing.pairingId,
+          horseName: pairing.horseName,
+          jockeyName: pairing.jockeyName,
+          ownerName: verifiedPairing?.ownerName,
+          verifiedAt: pairing.feeVerifiedAt,
+        };
+      });
+    }
+
+    return schedules.flatMap((race) =>
+      race.entries.map((entry) => ({
+        pairingId: entry.pairingId ?? entry.raceEntryId,
+        horseName: entry.horseName,
+        jockeyName: entry.jockeyName,
+        ownerName: entry.ownerName,
+      })),
+    );
+  }, [isFirstRound, preview, round, schedules, verifiedPairings]);
+  const poolSize = pairingCandidates.length;
+  const candidateListError = isFirstRound ? pairingListError : previewError;
   const raceReadyCount = schedules.filter(
     (race) => race.entries.length > 0 && !race.isPostPositionDrawn,
   ).length;
@@ -406,7 +494,10 @@ const RaceOperations = () => {
               <div className={styles.actionMeta}>
                 <span>
                   <FiUsers />
-                  {poolSize} cặp trong danh sách
+                  {poolSize}{" "}
+                  {isFirstRound
+                    ? "cặp đã xác nhận phí"
+                    : `cặp đủ điều kiện vào ${round.name}`}
                 </span>
                 <span>
                   <FiFlag />
@@ -420,41 +511,58 @@ const RaceOperations = () => {
                 )}
               </div>
             </div>
-            {preview && (
-              <div className={styles.paidPairings}>
+            <div className={styles.paidPairings}>
                 <div className={styles.paidPairingsHeader}>
                   <div>
-                    <h3>Pairing đã đóng phí</h3>
+                    <h3>
+                      {isFirstRound
+                        ? "Pairing đã xác nhận lệ phí"
+                        : `Pairing đủ điều kiện vào ${round.name}`}
+                    </h3>
                     <p>
-                      Danh sách cặp đủ điều kiện được dùng để phân bổ trong vòng
-                      này.
+                      {isFirstRound
+                        ? "Danh sách lấy trực tiếp từ kết quả đối chiếu lệ phí của giải đấu. Hệ thống sẽ kiểm tra thêm điều kiện tham gia khi phân bổ."
+                        : "Danh sách lấy từ kết quả vòng trước và chỉ gồm các cặp đủ điều kiện đi tiếp vào vòng đang chọn."}
                     </p>
                   </div>
-                  <span>{preview.selectedPool.length}</span>
+                  <span>{pairingCandidates.length}</span>
                 </div>
-                {preview.selectedPool.length === 0 ? (
+                {candidateListError ? (
+                  <p className={styles.pairingListError} role="alert">
+                    <FiAlertTriangle />
+                    {candidateListError}
+                  </p>
+                ) : pairingCandidates.length === 0 ? (
                   <p className={styles.noPaidPairings}>
-                    Chưa có pairing nào đủ điều kiện sau khi đối chiếu lệ phí.
+                    {isFirstRound
+                      ? "Chưa có pairing nào được xác nhận lệ phí."
+                      : `Chưa có pairing nào đủ điều kiện vào ${round.name}.`}
                   </p>
                 ) : (
                   <ul>
-                    {preview.selectedPool.map((pairing) => (
+                    {pairingCandidates.map((pairing) => (
                       <li key={pairing.pairingId}>
                         <div>
                           <strong>{pairing.horseName}</strong>
-                          <span>Nài ngựa: {pairing.jockeyName}</span>
+                          <span>
+                            Nài ngựa: {pairing.jockeyName}
+                            {pairing.ownerName
+                              ? ` · Chủ ngựa: ${pairing.ownerName}`
+                              : ""}
+                          </span>
                         </div>
                         <time>
-                          {pairing.feeVerifiedAt
-                            ? `Đã đóng phí ${dateTime(pairing.feeVerifiedAt)}`
+                          {!isFirstRound
+                            ? `Đủ điều kiện vào ${round.name}`
+                            : pairing.verifiedAt
+                            ? `Đã xác nhận ${dateTime(pairing.verifiedAt)}`
                             : "Đã xác nhận lệ phí"}
                         </time>
                       </li>
                     ))}
                   </ul>
                 )}
-              </div>
-            )}
+            </div>
             {roundReady ? (
               <div
                 className={styles.readyMetrics}
