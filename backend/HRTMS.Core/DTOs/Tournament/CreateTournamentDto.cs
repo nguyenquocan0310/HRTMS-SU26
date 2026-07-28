@@ -33,7 +33,7 @@ namespace HRTMS.Core.DTOs.Tournament
         public string AllowedBreed { get; set; } = string.Empty;
         [Required]
         public string TrackType { get; set; } = string.Empty;
-        [Range(1201, 2399, ErrorMessage = "RaceDistance must be greater than 1200 and less than 2400")]
+        [Range(1, int.MaxValue, ErrorMessage = "RaceDistance must be greater than 0")]
         public int RaceDistance { get; set; }
         [Required]
         public string RaceCategory { get; set; } = string.Empty;

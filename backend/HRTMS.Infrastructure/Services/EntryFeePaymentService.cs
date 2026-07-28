@@ -205,7 +205,8 @@ public class EntryFeePaymentService : IEntryFeePaymentService
             : paymentStatus;
         var validStatuses = new[]
         {
-            "All", "NoPayment", "PendingVerification", "Verified", "Rejected"
+            "All", "NoPayment", "PendingVerification", "Verified", "Rejected",
+            "RefundPending", "Refunded"
         };
         if (!validStatuses.Contains(effectiveStatus))
             throw new ArgumentException("INVALID_PAYMENT_STATUS");
@@ -395,6 +396,70 @@ public class EntryFeePaymentService : IEntryFeePaymentService
             type: "Both",
             relatedEntityType: "Pairing",
             relatedEntityId: pairing.PairingId);
+
+        return MapToDto(payment, pairing);
+    }
+
+    // =====================================================================
+    // Admin chốt hoàn phí: RefundPending -> Refunded
+    // =====================================================================
+    public async Task<FeePaymentResponseDto> CompleteRefundAsync(int adminId, int paymentId)
+    {
+        var payment = await _context.EntryFeePayments
+            .FirstOrDefaultAsync(p => p.PaymentId == paymentId)
+            ?? throw new KeyNotFoundException("PAYMENT_NOT_FOUND");
+
+        if (payment.Status == "Refunded")
+            throw new InvalidOperationException("PAYMENT_ALREADY_REFUNDED");
+        if (payment.Status != "RefundPending")
+            throw new InvalidOperationException("PAYMENT_NOT_REFUND_PENDING");
+
+        var pairing = await LoadPairingGraphAsync(payment.PairingId)
+            ?? throw new KeyNotFoundException("PAIRING_NOT_FOUND");
+
+        var now = DateTime.UtcNow;
+
+        await using var tx = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            // Guard nguyên tử như Verify/Reject: chỉ flip khi vẫn RefundPending
+            // -> hai Admin bấm song song chỉ một cái qua.
+            var rows = await _context.EntryFeePayments
+                .Where(p => p.PaymentId == paymentId && p.Status == "RefundPending")
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, "Refunded"));
+
+            if (rows == 0)
+                throw new InvalidOperationException("PAYMENT_NOT_REFUND_PENDING");
+
+            // RaceEntryService đặt hai cờ cùng lúc khi mở vòng hoàn phí
+            // (EntryFeeStatus 'Refund Pending' + payment 'RefundPending'); đóng
+            // vòng cũng phải đóng cả hai, nếu không entry kẹt 'Refund Pending'.
+            await _context.RaceEntries
+                .Where(e => e.PairingId == payment.PairingId &&
+                            e.EntryFeeStatus == "Refund Pending")
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(e => e.EntryFeeStatus, "Refunded")
+                    .SetProperty(e => e.UpdatedAt, now));
+
+            await tx.CommitAsync();
+        }
+        catch
+        {
+            await tx.RollbackAsync();
+            throw;
+        }
+
+        payment.Status = "Refunded";
+
+        await _audit.LogAsync(adminId, "Chốt hoàn lệ phí tham gia", "EntryFeePayment",
+            paymentId.ToString(), "RefundPending", $"Refunded;PairingId={pairing.PairingId}");
+
+        await _notification.SendAsync(pairing.Horse.OwnerId,
+            "Lệ phí đã được hoàn",
+            $"Lệ phí cho ngựa '{pairing.Horse.Name}' ở giải '{pairing.Tournament.Name}' đã được hoàn trả.",
+            type: "Both",
+            relatedEntityType: "EntryFeePayment",
+            relatedEntityId: paymentId);
 
         return MapToDto(payment, pairing);
     }

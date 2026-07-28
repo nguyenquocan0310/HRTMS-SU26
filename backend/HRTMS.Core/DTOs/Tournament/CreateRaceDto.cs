@@ -19,7 +19,7 @@ namespace HRTMS.Core.DTOs.Tournament
         public decimal? PurseAmount { get; set; }
 
         public string? TrackTypeOverride { get; set; }
-        [Range(1201, 2399, ErrorMessage = "RaceDistanceOverride must be greater than 1200 and less than 2400")]
+        [Range(1, int.MaxValue, ErrorMessage = "RaceDistanceOverride must be greater than 0")]
         public int? RaceDistanceOverride { get; set; }
         public int ConfirmationCutoffHours { get; set; } = 24;
     }

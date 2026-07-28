@@ -144,6 +144,32 @@ public class EntryFeePaymentController : ControllerBase
         }
     }
 
+    // Admin đã chi hoàn ngoài hệ thống -> đóng vòng hoàn phí.
+    [HttpPost("admin/fee-payments/{id:int}/refund-complete")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> CompleteRefund(int id)
+    {
+        if (!TryGetUserId(out var adminId))
+            return UnauthorizedResult();
+
+        try
+        {
+            return Ok(await _service.CompleteRefundAsync(adminId, id));
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(Err(ex.Message, "Không tìm thấy hồ sơ lệ phí."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "PAYMENT_ALREADY_REFUNDED")
+        {
+            return Conflict(Err(ex.Message, "Hồ sơ lệ phí này đã được hoàn trước đó."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "PAYMENT_NOT_REFUND_PENDING")
+        {
+            return Conflict(Err(ex.Message, "Hồ sơ lệ phí không ở trạng thái chờ hoàn phí."));
+        }
+    }
+
     [HttpPost("admin/pairings/{id:int}/reject-unpaid")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> RejectUnpaidPairing(
