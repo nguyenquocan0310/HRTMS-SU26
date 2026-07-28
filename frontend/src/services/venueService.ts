@@ -11,8 +11,17 @@ const query = (filters: VenueFilters) => {
   return params.toString();
 };
 
-export const getVenues = () => apiFetch<Venue[]>('/venues');
-export const getVenue = (venueId: number) => apiFetch<Venue>(`/venues/${venueId}`);
-export const getAdminVenues = (filters: VenueFilters = {}) => apiFetch<Venue[]>(`/admin/venues${query(filters) ? `?${query(filters)}` : ''}`);
-export const createVenue = (payload: Required<VenuePayload>) => apiFetch<Venue>('/admin/venues', { method: 'POST', body: JSON.stringify(payload) });
-export const updateVenue = (venueId: number, payload: VenuePayload) => apiFetch<Venue>(`/admin/venues/${venueId}`, { method: 'PUT', body: JSON.stringify(payload) });
+export const getVenues = (
+) => apiFetch<Venue[]>('/venues');
+ 
+export const getVenue = (
+  venueId: number) => apiFetch<Venue>(`/venues/${venueId}`);
+
+export const getAdminVenues = (
+  filters: VenueFilters = {}) => apiFetch<Venue[]>(`/admin/venues${query(filters) ? `?${query(filters)}` : ''}`);
+
+export const createVenue = (
+  payload: Required<VenuePayload>) => apiFetch<Venue>('/admin/venues', { method: 'POST', body: JSON.stringify(payload) });
+
+export const updateVenue = (
+  venueId: number, payload: VenuePayload) => apiFetch<Venue>(`/admin/venues/${venueId}`, { method: 'PUT', body: JSON.stringify(payload) });
