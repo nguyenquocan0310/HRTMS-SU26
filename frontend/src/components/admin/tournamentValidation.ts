@@ -227,9 +227,9 @@ export const validateBasicInfo = (
   }
 
   if (data.advancementCount === '') {
-    errors.advancementCount = 'Vui lòng nhập số cặp được vào vòng tiếp theo.';
+    errors.advancementCount = 'Vui lòng nhập số cặp đi tiếp từ mỗi cuộc đua.';
   } else if (!Number.isInteger(data.advancementCount) || data.advancementCount < 1) {
-    errors.advancementCount = 'Số cặp được vào vòng tiếp theo phải là số nguyên lớn hơn 0.';
+    errors.advancementCount = 'Số cặp đi tiếp từ mỗi cuộc đua phải là số nguyên lớn hơn 0.';
   }
 
   if (data.preRaceWeightThresholdKg <= 0) {

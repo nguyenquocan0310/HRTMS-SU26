@@ -1,104 +1,12 @@
-.stepper {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 0;
-  padding: 2rem 1rem 1rem;
-  background: transparent;
-}
+.stepper { display: flex; align-items: flex-start; justify-content: center; gap: 0; padding: 2rem 1rem 1rem; background: transparent; }
+.stepWrapper { display: flex; max-width: 160px; flex: 1; align-items: center; }
+.connector { height: 2px; flex: 1; margin-bottom: 1.8rem; background: #e5e7eb; transition: background .3s; &.connectorActive { background: #c0392b; } }
+.step { display: flex; min-width: 70px; flex-direction: column; align-items: center; gap: .4rem; cursor: default; }
+.circle { display: flex; width: 36px; height: 36px; align-items: center; justify-content: center; border-radius: 50%; font-size: .9rem; font-weight: 700; transition: all .3s; }
+.label { padding-bottom: 4px; color: #6b7280; font-size: .7rem; text-align: center; transition: all .3s; }
+.active { .circle { background: #c0392b; color: #ffffff; box-shadow: 0 0 0 4px rgba(192, 57, 43, .12); } .label { border-bottom: 2px solid #c0392b; color: #c0392b; font-weight: 700; } }
+.completed { .circle { border: 1px solid #c0392b; background: #fbe9e7; color: #c0392b; } .label { color: #6b7280; } }
+.upcoming { .circle { border: 2px solid #d1d5db; background: #ffffff; color: #9ca3af; } .label { color: #9ca3af; } }
+.skipped { .circle { border: 2px dashed #d1d5db; background: #f9fafb; color: #9ca3af; } .label { color: #9ca3af; text-decoration: line-through; } }
 
-.stepWrapper {
-  display: flex;
-  align-items: center;
-  flex: 1;
-  max-width: 160px;
-}
-
-.connector {
-  flex: 1;
-  height: 2px;
-  background: #3a3a3a;
-  margin-bottom: 1.8rem;
-  transition: background 0.3s;
-
-  &.connectorActive {
-    background: #B5121B;
-  }
-}
-
-.step {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.4rem;
-  cursor: default;
-  min-width: 70px;
-}
-
-.circle {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 0.9rem;
-  transition: all 0.3s;
-}
-
-.label {
-  font-size: 0.7rem;
-  text-align: center;
-  transition: all 0.3s;
-  padding-bottom: 4px;
-}
-
-// ─── Trạng thái ──────────────────────────────────────────────────────────────
-
-.active {
-  .circle {
-    background: #B5121B;
-    color: #fff;
-    box-shadow: 0 0 12px rgba(181, 18, 27, 0.5);
-  }
-  .label {
-    color: #F3C8C3;
-    font-weight: 600;
-    border-bottom: 2px solid #D8B45A;
-  }
-}
-
-.completed {
-  .circle {
-    background: #6b1217;
-    color: #F3C8C3;
-    border: 1px solid #B5121B;
-  }
-  .label {
-    color: #888;
-  }
-}
-
-.upcoming {
-  .circle {
-    background: transparent;
-    color: #555;
-    border: 2px solid #3a3a3a;
-  }
-  .label {
-    color: #555;
-  }
-}
-
-.skipped {
-  .circle {
-    background: transparent;
-    color: #333;
-    border: 2px dashed #333;
-  }
-  .label {
-    color: #333;
-    text-decoration: line-through;
-  }
-}
+@media (max-width: 640px) { .stepper { overflow-x: auto; justify-content: flex-start; } .stepWrapper { min-width: 100px; } .label { font-size: .65rem; } }
