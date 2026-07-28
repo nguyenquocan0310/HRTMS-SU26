@@ -104,18 +104,21 @@ export interface CreateTournamentPayload {
 
 // ─── API calls ──────────────────────────────────────────────────────────────
 
+// Lấy danh sách toàn bộ giải đấu.
 export const getTournaments = (): Promise<TournamentResponse[]> =>
   apiFetch<ApiResponse<TournamentResponse[]>>('/tournament').then((res) => {
     if (!res.success || !res.data) throw new Error(res.message || 'Không tải được danh sách giải đấu.');
     return res.data;
   });
 
+// Lấy chi tiết một giải đấu.
 export const getTournamentById = (id: number): Promise<TournamentResponse> =>
   apiFetch<ApiResponse<TournamentResponse>>(`/tournament/${id}`).then((res) => {
     if (!res.success || !res.data) throw new Error(res.message || 'Không tải được thông tin giải đấu.');
     return res.data;
   });
 
+// Tạo giải đấu mới.
 export const createTournament = (payload: CreateTournamentPayload): Promise<TournamentResponse> =>
   apiFetch<ApiResponse<TournamentResponse>>('/tournament', {
     method: 'POST',
@@ -125,6 +128,7 @@ export const createTournament = (payload: CreateTournamentPayload): Promise<Tour
     return res.data;
   });
 
+// Cập nhật thông tin giải đấu.
 export const updateTournament = (id: number, payload: CreateTournamentPayload): Promise<TournamentResponse> =>
   apiFetch<ApiResponse<TournamentResponse>>(`/tournament/${id}`, {
     method: 'PUT',
@@ -134,11 +138,13 @@ export const updateTournament = (id: number, payload: CreateTournamentPayload): 
     return res.data;
   });
 
+// Xóa giải đấu đã tạo.
 export const deleteTournament = (id: number): Promise<void> =>
   apiFetch<ApiResponse<unknown>>(`/tournament/${id}`, { method: 'DELETE' }).then((res) => {
     if (!res.success) throw new Error(res.message || 'Xóa giải đấu thất bại.');
   });
 
+// Cập nhật trạng thái giải đấu.
 export const updateTournamentStatus = (id: number, status: string): Promise<TournamentResponse> =>
   apiFetch<ApiResponse<TournamentResponse>>(`/tournament/${id}/status`, {
     method: 'PATCH',
@@ -153,6 +159,7 @@ export interface UpdatePrizeDistributionPayload {
   percentage: number;
 }
 
+// Cập nhật tỷ lệ giải thưởng.
 export const updatePrizeDistributions = (
   id: number,
   prizeDistributions: UpdatePrizeDistributionPayload[]
@@ -171,6 +178,7 @@ export interface CreateRoundPayload {
   scheduledDate: string;
 }
 
+// Tạo vòng đấu cho giải.
 export const createRound = (tournamentId: number, payload: CreateRoundPayload): Promise<RoundResponse> =>
   apiFetch<ApiResponse<RoundResponse>>(`/tournament/${tournamentId}/rounds`, {
     method: 'POST',
@@ -190,6 +198,7 @@ export interface CreateRacePayload {
   protestDeadlineMinutes?: number;
 }
 
+// Tạo cuộc đua cho vòng.
 export const createRace = (roundId: number, payload: CreateRacePayload): Promise<RaceResponse> =>
   apiFetch<ApiResponse<RaceResponse>>(`/rounds/${roundId}/races`, {
     method: 'POST',

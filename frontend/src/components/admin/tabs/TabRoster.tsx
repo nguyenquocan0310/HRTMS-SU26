@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
-import { FiCheckCircle } from 'react-icons/fi';
-import type { Round } from '../TournamentBuilder';
+import { useEffect, useMemo, useState } from "react";
+import { FiCheckCircle } from "react-icons/fi";
+import type { Round } from "../TournamentBuilder";
 import {
   getRoster,
   type ParticipantResponse,
-} from '../../../services/participantService';
-import styles from './TabRoster.module.scss';
+} from "../../../services/participantService";
+import styles from "./TabRoster.module.scss";
 
 interface TabRosterProps {
   tournamentId: string;
@@ -15,19 +15,24 @@ interface TabRosterProps {
 }
 
 const formatDate = (iso: string) =>
-  iso ? new Date(iso).toLocaleDateString('vi-VN') : '—';
+  iso ? new Date(iso).toLocaleDateString("vi-VN") : "—";
 
-const TabRoster = ({ tournamentId, tournamentName, rounds, isNewDraft }: TabRosterProps) => {
+const TabRoster = ({
+  tournamentId,
+  tournamentName,
+  rounds,
+  isNewDraft,
+}: TabRosterProps) => {
   const [roster, setRoster] = useState<ParticipantResponse[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (isNewDraft) return;
     const id = Number(tournamentId);
     if (!id) return;
     setLoading(true);
-    setError('');
+    setError("");
     getRoster(id)
       .then(setRoster)
       .catch((e: Error) => setError(e.message))
@@ -42,13 +47,13 @@ const TabRoster = ({ tournamentId, tournamentName, rounds, isNewDraft }: TabRost
           roundName: r.name,
           raceId: race.id,
           raceNumber: race.raceNumber,
-        }))
+        })),
       ),
-    [rounds]
+    [rounds],
   );
 
-  const approved = roster.filter((r) => r.status === 'Approved');
-  const pending = roster.filter((r) => r.status === 'Pending');
+  const approved = roster.filter((r) => r.status === "Approved");
+  const pending = roster.filter((r) => r.status === "Pending");
 
   // Stats
   const totalRegistered = roster.length;
@@ -57,7 +62,8 @@ const TabRoster = ({ tournamentId, tournamentName, rounds, isNewDraft }: TabRost
   if (isNewDraft) {
     return (
       <div className={styles.notice}>
-        Lưu giải đấu trước khi xem danh sách người tham gia. Danh sách chỉ có sau khi hệ thống tạo mã giải thật.
+        Lưu giải đấu trước khi xem danh sách người tham gia. Danh sách chỉ có
+        sau khi hệ thống tạo mã giải thật.
       </div>
     );
   }
@@ -70,11 +76,15 @@ const TabRoster = ({ tournamentId, tournamentName, rounds, isNewDraft }: TabRost
         <div className={styles.overviewGrid}>
           <div className={styles.overviewItem}>
             <span className={styles.overviewLabel}>Tên giải đấu</span>
-            <strong className={styles.overviewValue}>{tournamentName || '—'}</strong>
+            <strong className={styles.overviewValue}>
+              {tournamentName || "—"}
+            </strong>
           </div>
           <div className={styles.overviewItem}>
             <span className={styles.overviewLabel}>Đăng ký</span>
-            <strong className={styles.overviewValue}>Theo trạng thái giải</strong>
+            <strong className={styles.overviewValue}>
+              Theo trạng thái giải
+            </strong>
           </div>
           <div className={styles.overviewItem}>
             <span className={styles.overviewLabel}>Đã duyệt</span>
@@ -92,7 +102,11 @@ const TabRoster = ({ tournamentId, tournamentName, rounds, isNewDraft }: TabRost
       </section>
 
       {error && <div className={styles.errorBox}>{error}</div>}
-      {loading && <p className={styles.loadingText}>Đang tải danh sách người tham gia...</p>}
+      {loading && (
+        <p className={styles.loadingText}>
+          Đang tải danh sách người tham gia...
+        </p>
+      )}
 
       {/* ── Stats ── */}
       <section className={styles.statsRow}>
@@ -143,7 +157,9 @@ const TabRoster = ({ tournamentId, tournamentName, rounds, isNewDraft }: TabRost
                     <td className={styles.horseName}>{entry.fullName}</td>
                     <td>{entry.role}</td>
                     <td>{entry.email}</td>
-                    <td>{entry.approvedAt ? formatDate(entry.approvedAt) : '—'}</td>
+                    <td>
+                      {entry.approvedAt ? formatDate(entry.approvedAt) : "—"}
+                    </td>
                     <td>
                       <span className={styles.assignedBadge}>
                         <FiCheckCircle size={12} /> Đã duyệt
@@ -192,7 +208,12 @@ const TabRoster = ({ tournamentId, tournamentName, rounds, isNewDraft }: TabRost
       <section className={styles.validationCard}>
         <h3 className={styles.sectionTitle}>Lưu ý điều hành</h3>
         <ul className={styles.validationList}>
-          <li className={styles.validationItem}><span className={styles.validationMuted}>Việc xét cặp đủ điều kiện, phân cuộc đua và danh sách chờ được thực hiện tại mục Phân cuộc đua theo dữ liệu hệ thống.</span></li>
+          <li className={styles.validationItem}>
+            <span className={styles.validationMuted}>
+              Việc xét cặp đủ điều kiện, phân cuộc đua và danh sách chờ được
+              thực hiện tại mục Phân cuộc đua theo dữ liệu hệ thống.
+            </span>
+          </li>
         </ul>
       </section>
     </div>

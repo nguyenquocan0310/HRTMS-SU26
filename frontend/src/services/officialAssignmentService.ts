@@ -12,16 +12,19 @@ export interface RefereeAssignment {
   assignedAt: string;
 }
 
+// Lấy trọng tài của cuộc đua.
 export const getRefereesByRace = (raceId: number): Promise<RefereeAssignment[]> =>
   apiFetch<RefereeAssignment[]>(`/admin/races/${raceId}/referees`)
     .catch(() => []);
 
+// Phân công trọng tài cuộc đua.
 export const assignReferee = (raceId: number, refereeId: number, role: string): Promise<RefereeAssignment> =>
   apiFetch<RefereeAssignment>(`/admin/races/${raceId}/referees`, {
     method: 'POST',
     body: JSON.stringify({ refereeId, role }),
   });
 
+// Gỡ trọng tài khỏi cuộc đua.
 export const removeReferee = (raceId: number, refereeId: number): Promise<void> =>
   apiFetch(`/admin/races/${raceId}/referees/${refereeId}`, { method: 'DELETE' });
 
@@ -37,16 +40,19 @@ export interface DoctorAssignment {
   certifiedAt: string | null;
 }
 
+// Lấy bác sĩ của cuộc đua.
 export const getDoctorsByRace = (raceId: number): Promise<DoctorAssignment[]> =>
   apiFetch<DoctorAssignment[]>(`/admin/races/${raceId}/doctors`)
     .catch(() => []);
 
+// Phân công bác sĩ cuộc đua.
 export const assignDoctor = (raceId: number, doctorId: number): Promise<DoctorAssignment> =>
   apiFetch<DoctorAssignment>(`/admin/races/${raceId}/doctors`, {
     method: 'POST',
     body: JSON.stringify({ doctorId }),
   });
 
+// Gỡ bác sĩ khỏi cuộc đua.
 export const removeDoctor = (raceId: number, doctorId: number): Promise<void> =>
   apiFetch(`/admin/races/${raceId}/doctors/${doctorId}`, { method: 'DELETE' });
 
@@ -71,6 +77,7 @@ interface AvailableOfficialsResponse {
   doctors: AvailableOfficial[];
 }
 
+// Lấy nhân sự có thể phân công.
 export const getAvailableOfficials = (raceId: number): Promise<AvailableOfficialsResponse> =>
   apiFetch<{ success: boolean; data: AvailableOfficialsResponse }>(
     `/admin/races/${raceId}/available-officials`

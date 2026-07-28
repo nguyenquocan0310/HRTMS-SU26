@@ -1,22 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
-import {
-  FiCheckCircle,
-  FiChevronDown,
-  FiEye,
-  FiMapPin,
-} from 'react-icons/fi';
+import { useEffect, useMemo, useState } from "react";
+import { FiCheckCircle, FiChevronDown, FiEye, FiMapPin } from "react-icons/fi";
 import {
   declareRaceOfficial,
   getUnofficialRaces,
   type UnofficialRace,
-} from '../../services/raceOperationService';
+} from "../../services/raceOperationService";
 import {
   getTournaments,
   type TournamentResponse,
-} from '../../services/tournamentService';
-import { getRaceSchedule } from '../../services/schedulingService';
-import { adminError, dateTime } from '../../utils/adminLabels';
-import styles from './RaceList.module.scss';
+} from "../../services/tournamentService";
+import { getRaceSchedule } from "../../services/schedulingService";
+import { adminError, dateTime } from "../../utils/adminLabels";
+import styles from "./RaceList.module.scss";
 
 type RaceRow = UnofficialRace & {
   entryCount: number;
@@ -32,8 +27,8 @@ const RaceList = () => {
   const [detail, setDetail] = useState<RaceRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [declaring, setDeclaring] = useState(false);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   const tournament = useMemo(
     () =>
@@ -53,7 +48,7 @@ const RaceList = () => {
 
   const loadRaces = async (id: number) => {
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
       const list = await getUnofficialRaces(id);
@@ -82,7 +77,7 @@ const RaceList = () => {
           : (rows[0]?.raceId ?? null),
       );
     } catch (err) {
-      setError(adminError(err, 'Không tải được danh sách cuộc đua.'));
+      setError(adminError(err, "Không tải được danh sách cuộc đua."));
       setRaces([]);
     } finally {
       setLoading(false);
@@ -97,8 +92,7 @@ const RaceList = () => {
     }
   }, [tournamentId]);
 
-  const selected =
-    races.find((item) => item.raceId === selectedRaceId) ?? null;
+  const selected = races.find((item) => item.raceId === selectedRaceId) ?? null;
 
   const declareOfficial = async (race: RaceRow) => {
     if (
@@ -110,7 +104,7 @@ const RaceList = () => {
     }
 
     setDeclaring(true);
-    setError('');
+    setError("");
 
     try {
       await declareRaceOfficial(race.raceId, {
@@ -127,9 +121,7 @@ const RaceList = () => {
         await loadRaces(tournamentId);
       }
     } catch (err) {
-      setError(
-        adminError(err, 'Không thể chuyển trạng thái cuộc đua.'),
-      );
+      setError(adminError(err, "Không thể chuyển trạng thái cuộc đua."));
     } finally {
       setDeclaring(false);
     }
@@ -148,15 +140,12 @@ const RaceList = () => {
         <div className={styles.filters}>
           <label>
             Giải đấu
-
             <div>
               <select
-                value={tournamentId ?? ''}
+                value={tournamentId ?? ""}
                 onChange={(event) => {
                   setTournamentId(
-                    event.target.value
-                      ? Number(event.target.value)
-                      : null,
+                    event.target.value ? Number(event.target.value) : null,
                   );
                   setDetail(null);
                 }}
@@ -164,10 +153,7 @@ const RaceList = () => {
                 <option value="">-- Chọn giải đấu --</option>
 
                 {tournaments.map((item) => (
-                  <option
-                    key={item.tournamentId}
-                    value={item.tournamentId}
-                  >
+                  <option key={item.tournamentId} value={item.tournamentId}>
                     {item.name}
                   </option>
                 ))}
@@ -179,16 +165,13 @@ const RaceList = () => {
 
           <label>
             Cuộc đua hiện tại
-
             <div>
               <select
-                value={selectedRaceId ?? ''}
+                value={selectedRaceId ?? ""}
                 disabled={races.length === 0}
                 onChange={(event) =>
                   setSelectedRaceId(
-                    event.target.value
-                      ? Number(event.target.value)
-                      : null,
+                    event.target.value ? Number(event.target.value) : null,
                   )
                 }
               >
@@ -221,9 +204,7 @@ const RaceList = () => {
               <span>
                 <FiMapPin />
                 {tournament.venueName}
-                {tournament.venueCity
-                  ? ` · ${tournament.venueCity}`
-                  : ''}
+                {tournament.venueCity ? ` · ${tournament.venueCity}` : ""}
               </span>
             )}
 
@@ -241,9 +222,7 @@ const RaceList = () => {
         </div>
 
         {loading ? (
-          <p className={styles.empty}>
-            Đang tải danh sách cuộc đua…
-          </p>
+          <p className={styles.empty}>Đang tải danh sách cuộc đua…</p>
         ) : races.length === 0 ? (
           <p className={styles.empty}>
             Không có cuộc đua chưa chính thức trong giải đấu này.
@@ -272,19 +251,15 @@ const RaceList = () => {
                     <td>{race.roundName}</td>
                     <td>{dateTime(race.scheduledTime)}</td>
                     <td>
-                      {race.venueName ?? tournament?.venueName ?? '—'}
+                      {race.venueName ?? tournament?.venueName ?? "—"}
 
                       {(race.venueCity ?? tournament?.venueCity) && (
-                        <small>
-                          {race.venueCity ?? tournament?.venueCity}
-                        </small>
+                        <small>{race.venueCity ?? tournament?.venueCity}</small>
                       )}
                     </td>
                     <td>{race.entryCount}</td>
                     <td>
-                      <span className={styles.status}>
-                        Chưa chính thức
-                      </span>
+                      <span className={styles.status}>Chưa chính thức</span>
                     </td>
                     <td>
                       <button
@@ -322,8 +297,8 @@ const RaceList = () => {
             </dl>
 
             <p className={styles.muted}>
-              Chỉ chuyển trạng thái sau khi kết quả, chi thưởng và các
-              điều kiện nghiệp vụ đã sẵn sàng.
+              Chỉ chuyển trạng thái sau khi kết quả, chi thưởng và các điều kiện
+              nghiệp vụ đã sẵn sàng.
             </p>
 
             <div>
@@ -335,14 +310,13 @@ const RaceList = () => {
                 onClick={() => void declareOfficial(detail)}
               >
                 <FiCheckCircle />
-                {declaring ? 'Đang xử lý…' : 'Chuyển chính thức'}
+                {declaring ? "Đang xử lý…" : "Chuyển chính thức"}
               </button>
             </div>
 
             {!detail.canDeclareOfficial && (
               <small className={styles.hint}>
-                Cuộc đua chưa đáp ứng đủ điều kiện để chuyển sang chính
-                thức.
+                Cuộc đua chưa đáp ứng đủ điều kiện để chuyển sang chính thức.
               </small>
             )}
           </div>

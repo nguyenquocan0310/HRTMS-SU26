@@ -31,6 +31,7 @@ function unwrap<T>(response: ApiResponse<T>): T {
   return response.data
 }
 
+// Lấy danh sách thông báo hệ thống.
 export async function getNotifications(page = 1, pageSize = 20): Promise<Notification[]> {
   const response = await apiFetch<ApiResponse<Notification[]>>(
     `/notifications/all?page=${page}&pageSize=${pageSize}`,
@@ -38,15 +39,18 @@ export async function getNotifications(page = 1, pageSize = 20): Promise<Notific
   return unwrap(response)
 }
 
+// Đếm thông báo chưa được đọc.
 export async function getUnreadNotificationCount(): Promise<number> {
   const response = await apiFetch<ApiResponse<UnreadCount>>('/notifications/count')
   return unwrap(response).count
 }
 
+// Đánh dấu thông báo đã đọc.
 export async function markNotificationRead(notificationId: number): Promise<void> {
   await apiFetch<void>(`/notifications/${notificationId}/read`, { method: 'PATCH' })
 }
 
+// Đánh dấu toàn bộ đã đọc.
 export async function markAllNotificationsRead(): Promise<void> {
   await apiFetch<void>('/notifications/read-all', { method: 'PATCH' })
 }

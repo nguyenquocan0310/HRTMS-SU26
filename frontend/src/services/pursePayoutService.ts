@@ -96,12 +96,14 @@ const unwrap = <T>(res: ApiResponse<T>, fallback: string): T => {
   return res.data;
 };
 
+// Lấy tổng quan quỹ thưởng giải.
 export const getTournamentPurseSummary = async (tournamentId: number): Promise<TournamentPurseSummary> =>
   unwrap(
     await apiFetch<ApiResponse<TournamentPurseSummary>>(`/tournament/${tournamentId}/purse-summary`),
     'Không tải được tổng hợp quỹ thưởng của giải đấu.'
   );
 
+// Lấy quỹ thưởng từng cuộc đua.
 export const getRacePurseSummary = async (raceId: number): Promise<RacePurseSummary> =>
   unwrap(
     await apiFetch<ApiResponse<RacePurseSummary>>(`/races/${raceId}/purse-summary`),
@@ -112,6 +114,7 @@ export const getRacePurseSummary = async (raceId: number): Promise<RacePurseSumm
  * GET /api/races/{raceId}/payouts
  * Role: Admin
  */
+// Lấy chi tiết chi trả cuộc đua.
 export const getRacePayoutSummary = async (
   raceId: number
 ): Promise<RacePayoutSummary> => {
@@ -132,6 +135,7 @@ export const getRacePayoutSummary = async (
  * PUT /api/payouts/{payoutId}/status
  * Role: Admin
  */
+// Cập nhật trạng thái chi trả thưởng.
 export const updatePayoutStatus = async (
   payoutId: number,
   payoutStatus: 'Paid' | 'Unpaid'

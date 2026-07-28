@@ -182,7 +182,9 @@ const toDateTimeLocal = (value?: string | null): string => {
   if (!value) return "";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
-  const local = new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60_000);
+  const local = new Date(
+    parsed.getTime() - parsed.getTimezoneOffset() * 60_000,
+  );
   return local.toISOString().slice(0, 16);
 };
 
@@ -251,10 +253,14 @@ const TournamentBuilder = () => {
 
   useEffect(() => {
     if (view !== "wizard") return;
-    void getVenues().then((items) => {
-      setVenues(items);
-      setVenuesError("");
-    }).catch((err) => setVenuesError(adminError(err, "Không tải được danh sách trường đua.")));
+    void getVenues()
+      .then((items) => {
+        setVenues(items);
+        setVenuesError("");
+      })
+      .catch((err) =>
+        setVenuesError(adminError(err, "Không tải được danh sách trường đua.")),
+      );
   }, [view]);
 
   // ─── Handlers ────────────────────────────────────────────────────────────
@@ -390,13 +396,18 @@ const TournamentBuilder = () => {
       purseAmount:
         typeof b.purseAmount === "number" ? b.purseAmount : undefined,
       entryFeeAmount: b.entryFeeAmount,
-      paymentDeadline: b.paymentDeadline ? new Date(b.paymentDeadline).toISOString() : undefined,
-      refundDeadline: b.refundDeadline ? new Date(b.refundDeadline).toISOString() : undefined,
+      paymentDeadline: b.paymentDeadline
+        ? new Date(b.paymentDeadline).toISOString()
+        : undefined,
+      refundDeadline: b.refundDeadline
+        ? new Date(b.refundDeadline).toISOString()
+        : undefined,
       clearRefundDeadline: b.clearRefundDeadline,
       preRaceWeightThresholdKg: b.preRaceWeightThresholdKg,
       postRaceWeightDiffThresholdKg: b.postRaceWeightDiffThresholdKg,
       advancementRule: "TopPerRace",
-      advancementCount: typeof b.advancementCount === "number" ? b.advancementCount : undefined,
+      advancementCount:
+        typeof b.advancementCount === "number" ? b.advancementCount : undefined,
     };
   };
 
@@ -602,7 +613,12 @@ const TournamentBuilder = () => {
     {
       key: "status",
       header: "Trạng thái",
-      render: (row) => <StatusBadge status={row.status as StatusType} label={adminLabel(row.status)} />,
+      render: (row) => (
+        <StatusBadge
+          status={row.status as StatusType}
+          label={adminLabel(row.status)}
+        />
+      ),
     },
     {
       key: "action",

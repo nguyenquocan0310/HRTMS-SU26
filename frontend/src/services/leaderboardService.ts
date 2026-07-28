@@ -47,6 +47,7 @@ const buildLeaderboardQuery = (tournamentId: number, mode: LeaderboardMode) => {
   return params.toString()
 }
 
+// Lấy bảng xếp hạng ngựa.
 export const getHorseLeaderboard = async (
   tournamentId: number,
   mode: LeaderboardMode,
@@ -59,6 +60,7 @@ export const getHorseLeaderboard = async (
     )
   )
 
+// Lấy bảng xếp hạng nài ngựa.
 export const getJockeyLeaderboard = async (
   tournamentId: number,
   mode: LeaderboardMode,

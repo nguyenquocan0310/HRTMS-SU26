@@ -46,12 +46,14 @@ const unwrap = <T>(response: ApiResponse<T>, fallback: string): T => {
   return response.data;
 };
 
+// Lấy trạng thái đua trực tiếp.
 export const getLiveRaceStatus = async (raceId: number): Promise<LiveRaceStatus> =>
   unwrap(
     await apiFetch<ApiResponse<LiveRaceStatus>>(`/races/${raceId}/live-status`),
     'Không tải được trạng thái cuộc đua.'
   );
 
+// Lấy vi phạm trong cuộc đua.
 export const getRaceViolations = async (raceId: number): Promise<RaceViolation[]> =>
   unwrap(
     await apiFetch<ApiResponse<RaceViolation[]>>(`/races/${raceId}/violations`),

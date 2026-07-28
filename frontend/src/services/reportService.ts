@@ -23,11 +23,13 @@ const unwrap = <T>(response: ApiResponse<T>): T => {
   return response.data;
 };
 
+// Xem trước báo cáo của giải.
 export const getReportPreview = async (type: ReportType, tournamentId: number): Promise<ReportPreview> =>
   unwrap(
     await apiFetch<ApiResponse<ReportPreview>>(`/reports/${type}?tournamentId=${tournamentId}`)
   );
 
+// Xuất báo cáo giải dạng CSV.
 export const exportCsvReport = async (type: ReportType, tournamentId: number): Promise<{ blob: Blob; fileName: string }> => {
   const token = sessionStorage.getItem('token') ?? localStorage.getItem('token');
   const response = await fetch(

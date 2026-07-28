@@ -11,17 +11,22 @@ const query = (filters: VenueFilters) => {
   return params.toString();
 };
 
+// Lấy trường đua đang hoạt động.
 export const getVenues = (
 ) => apiFetch<Venue[]>('/venues');
  
+// Lấy chi tiết một trường đua.
 export const getVenue = (
   venueId: number) => apiFetch<Venue>(`/venues/${venueId}`);
 
+// Lấy trường đua theo bộ lọc.
 export const getAdminVenues = (
   filters: VenueFilters = {}) => apiFetch<Venue[]>(`/admin/venues${query(filters) ? `?${query(filters)}` : ''}`);
 
+// Tạo trường đua mới.
 export const createVenue = (
   payload: Required<VenuePayload>) => apiFetch<Venue>('/admin/venues', { method: 'POST', body: JSON.stringify(payload) });
 
+// Cập nhật thông tin trường đua.
 export const updateVenue = (
   venueId: number, payload: VenuePayload) => apiFetch<Venue>(`/admin/venues/${venueId}`, { method: 'PUT', body: JSON.stringify(payload) });

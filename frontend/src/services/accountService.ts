@@ -28,11 +28,13 @@ const assertMutationSuccess = (
   onSuccess?.(response.message || fallbackMessage)
 }
 
+// Lấy hồ sơ tài khoản hiện tại.
 export const getMyAccountProfile = async <TProfile>(): Promise<UserProfile<TProfile>> => {
   const response = await apiFetch<ApiResponse<UserProfile<TProfile>>>('/auth/profile')
   return assertSuccess(response, 'Không tải được thông tin tài khoản.')
 }
 
+// Cập nhật thông tin tài khoản.
 export const updateMyBasicInfo = async (
   payload: UpdateBasicInfoPayload,
   onSuccess?: SuccessMessageHandler,
@@ -45,6 +47,7 @@ export const updateMyBasicInfo = async (
   assertMutationSuccess(response, 'Cập nhật thông tin thành công.', onSuccess)
 }
 
+// Đổi mật khẩu tài khoản hiện tại.
 export const changeMyPassword = async (
   payload: ChangePasswordPayload,
   onSuccess?: SuccessMessageHandler,

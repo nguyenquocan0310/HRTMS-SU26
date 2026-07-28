@@ -58,6 +58,7 @@ export interface RaceEntriesData {
   entries: RawRaceEntryApiItem[];
 }
 
+// Lấy danh sách xuất phát cuộc đua.
 export const getRaceSchedule = (
   raceId: number
 ): Promise<RaceEntriesData> =>
@@ -116,6 +117,7 @@ export interface PostPositionDrawResult {
   assignments: PostPositionAssignment[];
 }
 
+// Bốc thăm vị trí xuất phát.
 export const drawPostPositions = (
   raceId: number
 ): Promise<PostPositionDrawResult> =>
@@ -182,6 +184,7 @@ export interface DeclareOfficialResult {
   remainderAmount: number;
 }
 
+// Công bố kết quả đua chính thức.
 export const declareRaceOfficial = (
   raceId: number,
   payload: DeclareOfficialPayload
@@ -269,6 +272,7 @@ export interface UnofficialRace {
   canDeclareOfficial: boolean;
 }
 
+// Lấy các cuộc đua chờ duyệt.
 export const getUnofficialRaces = (
   tournamentId?: number
 ): Promise<UnofficialRace[]> =>

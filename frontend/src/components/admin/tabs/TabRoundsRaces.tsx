@@ -1,23 +1,16 @@
-import { useState } from 'react';
-import {
-  FiPlus,
-  FiTrash2,
-  FiChevronDown,
-  FiChevronUp,
-} from 'react-icons/fi';
+import { useState } from "react";
+import { FiPlus, FiTrash2, FiChevronDown, FiChevronUp } from "react-icons/fi";
 
 import type {
   Round,
   Race,
   TrackType,
   TournamentBasicInfo,
-} from '../TournamentBuilder';
+} from "../TournamentBuilder";
 
-import {
-  validateRounds,
-} from '../tournamentValidation';
+import { validateRounds } from "../tournamentValidation";
 
-import styles from './TabRoundsRaces.module.scss';
+import styles from "./TabRoundsRaces.module.scss";
 
 interface Props {
   rounds: Round[];
@@ -35,52 +28,40 @@ interface Props {
   showAllErrors?: boolean;
 }
 
-const createEmptyRace = (
-  sequenceOrder: number
-): Race => ({
-  id: `race-${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 7)}`,
+const createEmptyRace = (sequenceOrder: number): Race => ({
+  id: `race-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
 
   sequenceOrder,
 
-  scheduledDate: '',
+  scheduledDate: "",
 
   raceNumber: sequenceOrder,
 
-  scheduledTime: '',
+  scheduledTime: "",
 
-  purseAmount: '',
+  purseAmount: "",
 
-  raceDistanceOverride: '',
+  raceDistanceOverride: "",
 
-  trackTypeOverride: '',
+  trackTypeOverride: "",
 
   isPostPositionDrawn: false,
 
   entries: [],
 });
 
-const createEmptyRound = (
-  roundNumber: number
-): Round => ({
-  id: `round-${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 7)}`,
+const createEmptyRound = (roundNumber: number): Round => ({
+  id: `round-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
 
   name: `Round ${roundNumber}`,
 
-  scheduledDate: '',
+  scheduledDate: "",
 
   races: [],
 });
 
-const formatCurrency = (
-  value: number
-): string =>
-  new Intl.NumberFormat('vi-VN').format(
-    value
-  ) + ' VNĐ';
+const formatCurrency = (value: number): string =>
+  new Intl.NumberFormat("vi-VN").format(value) + " VNĐ";
 
 const TabRoundsRaces = ({
   rounds,
@@ -97,11 +78,11 @@ const TabRoundsRaces = ({
 
   showAllErrors = false,
 }: Props) => {
-  const [expandedRounds, setExpandedRounds] =
-    useState<Record<string, boolean>>({});
+  const [expandedRounds, setExpandedRounds] = useState<Record<string, boolean>>(
+    {},
+  );
 
-  const [touched, setTouched] =
-    useState<Record<string, boolean>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   /*
    * validateRounds cần TournamentBasicInfo.
@@ -114,39 +95,39 @@ const TabRoundsRaces = ({
    * Các field còn lại không được kiểm tra ở đây.
    */
   const validationBasicInfo: TournamentBasicInfo = {
-    name: '',
+    name: "",
 
-    description: '',
+    description: "",
 
     startDate: tournamentStartDate,
 
     endDate: tournamentEndDate,
 
-    venueId: '',
+    venueId: "",
 
     venueLaneCount: null,
 
     venueTrackLengthMeters: null,
 
-    allowedBreed: '',
+    allowedBreed: "",
 
-    trackType: '',
+    trackType: "",
 
-    raceDistance: '',
+    raceDistance: "",
 
-    raceCategory: '',
+    raceCategory: "",
 
-    maxHorses: '',
+    maxHorses: "",
 
-    minJockeyExperienceYears: '',
+    minJockeyExperienceYears: "",
 
     purseAmount: tournamentPurse,
 
     entryFeeAmount: 0,
 
-    paymentDeadline: '',
+    paymentDeadline: "",
 
-    refundDeadline: '',
+    refundDeadline: "",
 
     clearRefundDeadline: false,
 
@@ -157,14 +138,9 @@ const TabRoundsRaces = ({
     postRaceWeightDiffThresholdKg: 1,
   };
 
-  const validation = validateRounds(
-    rounds,
-    validationBasicInfo
-  );
+  const validation = validateRounds(rounds, validationBasicInfo);
 
-  const markTouched = (
-    key: string
-  ) => {
+  const markTouched = (key: string) => {
     setTouched((previous) => ({
       ...previous,
 
@@ -172,40 +148,26 @@ const TabRoundsRaces = ({
     }));
   };
 
-  const getVisibleError = (
-    key: string,
-    error?: string
-  ): string | undefined => {
-    if (
-      !showAllErrors &&
-      !touched[key]
-    ) {
+  const getVisibleError = (key: string, error?: string): string | undefined => {
+    if (!showAllErrors && !touched[key]) {
       return undefined;
     }
 
     return error;
   };
 
-  const toggleRound = (
-    roundId: string
-  ) => {
+  const toggleRound = (roundId: string) => {
     setExpandedRounds((previous) => ({
       ...previous,
 
-      [roundId]:
-        !(previous[roundId] ?? true),
+      [roundId]: !(previous[roundId] ?? true),
     }));
   };
 
   const handleAddRound = () => {
-    const newRound = createEmptyRound(
-      rounds.length + 1
-    );
+    const newRound = createEmptyRound(rounds.length + 1);
 
-    onChange([
-      ...rounds,
-      newRound,
-    ]);
+    onChange([...rounds, newRound]);
 
     setExpandedRounds((previous) => ({
       ...previous,
@@ -214,1007 +176,557 @@ const TabRoundsRaces = ({
     }));
   };
 
-  const handleRemoveRound = (
-    roundId: string
-  ) => {
-    const updatedRounds =
-      rounds.filter(
-        (round) =>
-          round.id !== roundId
-      );
+  const handleRemoveRound = (roundId: string) => {
+    const updatedRounds = rounds.filter((round) => round.id !== roundId);
 
     onChange(updatedRounds);
   };
 
-  const handleRoundFieldChange = <
-    K extends keyof Round,
-  >(
+  const handleRoundFieldChange = <K extends keyof Round>(
     roundId: string,
     field: K,
-    value: Round[K]
+    value: Round[K],
   ) => {
-    const updatedRounds =
-      rounds.map((round) => {
-        if (
-          round.id !== roundId
-        ) {
-          return round;
-        }
+    const updatedRounds = rounds.map((round) => {
+      if (round.id !== roundId) {
+        return round;
+      }
 
-        return {
-          ...round,
+      return {
+        ...round,
 
-          [field]: value,
-        };
-      });
+        [field]: value,
+      };
+    });
 
     onChange(updatedRounds);
   };
 
-  const handleAddRace = (
-    roundId: string
-  ) => {
-    const updatedRounds =
-      rounds.map((round) => {
-        if (
-          round.id !== roundId
-        ) {
-          return round;
-        }
+  const handleAddRace = (roundId: string) => {
+    const updatedRounds = rounds.map((round) => {
+      if (round.id !== roundId) {
+        return round;
+      }
 
-        const nextRaceNumber =
-          round.races.length + 1;
+      const nextRaceNumber = round.races.length + 1;
 
-        const newRace =
-          createEmptyRace(
-            nextRaceNumber
-          );
+      const newRace = createEmptyRace(nextRaceNumber);
 
-        return {
-          ...round,
+      return {
+        ...round,
 
-          races: [
-            ...round.races,
-
-            newRace,
-          ],
-        };
-      });
+        races: [...round.races, newRace],
+      };
+    });
 
     onChange(updatedRounds);
   };
 
-  const handleRemoveRace = (
-    roundId: string,
-    raceId: string
-  ) => {
-    const updatedRounds =
-      rounds.map((round) => {
-        if (
-          round.id !== roundId
-        ) {
-          return round;
-        }
+  const handleRemoveRace = (roundId: string, raceId: string) => {
+    const updatedRounds = rounds.map((round) => {
+      if (round.id !== roundId) {
+        return round;
+      }
 
-        return {
-          ...round,
+      return {
+        ...round,
 
-          races:
-            round.races.filter(
-              (race) =>
-                race.id !== raceId
-            ),
-        };
-      });
+        races: round.races.filter((race) => race.id !== raceId),
+      };
+    });
 
     onChange(updatedRounds);
   };
 
-  const handleRaceFieldChange = <
-    K extends keyof Race,
-  >(
+  const handleRaceFieldChange = <K extends keyof Race>(
     roundId: string,
     raceId: string,
     field: K,
-    value: Race[K]
+    value: Race[K],
   ) => {
-    const updatedRounds =
-      rounds.map((round) => {
-        if (
-          round.id !== roundId
-        ) {
-          return round;
-        }
+    const updatedRounds = rounds.map((round) => {
+      if (round.id !== roundId) {
+        return round;
+      }
 
-        return {
-          ...round,
+      return {
+        ...round,
 
-          races:
-            round.races.map(
-              (race) => {
-                if (
-                  race.id !== raceId
-                ) {
-                  return race;
-                }
+        races: round.races.map((race) => {
+          if (race.id !== raceId) {
+            return race;
+          }
 
-                return {
-                  ...race,
+          return {
+            ...race,
 
-                  [field]: value,
-                };
-              }
-            ),
-        };
-      });
+            [field]: value,
+          };
+        }),
+      };
+    });
 
     onChange(updatedRounds);
   };
 
-  const totalRacePurse =
-    rounds.reduce(
-      (roundTotal, round) =>
-        roundTotal +
-        round.races.reduce(
-          (
-            raceTotal,
-            race
-          ) =>
-            raceTotal +
-            (Number(
-              race.purseAmount
-            ) || 0),
-          0
-        ),
-      0
-    );
+  const totalRacePurse = rounds.reduce(
+    (roundTotal, round) =>
+      roundTotal +
+      round.races.reduce(
+        (raceTotal, race) => raceTotal + (Number(race.purseAmount) || 0),
+        0,
+      ),
+    0,
+  );
 
   return (
-    <div
-      className={styles.container}
-    >
-      <div
-        className={
-          styles.purseSummary
-        }
-      >
+    <div className={styles.container}>
+      <div className={styles.purseSummary}>
         <div>
-          <span
-            className={
-              styles.purseLabel
-            }
-          >
-            Quỹ thưởng giải đấu
-          </span>
+          <span className={styles.purseLabel}>Quỹ thưởng giải đấu</span>
 
-          <strong>
-            {formatCurrency(
-              tournamentPurse
-            )}
-          </strong>
+          <strong>{formatCurrency(tournamentPurse)}</strong>
         </div>
 
         <div>
-          <span
-            className={
-              styles.purseLabel
-            }
-          >
+          <span className={styles.purseLabel}>
             Tổng quỹ thưởng các cuộc đua
           </span>
 
           <strong
             className={
-              totalRacePurse >
-              tournamentPurse
-                ? styles.purseExceeded
-                : ''
+              totalRacePurse > tournamentPurse ? styles.purseExceeded : ""
             }
           >
-            {formatCurrency(
-              totalRacePurse
-            )}
+            {formatCurrency(totalRacePurse)}
           </strong>
         </div>
       </div>
 
       {showAllErrors &&
-        validation.structureErrors.map(
-          (error) => (
-            <div
-              key={error}
-              className={
-                styles.errorBanner
-              }
-            >
-              {error}
-            </div>
-          )
-        )}
+        validation.structureErrors.map((error) => (
+          <div key={error} className={styles.errorBanner}>
+            {error}
+          </div>
+        ))}
 
-      <div
-        className={
-          styles.roundsList
-        }
-      >
-        {rounds.map(
-          (
-            round,
-            roundIndex
-          ) => {
-            const isExpanded =
-              expandedRounds[
-                round.id
-              ] ?? true;
+      <div className={styles.roundsList}>
+        {rounds.map((round, roundIndex) => {
+          const isExpanded = expandedRounds[round.id] ?? true;
 
-            const roundErrors =
-              validation.fieldErrors[
-                round.id
-              ] ?? {};
+          const roundErrors = validation.fieldErrors[round.id] ?? {};
 
-            const roundNameError =
-              getVisibleError(
-                `${round.id}.name`,
-                roundErrors.name
-              );
+          const roundNameError = getVisibleError(
+            `${round.id}.name`,
+            roundErrors.name,
+          );
 
-            const roundDateError =
-              getVisibleError(
-                `${round.id}.scheduledDate`,
-                roundErrors.scheduledDate
-              );
+          const roundDateError = getVisibleError(
+            `${round.id}.scheduledDate`,
+            roundErrors.scheduledDate,
+          );
 
-            return (
-              <div
-                key={round.id}
-                className={
-                  styles.roundCard
-                }
-              >
-                <div
-                  className={
-                    styles.roundHeader
-                  }
+          return (
+            <div key={round.id} className={styles.roundCard}>
+              <div className={styles.roundHeader}>
+                <button
+                  type="button"
+                  className={styles.roundToggle}
+                  onClick={() => toggleRound(round.id)}
+                  aria-label={isExpanded ? "Thu gọn vòng" : "Mở rộng vòng"}
                 >
-                  <button
-                    type="button"
-                    className={
-                      styles.roundToggle
-                    }
-                    onClick={() =>
-                      toggleRound(
-                        round.id
+                  {isExpanded ? (
+                    <FiChevronUp size={16} />
+                  ) : (
+                    <FiChevronDown size={16} />
+                  )}
+                </button>
+
+                <div className={styles.roundFieldWrap}>
+                  <label className={styles.roundFieldLabel}>Tên Round</label>
+
+                  <input
+                    type="text"
+                    className={[
+                      styles.roundNameInput,
+
+                      roundNameError ? styles.inputError : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    value={round.name}
+                    placeholder={`Round ${roundIndex + 1}`}
+                    maxLength={101}
+                    disabled={readOnly}
+                    onBlur={() => markTouched(`${round.id}.name`)}
+                    onChange={(event) =>
+                      handleRoundFieldChange(
+                        round.id,
+
+                        "name",
+
+                        event.target.value,
                       )
                     }
-                    aria-label={
-                      isExpanded
-                        ? 'Thu gọn vòng'
-                        : 'Mở rộng vòng'
+                  />
+
+                  {roundNameError && (
+                    <span className={styles.raceErrorText}>
+                      {roundNameError}
+                    </span>
+                  )}
+                </div>
+
+                <div className={styles.roundFieldWrap}>
+                  <label className={styles.roundFieldLabel}>Ngày Round</label>
+
+                  <input
+                    type="date"
+                    className={[
+                      styles.roundDateInput,
+
+                      roundDateError ? styles.inputError : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    value={round.scheduledDate}
+                    min={tournamentStartDate || undefined}
+                    max={tournamentEndDate || undefined}
+                    disabled={readOnly}
+                    onBlur={() => markTouched(`${round.id}.scheduledDate`)}
+                    onChange={(event) =>
+                      handleRoundFieldChange(
+                        round.id,
+
+                        "scheduledDate",
+
+                        event.target.value,
+                      )
                     }
+                  />
+
+                  {roundDateError && (
+                    <span className={styles.raceErrorText}>
+                      {roundDateError}
+                    </span>
+                  )}
+                </div>
+
+                <span className={styles.raceCountBadge}>
+                  {round.races.length} race
+                </span>
+
+                {!readOnly && (
+                  <button
+                    type="button"
+                    className={styles.removeRoundBtn}
+                    onClick={() => handleRemoveRound(round.id)}
+                    aria-label="Xóa Round"
+                    title="Xóa Round"
                   >
-                    {isExpanded ? (
-                      <FiChevronUp
-                        size={16}
-                      />
-                    ) : (
-                      <FiChevronDown
-                        size={16}
-                      />
-                    )}
+                    <FiTrash2 size={15} />
                   </button>
+                )}
+              </div>
 
-                  <div
-                    className={
-                      styles.roundFieldWrap
-                    }
-                  >
-                    <label
-                      className={
-                        styles.roundFieldLabel
-                      }
-                    >
-                      Tên Round
-                    </label>
+              {isExpanded && (
+                <div className={styles.racesList}>
+                  {round.races.map((race) => {
+                    const raceErrors = roundErrors.races?.[race.id] ?? {};
 
-                    <input
-                      type="text"
-                      className={[
-                        styles.roundNameInput,
+                    const isFrozen = race.isPostPositionDrawn;
 
-                        roundNameError
-                          ? styles.inputError
-                          : '',
-                      ]
-                        .filter(
-                          Boolean
-                        )
-                        .join(' ')}
-                      value={
-                        round.name
-                      }
-                      placeholder={`Round ${
-                        roundIndex +
-                        1
-                      }`}
-                      maxLength={
-                        101
-                      }
-                      disabled={
-                        readOnly
-                      }
-                      onBlur={() =>
-                        markTouched(
-                          `${round.id}.name`
-                        )
-                      }
-                      onChange={(
-                        event
-                      ) =>
-                        handleRoundFieldChange(
-                          round.id,
+                    const fieldKey = (field: string) =>
+                      `${round.id}.${race.id}.${field}`;
 
-                          'name',
+                    const scheduledDateError = getVisibleError(
+                      fieldKey("scheduledDate"),
 
-                          event
-                            .target
-                            .value
-                        )
-                      }
-                    />
+                      raceErrors.scheduledDate,
+                    );
 
-                    {roundNameError && (
-                      <span
-                        className={
-                          styles.raceErrorText
-                        }
-                      >
-                        {
-                          roundNameError
-                        }
-                      </span>
-                    )}
-                  </div>
+                    const scheduledTimeError = getVisibleError(
+                      fieldKey("scheduledTime"),
 
-                  <div
-                    className={
-                      styles.roundFieldWrap
-                    }
-                  >
-                    <label
-                      className={
-                        styles.roundFieldLabel
-                      }
-                    >
-                      Ngày Round
-                    </label>
+                      raceErrors.scheduledTime,
+                    );
 
-                    <input
-                      type="date"
-                      className={[
-                        styles.roundDateInput,
+                    const purseAmountError = getVisibleError(
+                      fieldKey("purseAmount"),
 
-                        roundDateError
-                          ? styles.inputError
-                          : '',
-                      ]
-                        .filter(
-                          Boolean
-                        )
-                        .join(' ')}
-                      value={
-                        round.scheduledDate
-                      }
-                      min={
-                        tournamentStartDate ||
-                        undefined
-                      }
-                      max={
-                        tournamentEndDate ||
-                        undefined
-                      }
-                      disabled={
-                        readOnly
-                      }
-                      onBlur={() =>
-                        markTouched(
-                          `${round.id}.scheduledDate`
-                        )
-                      }
-                      onChange={(
-                        event
-                      ) =>
-                        handleRoundFieldChange(
-                          round.id,
+                      raceErrors.purseAmount,
+                    );
 
-                          'scheduledDate',
+                    const distanceOverrideError = getVisibleError(
+                      fieldKey("raceDistanceOverride"),
 
-                          event
-                            .target
-                            .value
-                        )
-                      }
-                    />
+                      raceErrors.raceDistanceOverride,
+                    );
 
-                    {roundDateError && (
-                      <span
-                        className={
-                          styles.raceErrorText
-                        }
-                      >
-                        {
-                          roundDateError
-                        }
-                      </span>
-                    )}
-                  </div>
+                    return (
+                      <div key={race.id} className={styles.raceRow}>
+                        <div className={styles.raceRowHeader}>
+                          <span className={styles.raceNumberBadge}>
+                            Cuộc đua #{race.raceNumber}
+                          </span>
 
-                  <span
-                    className={
-                      styles.raceCountBadge
-                    }
-                  >
-                    {
-                      round.races
-                        .length
-                    }{' '}
-                    race
-                  </span>
+                          {isFrozen && (
+                            <span className={styles.frozenBadge}>
+                              🔒 Đã bốc thăm
+                            </span>
+                          )}
+
+                          {!readOnly && (
+                            <button
+                              type="button"
+                              className={styles.removeRaceBtn}
+                              onClick={() =>
+                                handleRemoveRace(
+                                  round.id,
+
+                                  race.id,
+                                )
+                              }
+                              aria-label="Xóa cuộc đua"
+                              title="Xóa cuộc đua"
+                            >
+                              <FiTrash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+
+                        <div className={styles.raceFields}>
+                          {/* Race Number */}
+                          <div className={styles.raceField}>
+                            <label>Số cuộc đua</label>
+
+                            <input
+                              type="number"
+                              min={1}
+                              step={1}
+                              value={race.raceNumber}
+                              disabled={isFrozen || readOnly}
+                              onChange={(event) =>
+                                handleRaceFieldChange(
+                                  round.id,
+
+                                  race.id,
+
+                                  "raceNumber",
+
+                                  Number(event.target.value),
+                                )
+                              }
+                            />
+                          </div>
+
+                          {/* Race Date */}
+                          <div className={styles.raceField}>
+                            <label>Ngày đua</label>
+
+                            <input
+                              type="date"
+                              className={
+                                scheduledDateError ? styles.inputError : ""
+                              }
+                              value={race.scheduledDate}
+                              min={
+                                round.scheduledDate ||
+                                tournamentStartDate ||
+                                undefined
+                              }
+                              max={tournamentEndDate || undefined}
+                              disabled={isFrozen || readOnly}
+                              onBlur={() =>
+                                markTouched(fieldKey("scheduledDate"))
+                              }
+                              onChange={(event) =>
+                                handleRaceFieldChange(
+                                  round.id,
+
+                                  race.id,
+
+                                  "scheduledDate",
+
+                                  event.target.value,
+                                )
+                              }
+                            />
+
+                            {scheduledDateError && (
+                              <span className={styles.raceErrorText}>
+                                {scheduledDateError}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Race Time */}
+                          <div className={styles.raceField}>
+                            <label>Giờ đua</label>
+
+                            <input
+                              type="time"
+                              className={
+                                scheduledTimeError ? styles.inputError : ""
+                              }
+                              value={race.scheduledTime}
+                              disabled={isFrozen || readOnly}
+                              onBlur={() =>
+                                markTouched(fieldKey("scheduledTime"))
+                              }
+                              onChange={(event) =>
+                                handleRaceFieldChange(
+                                  round.id,
+
+                                  race.id,
+
+                                  "scheduledTime",
+
+                                  event.target.value,
+                                )
+                              }
+                            />
+
+                            {scheduledTimeError && (
+                              <span className={styles.raceErrorText}>
+                                {scheduledTimeError}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Purse Amount */}
+                          <div className={styles.raceField}>
+                            <label>Quỹ thưởng</label>
+
+                            <input
+                              type="number"
+                              min={0}
+                              className={
+                                purseAmountError ? styles.inputError : ""
+                              }
+                              value={race.purseAmount}
+                              disabled={readOnly}
+                              onBlur={() =>
+                                markTouched(fieldKey("purseAmount"))
+                              }
+                              onChange={(event) =>
+                                handleRaceFieldChange(
+                                  round.id,
+
+                                  race.id,
+
+                                  "purseAmount",
+
+                                  event.target.value
+                                    ? Number(event.target.value)
+                                    : "",
+                                )
+                              }
+                            />
+
+                            {purseAmountError && (
+                              <span className={styles.raceErrorText}>
+                                {purseAmountError}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Race Distance Override */}
+                          <div className={styles.raceField}>
+                            <label>Cự ly ghi đè</label>
+
+                            <input
+                              type="number"
+                              placeholder="Tùy chọn"
+                              className={
+                                distanceOverrideError ? styles.inputError : ""
+                              }
+                              value={race.raceDistanceOverride}
+                              disabled={isFrozen || readOnly}
+                              onBlur={() =>
+                                markTouched(fieldKey("raceDistanceOverride"))
+                              }
+                              onChange={(event) =>
+                                handleRaceFieldChange(
+                                  round.id,
+
+                                  race.id,
+
+                                  "raceDistanceOverride",
+
+                                  event.target.value
+                                    ? Number(event.target.value)
+                                    : "",
+                                )
+                              }
+                            />
+
+                            {distanceOverrideError && (
+                              <span className={styles.raceErrorText}>
+                                {distanceOverrideError}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Track Type Override */}
+                          <div className={styles.raceField}>
+                            <label>Loại mặt sân ghi đè</label>
+
+                            <select
+                              value={race.trackTypeOverride}
+                              disabled={isFrozen || readOnly}
+                              onChange={(event) =>
+                                handleRaceFieldChange(
+                                  round.id,
+
+                                  race.id,
+
+                                  "trackTypeOverride",
+
+                                  event.target.value as TrackType,
+                                )
+                              }
+                            >
+                              <option value="">-- Mặc định --</option>
+
+                              <option value="Turf">Đường cỏ</option>
+
+                              <option value="Dirt">Đường đất</option>
+
+                              <option value="Synthetic">
+                                Mặt sân tổng hợp
+                              </option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
 
                   {!readOnly && (
                     <button
                       type="button"
-                      className={
-                        styles.removeRoundBtn
-                      }
-                      onClick={() =>
-                        handleRemoveRound(
-                          round.id
-                        )
-                      }
-                      aria-label="Xóa Round"
-                      title="Xóa Round"
+                      className={styles.addRaceBtn}
+                      onClick={() => handleAddRace(round.id)}
                     >
-                      <FiTrash2
-                        size={15}
-                      />
+                      <FiPlus size={14} />
+                      Thêm cuộc đua
                     </button>
                   )}
                 </div>
-
-                {isExpanded && (
-                  <div
-                    className={
-                      styles.racesList
-                    }
-                  >
-                    {round.races.map(
-                      (
-                        race
-                      ) => {
-                        const raceErrors =
-                          roundErrors
-                            .races?.[
-                            race.id
-                          ] ?? {};
-
-                        const isFrozen =
-                          race.isPostPositionDrawn;
-
-                        const fieldKey =
-                          (
-                            field: string
-                          ) =>
-                            `${round.id}.${race.id}.${field}`;
-
-                        const scheduledDateError =
-                          getVisibleError(
-                            fieldKey(
-                              'scheduledDate'
-                            ),
-
-                            raceErrors.scheduledDate
-                          );
-
-                        const scheduledTimeError =
-                          getVisibleError(
-                            fieldKey(
-                              'scheduledTime'
-                            ),
-
-                            raceErrors.scheduledTime
-                          );
-
-                        const purseAmountError =
-                          getVisibleError(
-                            fieldKey(
-                              'purseAmount'
-                            ),
-
-                            raceErrors.purseAmount
-                          );
-
-                        const distanceOverrideError =
-                          getVisibleError(
-                            fieldKey(
-                              'raceDistanceOverride'
-                            ),
-
-                            raceErrors.raceDistanceOverride
-                          );
-
-                        return (
-                          <div
-                            key={
-                              race.id
-                            }
-                            className={
-                              styles.raceRow
-                            }
-                          >
-                            <div
-                              className={
-                                styles.raceRowHeader
-                              }
-                            >
-                              <span
-                                className={
-                                  styles.raceNumberBadge
-                                }
-                              >
-                                Cuộc đua #
-                                {
-                                  race.raceNumber
-                                }
-                              </span>
-
-                              {isFrozen && (
-                                <span
-                                  className={
-                                    styles.frozenBadge
-                                  }
-                                >
-                                  🔒 Đã
-                                  bốc
-                                  thăm
-                                </span>
-                              )}
-
-                              {!readOnly && (
-                                <button
-                                  type="button"
-                                  className={
-                                    styles.removeRaceBtn
-                                  }
-                                  onClick={() =>
-                                    handleRemoveRace(
-                                      round.id,
-
-                                      race.id
-                                    )
-                                  }
-                                  aria-label="Xóa cuộc đua"
-                                  title="Xóa cuộc đua"
-                                >
-                                  <FiTrash2
-                                    size={
-                                      13
-                                    }
-                                  />
-                                </button>
-                              )}
-                            </div>
-
-                            <div
-                              className={
-                                styles.raceFields
-                              }
-                            >
-                              {/* Race Number */}
-                              <div
-                                className={
-                                  styles.raceField
-                                }
-                              >
-                                <label>
-                                  Số cuộc đua
-                                </label>
-
-                                <input
-                                  type="number"
-                                  min={1}
-                                  step={1}
-                                  value={
-                                    race.raceNumber
-                                  }
-                                  disabled={
-                                    isFrozen ||
-                                    readOnly
-                                  }
-                                  onChange={(
-                                    event
-                                  ) =>
-                                    handleRaceFieldChange(
-                                      round.id,
-
-                                      race.id,
-
-                                      'raceNumber',
-
-                                      Number(
-                                        event
-                                          .target
-                                          .value
-                                      )
-                                    )
-                                  }
-                                />
-                              </div>
-
-                              {/* Race Date */}
-                              <div
-                                className={
-                                  styles.raceField
-                                }
-                              >
-                                <label>
-                                  Ngày đua
-                                </label>
-
-                                <input
-                                  type="date"
-                                  className={
-                                    scheduledDateError
-                                      ? styles.inputError
-                                      : ''
-                                  }
-                                  value={
-                                    race.scheduledDate
-                                  }
-                                  min={
-                                    round.scheduledDate ||
-                                    tournamentStartDate ||
-                                    undefined
-                                  }
-                                  max={
-                                    tournamentEndDate ||
-                                    undefined
-                                  }
-                                  disabled={
-                                    isFrozen ||
-                                    readOnly
-                                  }
-                                  onBlur={() =>
-                                    markTouched(
-                                      fieldKey(
-                                        'scheduledDate'
-                                      )
-                                    )
-                                  }
-                                  onChange={(
-                                    event
-                                  ) =>
-                                    handleRaceFieldChange(
-                                      round.id,
-
-                                      race.id,
-
-                                      'scheduledDate',
-
-                                      event
-                                        .target
-                                        .value
-                                    )
-                                  }
-                                />
-
-                                {scheduledDateError && (
-                                  <span
-                                    className={
-                                      styles.raceErrorText
-                                    }
-                                  >
-                                    {
-                                      scheduledDateError
-                                    }
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Race Time */}
-                              <div
-                                className={
-                                  styles.raceField
-                                }
-                              >
-                                <label>
-                                  Giờ đua
-                                </label>
-
-                                <input
-                                  type="time"
-                                  className={
-                                    scheduledTimeError
-                                      ? styles.inputError
-                                      : ''
-                                  }
-                                  value={
-                                    race.scheduledTime
-                                  }
-                                  disabled={
-                                    isFrozen ||
-                                    readOnly
-                                  }
-                                  onBlur={() =>
-                                    markTouched(
-                                      fieldKey(
-                                        'scheduledTime'
-                                      )
-                                    )
-                                  }
-                                  onChange={(
-                                    event
-                                  ) =>
-                                    handleRaceFieldChange(
-                                      round.id,
-
-                                      race.id,
-
-                                      'scheduledTime',
-
-                                      event
-                                        .target
-                                        .value
-                                    )
-                                  }
-                                />
-
-                                {scheduledTimeError && (
-                                  <span
-                                    className={
-                                      styles.raceErrorText
-                                    }
-                                  >
-                                    {
-                                      scheduledTimeError
-                                    }
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Purse Amount */}
-                              <div
-                                className={
-                                  styles.raceField
-                                }
-                              >
-                                <label>
-                                  Quỹ thưởng
-                                </label>
-
-                                <input
-                                  type="number"
-                                  min={0}
-                                  className={
-                                    purseAmountError
-                                      ? styles.inputError
-                                      : ''
-                                  }
-                                  value={
-                                    race.purseAmount
-                                  }
-                                  disabled={
-                                    readOnly
-                                  }
-                                  onBlur={() =>
-                                    markTouched(
-                                      fieldKey(
-                                        'purseAmount'
-                                      )
-                                    )
-                                  }
-                                  onChange={(
-                                    event
-                                  ) =>
-                                    handleRaceFieldChange(
-                                      round.id,
-
-                                      race.id,
-
-                                      'purseAmount',
-
-                                      event
-                                        .target
-                                        .value
-                                        ? Number(
-                                            event
-                                              .target
-                                              .value
-                                          )
-                                        : ''
-                                    )
-                                  }
-                                />
-
-                                {purseAmountError && (
-                                  <span
-                                    className={
-                                      styles.raceErrorText
-                                    }
-                                  >
-                                    {
-                                      purseAmountError
-                                    }
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Race Distance Override */}
-                              <div
-                                className={
-                                  styles.raceField
-                                }
-                              >
-                                <label>
-                                  Cự ly ghi đè
-                                </label>
-
-                                <input
-                                  type="number"
-                                  placeholder="Tùy chọn"
-                                  className={
-                                    distanceOverrideError
-                                      ? styles.inputError
-                                      : ''
-                                  }
-                                  value={
-                                    race.raceDistanceOverride
-                                  }
-                                  disabled={
-                                    isFrozen ||
-                                    readOnly
-                                  }
-                                  onBlur={() =>
-                                    markTouched(
-                                      fieldKey(
-                                        'raceDistanceOverride'
-                                      )
-                                    )
-                                  }
-                                  onChange={(
-                                    event
-                                  ) =>
-                                    handleRaceFieldChange(
-                                      round.id,
-
-                                      race.id,
-
-                                      'raceDistanceOverride',
-
-                                      event
-                                        .target
-                                        .value
-                                        ? Number(
-                                            event
-                                              .target
-                                              .value
-                                          )
-                                        : ''
-                                    )
-                                  }
-                                />
-
-                                {distanceOverrideError && (
-                                  <span
-                                    className={
-                                      styles.raceErrorText
-                                    }
-                                  >
-                                    {
-                                      distanceOverrideError
-                                    }
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Track Type Override */}
-                              <div
-                                className={
-                                  styles.raceField
-                                }
-                              >
-                                <label>
-                                  Loại mặt sân ghi đè
-                                </label>
-
-                                <select
-                                  value={
-                                    race.trackTypeOverride
-                                  }
-                                  disabled={
-                                    isFrozen ||
-                                    readOnly
-                                  }
-                                  onChange={(
-                                    event
-                                  ) =>
-                                    handleRaceFieldChange(
-                                      round.id,
-
-                                      race.id,
-
-                                      'trackTypeOverride',
-
-                                      event
-                                        .target
-                                        .value as TrackType
-                                    )
-                                  }
-                                >
-                                  <option value="">
-                                    --
-                                    Mặc
-                                    định
-                                    --
-                                  </option>
-
-                                  <option value="Turf">
-                                    Đường cỏ
-                                  </option>
-
-                                  <option value="Dirt">
-                                    Đường đất
-                                  </option>
-
-                                  <option value="Synthetic">
-                                    Mặt sân tổng hợp
-                                  </option>
-                                </select>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      }
-                    )}
-
-                    {!readOnly && (
-                      <button
-                        type="button"
-                        className={
-                          styles.addRaceBtn
-                        }
-                        onClick={() =>
-                          handleAddRace(
-                            round.id
-                          )
-                        }
-                      >
-                        <FiPlus
-                          size={14}
-                        />
-
-                        Thêm cuộc đua
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          }
-        )}
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {!readOnly && (
         <button
           type="button"
-          className={
-            styles.addRoundBtn
-          }
-          onClick={
-            handleAddRound
-          }
+          className={styles.addRoundBtn}
+          onClick={handleAddRound}
         >
           <FiPlus size={16} />
-
           Thêm vòng đấu
         </button>
       )}

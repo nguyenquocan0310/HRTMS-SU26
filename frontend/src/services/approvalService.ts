@@ -25,6 +25,7 @@ export interface HorseEnrollmentPending {
   updatedAt: string;
 }
 
+// Lấy hồ sơ ngựa chờ duyệt.
 export const getPendingHorses =
   async (): Promise<HorseEnrollmentPending[]> => {
     const res = await apiFetch<
@@ -41,6 +42,7 @@ export const getPendingHorses =
     return res.data ?? [];
   };
 
+// Duyệt hồ sơ ngựa đăng ký.
 export const approveHorse = async (
   enrollmentId: number
 ): Promise<void> => {
@@ -58,6 +60,7 @@ export const approveHorse = async (
   }
 };
 
+// Từ chối hồ sơ ngựa đăng ký.
 export const rejectHorse = async (
   enrollmentId: number,
   reason: string
@@ -103,6 +106,7 @@ export interface HorseDetail {
   updatedAt: string;
 }
 
+// Lấy chi tiết hồ sơ ngựa.
 export const getHorseDetail = async (
   horseId: number
 ): Promise<HorseDetail> => {
@@ -139,6 +143,7 @@ export interface PendingApprovalsData {
   jockeys: PersonPending[];
 }
 
+// Lấy hồ sơ nhân sự chờ duyệt.
 export const getPendingApprovals =
   async (): Promise<PendingApprovalsData> => {
     const res = await apiFetch<
@@ -163,6 +168,7 @@ export const getPendingApprovals =
 
 // ─── JOCKEY APPROVAL ────────────────────────────────────────────────────────
 
+// Duyệt hồ sơ nài ngựa.
 export const approveJockey = async (
   userId: number
 ): Promise<void> => {
@@ -180,6 +186,7 @@ export const approveJockey = async (
   }
 };
 
+// Từ chối hồ sơ nài ngựa.
 export const rejectJockey = async (
   userId: number,
   reason: string
@@ -202,6 +209,7 @@ export const rejectJockey = async (
 
 // ─── REFEREE APPROVAL ───────────────────────────────────────────────────────
 
+// Duyệt hồ sơ trọng tài.
 export const approveReferee = async (
   userId: number
 ): Promise<void> => {
@@ -220,6 +228,7 @@ export const approveReferee = async (
   }
 };
 
+// Từ chối hồ sơ trọng tài.
 export const rejectReferee = async (
   userId: number,
   reason: string
@@ -242,6 +251,7 @@ export const rejectReferee = async (
 
 // ─── DOCTOR APPROVAL ────────────────────────────────────────────────────────
 
+// Duyệt hồ sơ bác sĩ.
 export const approveDoctor = async (
   userId: number
 ): Promise<void> => {
@@ -260,6 +270,7 @@ export const approveDoctor = async (
   }
 };
 
+// Từ chối hồ sơ bác sĩ.
 export const rejectDoctor = async (
   userId: number,
   reason: string
@@ -292,6 +303,7 @@ export interface ActiveUser {
   createdAt: string;
 }
 
+// Lấy nhân sự đang hoạt động.
 export const getActiveUsersByRole = async (
   role: 'Referee' | 'Doctor'
 ): Promise<ActiveUser[]> => {
@@ -321,6 +333,7 @@ export interface UserBasicInfo {
   fullName: string;
 }
 
+// Lấy thông tin người dùng cơ bản.
 export const getUserBasicInfo = async (userId: number): Promise<UserBasicInfo | null> => {
   try {
     const res = await apiFetch<{ success: boolean; data: { userId: number; fullName: string } }>(

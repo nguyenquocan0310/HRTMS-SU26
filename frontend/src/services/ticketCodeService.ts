@@ -30,6 +30,7 @@ export interface CreateTicketCodesResult {
  *   expiresAt: ISO string
  * }
  */
+// Tạo lô mã vé mới.
 export const createTicketCodes = async (
   payload: CreateTicketCodesPayload
 ): Promise<CreateTicketCodesResult> => {
@@ -73,6 +74,7 @@ export interface TicketCodeListResult {
  * GET /api/admin/ticket-codes?status=&page=&pageSize=
  * Role: Admin
  */
+// Lấy danh sách mã vé.
 export const getTicketCodes = async (params: {
   status?: TicketCodeStatus | '';
   page?: number;

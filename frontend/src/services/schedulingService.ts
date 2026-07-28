@@ -12,13 +12,19 @@ export interface DrawResult { raceId: number; isPostPositionDrawn: boolean; tota
 export interface FinalizeResult { roundId: number; allocation: AutoAllocateResult; draws: DrawResult[]; skippedDraws: Array<{ raceId: number; raceNumber: number; reason: string }>; }
 
 interface ApiEnvelope<T> { success: boolean; message?: string; data: T | null; }
+// Lấy danh sách xuất phát cuộc đua.
 export const getRaceSchedule = (raceId: number) => apiFetch<ApiEnvelope<RaceSchedule>>(`/races/${raceId}/entries`).then((response) => {
   if (!response.success || !response.data) throw new Error(response.message ?? 'Không tải được danh sách xuất phát.');
   return response.data;
 });
 export const previewAutoAllocate = (roundId: number) => apiFetch<AutoAllocateResult>(`/admin/rounds/${roundId}/auto-allocate/preview`, { method: 'POST' });
+// Tự động phân cuộc đua vòng.
 export const autoAllocate = (roundId: number) => apiFetch<AutoAllocateResult>(`/admin/rounds/${roundId}/auto-allocate`, { method: 'POST' });
+// Lấy danh sách chờ của vòng.
 export const getRoundWaitlist = (roundId: number) => apiFetch<WaitlistEntry[]>(`/admin/rounds/${roundId}/waitlist`);
+// Chuyển đăng ký sang cuộc đua.
 export const moveRaceEntry = (entryId: number, targetRaceId: number) => apiFetch<ScheduledEntry>(`/admin/race-entries/${entryId}/move`, { method: 'PUT', body: JSON.stringify({ targetRaceId }) });
+// Bốc thăm vị trí xuất phát.
 export const drawPostPositions = (raceId: number) => apiFetch<DrawResult>(`/admin/races/${raceId}/draw`, { method: 'POST' });
+// Chốt kết quả và chuyển vòng.
 export const finalizeRound = (roundId: number) => apiFetch<FinalizeResult>(`/admin/rounds/${roundId}/finalize`, { method: 'POST' });

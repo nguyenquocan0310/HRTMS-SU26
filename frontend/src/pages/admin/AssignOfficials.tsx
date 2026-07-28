@@ -1,29 +1,53 @@
-import { useEffect, useState } from 'react';
-import { FiChevronDown, FiX, FiSearch, FiCheckCircle, FiUserMinus } from 'react-icons/fi';
-import { getTournaments } from '../../services/tournamentService';
-import { getActiveUsersByRole, type ActiveUser } from '../../services/approvalService';
+import { useEffect, useState } from "react";
 import {
-  getRefereesByRace, assignReferee, removeReferee,
-  getDoctorsByRace, assignDoctor, removeDoctor,
+  FiChevronDown,
+  FiX,
+  FiSearch,
+  FiCheckCircle,
+  FiUserMinus,
+} from "react-icons/fi";
+import { getTournaments } from "../../services/tournamentService";
+import {
+  getActiveUsersByRole,
+  type ActiveUser,
+} from "../../services/approvalService";
+import {
+  getRefereesByRace,
+  assignReferee,
+  removeReferee,
+  getDoctorsByRace,
+  assignDoctor,
+  removeDoctor,
   getAvailableOfficials,
-  type RefereeAssignment, type DoctorAssignment, type AvailableOfficial,
-} from '../../services/officialAssignmentService';
-import styles from './AssignOfficials.module.scss';
+  type RefereeAssignment,
+  type DoctorAssignment,
+  type AvailableOfficial,
+} from "../../services/officialAssignmentService";
+import styles from "./AssignOfficials.module.scss";
 
-
-interface TournamentOption { id: number; name: string; }
-interface RaceOption { id: number; label: string; scheduledTime: string; status: string; }
+interface TournamentOption {
+  id: number;
+  name: string;
+}
+interface RaceOption {
+  id: number;
+  label: string;
+  scheduledTime: string;
+  status: string;
+}
 
 const formatDateTime = (iso: string) => {
   const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')} ${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")} ${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
 };
 
-type ModalType = 'referee' | 'doctor' | null;
+type ModalType = "referee" | "doctor" | null;
 
 const AssignOfficials = () => {
   const [tournaments, setTournaments] = useState<TournamentOption[]>([]);
-  const [selectedTournamentId, setSelectedTournamentId] = useState<number | null>(null);
+  const [selectedTournamentId, setSelectedTournamentId] = useState<
+    number | null
+  >(null);
   const [races, setRaces] = useState<RaceOption[]>([]);
   const [selectedRace, setSelectedRace] = useState<RaceOption | null>(null);
 
@@ -32,43 +56,53 @@ const AssignOfficials = () => {
   const [loadingAssignments, setLoadingAssignments] = useState(false);
 
   // Available personnel from pending-approvals (approved ones)
-// Available personnel — lấy theo đúng Race đang chọn (đã lọc roster + trùng giờ)
-  const [availableReferees, setAvailableReferees] = useState<AvailableOfficial[]>([]);
-  const [availableDoctors, setAvailableDoctors] = useState<AvailableOfficial[]>([]);
+  // Available personnel — lấy theo đúng Race đang chọn (đã lọc roster + trùng giờ)
+  const [availableReferees, setAvailableReferees] = useState<
+    AvailableOfficial[]
+  >([]);
+  const [availableDoctors, setAvailableDoctors] = useState<AvailableOfficial[]>(
+    [],
+  );
 
   const [modal, setModal] = useState<ModalType>(null);
-  const [search, setSearch] = useState('');
-  const [refereeRole, setRefereeRole] = useState<'Lead Referee' | 'Assistant Referee'>('Lead Referee');
+  const [search, setSearch] = useState("");
+  const [refereeRole, setRefereeRole] = useState<
+    "Lead Referee" | "Assistant Referee"
+  >("Lead Referee");
   const [actionLoading, setActionLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [msg, setMsg] = useState('');
+  const [error, setError] = useState("");
+  const [msg, setMsg] = useState("");
 
   // Load tournaments
   useEffect(() => {
-    getTournaments().then((list) => {
-      const opts = list.map((t) => ({ id: t.tournamentId, name: t.name }));
-      setTournaments(opts);
-      if (opts.length > 0) setSelectedTournamentId(opts[0].id);
-    }).catch(() => {});
+    getTournaments()
+      .then((list) => {
+        const opts = list.map((t) => ({ id: t.tournamentId, name: t.name }));
+        setTournaments(opts);
+        if (opts.length > 0) setSelectedTournamentId(opts[0].id);
+      })
+      .catch(() => {});
   }, []);
 
   // Load races when tournament changes
   useEffect(() => {
     if (!selectedTournamentId) return;
-    getTournaments().then((list) => {
-      const t = list.find((x) => x.tournamentId === selectedTournamentId);
-      if (!t) return;
-      const opts: RaceOption[] = t.rounds.flatMap((r) =>
-        r.races.map((race) => ({
-          id: race.raceId,
-          label: `${r.name} - Race #${race.raceNumber}`,
-          scheduledTime: race.scheduledTime,
-          status: race.status,
-        }))
-      );
-      setRaces(opts);
-      if (opts.length > 0) setSelectedRace(opts[0]);
-    }).catch(() => {});
+    getTournaments()
+      .then((list) => {
+        const t = list.find((x) => x.tournamentId === selectedTournamentId);
+        if (!t) return;
+        const opts: RaceOption[] = t.rounds.flatMap((r) =>
+          r.races.map((race) => ({
+            id: race.raceId,
+            label: `${r.name} - Race #${race.raceNumber}`,
+            scheduledTime: race.scheduledTime,
+            status: race.status,
+          })),
+        );
+        setRaces(opts);
+        if (opts.length > 0) setSelectedRace(opts[0]);
+      })
+      .catch(() => {});
   }, [selectedTournamentId]);
 
   // Load assignments when race changes
@@ -78,15 +112,17 @@ const AssignOfficials = () => {
     Promise.all([
       getRefereesByRace(selectedRace.id),
       getDoctorsByRace(selectedRace.id),
-    ]).then(([r, d]) => {
-      setReferees(r);
-      setDoctors(d);
-    }).finally(() => setLoadingAssignments(false));
+    ])
+      .then(([r, d]) => {
+        setReferees(r);
+        setDoctors(d);
+      })
+      .finally(() => setLoadingAssignments(false));
   }, [selectedRace]);
 
   // Load available personnel
-// Load available personnel (Active referees/doctors, không phải danh sách chờ duyệt)
-// Load available officials theo đúng Race đang chọn — gọi lại mỗi khi đổi Race
+  // Load available personnel (Active referees/doctors, không phải danh sách chờ duyệt)
+  // Load available officials theo đúng Race đang chọn — gọi lại mỗi khi đổi Race
   useEffect(() => {
     if (!selectedRace) {
       setAvailableReferees([]);
@@ -117,62 +153,74 @@ const AssignOfficials = () => {
   const handleAssignReferee = async (person: AvailableOfficial) => {
     if (!selectedRace) return;
     setActionLoading(true);
-    setError(''); setMsg('');
+    setError("");
+    setMsg("");
     try {
       await assignReferee(selectedRace.id, person.userId, refereeRole);
       setMsg(`Đã assign ${person.fullName} làm ${refereeRole}.`);
       setModal(null);
       await reloadAssignments();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Assign thất bại.');
-    } finally { setActionLoading(false); }
+      setError(e instanceof Error ? e.message : "Assign thất bại.");
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handleAssignDoctor = async (person: AvailableOfficial) => {
     if (!selectedRace) return;
     setActionLoading(true);
-    setError(''); setMsg('');
+    setError("");
+    setMsg("");
     try {
       await assignDoctor(selectedRace.id, person.userId);
       setMsg(`Đã assign ${person.fullName} làm Race Doctor.`);
       setModal(null);
       await reloadAssignments();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Assign thất bại.');
-    } finally { setActionLoading(false); }
+      setError(e instanceof Error ? e.message : "Assign thất bại.");
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handleRemoveReferee = async (refereeId: number) => {
     if (!selectedRace) return;
     setActionLoading(true);
-    setError(''); setMsg('');
+    setError("");
+    setMsg("");
     try {
       await removeReferee(selectedRace.id, refereeId);
-      setMsg('Đã xóa referee.');
+      setMsg("Đã xóa referee.");
       await reloadAssignments();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Xóa thất bại.');
-    } finally { setActionLoading(false); }
+      setError(e instanceof Error ? e.message : "Xóa thất bại.");
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handleRemoveDoctor = async (doctorId: number) => {
     if (!selectedRace) return;
     setActionLoading(true);
-    setError(''); setMsg('');
+    setError("");
+    setMsg("");
     try {
       await removeDoctor(selectedRace.id, doctorId);
-      setMsg('Đã xóa doctor.');
+      setMsg("Đã xóa doctor.");
       await reloadAssignments();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Xóa thất bại.');
-    } finally { setActionLoading(false); }
+      setError(e instanceof Error ? e.message : "Xóa thất bại.");
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const filteredReferees = availableReferees.filter((p) =>
-    p.fullName.toLowerCase().includes(search.toLowerCase())
+    p.fullName.toLowerCase().includes(search.toLowerCase()),
   );
   const filteredDoctors = availableDoctors.filter((p) =>
-    p.fullName.toLowerCase().includes(search.toLowerCase())
+    p.fullName.toLowerCase().includes(search.toLowerCase()),
   );
 
   const refereeConfirmed = referees.length > 0;
@@ -194,9 +242,18 @@ const AssignOfficials = () => {
           <div className={styles.filterGroup}>
             <label className={styles.filterLabel}>Tournament</label>
             <div className={styles.selectWrap}>
-              <select className={styles.select} value={selectedTournamentId ?? ''}
-                onChange={(e) => setSelectedTournamentId(Number(e.target.value))}>
-                {tournaments.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              <select
+                className={styles.select}
+                value={selectedTournamentId ?? ""}
+                onChange={(e) =>
+                  setSelectedTournamentId(Number(e.target.value))
+                }
+              >
+                {tournaments.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
               </select>
               <FiChevronDown className={styles.selectIcon} size={14} />
             </div>
@@ -204,12 +261,21 @@ const AssignOfficials = () => {
           <div className={styles.filterGroup}>
             <label className={styles.filterLabel}>Race</label>
             <div className={styles.selectWrap}>
-              <select className={styles.select} value={selectedRace?.id ?? ''}
+              <select
+                className={styles.select}
+                value={selectedRace?.id ?? ""}
                 onChange={(e) => {
-                  const race = races.find((r) => r.id === Number(e.target.value));
+                  const race = races.find(
+                    (r) => r.id === Number(e.target.value),
+                  );
                   if (race) setSelectedRace(race);
-                }}>
-                {races.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+                }}
+              >
+                {races.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.label}
+                  </option>
+                ))}
               </select>
               <FiChevronDown className={styles.selectIcon} size={14} />
             </div>
@@ -219,9 +285,16 @@ const AssignOfficials = () => {
         {/* Race info */}
         {selectedRace && (
           <div className={styles.raceInfo}>
-            <span className={styles.raceInfoItem}><strong>Race:</strong> {selectedRace.label}</span>
-            <span className={styles.raceInfoItem}><strong>Scheduled:</strong> {formatDateTime(selectedRace.scheduledTime)}</span>
-            <span className={styles.raceInfoItem}><strong>Status:</strong> {selectedRace.status}</span>
+            <span className={styles.raceInfoItem}>
+              <strong>Race:</strong> {selectedRace.label}
+            </span>
+            <span className={styles.raceInfoItem}>
+              <strong>Scheduled:</strong>{" "}
+              {formatDateTime(selectedRace.scheduledTime)}
+            </span>
+            <span className={styles.raceInfoItem}>
+              <strong>Status:</strong> {selectedRace.status}
+            </span>
           </div>
         )}
       </div>
@@ -239,8 +312,15 @@ const AssignOfficials = () => {
           ) : referees.length === 0 ? (
             <div className={styles.emptyAssign}>
               <p className={styles.emptyText}>No Referee Assigned</p>
-              <button type="button" className={styles.assignBtn}
-                onClick={() => { setModal('referee'); setSearch(''); setError(''); }}>
+              <button
+                type="button"
+                className={styles.assignBtn}
+                onClick={() => {
+                  setModal("referee");
+                  setSearch("");
+                  setError("");
+                }}
+              >
                 Assign Referee
               </button>
             </div>
@@ -250,19 +330,34 @@ const AssignOfficials = () => {
                 <div className={styles.assignedInfo}>
                   <span className={styles.assignedName}>{r.refereeName}</span>
                   <span className={styles.assignedRole}>{r.role}</span>
-                  <span className={styles.assignedMeta}>Assigned: {formatDateTime(r.assignedAt)}</span>
-                  <span className={styles.assignedMeta}>Cert: {r.certificationLevel}</span>
+                  <span className={styles.assignedMeta}>
+                    Assigned: {formatDateTime(r.assignedAt)}
+                  </span>
+                  <span className={styles.assignedMeta}>
+                    Cert: {r.certificationLevel}
+                  </span>
                 </div>
-                <button type="button" className={styles.removeBtn}
-                  onClick={() => handleRemoveReferee(r.refereeId)} disabled={actionLoading}>
+                <button
+                  type="button"
+                  className={styles.removeBtn}
+                  onClick={() => handleRemoveReferee(r.refereeId)}
+                  disabled={actionLoading}
+                >
                   <FiUserMinus size={14} /> Remove
                 </button>
               </div>
             ))
           )}
           {referees.length > 0 && (
-            <button type="button" className={styles.addMoreBtn}
-              onClick={() => { setModal('referee'); setSearch(''); setError(''); }}>
+            <button
+              type="button"
+              className={styles.addMoreBtn}
+              onClick={() => {
+                setModal("referee");
+                setSearch("");
+                setError("");
+              }}
+            >
               + Add Another Referee
             </button>
           )}
@@ -276,8 +371,15 @@ const AssignOfficials = () => {
           ) : doctors.length === 0 ? (
             <div className={styles.emptyAssign}>
               <p className={styles.emptyText}>No Doctor Assigned</p>
-              <button type="button" className={styles.assignBtn}
-                onClick={() => { setModal('doctor'); setSearch(''); setError(''); }}>
+              <button
+                type="button"
+                className={styles.assignBtn}
+                onClick={() => {
+                  setModal("doctor");
+                  setSearch("");
+                  setError("");
+                }}
+              >
                 Assign Doctor
               </button>
             </div>
@@ -286,19 +388,34 @@ const AssignOfficials = () => {
               <div key={d.doctorId} className={styles.assignedItem}>
                 <div className={styles.assignedInfo}>
                   <span className={styles.assignedName}>{d.doctorName}</span>
-                  <span className={styles.assignedMeta}>License: {d.medicalLicenseNumber}</span>
-                  <span className={styles.assignedMeta}>Assigned: {formatDateTime(d.assignedAt)}</span>
+                  <span className={styles.assignedMeta}>
+                    License: {d.medicalLicenseNumber}
+                  </span>
+                  <span className={styles.assignedMeta}>
+                    Assigned: {formatDateTime(d.assignedAt)}
+                  </span>
                 </div>
-                <button type="button" className={styles.removeBtn}
-                  onClick={() => handleRemoveDoctor(d.doctorId)} disabled={actionLoading}>
+                <button
+                  type="button"
+                  className={styles.removeBtn}
+                  onClick={() => handleRemoveDoctor(d.doctorId)}
+                  disabled={actionLoading}
+                >
                   <FiUserMinus size={14} /> Remove
                 </button>
               </div>
             ))
           )}
           {doctors.length > 0 && (
-            <button type="button" className={styles.addMoreBtn}
-              onClick={() => { setModal('doctor'); setSearch(''); setError(''); }}>
+            <button
+              type="button"
+              className={styles.addMoreBtn}
+              onClick={() => {
+                setModal("doctor");
+                setSearch("");
+                setError("");
+              }}
+            >
               + Add Another Doctor
             </button>
           )}
@@ -309,19 +426,37 @@ const AssignOfficials = () => {
       <div className={styles.statusCard}>
         <h3 className={styles.cardTitle}>Overall Assignment Status</h3>
         <div className={styles.statusItems}>
-          <div className={`${styles.statusItem} ${refereeConfirmed ? styles.statusOk : styles.statusPending}`}>
-            {refereeConfirmed ? <FiCheckCircle size={16} /> : <span className={styles.statusDot} />}
-            <span>Referee {refereeConfirmed ? 'Assigned' : 'Not Assigned'}</span>
+          <div
+            className={`${styles.statusItem} ${refereeConfirmed ? styles.statusOk : styles.statusPending}`}
+          >
+            {refereeConfirmed ? (
+              <FiCheckCircle size={16} />
+            ) : (
+              <span className={styles.statusDot} />
+            )}
+            <span>
+              Referee {refereeConfirmed ? "Assigned" : "Not Assigned"}
+            </span>
           </div>
-          <div className={`${styles.statusItem} ${doctorConfirmed ? styles.statusOk : styles.statusPending}`}>
-            {doctorConfirmed ? <FiCheckCircle size={16} /> : <span className={styles.statusDot} />}
-            <span>Doctor {doctorConfirmed ? 'Assigned' : 'Not Assigned'}</span>
+          <div
+            className={`${styles.statusItem} ${doctorConfirmed ? styles.statusOk : styles.statusPending}`}
+          >
+            {doctorConfirmed ? (
+              <FiCheckCircle size={16} />
+            ) : (
+              <span className={styles.statusDot} />
+            )}
+            <span>Doctor {doctorConfirmed ? "Assigned" : "Not Assigned"}</span>
           </div>
         </div>
         {!refereeConfirmed || !doctorConfirmed ? (
-          <p className={styles.statusNote}>Race cannot proceed until Referee and Doctor are assigned.</p>
+          <p className={styles.statusNote}>
+            Race cannot proceed until Referee and Doctor are assigned.
+          </p>
         ) : (
-          <p className={styles.statusReady}>✓ All officials assigned. Race is ready.</p>
+          <p className={styles.statusReady}>
+            ✓ All officials assigned. Race is ready.
+          </p>
         )}
       </div>
 
@@ -332,18 +467,31 @@ const AssignOfficials = () => {
           <div className={styles.modal}>
             <div className={styles.modalHeader}>
               <h3 className={styles.modalTitle}>
-                {modal === 'referee' ? 'Assign Lead Referee' : 'Assign Race Doctor'}
+                {modal === "referee"
+                  ? "Assign Lead Referee"
+                  : "Assign Race Doctor"}
               </h3>
-              <button type="button" className={styles.closeBtn} onClick={() => setModal(null)}>
+              <button
+                type="button"
+                className={styles.closeBtn}
+                onClick={() => setModal(null)}
+              >
                 <FiX size={18} />
               </button>
             </div>
 
-            {modal === 'referee' && (
+            {modal === "referee" && (
               <div className={styles.roleSelect}>
                 <label className={styles.filterLabel}>Role</label>
-                <select className={styles.select} value={refereeRole}
-                  onChange={(e) => setRefereeRole(e.target.value as 'Lead Referee' | 'Assistant Referee')}>
+                <select
+                  className={styles.select}
+                  value={refereeRole}
+                  onChange={(e) =>
+                    setRefereeRole(
+                      e.target.value as "Lead Referee" | "Assistant Referee",
+                    )
+                  }
+                >
                   <option value="Lead Referee">Lead Referee</option>
                   <option value="Assistant Referee">Assistant Referee</option>
                 </select>
@@ -352,32 +500,45 @@ const AssignOfficials = () => {
 
             <div className={styles.searchWrap}>
               <FiSearch size={14} className={styles.searchIcon} />
-              <input type="text" className={styles.searchInput}
+              <input
+                type="text"
+                className={styles.searchInput}
                 placeholder="Tìm kiếm theo tên..."
-                value={search} onChange={(e) => setSearch(e.target.value)} />
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
             </div>
 
             <div className={styles.personList}>
-              {(modal === 'referee' ? filteredReferees : filteredDoctors).map((p) => (
-                <div key={p.userId} className={styles.personRow}>
-                  <div className={styles.personInfo}>
-                    <span className={styles.personName}>{p.fullName}</span>
-                    <span className={styles.personMeta}>{p.email}</span>
-                    <span className={`${styles.personStatus} ${styles.statusApproved}`}>
-                      {p.profileStatus}
-                    </span>
+              {(modal === "referee" ? filteredReferees : filteredDoctors).map(
+                (p) => (
+                  <div key={p.userId} className={styles.personRow}>
+                    <div className={styles.personInfo}>
+                      <span className={styles.personName}>{p.fullName}</span>
+                      <span className={styles.personMeta}>{p.email}</span>
+                      <span
+                        className={`${styles.personStatus} ${styles.statusApproved}`}
+                      >
+                        {p.profileStatus}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.sendBtn}
+                      disabled={actionLoading}
+                      onClick={() =>
+                        modal === "referee"
+                          ? handleAssignReferee(p)
+                          : handleAssignDoctor(p)
+                      }
+                    >
+                      Assign
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    className={styles.sendBtn}
-                    disabled={actionLoading}
-                    onClick={() => modal === 'referee' ? handleAssignReferee(p) : handleAssignDoctor(p)}
-                  >
-                    Assign
-                  </button>
-                </div>
-              ))}
-              {(modal === 'referee' ? filteredReferees : filteredDoctors).length === 0 && (
+                ),
+              )}
+              {(modal === "referee" ? filteredReferees : filteredDoctors)
+                .length === 0 && (
                 <p className={styles.emptyText}>Không tìm thấy.</p>
               )}
             </div>

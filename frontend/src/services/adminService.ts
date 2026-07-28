@@ -7,7 +7,7 @@ interface PendingApprovalsData {
   totalPending: number;
 }
 
-/** Số hồ sơ (Referee + Doctor + Jockey) đang chờ duyệt. */
+/** Đếm hồ sơ chờ phê duyệt. */
 export const getPendingApprovalsCount = async (): Promise<number> => {
   const res = await apiFetch<{ success: boolean; data: PendingApprovalsData }>(
     '/admin/pending-approvals'
@@ -44,7 +44,7 @@ export interface AuditLogFilters {
   pageSize?: number;
 }
 
-/** Lấy N bản ghi audit log mới nhất cho mục Recent Activity. */
+/** Lấy nhật ký hoạt động mới nhất. */
 export const getRecentAuditLogs = async (limit = 5): Promise<AuditLogItem[]> => {
   const res = await apiFetch<{ success: boolean; data: AuditLogItem[] }>(
     `/admin/audit-logs?page=1&pageSize=${limit}`
@@ -52,6 +52,7 @@ export const getRecentAuditLogs = async (limit = 5): Promise<AuditLogItem[]> => 
   return res.data ?? [];
 };
 
+/** Lấy nhật ký theo bộ lọc. */
 export const getAuditLogs = async (filters: AuditLogFilters = {}): Promise<AuditLogPage> => {
   const params = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => {

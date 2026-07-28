@@ -22,6 +22,7 @@ export interface ParticipantResponse {
   approvedAt: string | null;
 }
 
+// Lấy danh sách tham gia giải.
 export const getRoster = (
   tournamentId: number,
   role?: string,
@@ -40,6 +41,7 @@ export const getRoster = (
   });
 };
 
+// Duyệt người tham gia giải.
 export const approveParticipant = (participantId: number): Promise<ParticipantResponse> =>
   apiFetch<ApiResponse<ParticipantResponse>>(
     `/admin/tournament-participants/${participantId}/approve`,
@@ -49,6 +51,7 @@ export const approveParticipant = (participantId: number): Promise<ParticipantRe
     return res.data;
   });
 
+// Từ chối người tham gia giải.
 export const rejectParticipant = (participantId: number, reason: string): Promise<ParticipantResponse> =>
   apiFetch<ApiResponse<ParticipantResponse>>(
     `/admin/tournament-participants/${participantId}/reject`,

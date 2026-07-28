@@ -1,55 +1,513 @@
-import { useState } from 'react';
-import type { TournamentBasicInfo, AllowedBreed, RaceCategory, TrackType } from '../TournamentBuilder';
-import type { Venue } from '../../../services/venueService';
-import { adminLabel } from '../../../utils/adminLabels';
-import { validateBasicInfo, type BasicFieldErrors } from '../tournamentValidation';
-import styles from './TabBasicInfo.module.scss';
+import { useState } from "react";
+import type {
+  TournamentBasicInfo,
+  AllowedBreed,
+  RaceCategory,
+  TrackType,
+} from "../TournamentBuilder";
+import type { Venue } from "../../../services/venueService";
+import { adminLabel } from "../../../utils/adminLabels";
+import {
+  validateBasicInfo,
+  type BasicFieldErrors,
+} from "../tournamentValidation";
+import styles from "./TabBasicInfo.module.scss";
 
-interface Props { data: TournamentBasicInfo; onChange: (data: TournamentBasicInfo) => void; readOnly?: boolean; showAllErrors?: boolean; isCreateMode: boolean; venues: Venue[]; venuesError: string; }
-const formatVND = (value: number | '') => value === '' ? '' : Number(value).toLocaleString('vi-VN');
-const parseVND = (value: string) => { const number = Number(value.replace(/[.,]/g, '')); return value ? (Number.isNaN(number) ? '' : number) : ''; };
+interface Props {
+  data: TournamentBasicInfo;
+  onChange: (data: TournamentBasicInfo) => void;
+  readOnly?: boolean;
+  showAllErrors?: boolean;
+  isCreateMode: boolean;
+  venues: Venue[];
+  venuesError: string;
+}
+const formatVND = (value: number | "") =>
+  value === "" ? "" : Number(value).toLocaleString("vi-VN");
+const parseVND = (value: string) => {
+  const number = Number(value.replace(/[.,]/g, ""));
+  return value ? (Number.isNaN(number) ? "" : number) : "";
+};
 const distances = [1600, 1800, 2000];
 
-const TabBasicInfo = ({ data, onChange, readOnly, showAllErrors = false, isCreateMode, venues, venuesError }: Props) => {
-  const [touched, setTouched] = useState<Partial<Record<keyof TournamentBasicInfo, boolean>>>({});
+const TabBasicInfo = ({
+  data,
+  onChange,
+  readOnly,
+  showAllErrors = false,
+  isCreateMode,
+  venues,
+  venuesError,
+}: Props) => {
+  const [touched, setTouched] = useState<
+    Partial<Record<keyof TournamentBasicInfo, boolean>>
+  >({});
   const errors: BasicFieldErrors = validateBasicInfo(data, isCreateMode);
-  const update = <K extends keyof TournamentBasicInfo>(field: K, value: TournamentBasicInfo[K]) => onChange({ ...data, [field]: value });
-  const touch = (field: keyof TournamentBasicInfo) => setTouched((previous) => ({ ...previous, [field]: true }));
-  const visibleError = (field: keyof TournamentBasicInfo) => (showAllErrors || touched[field]) ? errors[field] : undefined;
-  const inputClass = (field: keyof TournamentBasicInfo) => `${styles.input} ${visibleError(field) ? styles.inputError : ''}`;
+  const update = <K extends keyof TournamentBasicInfo>(
+    field: K,
+    value: TournamentBasicInfo[K],
+  ) => onChange({ ...data, [field]: value });
+  const touch = (field: keyof TournamentBasicInfo) =>
+    setTouched((previous) => ({ ...previous, [field]: true }));
+  const visibleError = (field: keyof TournamentBasicInfo) =>
+    showAllErrors || touched[field] ? errors[field] : undefined;
+  const inputClass = (field: keyof TournamentBasicInfo) =>
+    `${styles.input} ${visibleError(field) ? styles.inputError : ""}`;
   const selectedVenue = venues.find((venue) => venue.venueId === data.venueId);
-  const advancementCountLabel = data.advancementCount === '' ? '…' : data.advancementCount;
-  const chooseVenue = (value: string) => { const venue = venues.find((item) => item.venueId === Number(value)); onChange({ ...data, venueId: venue?.venueId ?? '', venueLaneCount: venue?.laneCount ?? null, venueTrackLengthMeters: venue?.trackLengthMeters ?? null, trackType: (venue?.trackType ?? '') as TrackType }); touch('venueId'); };
-  return <div className={styles.container}>
-    <section className={styles.section}><div className={styles.sectionHeader}><h2>Thông tin chung</h2><p>Thiết lập tên, mô tả và thời gian tổ chức giải đấu.</p></div><div className={styles.grid}>
-      <label className={`${styles.field} ${styles.fieldFull}`}>Tên giải đấu<input className={inputClass('name')} value={data.name} disabled={readOnly} placeholder="Ví dụ: Cúp Mùa Xuân Phú Thọ 2026" onBlur={() => touch('name')} onChange={(event) => update('name', event.target.value)} />{visibleError('name') && <small>{visibleError('name')}</small>}</label>
-      <label className={`${styles.field} ${styles.fieldFull}`}>Mô tả giải đấu<textarea className={inputClass('description')} value={data.description} disabled={readOnly} rows={4} maxLength={4000} placeholder="Nhập mô tả ngắn về giải đấu" onBlur={() => touch('description')} onChange={(event) => update('description', event.target.value)} /> <span className={styles.counter}>{data.description.length}/4000 ký tự</span>{visibleError('description') && <small>{visibleError('description')}</small>}</label>
-      <label className={styles.field}>Ngày khai mạc<input className={inputClass('startDate')} type="date" value={data.startDate} disabled={readOnly} onBlur={() => touch('startDate')} onChange={(event) => update('startDate', event.target.value)} />{visibleError('startDate') && <small>{visibleError('startDate')}</small>}</label>
-      <label className={styles.field}>Ngày bế mạc<input className={inputClass('endDate')} type="date" value={data.endDate} disabled={readOnly} onBlur={() => touch('endDate')} onChange={(event) => update('endDate', event.target.value)} />{visibleError('endDate') && <small>{visibleError('endDate')}</small>}</label>
-    </div></section>
-    <section className={styles.section}><div className={styles.sectionHeader}><h2>Địa điểm và đường đua</h2><p>Chọn trường đua trước: mặt sân và sức chứa thực tế mỗi cuộc đua lấy theo sân.</p></div><div className={styles.grid}>
-      <label className={`${styles.field} ${styles.fieldFull}`}>Trường đua<select className={inputClass('venueId')} value={data.venueId} disabled={readOnly} onBlur={() => touch('venueId')} onChange={(event) => chooseVenue(event.target.value)}><option value="">-- Chọn trường đua đang hoạt động --</option>{venues.map((venue) => <option key={venue.venueId} value={venue.venueId}>{venue.name} — {venue.city ?? 'Chưa cập nhật'} ({venue.laneCount} làn · {adminLabel(venue.trackType)})</option>)}</select>{venuesError && <small>{venuesError}</small>}{visibleError('venueId') && <small>{visibleError('venueId')}</small>}</label>
-      <label className={styles.field}>Loại mặt sân<input className={styles.input} value={adminLabel(data.trackType)} readOnly placeholder="Chọn trường đua để xác định" /></label>
-      <label className={styles.field}>Chiều dài đường đua<input className={styles.input} value={selectedVenue?.trackLengthMeters ?? data.venueTrackLengthMeters ?? '' ? `${(selectedVenue?.trackLengthMeters ?? data.venueTrackLengthMeters)?.toLocaleString('vi-VN')} m` : ''} readOnly placeholder="Chọn trường đua để xác định" /></label>
-      <label className={styles.field}>Số ngựa tối đa mỗi cuộc đua<input className={inputClass('maxHorses')} type="number" min="1" max={data.venueLaneCount ?? undefined} disabled={readOnly} value={data.maxHorses} placeholder="Ví dụ: 10" onBlur={() => touch('maxHorses')} onChange={(event) => update('maxHorses', event.target.value ? Number(event.target.value) : '')} />{data.venueLaneCount && <span className={styles.hint}>Tối đa {data.venueLaneCount} · sức chứa thực tế: {typeof data.maxHorses === 'number' ? Math.min(data.maxHorses, data.venueLaneCount) : data.venueLaneCount}</span>}{visibleError('maxHorses') && <small>{visibleError('maxHorses')}</small>}</label>
-      <label className={styles.field}>Cự ly cuộc đua (m)<input className={inputClass('raceDistance')} type="number" list="race-distances" min="1201" max="2399" disabled={readOnly} value={data.raceDistance} onBlur={() => touch('raceDistance')} onChange={(event) => update('raceDistance', event.target.value ? Number(event.target.value) : '')} /><datalist id="race-distances">{distances.map((distance) => <option key={distance} value={distance} />)}</datalist>{visibleError('raceDistance') && <small>{visibleError('raceDistance')}</small>}</label>
-    </div></section>
-    <section className={styles.section}><div className={styles.sectionHeader}><h2>Điều kiện dự thi</h2><p>Ràng buộc áp dụng khi chủ ngựa đăng ký ngựa và mời nài vào giải.</p></div><div className={styles.grid}>
-      <label className={styles.field}>Giống ngựa được phép<select className={inputClass('allowedBreed')} value={data.allowedBreed} disabled={readOnly} onBlur={() => touch('allowedBreed')} onChange={(event) => update('allowedBreed', event.target.value as AllowedBreed)}><option value="">-- Chọn giống ngựa --</option><option value="Thoroughbred">Ngựa thuần chủng</option><option value="Arabian">Ngựa Ả Rập</option><option value="Quarter Horse">Ngựa Quarter</option><option value="Mixed">Ngựa lai</option></select>{visibleError('allowedBreed') && <small>{visibleError('allowedBreed')}</small>}</label>
-      <label className={styles.field}>Hạng đua<select className={inputClass('raceCategory')} value={data.raceCategory} disabled={readOnly} onBlur={() => touch('raceCategory')} onChange={(event) => update('raceCategory', event.target.value as RaceCategory)}><option value="">-- Chọn hạng đua --</option><option value="Open">Mở</option><option value="Classic">Cổ điển</option><option value="Maiden">Ra mắt</option></select>{visibleError('raceCategory') && <small>{visibleError('raceCategory')}</small>}</label>
-      <label className={styles.field}>Kinh nghiệm tối thiểu của nài (năm)<input className={inputClass('minJockeyExperienceYears')} type="number" min="0" max="50" disabled={readOnly} value={data.minJockeyExperienceYears} placeholder="Ví dụ: 2" onBlur={() => touch('minJockeyExperienceYears')} onChange={(event) => update('minJockeyExperienceYears', event.target.value ? Number(event.target.value) : '')} />{visibleError('minJockeyExperienceYears') && <small>{visibleError('minJockeyExperienceYears')}</small>}<span className={styles.hint}>Nài không đủ số năm này sẽ không nhận được lời mời ghép cặp.</span></label>
-      <label className={styles.field}>Số cặp đi tiếp từ mỗi cuộc đua<span className={styles.advancementControl}><input className={`${inputClass('advancementCount')} ${styles.advancementInput}`} type="number" min="1" disabled={readOnly} value={data.advancementCount} onBlur={() => touch('advancementCount')} onChange={(event) => update('advancementCount', event.target.value ? Number(event.target.value) : '')} /><span className={styles.advancementUnit}>cặp / cuộc đua</span></span>{visibleError('advancementCount') && <small>{visibleError('advancementCount')}</small>}<span className={styles.hint}>Sau khi công bố kết quả, hệ thống chọn tối đa {advancementCountLabel} cặp có thứ hạng cao nhất của mỗi cuộc đua để xét vào vòng tiếp theo.</span><span className={styles.finalRoundNotice}>Vòng chung kết không có vòng đấu tiếp theo.</span></label>
-    </div></section>
-    <section className={styles.section}><div className={styles.sectionHeader}><h2>Lệ phí và thời hạn</h2><p>Hạn nộp lệ phí là mốc hệ thống chốt danh sách rồi tự phân cuộc đua.</p></div><div className={styles.grid}>
-      <label className={styles.field}>Lệ phí tham gia<input className={inputClass('entryFeeAmount')} type="text" inputMode="numeric" disabled={readOnly} value={data.entryFeeAmount ? formatVND(data.entryFeeAmount) : ''} placeholder="Ví dụ: 500.000" onBlur={() => touch('entryFeeAmount')} onChange={(event) => { const value = parseVND(event.target.value); onChange({ ...data, entryFeeAmount: value === '' ? 0 : value, refundDeadline: value === '' || value === 0 ? '' : data.refundDeadline, clearRefundDeadline: value === '' || value === 0 }); }} /><span className={styles.hint}>{data.entryFeeAmount === 0 ? 'Giải miễn phí — không có lệ phí để hoàn.' : 'Đơn vị: đồng Việt Nam.'}</span>{visibleError('entryFeeAmount') && <small>{visibleError('entryFeeAmount')}</small>}</label>
-      <label className={styles.field}>Hạn nộp lệ phí<input className={inputClass('paymentDeadline')} type="datetime-local" disabled={readOnly} value={data.paymentDeadline} onBlur={() => touch('paymentDeadline')} onChange={(event) => update('paymentDeadline', event.target.value)} />{visibleError('paymentDeadline') && <small>{visibleError('paymentDeadline')}</small>}</label>
-      <label className={styles.field}>Hạn hoàn lệ phí khi rút lui<input className={inputClass('refundDeadline')} type="datetime-local" disabled={readOnly || data.entryFeeAmount === 0} value={data.refundDeadline} onBlur={() => touch('refundDeadline')} onChange={(event) => onChange({ ...data, refundDeadline: event.target.value, clearRefundDeadline: false })} />{data.entryFeeAmount > 0 && <span className={styles.hint}>Bỏ trống để hệ thống tự tính; rút trước hạn có thể được hoàn phí.</span>}{visibleError('refundDeadline') && <small>{visibleError('refundDeadline')}</small>}</label>
-    </div></section>
-    <section className={styles.section}><div className={styles.sectionHeader}><h2>Giải thưởng và quy định cân nài</h2><p>Quỹ thưởng được chia cho từng cuộc đua ở bước sau; bác sĩ dùng ngưỡng cân ở paddock.</p></div><div className={styles.grid}>
-      <label className={styles.field}>Tổng quỹ thưởng<input className={inputClass('purseAmount')} type="text" inputMode="numeric" disabled={readOnly} value={formatVND(data.purseAmount)} placeholder="Ví dụ: 500.000.000" onBlur={() => touch('purseAmount')} onChange={(event) => update('purseAmount', parseVND(event.target.value))} />{visibleError('purseAmount') && <small>{visibleError('purseAmount')}</small>}</label>
-      <label className={styles.field}>Chênh lệch cân cho phép trước đua (kg)<input className={inputClass('preRaceWeightThresholdKg')} type="number" min="0.1" step="0.1" disabled={readOnly} value={data.preRaceWeightThresholdKg} onBlur={() => touch('preRaceWeightThresholdKg')} onChange={(event) => update('preRaceWeightThresholdKg', Number(event.target.value))} />{visibleError('preRaceWeightThresholdKg') && <small>{visibleError('preRaceWeightThresholdKg')}</small>}</label>
-      <label className={styles.field}>Chênh lệch cân cho phép sau đua (kg)<input className={inputClass('postRaceWeightDiffThresholdKg')} type="number" min="0.1" step="0.1" disabled={readOnly} value={data.postRaceWeightDiffThresholdKg} onBlur={() => touch('postRaceWeightDiffThresholdKg')} onChange={(event) => update('postRaceWeightDiffThresholdKg', Number(event.target.value))} />{visibleError('postRaceWeightDiffThresholdKg') && <small>{visibleError('postRaceWeightDiffThresholdKg')}</small>}</label>
-    </div></section>
-  </div>;
+  const advancementCountLabel =
+    data.advancementCount === "" ? "…" : data.advancementCount;
+  const chooseVenue = (value: string) => {
+    const venue = venues.find((item) => item.venueId === Number(value));
+    onChange({
+      ...data,
+      venueId: venue?.venueId ?? "",
+      venueLaneCount: venue?.laneCount ?? null,
+      venueTrackLengthMeters: venue?.trackLengthMeters ?? null,
+      trackType: (venue?.trackType ?? "") as TrackType,
+    });
+    touch("venueId");
+  };
+  return (
+    <div className={styles.container}>
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <h2>Thông tin chung</h2>
+          <p>Thiết lập tên, mô tả và thời gian tổ chức giải đấu.</p>
+        </div>
+        <div className={styles.grid}>
+          <label className={`${styles.field} ${styles.fieldFull}`}>
+            Tên giải đấu
+            <input
+              className={inputClass("name")}
+              value={data.name}
+              disabled={readOnly}
+              placeholder="Ví dụ: Cúp Mùa Xuân Phú Thọ 2026"
+              onBlur={() => touch("name")}
+              onChange={(event) => update("name", event.target.value)}
+            />
+            {visibleError("name") && <small>{visibleError("name")}</small>}
+          </label>
+          <label className={`${styles.field} ${styles.fieldFull}`}>
+            Mô tả giải đấu
+            <textarea
+              className={inputClass("description")}
+              value={data.description}
+              disabled={readOnly}
+              rows={4}
+              maxLength={4000}
+              placeholder="Nhập mô tả ngắn về giải đấu"
+              onBlur={() => touch("description")}
+              onChange={(event) => update("description", event.target.value)}
+            />{" "}
+            <span className={styles.counter}>
+              {data.description.length}/4000 ký tự
+            </span>
+            {visibleError("description") && (
+              <small>{visibleError("description")}</small>
+            )}
+          </label>
+          <label className={styles.field}>
+            Ngày khai mạc
+            <input
+              className={inputClass("startDate")}
+              type="date"
+              value={data.startDate}
+              disabled={readOnly}
+              onBlur={() => touch("startDate")}
+              onChange={(event) => update("startDate", event.target.value)}
+            />
+            {visibleError("startDate") && (
+              <small>{visibleError("startDate")}</small>
+            )}
+          </label>
+          <label className={styles.field}>
+            Ngày bế mạc
+            <input
+              className={inputClass("endDate")}
+              type="date"
+              value={data.endDate}
+              disabled={readOnly}
+              onBlur={() => touch("endDate")}
+              onChange={(event) => update("endDate", event.target.value)}
+            />
+            {visibleError("endDate") && (
+              <small>{visibleError("endDate")}</small>
+            )}
+          </label>
+        </div>
+      </section>
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <h2>Địa điểm và đường đua</h2>
+          <p>
+            Chọn trường đua trước: mặt sân và sức chứa thực tế mỗi cuộc đua lấy
+            theo sân.
+          </p>
+        </div>
+        <div className={styles.grid}>
+          <label className={`${styles.field} ${styles.fieldFull}`}>
+            Trường đua
+            <select
+              className={inputClass("venueId")}
+              value={data.venueId}
+              disabled={readOnly}
+              onBlur={() => touch("venueId")}
+              onChange={(event) => chooseVenue(event.target.value)}
+            >
+              <option value="">-- Chọn trường đua đang hoạt động --</option>
+              {venues.map((venue) => (
+                <option key={venue.venueId} value={venue.venueId}>
+                  {venue.name} — {venue.city ?? "Chưa cập nhật"} (
+                  {venue.laneCount} làn · {adminLabel(venue.trackType)})
+                </option>
+              ))}
+            </select>
+            {venuesError && <small>{venuesError}</small>}
+            {visibleError("venueId") && (
+              <small>{visibleError("venueId")}</small>
+            )}
+          </label>
+          <label className={styles.field}>
+            Loại mặt sân
+            <input
+              className={styles.input}
+              value={adminLabel(data.trackType)}
+              readOnly
+              placeholder="Chọn trường đua để xác định"
+            />
+          </label>
+          <label className={styles.field}>
+            Chiều dài đường đua
+            <input
+              className={styles.input}
+              value={
+                (selectedVenue?.trackLengthMeters ??
+                data.venueTrackLengthMeters ??
+                "")
+                  ? `${(selectedVenue?.trackLengthMeters ?? data.venueTrackLengthMeters)?.toLocaleString("vi-VN")} m`
+                  : ""
+              }
+              readOnly
+              placeholder="Chọn trường đua để xác định"
+            />
+          </label>
+          <label className={styles.field}>
+            Số ngựa tối đa mỗi cuộc đua
+            <input
+              className={inputClass("maxHorses")}
+              type="number"
+              min="1"
+              max={data.venueLaneCount ?? undefined}
+              disabled={readOnly}
+              value={data.maxHorses}
+              placeholder="Ví dụ: 10"
+              onBlur={() => touch("maxHorses")}
+              onChange={(event) =>
+                update(
+                  "maxHorses",
+                  event.target.value ? Number(event.target.value) : "",
+                )
+              }
+            />
+            {data.venueLaneCount && (
+              <span className={styles.hint}>
+                Tối đa {data.venueLaneCount} · sức chứa thực tế:{" "}
+                {typeof data.maxHorses === "number"
+                  ? Math.min(data.maxHorses, data.venueLaneCount)
+                  : data.venueLaneCount}
+              </span>
+            )}
+            {visibleError("maxHorses") && (
+              <small>{visibleError("maxHorses")}</small>
+            )}
+          </label>
+          <label className={styles.field}>
+            Cự ly cuộc đua (m)
+            <input
+              className={inputClass("raceDistance")}
+              type="number"
+              list="race-distances"
+              min="1201"
+              max="2399"
+              disabled={readOnly}
+              value={data.raceDistance}
+              onBlur={() => touch("raceDistance")}
+              onChange={(event) =>
+                update(
+                  "raceDistance",
+                  event.target.value ? Number(event.target.value) : "",
+                )
+              }
+            />
+            <datalist id="race-distances">
+              {distances.map((distance) => (
+                <option key={distance} value={distance} />
+              ))}
+            </datalist>
+            {visibleError("raceDistance") && (
+              <small>{visibleError("raceDistance")}</small>
+            )}
+          </label>
+        </div>
+      </section>
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <h2>Điều kiện dự thi</h2>
+          <p>
+            Ràng buộc áp dụng khi chủ ngựa đăng ký ngựa và mời nài vào giải.
+          </p>
+        </div>
+        <div className={styles.grid}>
+          <label className={styles.field}>
+            Giống ngựa được phép
+            <select
+              className={inputClass("allowedBreed")}
+              value={data.allowedBreed}
+              disabled={readOnly}
+              onBlur={() => touch("allowedBreed")}
+              onChange={(event) =>
+                update("allowedBreed", event.target.value as AllowedBreed)
+              }
+            >
+              <option value="">-- Chọn giống ngựa --</option>
+              <option value="Thoroughbred">Ngựa thuần chủng</option>
+              <option value="Arabian">Ngựa Ả Rập</option>
+              <option value="Quarter Horse">Ngựa Quarter</option>
+              <option value="Mixed">Ngựa lai</option>
+            </select>
+            {visibleError("allowedBreed") && (
+              <small>{visibleError("allowedBreed")}</small>
+            )}
+          </label>
+          <label className={styles.field}>
+            Hạng đua
+            <select
+              className={inputClass("raceCategory")}
+              value={data.raceCategory}
+              disabled={readOnly}
+              onBlur={() => touch("raceCategory")}
+              onChange={(event) =>
+                update("raceCategory", event.target.value as RaceCategory)
+              }
+            >
+              <option value="">-- Chọn hạng đua --</option>
+              <option value="Open">Mở</option>
+              <option value="Classic">Cổ điển</option>
+              <option value="Maiden">Ra mắt</option>
+            </select>
+            {visibleError("raceCategory") && (
+              <small>{visibleError("raceCategory")}</small>
+            )}
+          </label>
+          <label className={styles.field}>
+            Kinh nghiệm tối thiểu của nài (năm)
+            <input
+              className={inputClass("minJockeyExperienceYears")}
+              type="number"
+              min="0"
+              max="50"
+              disabled={readOnly}
+              value={data.minJockeyExperienceYears}
+              placeholder="Ví dụ: 2"
+              onBlur={() => touch("minJockeyExperienceYears")}
+              onChange={(event) =>
+                update(
+                  "minJockeyExperienceYears",
+                  event.target.value ? Number(event.target.value) : "",
+                )
+              }
+            />
+            {visibleError("minJockeyExperienceYears") && (
+              <small>{visibleError("minJockeyExperienceYears")}</small>
+            )}
+            <span className={styles.hint}>
+              Nài không đủ số năm này sẽ không nhận được lời mời ghép cặp.
+            </span>
+          </label>
+          <label className={styles.field}>
+            Số cặp đi tiếp từ mỗi cuộc đua
+            <span className={styles.advancementControl}>
+              <input
+                className={`${inputClass("advancementCount")} ${styles.advancementInput}`}
+                type="number"
+                min="1"
+                disabled={readOnly}
+                value={data.advancementCount}
+                onBlur={() => touch("advancementCount")}
+                onChange={(event) =>
+                  update(
+                    "advancementCount",
+                    event.target.value ? Number(event.target.value) : "",
+                  )
+                }
+              />
+              <span className={styles.advancementUnit}>cặp / cuộc đua</span>
+            </span>
+            {visibleError("advancementCount") && (
+              <small>{visibleError("advancementCount")}</small>
+            )}
+            <span className={styles.hint}>
+              Sau khi công bố kết quả, hệ thống chọn tối đa{" "}
+              {advancementCountLabel} cặp có thứ hạng cao nhất của mỗi cuộc đua
+              để xét vào vòng tiếp theo.
+            </span>
+            <span className={styles.finalRoundNotice}>
+              Vòng chung kết không có vòng đấu tiếp theo.
+            </span>
+          </label>
+        </div>
+      </section>
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <h2>Lệ phí và thời hạn</h2>
+          <p>
+            Hạn nộp lệ phí là mốc hệ thống chốt danh sách rồi tự phân cuộc đua.
+          </p>
+        </div>
+        <div className={styles.grid}>
+          <label className={styles.field}>
+            Lệ phí tham gia
+            <input
+              className={inputClass("entryFeeAmount")}
+              type="text"
+              inputMode="numeric"
+              disabled={readOnly}
+              value={data.entryFeeAmount ? formatVND(data.entryFeeAmount) : ""}
+              placeholder="Ví dụ: 500.000"
+              onBlur={() => touch("entryFeeAmount")}
+              onChange={(event) => {
+                const value = parseVND(event.target.value);
+                onChange({
+                  ...data,
+                  entryFeeAmount: value === "" ? 0 : value,
+                  refundDeadline:
+                    value === "" || value === 0 ? "" : data.refundDeadline,
+                  clearRefundDeadline: value === "" || value === 0,
+                });
+              }}
+            />
+            <span className={styles.hint}>
+              {data.entryFeeAmount === 0
+                ? "Giải miễn phí — không có lệ phí để hoàn."
+                : "Đơn vị: đồng Việt Nam."}
+            </span>
+            {visibleError("entryFeeAmount") && (
+              <small>{visibleError("entryFeeAmount")}</small>
+            )}
+          </label>
+          <label className={styles.field}>
+            Hạn nộp lệ phí
+            <input
+              className={inputClass("paymentDeadline")}
+              type="datetime-local"
+              disabled={readOnly}
+              value={data.paymentDeadline}
+              onBlur={() => touch("paymentDeadline")}
+              onChange={(event) =>
+                update("paymentDeadline", event.target.value)
+              }
+            />
+            {visibleError("paymentDeadline") && (
+              <small>{visibleError("paymentDeadline")}</small>
+            )}
+          </label>
+          <label className={styles.field}>
+            Hạn hoàn lệ phí khi rút lui
+            <input
+              className={inputClass("refundDeadline")}
+              type="datetime-local"
+              disabled={readOnly || data.entryFeeAmount === 0}
+              value={data.refundDeadline}
+              onBlur={() => touch("refundDeadline")}
+              onChange={(event) =>
+                onChange({
+                  ...data,
+                  refundDeadline: event.target.value,
+                  clearRefundDeadline: false,
+                })
+              }
+            />
+            {data.entryFeeAmount > 0 && (
+              <span className={styles.hint}>
+                Bỏ trống để hệ thống tự tính; rút trước hạn có thể được hoàn
+                phí.
+              </span>
+            )}
+            {visibleError("refundDeadline") && (
+              <small>{visibleError("refundDeadline")}</small>
+            )}
+          </label>
+        </div>
+      </section>
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <h2>Giải thưởng và quy định cân nài</h2>
+          <p>
+            Quỹ thưởng được chia cho từng cuộc đua ở bước sau; bác sĩ dùng
+            ngưỡng cân ở paddock.
+          </p>
+        </div>
+        <div className={styles.grid}>
+          <label className={styles.field}>
+            Tổng quỹ thưởng
+            <input
+              className={inputClass("purseAmount")}
+              type="text"
+              inputMode="numeric"
+              disabled={readOnly}
+              value={formatVND(data.purseAmount)}
+              placeholder="Ví dụ: 500.000.000"
+              onBlur={() => touch("purseAmount")}
+              onChange={(event) =>
+                update("purseAmount", parseVND(event.target.value))
+              }
+            />
+            {visibleError("purseAmount") && (
+              <small>{visibleError("purseAmount")}</small>
+            )}
+          </label>
+          <label className={styles.field}>
+            Chênh lệch cân cho phép trước đua (kg)
+            <input
+              className={inputClass("preRaceWeightThresholdKg")}
+              type="number"
+              min="0.1"
+              step="0.1"
+              disabled={readOnly}
+              value={data.preRaceWeightThresholdKg}
+              onBlur={() => touch("preRaceWeightThresholdKg")}
+              onChange={(event) =>
+                update("preRaceWeightThresholdKg", Number(event.target.value))
+              }
+            />
+            {visibleError("preRaceWeightThresholdKg") && (
+              <small>{visibleError("preRaceWeightThresholdKg")}</small>
+            )}
+          </label>
+          <label className={styles.field}>
+            Chênh lệch cân cho phép sau đua (kg)
+            <input
+              className={inputClass("postRaceWeightDiffThresholdKg")}
+              type="number"
+              min="0.1"
+              step="0.1"
+              disabled={readOnly}
+              value={data.postRaceWeightDiffThresholdKg}
+              onBlur={() => touch("postRaceWeightDiffThresholdKg")}
+              onChange={(event) =>
+                update(
+                  "postRaceWeightDiffThresholdKg",
+                  Number(event.target.value),
+                )
+              }
+            />
+            {visibleError("postRaceWeightDiffThresholdKg") && (
+              <small>{visibleError("postRaceWeightDiffThresholdKg")}</small>
+            )}
+          </label>
+        </div>
+      </section>
+    </div>
+  );
 };
 export default TabBasicInfo;
