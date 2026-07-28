@@ -1,67 +1,10 @@
-.container {
-  padding: 1.5rem 0;
-}
+.container { padding: 1.5rem 0; }
+.title { margin: 0 0 .4rem; color: #111111; font-size: 1.4rem; font-weight: 700; }
+.subtitle { margin: 0 0 2rem; color: #6b7280; font-size: .85rem; }
+.card { overflow: hidden; max-width: 600px; border: 1px solid #e5e7eb; border-radius: 8px; background: #ffffff; }
+.row { display: flex; align-items: center; gap: 1rem; padding: .85rem 1.25rem; border-bottom: 1px solid #e5e7eb; &:last-child { border-bottom: none; } }
+.label { width: 180px; flex-shrink: 0; color: #6b7280; font-size: .82rem; }
+.value { flex: 1; color: #111111; font-size: .9rem; word-break: break-all; }
+.editBtn { flex-shrink: 0; padding: .3rem .65rem; border: 1px solid #d1d5db; border-radius: 5px; background: #ffffff; color: #c0392b; font-size: .75rem; font-weight: 700; cursor: pointer; transition: background .2s, border-color .2s; &:hover { border-color: #c0392b; background: #fbe9e7; } }
 
-.title {
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: #fff;
-  margin-bottom: 0.4rem;
-}
-
-.subtitle {
-  color: #888;
-  font-size: 0.85rem;
-  margin-bottom: 2rem;
-}
-
-.card {
-  background: #15151A;
-  border: 1px solid #2a2a2a;
-  border-radius: 3px;
-  overflow: hidden;
-  max-width: 600px;
-}
-
-.row {
-  display: flex;
-  align-items: center;
-  padding: 0.85rem 1.25rem;
-  border-bottom: 1px solid #1e1e1e;
-  gap: 1rem;
-
-  &:last-child {
-    border-bottom: none;
-  }
-}
-
-.label {
-  font-size: 0.82rem;
-  color: #888;
-  width: 180px;
-  flex-shrink: 0;
-}
-
-.value {
-  font-size: 0.9rem;
-  color: #fff;
-  flex: 1;
-  word-break: break-all;
-}
-
-.editBtn {
-  background: transparent;
-  border: 1px solid #3a3a3a;
-  color: #F3C8C3;
-  font-size: 0.75rem;
-  padding: 0.25rem 0.6rem;
-  border-radius: 3px;
-  cursor: pointer;
-  transition: all 0.2s;
-  flex-shrink: 0;
-
-  &:hover {
-    border-color: #B5121B;
-    background: rgba(181, 18, 27, 0.1);
-  }
-}
+@media (max-width: 560px) { .row { align-items: flex-start; flex-wrap: wrap; } .label { width: 100%; } .editBtn { margin-left: auto; } }
