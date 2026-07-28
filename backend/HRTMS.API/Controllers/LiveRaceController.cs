@@ -155,6 +155,10 @@ public class LiveRaceController : ControllerBase
         {
             return Conflict(ApiResponse<ViolationDto>.Fail("Race entry is cancelled, withdrawn, or disqualified."));
         }
+        catch (InvalidOperationException ex) when (ex.Message == "RACE_ENTRY_ALREADY_PLACE_BEHIND")
+        {
+            return Conflict(ApiResponse<ViolationDto>.Fail("Race entry này đã có hình phạt xếp sau."));
+        }
         catch (InvalidOperationException ex) when (ex.Message == "RACE_NOT_LIVE")
         {
             return Conflict(ApiResponse<ViolationDto>.Fail("Chỉ có thể ghi nhận vi phạm khi cuộc đua đang Live."));
@@ -225,6 +229,14 @@ public class LiveRaceController : ControllerBase
         catch (InvalidOperationException ex) when (ex.Message == "RACE_NOT_LIVE")
         {
             return Conflict(ApiResponse<ViolationDto>.Fail("Violations can only be changed before unofficial results are submitted."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "RACE_ENTRY_ALREADY_PLACE_BEHIND")
+        {
+            return Conflict(ApiResponse<ViolationDto>.Fail("Race entry này đã có hình phạt xếp sau."));
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "RACE_ENTRY_ALREADY_EXCLUDED")
+        {
+            return Conflict(ApiResponse<ViolationDto>.Fail("Race entry đã bị loại hoặc rút khỏi cuộc đua."));
         }
     }
 
@@ -306,6 +318,8 @@ public class LiveRaceController : ControllerBase
         "DESCRIPTION_REQUIRED" => "Vui lòng nhập mô tả vi phạm.",
         "INVALID_PENALTY" => "Hình thức xử phạt không hợp lệ (Disqualified/PlaceBehind/Warning/Scratch).",
         "PLACE_BEHIND_ENTRY_REQUIRED" => "Vui lòng chọn race entry bị xếp phía sau khi hình phạt là PlaceBehind.",
+        "PLACE_BEHIND_ENTRY_CANNOT_MATCH_OFFENDER" => "Race entry vi phạm phải được xếp sau một race entry khác.",
+        "CONFLICTING_PLACE_BEHIND_PENALTIES" => "Các hình phạt xếp sau đang mâu thuẫn; vui lòng chỉnh lại trước khi chốt kết quả.",
         "RESULTS_REQUIRED" => "Vui lòng nhập kết quả về đích.",
         "DUPLICATE_RACE_ENTRY_IN_RESULTS" => "Một race entry không được xuất hiện nhiều lần trong kết quả.",
         "RESULTS_MUST_INCLUDE_ALL_ELIGIBLE_ENTRIES" => "Phải nhập kết quả cho tất cả race entry hợp lệ.",
