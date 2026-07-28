@@ -52,6 +52,11 @@
 --                                  + FK_RaceEntries_PostRaceClinicalDoctor -> DoctorProfiles +
 --                                  CHECK ('Fit'/'Unfit'/NULL). Không có seed. Nguồn đặt tên
 --                                  CHECK là CK_...; schema dùng CHK_... theo convention snapshot.
+--   016_race_distance_unbounded.sql: đã fold — bỏ trần 2400m của cự ly đua.
+--                                  CHK_Tournaments_Distance và CHK_Races_DistOverride
+--                                  chỉ còn ràng buộc "> 0". Lý do: đường đua chạy nhiều
+--                                  vòng nên cự ly không bị chặn bởi chiều dài sân.
+--                                  Không có seed; dữ liệu cũ (1200<d<2400) vẫn hợp lệ.
 --
 -- Thời điểm cập nhật : 2026-07-24
 -- Cách tạo           : schema gốc + patch 001→013 theo thứ tự; thay đổi xóa của
@@ -295,7 +300,7 @@ CREATE TABLE Tournaments (
     CONSTRAINT CHK_Tournaments_MaxHorses CHECK (MaxHorses > 0),
     CONSTRAINT CHK_Tournaments_Breed CHECK (AllowedBreed IN ('Thoroughbred','Arabian','Quarter Horse','Mixed')),
     CONSTRAINT CHK_Tournaments_TrackType CHECK (TrackType IN ('Turf','Dirt','Synthetic')),
-    CONSTRAINT CHK_Tournaments_Distance CHECK (RaceDistance > 1200 AND RaceDistance < 2400),
+    CONSTRAINT CHK_Tournaments_Distance CHECK (RaceDistance > 0),
     CONSTRAINT CHK_Tournaments_Category CHECK (RaceCategory IN ('Open','Classic','Maiden')),
     CONSTRAINT CHK_Tournaments_MinExp CHECK (MinJockeyExperienceYears >= 0),
     CONSTRAINT CHK_Tournaments_Purse CHECK (PurseAmount >= 0),
@@ -390,7 +395,7 @@ CREATE TABLE Races (
     CONSTRAINT CHK_Races_RaceNumber CHECK (RaceNumber > 0),
     CONSTRAINT CHK_Races_Purse CHECK (PurseAmount >= 0),
     CONSTRAINT CHK_Races_TrackOverride CHECK (TrackTypeOverride IS NULL OR TrackTypeOverride IN ('Turf','Dirt','Synthetic')),
-    CONSTRAINT CHK_Races_DistOverride CHECK (RaceDistanceOverride IS NULL OR (RaceDistanceOverride > 1200 AND RaceDistanceOverride < 2400)),
+    CONSTRAINT CHK_Races_DistOverride CHECK (RaceDistanceOverride IS NULL OR RaceDistanceOverride > 0),
     CONSTRAINT CHK_Races_Status CHECK ([Status] IN ('Upcoming','Pre-Race','Live','Unofficial','Official','Cancelled')),
     CONSTRAINT CHK_Races_CutoffHrs CHECK (ConfirmationCutoffHours > 0)
 );

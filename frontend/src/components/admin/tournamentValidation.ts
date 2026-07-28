@@ -139,11 +139,10 @@ export const validateBasicInfo = (
       'Vui lòng nhập cự ly cuộc đua.';
   } else if (
     !Number.isInteger(data.raceDistance) ||
-    data.raceDistance <= 1200 ||
-    data.raceDistance >= 2400
+    data.raceDistance <= 0
   ) {
     errors.raceDistance =
-      'Cự ly phải lớn hơn 1.200m và nhỏ hơn 2.400m.';
+      'Cự ly phải là số nguyên mét lớn hơn 0.';
   }
 
   if (!data.raceCategory) {
@@ -464,11 +463,10 @@ export const validateRounds = (
           !Number.isInteger(
             race.raceDistanceOverride
           ) ||
-          race.raceDistanceOverride <= 1200 ||
-          race.raceDistanceOverride >= 2400
+          race.raceDistanceOverride <= 0
         ) {
           raceErrors.raceDistanceOverride =
-            'Cự ly ghi đè phải lớn hơn 1.200m và nhỏ hơn 2.400m.';
+            'Cự ly ghi đè phải là số nguyên mét lớn hơn 0.';
         }
       }
 

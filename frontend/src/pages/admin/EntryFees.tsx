@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FiCheck, FiChevronLeft, FiChevronRight, FiEye, FiFileText, FiX, FiXCircle } from 'react-icons/fi';
 import {
+  completeFeeRefund,
   getAdminFeePairings,
   getFeeProof,
   rejectFeePayment,
@@ -19,6 +20,8 @@ const tabs: Array<{ status: AdminFeePairingStatus; label: string }> = [
   { status: 'PendingVerification', label: 'Chờ đối chiếu' },
   { status: 'Verified', label: 'Đã xác nhận' },
   { status: 'Rejected', label: 'Đã từ chối phí' },
+  { status: 'RefundPending', label: 'Chờ hoàn phí' },
+  { status: 'Refunded', label: 'Đã hoàn phí' },
 ];
 
 const EntryFees = () => {
@@ -28,6 +31,7 @@ const EntryFees = () => {
   const [items, setItems] = useState<AdminFeePairing[]>([]);
   const [counts, setCounts] = useState<Record<AdminFeePairingStatus, number>>({
     All: 0, NoPayment: 0, PendingVerification: 0, Verified: 0, Rejected: 0,
+    RefundPending: 0, Refunded: 0,
   });
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -39,6 +43,7 @@ const EntryFees = () => {
   const [confirming, setConfirming] = useState<AdminFeePairing | null>(null);
   const [rejectingPayment, setRejectingPayment] = useState<AdminFeePairing | null>(null);
   const [rejectingUnpaid, setRejectingUnpaid] = useState<AdminFeePairing | null>(null);
+  const [refunding, setRefunding] = useState<AdminFeePairing | null>(null);
   const [reason, setReason] = useState('');
   const tournament = useMemo(
     () => tournaments.find((item) => item.tournamentId === tournamentId),
@@ -63,6 +68,8 @@ const EntryFees = () => {
         PendingVerification: countResults[2].totalCount,
         Verified: countResults[3].totalCount,
         Rejected: countResults[4].totalCount,
+        RefundPending: countResults[5].totalCount,
+        Refunded: countResults[6].totalCount,
       });
     } catch (err) {
       setError(adminError(err, 'Không tải được danh sách pairing và lệ phí.'));
@@ -110,6 +117,23 @@ const EntryFees = () => {
       await load();
     } catch (err) {
       setError(adminError(err, 'Không thể xác nhận lệ phí.'));
+    } finally {
+      setActionKey(null);
+    }
+  };
+
+  const completeRefund = async () => {
+    if (!refunding?.paymentId) return;
+    setActionKey(`refund-${refunding.paymentId}`);
+    setError('');
+    try {
+      await completeFeeRefund(refunding.paymentId);
+      setNotice(`Đã chốt hoàn lệ phí cho ${refunding.horseName}.`);
+      setRefunding(null);
+      setDetail(null);
+      await load();
+    } catch (err) {
+      setError(adminError(err, 'Không thể chốt hoàn lệ phí.'));
     } finally {
       setActionKey(null);
     }
@@ -191,10 +215,12 @@ const EntryFees = () => {
     </dl>
     {detail.hasProof && detail.paymentId && <button className={styles.proofButton} onClick={() => void openProof(detail)}><FiFileText /> Mở chứng từ</button>}
     {detail.paymentStatus === 'PendingVerification' && detail.paymentId && <div className={styles.drawerActions}><button className={styles.rejectButton} onClick={() => { setRejectingPayment(detail); setReason(''); }}><FiXCircle /> Từ chối lệ phí</button><button className={styles.verifyButton} onClick={() => setConfirming(detail)}><FiCheck /> Xác nhận lệ phí</button></div>}
-    {detail.canRejectUnpaid && <div className={styles.drawerActions}><button className={styles.rejectButton} onClick={() => { setRejectingUnpaid(detail); setReason(''); }}><FiXCircle /> Từ chối pairing chưa nộp phí</button></div>}
+    {detail.paymentStatus === 'RefundPending' && detail.paymentId && <div className={styles.drawerActions}><button className={styles.verifyButton} onClick={() => setRefunding(detail)}><FiCheck /> Chốt đã hoàn phí</button></div>}
+    {detail.canRejectUnpaid &&<div className={styles.drawerActions}><button className={styles.rejectButton} onClick={() => { setRejectingUnpaid(detail); setReason(''); }}><FiXCircle /> Từ chối pairing chưa nộp phí</button></div>}
     </aside></>}
 
     {confirming && <div className={styles.modalLayer}><div className={styles.modal}><h2>Xác nhận lệ phí</h2><p>Xác nhận hồ sơ của <strong>{confirming.horseName}</strong>? Cặp đấu sẽ đủ điều kiện tham gia.</p><div><button onClick={() => setConfirming(null)}>Hủy</button><button className={styles.verifyButton} disabled={actionKey !== null} onClick={() => void verify()}>Xác nhận</button></div></div></div>}
+    {refunding && <div className={styles.modalLayer}><div className={styles.modal}><h2>Chốt hoàn lệ phí</h2><p>Xác nhận đã hoàn lệ phí cho <strong>{refunding.horseName}</strong> ngoài hệ thống? Hồ sơ sẽ chuyển sang “Đã hoàn phí”.</p><div><button onClick={() => setRefunding(null)}>Hủy</button><button className={styles.verifyButton} disabled={actionKey !== null} onClick={() => void completeRefund()}>Chốt hoàn phí</button></div></div></div>}
     {rejectingPayment && <ReasonModal title="Từ chối lệ phí" description="Nêu rõ lý do để chủ ngựa có thể nộp lại chứng từ." reason={reason} onReasonChange={setReason} onCancel={() => setRejectingPayment(null)} onConfirm={() => void rejectPayment()} disabled={reason.trim().length < 10 || actionKey !== null} confirm="Từ chối lệ phí" />}
     {rejectingUnpaid && <ReasonModal title="Từ chối pairing chưa nộp phí" description={`Pairing của ${rejectingUnpaid.horseName} sẽ bị từ chối và không còn đủ điều kiện tham gia giải. Chủ ngựa có thể tạo pairing mới nếu cần.`} reason={reason} onReasonChange={setReason} onCancel={() => setRejectingUnpaid(null)} onConfirm={() => void rejectUnpaid()} disabled={reason.trim().length < 10 || actionKey !== null} confirm="Từ chối pairing" />}
   </div>;

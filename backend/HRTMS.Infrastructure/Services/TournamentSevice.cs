@@ -26,8 +26,9 @@ namespace HRTMS.Infrastructure.Services
         // multi-round chet cung vi entry khong bao gio co AdvancementStatus).
         // CHK_Tournaments_AdvRule o DB van rong hon (giu nguyen, khong can patch).
         private static readonly string[] ValidAdvancementRules = ["TopPerRace"];
-        private const int MinRaceDistanceMeters = 1200;
-        private const int MaxRaceDistanceMeters = 2400;
+        // Trần 2400m đã bỏ: sân đua chạy nhiều vòng nên cự ly không bị chặn bởi
+        // chiều dài đường đua. Chỉ còn ràng buộc vật lý duy nhất là số dương.
+        private const int MinRaceDistanceMeters = 1;
         // State machine cấp GIẢI một chiều: Draft → Open Registration → Closed Registration → Completed
         // (nhánh Cancelled xử lý riêng ở CancelTournamentAsync). Pre-Race/Live/In-Progress/Unofficial/Official
         // là trạng thái cấp RACE, KHÔNG lưu ở Tournament.
@@ -58,8 +59,8 @@ namespace HRTMS.Infrastructure.Services
         // PRIVATE HELPER
         private static void ValidateRaceDistance(int distance, string fieldName)
         {
-            if (distance <= MinRaceDistanceMeters || distance >= MaxRaceDistanceMeters)
-                throw new ArgumentException($"{fieldName} phải lớn hơn {MinRaceDistanceMeters}m và nhỏ hơn {MaxRaceDistanceMeters}m.");
+            if (distance < MinRaceDistanceMeters)
+                throw new ArgumentException($"{fieldName} phải lớn hơn 0m.");
         }
 
         private static void ValidateRaceDistanceOverride(int? distance)

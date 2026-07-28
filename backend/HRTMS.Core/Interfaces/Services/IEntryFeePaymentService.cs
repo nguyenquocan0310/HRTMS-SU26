@@ -21,6 +21,10 @@ namespace HRTMS.Core.Interfaces.Services
 
         Task<FeePaymentResponseDto> RejectAsync(int adminId, int paymentId, string reason);
 
+        // Admin chốt vòng hoàn phí sau khi đã chi trả ngoài hệ thống:
+        // payment 'RefundPending' -> 'Refunded'.
+        Task<FeePaymentResponseDto> CompleteRefundAsync(int adminId, int paymentId);
+
         // Admin loại pairing chưa nộp phí để không còn nằm trong danh sách chờ.
         Task<AdminFeePairingDto> RejectUnpaidPairingAsync(
             int adminId, int pairingId, string reason);
